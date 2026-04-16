@@ -2,7 +2,18 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { BookCheck, ClipboardList, Save, Settings2, UserRound } from 'lucide-react';
+import {
+  ArrowUp,
+  BookCheck,
+  CheckSquare2,
+  ClipboardList,
+  PencilLine,
+  Plus,
+  Save,
+  Settings2,
+  Square,
+  UserRound
+} from 'lucide-react';
 import { LoginRequiredCard } from '@/components/login-required-card';
 import { ManualProjectEntryCard } from '@/components/manual-project-entry-card';
 import { SiteShell } from '@/components/site-shell';
@@ -35,22 +46,76 @@ const pipelineStages = [
   { key: '已结束', label: '已结束' }
 ] as const;
 
+const TODO_COMPLETED_STORAGE_KEY = 'seekoffer-workbench-completed-todos';
+const TODO_CUSTOM_STORAGE_KEY = 'seekoffer-workbench-custom-todos';
+
 type ActionTask = {
   id: string;
   title: string;
   detail: string;
-  href: string;
-  tone: 'rose' | 'amber' | 'emerald';
+  href?: string;
 };
+
+type CustomTodo = {
+  id: string;
+  text: string;
+};
+
+function isProfileComplete(profile: UserProfile) {
+  return Boolean(profile.undergraduateSchool && profile.major && profile.targetMajor && profile.targetRegion);
+}
+
+function readBrowserArray(key: string) {
+  if (typeof window === 'undefined') {
+    return [] as string[];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) {
+      return [] as string[];
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [] as string[];
+  }
+}
+
+function readCustomTodos() {
+  if (typeof window === 'undefined') {
+    return [] as CustomTodo[];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(TODO_CUSTOM_STORAGE_KEY);
+    if (!raw) {
+      return [] as CustomTodo[];
+    }
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is CustomTodo => Boolean(item?.id) && Boolean(item?.text))
+      : [];
+  } catch {
+    return [] as CustomTodo[];
+  }
+}
 
 export default function MePage() {
   const { session, ready, loggedIn } = useUserSessionState();
   const [form, setForm] = useState<UserProfile>(emptyProfile);
   const [rows, setRows] = useState<ApplicationRow[]>([]);
   const [saveMessage, setSaveMessage] = useState('');
+  const [profileExpanded, setProfileExpanded] = useState(true);
+  const [completedTodoIds, setCompletedTodoIds] = useState<string[]>([]);
+  const [customTodos, setCustomTodos] = useState<CustomTodo[]>([]);
+  const [todoDraft, setTodoDraft] = useState('');
 
   useEffect(() => {
-    setForm(session?.profile || emptyProfile);
+    const nextProfile = session?.profile || emptyProfile;
+    setForm(nextProfile);
+    setProfileExpanded(!isProfileComplete(nextProfile));
   }, [session]);
 
   useEffect(() => {
@@ -77,8 +142,25 @@ export default function MePage() {
     };
   }, [loggedIn]);
 
+  useEffect(() => {
+    setCompletedTodoIds(readBrowserArray(TODO_COMPLETED_STORAGE_KEY));
+    setCustomTodos(readCustomTodos());
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(TODO_COMPLETED_STORAGE_KEY, JSON.stringify(completedTodoIds));
+    }
+  }, [completedTodoIds]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(TODO_CUSTOM_STORAGE_KEY, JSON.stringify(customTodos));
+    }
+  }, [customTodos]);
+
   const displayName = form.nickname || '我的';
-  const profileComplete = Boolean(form.undergraduateSchool && form.major && form.targetMajor && form.targetRegion);
+  const profileComplete = isProfileComplete(form);
 
   const stats = useMemo(
     () => ({
@@ -110,9 +192,8 @@ export default function MePage() {
       tasks.push({
         id: 'profile',
         title: '补齐个人资料',
-        detail: '先完善本科院校、专业方向和目标地区，后续提醒才会更准确。',
-        href: '#profile-form',
-        tone: 'amber'
+        detail: '完善本科院校、专业、目标方向和地区，工作台提醒会更准确。',
+        href: '#profile-form'
       });
     }
 
@@ -122,10 +203,9 @@ export default function MePage() {
       .forEach(({ item, project }) => {
         tasks.push({
           id: `today-${item.userProjectId}`,
-          title: `今天先处理 ${project.schoolName}`,
-          detail: `${project.projectName} 今天截止，优先核对材料并完成提交。`,
-          href: project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id),
-          tone: 'rose'
+          title: `今天处理 ${project.schoolName}`,
+          detail: `${project.projectName} 今天截止，优先检查材料并完成提交。`,
+          href: project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id)
         });
       });
 
@@ -138,11 +218,10 @@ export default function MePage() {
       .slice(0, 3)
       .forEach(({ item, project }) => {
         tasks.push({
-          id: `week-${item.userProjectId}`,
+          id: `deadline-${item.userProjectId}`,
           title: `本周推进 ${project.schoolName}`,
           detail: `${project.projectName} 即将截止，建议尽快补齐关键材料。`,
-          href: project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id),
-          tone: 'amber'
+          href: project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id)
         });
       });
 
@@ -153,16 +232,31 @@ export default function MePage() {
         tasks.push({
           id: `material-${item.userProjectId}`,
           title: `补齐 ${project.schoolName} 的材料`,
-          detail: `当前材料完成度 ${item.materialsProgress}%，建议继续推进简历、成绩单或推荐信。`,
-          href: project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id),
-          tone: 'emerald'
+          detail: `当前材料完成度 ${item.materialsProgress}%，还需要继续推进。`,
+          href: project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id)
         });
       });
 
     return tasks.slice(0, 8);
   }, [profileComplete, rows]);
 
+  const todoItems = useMemo(
+    () => [
+      ...actionTasks.map((task) => ({ id: task.id, text: task.title, detail: task.detail, href: task.href, source: 'system' as const })),
+      ...customTodos.map((task) => ({ id: task.id, text: task.text, source: 'custom' as const }))
+    ],
+    [actionTasks, customTodos]
+  );
+
+  const visibleTodoItems = useMemo(
+    () => todoItems.filter((item) => !completedTodoIds.includes(item.id)),
+    [todoItems, completedTodoIds]
+  );
+
   const applicationPreview = rows.slice(0, 6);
+  const layoutClass = profileExpanded
+    ? 'grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)_320px]'
+    : 'grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]';
 
   function handleProfileChange<K extends keyof UserProfile>(key: K, value: UserProfile[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -171,7 +265,37 @@ export default function MePage() {
   async function handleSaveProfile() {
     updateUserProfile(form);
     const synced = await saveUserProfileToWorkspace(form);
-    setSaveMessage(synced ? '基本信息已保存并同步到云端工作台。' : '基本信息已保存。');
+    setSaveMessage(synced ? '基本信息已保存并同步。' : '基本信息已保存。');
+
+    if (isProfileComplete(form)) {
+      setProfileExpanded(false);
+    }
+  }
+
+  function handleCompleteTodo(id: string) {
+    setCompletedTodoIds((current) => (current.includes(id) ? current : [...current, id]));
+  }
+
+  function handleClearCompleted() {
+    const customTodoIds = new Set(customTodos.map((item) => item.id));
+    setCustomTodos((current) => current.filter((item) => !completedTodoIds.includes(item.id)));
+    setCompletedTodoIds((current) => current.filter((id) => !customTodoIds.has(id)));
+  }
+
+  function handleCreateCustomTodo() {
+    const nextText = todoDraft.trim();
+    if (!nextText) {
+      return;
+    }
+
+    setCustomTodos((current) => [
+      ...current,
+      {
+        id: `custom-${Date.now()}`,
+        text: nextText
+      }
+    ]);
+    setTodoDraft('');
   }
 
   if (!ready) {
@@ -187,7 +311,7 @@ export default function MePage() {
       <SiteShell>
         <LoginRequiredCard
           title="登录后开启你的工作台"
-          description="通知库、资源库和院校库可以直接浏览；申请表、行动清单和收藏需要先完成微信登录。"
+          description="通知库、资源库和院校库可以直接浏览；申请表、行动清单和收藏功能需要先完成微信登录。"
         />
       </SiteShell>
     );
@@ -213,7 +337,16 @@ export default function MePage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {profileComplete ? (
+              <button
+                onClick={() => setProfileExpanded((current) => !current)}
+                className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"
+              >
+                <PencilLine className="h-4 w-4" />
+                {profileExpanded ? '收起资料' : '编辑资料'}
+              </button>
+            ) : null}
             <StatPill label="申请项目数" value={stats.total.toString()} />
             <StatPill label="已提交" value={stats.submitted.toString()} />
             <StatPill label="高风险项目" value={stats.highRisk.toString()} />
@@ -222,208 +355,253 @@ export default function MePage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
+      <section className={layoutClass}>
+        {profileExpanded ? (
+          <div className="space-y-6">
+            <section id="profile-form" className="surface-card rounded-[30px] p-5">
+              <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-brand">
+                <Settings2 className="h-4 w-4" />
+                个人基本信息
+              </div>
+
+              <div className="grid gap-3">
+                <CompactField label="昵称">
+                  <input
+                    value={form.nickname}
+                    onChange={(event) => handleProfileChange('nickname', event.target.value)}
+                    placeholder="例如 张同学"
+                    className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
+                  />
+                </CompactField>
+
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <CompactField label="当前年级">
+                    <input
+                      value={form.grade}
+                      onChange={(event) => handleProfileChange('grade', event.target.value)}
+                      placeholder="例如 大四"
+                      className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
+                    />
+                  </CompactField>
+                  <CompactField label="年龄">
+                    <input
+                      value={form.age}
+                      onChange={(event) => handleProfileChange('age', event.target.value)}
+                      placeholder="例如 21"
+                      className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
+                    />
+                  </CompactField>
+                </div>
+
+                <CompactField label="本科院校">
+                  <input
+                    value={form.undergraduateSchool}
+                    onChange={(event) => handleProfileChange('undergraduateSchool', event.target.value)}
+                    placeholder="例如 同济大学"
+                    className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
+                  />
+                </CompactField>
+
+                <CompactField label="本科专业">
+                  <input
+                    value={form.major}
+                    onChange={(event) => handleProfileChange('major', event.target.value)}
+                    placeholder="例如 计算机科学与技术"
+                    className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
+                  />
+                </CompactField>
+
+                <CompactField label="目标专业方向">
+                  <input
+                    value={form.targetMajor}
+                    onChange={(event) => handleProfileChange('targetMajor', event.target.value)}
+                    placeholder="例如 人工智能 / 计算机"
+                    className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
+                  />
+                </CompactField>
+
+                <CompactField label="目标地区">
+                  <input
+                    value={form.targetRegion}
+                    onChange={(event) => handleProfileChange('targetRegion', event.target.value)}
+                    placeholder="例如 北京 / 上海 / 杭州"
+                    className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
+                  />
+                </CompactField>
+              </div>
+
+              <div className="mt-4 flex flex-col items-start gap-2">
+                <button
+                  onClick={handleSaveProfile}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white"
+                >
+                  <Save className="h-4 w-4" />
+                  保存基本信息
+                </button>
+                {saveMessage ? <div className="text-xs text-slate-500">{saveMessage}</div> : null}
+              </div>
+            </section>
+
+            <ManualProjectEntryCard compact />
+          </div>
+        ) : null}
+
         <div className="space-y-6">
-          <section id="profile-form" className="surface-card rounded-[30px] p-5">
-            <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-brand">
-              <Settings2 className="h-4 w-4" />
-              个人基本信息
-            </div>
-
-            <div className="grid gap-3">
-              <CompactField label="昵称">
-                <input
-                  value={form.nickname}
-                  onChange={(event) => handleProfileChange('nickname', event.target.value)}
-                  placeholder="例如 张同学"
-                  className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
-                />
-              </CompactField>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                <CompactField label="当前年级">
-                  <input
-                    value={form.grade}
-                    onChange={(event) => handleProfileChange('grade', event.target.value)}
-                    placeholder="例如 大四"
-                    className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
-                  />
-                </CompactField>
-                <CompactField label="年龄">
-                  <input
-                    value={form.age}
-                    onChange={(event) => handleProfileChange('age', event.target.value)}
-                    placeholder="例如 21"
-                    className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
-                  />
-                </CompactField>
+          <section className="surface-card rounded-[32px] p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
+                  <BookCheck className="h-4 w-4" />
+                  我的申请表
+                </div>
+                <p className="mt-2 text-sm leading-7 text-slate-500">
+                  在一张表里统一管理项目状态、材料进度、优先级、备注和提醒。
+                </p>
               </div>
-
-              <CompactField label="本科院校">
-                <input
-                  value={form.undergraduateSchool}
-                  onChange={(event) => handleProfileChange('undergraduateSchool', event.target.value)}
-                  placeholder="例如 同济大学"
-                  className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
-                />
-              </CompactField>
-
-              <CompactField label="本科专业">
-                <input
-                  value={form.major}
-                  onChange={(event) => handleProfileChange('major', event.target.value)}
-                  placeholder="例如 计算机科学与技术"
-                  className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
-                />
-              </CompactField>
-
-              <CompactField label="目标专业方向">
-                <input
-                  value={form.targetMajor}
-                  onChange={(event) => handleProfileChange('targetMajor', event.target.value)}
-                  placeholder="例如 人工智能 / 计算机"
-                  className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
-                />
-              </CompactField>
-
-              <CompactField label="目标地区">
-                <input
-                  value={form.targetRegion}
-                  onChange={(event) => handleProfileChange('targetRegion', event.target.value)}
-                  placeholder="例如 北京 / 上海 / 杭州"
-                  className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
-                />
-              </CompactField>
+              <Link href="/applications" className="text-sm font-semibold text-brand">
+                查看完整申请表
+              </Link>
             </div>
 
-            <div className="mt-4 flex flex-col items-start gap-2">
-              <button
-                onClick={handleSaveProfile}
-                className="inline-flex items-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white"
-              >
-                <Save className="h-4 w-4" />
-                保存基本信息
-              </button>
-              {saveMessage ? <div className="text-xs text-slate-500">{saveMessage}</div> : null}
+            <div className="mt-5 grid gap-3 lg:grid-cols-5">
+              {pipelineStages.map((stage) => (
+                <div key={stage.key} className="rounded-[22px] bg-slate-50 px-4 py-4">
+                  <div className="text-sm font-semibold text-ink">{stage.label}</div>
+                  <div className="mt-3 text-2xl font-semibold text-brand">{pipelineSummary[stage.key]}</div>
+                </div>
+              ))}
             </div>
-          </section>
 
-          <ManualProjectEntryCard compact />
-        </div>
-
-        <section className="surface-card rounded-[32px] p-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
-                <BookCheck className="h-4 w-4" />
-                我的申请表
-              </div>
-              <p className="mt-2 text-sm leading-7 text-slate-500">
-                在一张表里统一管理项目状态、材料进度、优先级、备注和提醒。
-              </p>
-            </div>
-            <Link href="/applications" className="text-sm font-semibold text-brand">
-              查看完整申请表
-            </Link>
-          </div>
-
-          <div className="mt-5 grid gap-3 lg:grid-cols-5">
-            {pipelineStages.map((stage) => (
-              <div key={stage.key} className="rounded-[22px] bg-slate-50 px-4 py-4">
-                <div className="text-sm font-semibold text-ink">{stage.label}</div>
-                <div className="mt-3 text-2xl font-semibold text-brand">{pipelineSummary[stage.key]}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-5 grid gap-3">
-            {applicationPreview.length ? (
-              applicationPreview.map(({ item, project }) => (
-                <div key={item.userProjectId} className="rounded-[26px] bg-slate-50 px-5 py-4">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-base font-semibold text-ink">{project.schoolName}</div>
-                        <DeadlineBadge level={project.deadlineLevel} />
+            <div className="mt-5 grid gap-3">
+              {applicationPreview.length ? (
+                applicationPreview.map(({ item, project }) => (
+                  <div key={item.userProjectId} className="rounded-[26px] bg-slate-50 px-5 py-4">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="text-base font-semibold text-ink">{project.schoolName}</div>
+                          <DeadlineBadge level={project.deadlineLevel} />
+                        </div>
+                        <div className="mt-2 text-sm leading-7 text-slate-600">{project.projectName}</div>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                          <span className="rounded-full bg-white px-3 py-1 shadow-sm">状态：{item.myStatus}</span>
+                          <span className="rounded-full bg-white px-3 py-1 shadow-sm">材料：{item.materialsProgress}%</span>
+                          <span className="rounded-full bg-white px-3 py-1 shadow-sm">优先级：{item.priorityLevel}</span>
+                        </div>
                       </div>
-                      <div className="mt-2 text-sm leading-7 text-slate-600">{project.projectName}</div>
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                        <span className="rounded-full bg-white px-3 py-1 shadow-sm">状态：{item.myStatus}</span>
-                        <span className="rounded-full bg-white px-3 py-1 shadow-sm">材料：{item.materialsProgress}%</span>
-                        <span className="rounded-full bg-white px-3 py-1 shadow-sm">优先级：{item.priorityLevel}</span>
-                      </div>
+                      <Link
+                        href={project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id)}
+                        className="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
+                      >
+                        查看项目
+                      </Link>
                     </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-[28px] border border-dashed border-black/10 px-5 py-12 text-center">
+                  <div className="text-lg font-semibold text-ink">你的申请表还是空的</div>
+                  <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
+                    从通知库加入一个目标项目，或手动录入正在跟进的院校，工作台会立刻开始为你生成提醒和行动清单。
+                  </p>
+                  <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
                     <Link
-                      href={project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id)}
-                      className="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
+                      href="/notices"
+                      className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white"
                     >
-                      查看项目
+                      立即前往通知库，记录我的第一个目标院校
+                    </Link>
+                    <Link
+                      href="/applications#manual-entry"
+                      className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm"
+                    >
+                      手动新增项目
                     </Link>
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="rounded-[28px] border border-dashed border-black/10 px-5 py-12 text-center">
-                <div className="text-lg font-semibold text-ink">你的申请表还是空的</div>
-                <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
-                  从通知库加入一个目标项目，或手动录入正在跟进的院校，工作台会立即开始为你生成提醒和行动清单。
-                </p>
-                <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-                  <Link
-                    href="/notices"
-                    className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white"
-                  >
-                    立即前往通知库，记录我的第一个目标院校
-                  </Link>
-                  <Link
-                    href="/applications#manual-entry"
-                    className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm"
-                  >
-                    手动新增项目
-                  </Link>
-                </div>
+              )}
+            </div>
+          </section>
+
+          {!profileExpanded ? <ManualProjectEntryCard compact /> : null}
+        </div>
+
+        <section className="surface-card rounded-[32px] p-5">
+          <div className="flex items-center justify-between gap-3 border-b border-black/5 pb-4">
+            <div>
+              <div className="inline-flex items-center gap-2 text-base font-semibold text-ink">
+                <ClipboardList className="h-4 w-4 text-brand" />
+                行动清单 (To-Do)
               </div>
-            )}
+              <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">My Tasks</div>
+            </div>
+            <button onClick={handleClearCompleted} className="text-xs font-semibold text-slate-400 transition hover:text-brand">
+              清理完成
+            </button>
           </div>
-        </section>
 
-        <section className="surface-card rounded-[32px] p-6">
-          <div className="flex items-center gap-2 text-sm font-semibold text-brand">
-            <ClipboardList className="h-4 w-4" />
-            行动清单
-          </div>
-          <p className="mt-2 text-sm leading-7 text-slate-500">先处理今天最重要的事，再推进本周关键节点。</p>
-
-          <div className="mt-5 space-y-4">
-            {actionTasks.length ? (
-              actionTasks.map((task) => (
-                <Link
-                  key={task.id}
-                  href={task.href}
-                  className="block rounded-[22px] border border-black/5 bg-slate-50 px-4 py-4 transition hover:bg-slate-100"
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
-                        task.tone === 'rose'
-                          ? 'bg-rose-500'
-                          : task.tone === 'amber'
-                            ? 'bg-amber-500'
-                            : 'bg-emerald-500'
-                      }`}
-                    />
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-ink">{task.title}</div>
-                      <div className="mt-1 text-xs leading-6 text-slate-500">{task.detail}</div>
+          <div className="mt-4 flex min-h-[460px] flex-col">
+            <div className="space-y-3">
+              {visibleTodoItems.length ? (
+                visibleTodoItems.map((task) => (
+                  <div key={task.id} className="rounded-[20px] border border-black/5 bg-white px-4 py-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <button
+                        onClick={() => handleCompleteTodo(task.id)}
+                        className="mt-0.5 text-slate-300 transition hover:text-brand"
+                        aria-label={`完成任务：${task.text}`}
+                      >
+                        {completedTodoIds.includes(task.id) ? (
+                          <CheckSquare2 className="h-5 w-5" />
+                        ) : (
+                          <Square className="h-5 w-5" />
+                        )}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        {task.href ? (
+                          <Link href={task.href} className="text-sm font-semibold leading-6 text-ink hover:text-brand">
+                            {task.text}
+                          </Link>
+                        ) : (
+                          <div className="text-sm font-semibold leading-6 text-ink">{task.text}</div>
+                        )}
+                        {'detail' in task && task.detail ? (
+                          <div className="mt-1 text-xs leading-6 text-slate-500">{task.detail}</div>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
-                </Link>
-              ))
-            ) : (
-              <div className="rounded-[24px] border border-dashed border-black/10 px-4 py-8 text-sm text-slate-500">
-                当前没有需要立刻处理的行动项，继续从通知库加入项目后，这里会自动生成你的 To-Do。
+                ))
+              ) : (
+                <div className="rounded-[22px] border border-dashed border-black/10 px-4 py-10 text-sm text-slate-500">
+                  当前没有需要立刻处理的任务。等你从通知库加入项目后，这里会自动生成真正的 To-Do。
+                </div>
+              )}
+            </div>
+
+            <div className="mt-auto pt-4">
+              <div className="flex items-center gap-2 rounded-[18px] border border-black/5 bg-slate-50 px-3 py-2">
+                <input
+                  value={todoDraft}
+                  onChange={(event) => setTodoDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleCreateCustomTodo();
+                    }
+                  }}
+                  placeholder="添加碎片备注，回车保存..."
+                  className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                />
+                <button
+                  onClick={handleCreateCustomTodo}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-brand shadow-sm"
+                  aria-label="添加任务"
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </button>
               </div>
-            )}
+            </div>
           </div>
         </section>
       </section>

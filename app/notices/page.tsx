@@ -44,6 +44,16 @@ function getVisiblePages(currentPage: number, totalPages: number) {
   return Array.from(new Set(pages));
 }
 
+function normalizeNoticeTitle(projectName: string) {
+  const compact = projectName
+    .replace(/发布时间[:：].*$/i, '')
+    .replace(/报名通知发布时间[:：].*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return compact.length > 80 ? `${compact.slice(0, 80)}…` : compact;
+}
+
 export default function NoticesPage() {
   const [projects, setProjects] = useState<PublicNoticeProject[]>([]);
   const [keyword, setKeyword] = useState('');
@@ -158,8 +168,7 @@ export default function NoticesPage() {
       <section className="space-y-5 rounded-[30px] border border-black/5 bg-white p-5 shadow-soft lg:p-6">
         <div className="flex flex-col gap-4 border-b border-black/5 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-ink">通知筛选条件</h1>
-            <p className="mt-2 text-sm leading-7 text-slate-500">按学校、专业方向、状态和年份快速筛选保研通知。</p>
+            <h1 className="text-3xl font-semibold tracking-tight text-ink">通知库</h1>
           </div>
 
           <div className="flex w-full max-w-[360px] items-center gap-3 rounded-2xl border border-black/5 bg-slate-50 px-4 py-3">
@@ -271,8 +280,7 @@ export default function NoticesPage() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-3 rounded-[24px] bg-white/80 px-5 py-4 shadow-soft lg:flex-row lg:items-center lg:justify-between">
-        <div className="text-sm font-semibold text-ink">保研通知查询结果</div>
+      <section className="flex flex-col gap-3 rounded-[24px] bg-white/80 px-5 py-4 shadow-soft lg:flex-row lg:items-center lg:justify-end">
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setSortBy('publish')}
@@ -314,19 +322,20 @@ export default function NoticesPage() {
                   <StatusBadge status={project.status} />
                 </div>
 
-                <div className="mt-4 text-xl font-semibold tracking-tight text-ink">{project.projectName}</div>
-
                 <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-500">
                   <span className="font-semibold text-ink">{project.schoolName}</span>
                   <span>{project.departmentName}</span>
-                  <span>
-                    {project.publishDate} ~ {project.deadlineDate}
-                  </span>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {project.tags.slice(0, 6).map((item) => (
-                    <span key={item} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                <div className="mt-3 text-xl font-semibold tracking-tight text-ink [display:-webkit-box] overflow-hidden [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+                  {normalizeNoticeTitle(project.projectName)}
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
+                  <span className="rounded-full bg-slate-100 px-3 py-1">{project.publishDate}</span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1">截止：{project.deadlineDate}</span>
+                  {project.tags.slice(0, 4).map((item) => (
+                    <span key={item} className="rounded-full bg-slate-100 px-3 py-1">
                       {item}
                     </span>
                   ))}
@@ -393,10 +402,7 @@ export default function NoticesPage() {
               placeholder="页码"
               className="h-12 w-28 rounded-2xl border border-black/5 px-4 text-center text-sm outline-none"
             />
-            <button
-              onClick={handleJumpPage}
-              className="h-12 rounded-2xl bg-brand px-5 text-sm font-semibold text-white"
-            >
+            <button onClick={handleJumpPage} className="h-12 rounded-2xl bg-brand px-5 text-sm font-semibold text-white">
               跳转
             </button>
           </div>

@@ -611,9 +611,20 @@ export async function fetchPublicNotices() {
   return cloudProjects.length ? cloudProjects : baseNoticeProjects;
 }
 
+async function getAllProjectsAsync() {
+  const noticeProjects = await fetchPublicNotices();
+  const manualProjects = readStoredManualProjects();
+  const projectMap = new Map<string, PublicNoticeProject>();
+
+  [...noticeProjects, ...manualProjects].forEach((project: PublicNoticeProject) => {
+    projectMap.set(project.id, project);
+  });
+
+  return Array.from(projectMap.values());
+}
+
 export async function fetchNoticeById(id: string) {
-  const cloudProjects = await readCloudNoticeProjects();
-  const source = cloudProjects.length ? [...cloudProjects, ...readStoredManualProjects()] : getAllProjects();
+  const source = await getAllProjectsAsync();
   return source.find((item: PublicNoticeProject) => item.id === id) || null;
 }
 
@@ -630,7 +641,7 @@ export async function fetchUserProjects() {
 export async function fetchApplicationRows() {
   await hydrateWorkspaceFromCloud();
   const records = readStoredRecords();
-  const projects = getAllProjects();
+  const projects = await getAllProjectsAsync();
   const rows = records.reduce<ApplicationRow[]>((list, item) => {
     const project = projects.find((notice) => notice.id === item.projectId);
     if (project) {
