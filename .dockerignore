@@ -1,0 +1,13 @@
+.git
+.gitignore
+node_modules
+.next
+.next-web
+dev-*.log
+*.err.log
+*.out.log
+FRONTEND_CODE_DUMP.md
+CLOUDBASE_SETUP.md
+cloudbaserc.json
+tsconfig.tsbuildinfo
+npm-debug.log*
