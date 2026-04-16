@@ -21,7 +21,7 @@ export function SeekofferLogo() {
           <Compass className="h-4 w-4 text-emerald-200" />
         </div>
         <div className="hidden text-[11px] uppercase tracking-[0.24em] text-white/65 lg:block">
-          保研通知 + 助力申请 + 资源整合
+          保研通知 · 助力申请 · 资源整合
         </div>
       </div>
     </Link>

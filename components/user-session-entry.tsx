@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { LoaderCircle, LogOut, QrCode, UserRound } from 'lucide-react';
-import { LoginMethodPanel } from './login-method-panel';
+import { LayoutGrid, LoaderCircle, LogIn, LogOut } from 'lucide-react';
 import {
   getUserSession,
   hydrateCloudbaseSession,
+  openCloudbaseLoginPage,
   signOutUser,
   watchUserSession,
   type UserSession
@@ -14,8 +14,7 @@ import {
 
 export function UserSessionEntry() {
   const [session, setSession] = useState<UserSession | null>(null);
-  const [pending, setPending] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'login' | 'logout' | ''>('');
 
   useEffect(() => {
     const load = async () => {
@@ -31,43 +30,44 @@ export function UserSessionEntry() {
     return () => dispose();
   }, []);
 
-  async function handleSignOut() {
-    if (pending) {
+  async function handleOpenLogin() {
+    if (pendingAction) {
       return;
     }
 
-    setPending(true);
+    setPendingAction('login');
+
+    try {
+      await openCloudbaseLoginPage();
+    } finally {
+      setPendingAction('');
+    }
+  }
+
+  async function handleSignOut() {
+    if (pendingAction) {
+      return;
+    }
+
+    setPendingAction('logout');
 
     try {
       await signOutUser();
       setSession(null);
     } finally {
-      setPending(false);
+      setPendingAction('');
     }
   }
 
   if (!session) {
     return (
-      <div className="relative flex flex-col items-end gap-1.5">
-        <button
-          onClick={() => setOpen((current) => !current)}
-          className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5"
-        >
-          <QrCode className="h-4 w-4" />
-          登录 / 注册
-        </button>
-        {open ? (
-          <div className="absolute right-0 top-full z-50 mt-3">
-            <LoginMethodPanel
-              mode="popover"
-              onSuccess={() => {
-                setOpen(false);
-                setSession(getUserSession());
-              }}
-            />
-          </div>
-        ) : null}
-      </div>
+      <button
+        onClick={handleOpenLogin}
+        className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5"
+      >
+        {pendingAction === 'login' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+        登录
+      </button>
     );
   }
 
@@ -75,17 +75,23 @@ export function UserSessionEntry() {
     <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
       <Link
         href="/me"
-        className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm"
+        className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5"
       >
-        <UserRound className="h-4 w-4 text-brand" />
-        工作台
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand/10 text-brand">
+          <LayoutGrid className="h-4 w-4" />
+        </span>
+        <span>工作台</span>
       </Link>
       <button
         onClick={handleSignOut}
-        className="inline-flex items-center gap-2 rounded-full bg-white/12 px-3.5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/18"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/12 text-white transition hover:bg-white/18"
+        aria-label="退出登录"
       >
-        {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
-        退出
+        {pendingAction === 'logout' ? (
+          <LoaderCircle className="h-4 w-4 animate-spin" />
+        ) : (
+          <LogOut className="h-4 w-4" />
+        )}
       </button>
     </div>
   );
