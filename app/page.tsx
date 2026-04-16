@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, BellRing, BookMarked, BriefcaseBusiness, ShieldAlert } from 'lucide-react';
+import { ArrowRight, BellRing, BookMarked, BriefcaseBusiness } from 'lucide-react';
 import { DeadlineBadge } from '@/components/status-badge';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
@@ -11,14 +11,6 @@ import { buildNoticeDetailHref } from '@/lib/notice-links';
 import { collegeDirectory } from '@/lib/college-directory';
 import { offerFeedItems, officialResourceSections } from '@/lib/portal-data';
 import type { PublicNoticeProject } from '@/lib/mock-data';
-
-const warningOrder: Array<PublicNoticeProject['deadlineLevel']> = ['today', 'within3days', 'within7days'];
-
-function warningLabel(level: PublicNoticeProject['deadlineLevel']) {
-  if (level === 'today') return '今日截止';
-  if (level === 'within3days') return '3 天内截止';
-  return '7 天内截止';
-}
 
 export default function HomePage() {
   const [projects, setProjects] = useState<PublicNoticeProject[]>([]);
@@ -42,19 +34,6 @@ export default function HomePage() {
     [projects]
   );
 
-  const warningGroups = useMemo(
-    () =>
-      warningOrder.map((level) => ({
-        level,
-        label: warningLabel(level),
-        items: projects
-          .filter((item) => item.deadlineLevel === level)
-          .sort((left, right) => left.deadlineDate.localeCompare(right.deadlineDate))
-          .slice(0, 3)
-      })),
-    [projects]
-  );
-
   const resourcePreview = officialResourceSections.flatMap((section) => section.links).slice(0, 4);
   const offerPreview = [...offerFeedItems].sort((left, right) => right.heat - left.heat).slice(0, 4);
   const collegePreview = collegeDirectory.slice(0, 6);
@@ -62,8 +41,9 @@ export default function HomePage() {
   return (
     <SiteShell>
       <div className="mx-auto w-full max-w-[1240px] space-y-6">
-        <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
-          <div className="surface-card rounded-[34px] p-8 lg:p-10">
+        <section className="surface-card rounded-[34px] p-8 lg:p-10">
+          <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1.1fr)_360px]">
+            <div>
             <div className="eyebrow">Seekoffer Product</div>
             <h1 className="mt-6 max-w-4xl text-4xl font-semibold tracking-tight text-ink md:text-5xl">
               把分散的保研信息，整理成清晰的申请路径
@@ -101,58 +81,55 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="rounded-[30px] bg-brand p-6 text-white shadow-hero">
-              <div className="inline-flex items-center gap-2 text-sm font-semibold text-white/85">
-                <ShieldAlert className="h-4 w-4" />
-                智能防漏预警
-              </div>
-              <h2 className="mt-4 text-2xl font-semibold">先把今天和本周最危险的节点捞出来。</h2>
-              <p className="mt-3 text-sm leading-7 text-white/75">
-                今日截止、3 天内截止和 7 天内截止会单独抬高，帮助你优先处理最不能漏掉的项目。
-              </p>
             </div>
 
-            {warningGroups.map((group) => (
-              <div key={group.level} className="surface-card rounded-[28px] p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-base font-semibold text-ink">{group.label}</div>
-                  <span className="rounded-full bg-brand-cream px-3 py-1 text-xs font-semibold text-brand">
-                    {group.items.length} 项
-                  </span>
+            <div className="space-y-4">
+              <div className="surface-card rounded-[30px] p-6">
+                <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
+                  <BriefcaseBusiness className="h-4 w-4" />
+                  工作台入口
                 </div>
+                <h2 className="mt-4 text-2xl font-semibold text-ink">把申请状态、材料进度和待办收进同一处。</h2>
+                <p className="mt-3 text-sm leading-7 text-slate-500">
+                  进入工作台后，可以继续管理我的申请表、行动清单、材料状态和个人申请节奏。
+                </p>
+                <Link
+                  href="/me"
+                  className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white"
+                >
+                  打开工作台
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
 
-                <div className="mt-4 grid gap-3">
-                  {group.items.length ? (
-                    group.items.map((project) => (
-                      <Link
-                        key={project.id}
-                        href={buildNoticeDetailHref(project.id)}
-                        className="rounded-2xl bg-slate-50 px-4 py-4 transition hover:bg-slate-100"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold text-ink">{project.schoolName}</div>
-                            <div className="mt-1 truncate text-xs text-slate-500">{project.projectName}</div>
-                          </div>
-                          <DeadlineBadge level={project.deadlineLevel} />
-                        </div>
-                      </Link>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-black/10 px-4 py-4 text-sm text-slate-500">
-                      当前没有 {group.label} 的项目。
-                    </div>
-                  )}
+              <div className="surface-card rounded-[30px] p-6">
+                <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
+                  <BookMarked className="h-4 w-4" />
+                  资源速览
+                </div>
+                <div className="mt-5 grid gap-3">
+                  {resourcePreview.map((item) => (
+                    <a
+                      key={item.title}
+                      href={item.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-4 transition hover:bg-slate-100"
+                    >
+                      <ExternalSiteMark source={item.href} label={item.title} size="md" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-ink">{item.title}</div>
+                        <div className="mt-1 truncate text-xs text-slate-500">{item.badge}</div>
+                      </div>
+                    </a>
+                  ))}
                 </div>
               </div>
-            ))}
+            </div>
           </div>
         </section>
 
-        <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
+        <section className="grid items-start gap-6 xl:grid-cols-2">
           <div className="surface-card rounded-[34px] p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -192,50 +169,6 @@ export default function HomePage() {
                   </div>
                 </Link>
               ))}
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="surface-card rounded-[30px] p-6">
-              <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
-                <BriefcaseBusiness className="h-4 w-4" />
-                工作台入口
-              </div>
-              <h3 className="mt-4 text-2xl font-semibold text-ink">把申请状态、材料进度和待办收进同一处。</h3>
-              <p className="mt-3 text-sm leading-7 text-slate-500">
-                进入工作台后，可以继续管理我的申请表、行动清单、材料状态和个人申请节奏。
-              </p>
-              <Link
-                href="/me"
-                className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white"
-              >
-                打开工作台
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-
-            <div className="surface-card rounded-[30px] p-6">
-              <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
-                <BookMarked className="h-4 w-4" />
-                资源速览
-              </div>
-              <div className="mt-5 grid gap-3">
-                {resourcePreview.map((item) => (
-                  <a
-                    key={item.title}
-                    href={item.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-4 transition hover:bg-slate-100"
-                  >
-                    <ExternalSiteMark source={item.href} label={item.title} size="md" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-ink">{item.title}</div>
-                      <div className="mt-1 truncate text-xs text-slate-500">{item.badge}</div>
-                    </div>
-                  </a>
-                ))}
-              </div>
             </div>
           </div>
         </section>
