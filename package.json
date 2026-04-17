@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "cache:logos": "node ./scripts/cache-site-marks.mjs",
     "build:hosting": "npm run build && node ./scripts/prepare-hosting.mjs",
     "deploy:cloudbase": "npm run build:hosting && tcb hosting deploy ./hosting-dist --env-id cloudbase-4gonuep215f23af4"
   },

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { siteMarkManifest } from '@/lib/site-mark-manifest';
 
 function resolveDomain(urlOrDomain: string) {
   if (!urlOrDomain) return '';
@@ -14,7 +15,7 @@ function resolveDomain(urlOrDomain: string) {
 }
 
 function buildFaviconUrl(domain: string) {
-  return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=256`;
 }
 
 export function ExternalSiteMark({
@@ -28,8 +29,10 @@ export function ExternalSiteMark({
   size?: 'sm' | 'md' | 'lg';
   rounded?: 'full' | 'xl';
 }) {
-  const [broken, setBroken] = useState(false);
+  const [mode, setMode] = useState<'local' | 'remote' | 'text'>('local');
   const domain = useMemo(() => resolveDomain(source), [source]);
+  const localSrc = domain ? siteMarkManifest[domain] : '';
+  const imageSrc = mode === 'local' && localSrc ? localSrc : mode !== 'text' && domain ? buildFaviconUrl(domain) : '';
 
   const dimensions =
     size === 'sm'
@@ -45,12 +48,19 @@ export function ExternalSiteMark({
     <div
       className={`relative flex ${dimensions} ${radius} items-center justify-center overflow-hidden border border-black/5 bg-white shadow-sm`}
     >
-      {!broken && domain ? (
+      {imageSrc ? (
         <img
-          src={buildFaviconUrl(domain)}
+          src={imageSrc}
           alt={`${label} logo`}
-          className="h-full w-full object-cover p-2"
-          onError={() => setBroken(true)}
+          className="h-full w-full object-contain p-2"
+          loading="lazy"
+          onError={() => {
+            if (mode === 'local' && localSrc) {
+              setMode('remote');
+              return;
+            }
+            setMode('text');
+          }}
         />
       ) : (
         <span className="font-semibold text-brand">{initial}</span>
