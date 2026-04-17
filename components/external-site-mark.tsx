@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { siteMarkManifest } from '@/lib/site-mark-manifest';
 
 function resolveDomain(urlOrDomain: string) {
@@ -29,17 +29,16 @@ export function ExternalSiteMark({
   size?: 'sm' | 'md' | 'lg';
   rounded?: 'full' | 'xl';
 }) {
-  const [mode, setMode] = useState<'local' | 'remote' | 'text'>('local');
   const domain = useMemo(() => resolveDomain(source), [source]);
   const localSrc = domain ? siteMarkManifest[domain] : '';
-  const imageSrc = mode === 'local' && localSrc ? localSrc : mode !== 'text' && domain ? buildFaviconUrl(domain) : '';
+  const imageSrc = localSrc || (domain ? buildFaviconUrl(domain) : '');
 
   const dimensions =
     size === 'sm'
       ? 'h-10 w-10 text-base'
       : size === 'lg'
-        ? 'h-16 w-16 text-2xl'
-        : 'h-12 w-12 text-lg';
+        ? 'h-14 w-14 text-2xl'
+        : 'h-11 w-11 text-lg';
 
   const radius = rounded === 'full' ? 'rounded-full' : 'rounded-2xl';
   const initial = (label || domain || '?').trim().slice(0, 1).toUpperCase();
@@ -52,19 +51,21 @@ export function ExternalSiteMark({
         <img
           src={imageSrc}
           alt={`${label} logo`}
-          className="h-full w-full object-contain p-2"
+          className="h-full w-full object-contain p-1.5"
           loading="lazy"
-          onError={() => {
-            if (mode === 'local' && localSrc) {
-              setMode('remote');
-              return;
+          onError={(event) => {
+            const target = event.currentTarget;
+            target.style.display = 'none';
+            const fallback = target.nextElementSibling;
+            if (fallback instanceof HTMLElement) {
+              fallback.style.display = 'flex';
             }
-            setMode('text');
           }}
         />
-      ) : (
-        <span className="font-semibold text-brand">{initial}</span>
-      )}
+      ) : null}
+      <span className={`hidden h-full w-full items-center justify-center font-semibold text-brand ${imageSrc ? 'hidden' : 'flex'}`}>
+        {initial}
+      </span>
     </div>
   );
 }

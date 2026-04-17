@@ -4,7 +4,7 @@
 
 :root {
   color-scheme: light;
-  --page-bg: #f3faf6;
+  --page-bg: #f6faf8;
   --page-ink: #122026;
   --panel: rgba(255, 255, 255, 0.96);
 }
@@ -22,9 +22,8 @@ body {
 
 body {
   background:
-    radial-gradient(circle at top left, rgba(41, 123, 103, 0.08), transparent 28%),
-    radial-gradient(circle at top right, rgba(22, 73, 77, 0.08), transparent 22%),
-    linear-gradient(180deg, #f7fcf9 0%, #f3faf6 100%);
+    linear-gradient(180deg, rgba(22, 92, 80, 0.06) 0%, rgba(22, 92, 80, 0) 180px),
+    var(--page-bg);
   color: var(--page-ink);
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
 }

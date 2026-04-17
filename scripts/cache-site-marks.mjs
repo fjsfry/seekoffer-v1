@@ -12,6 +12,10 @@ const REQUEST_HEADERS = {
   accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
 };
 
+function isValidDomain(value = '') {
+  return /^[a-z0-9.-]+$/i.test(value);
+}
+
 function parseDomains() {
   return Promise.all([
     fs.readFile(path.join(projectRoot, 'lib', 'college-directory.ts'), 'utf8'),
@@ -23,7 +27,9 @@ function parseDomains() {
     let collegeMatch = collegeRegex.exec(collegeSource);
     while (collegeMatch) {
       const [, label, sourceUrl, domain] = collegeMatch;
-      entries.set(domain, { label, sourceUrl, domain });
+      if (isValidDomain(domain)) {
+        entries.set(domain, { label, sourceUrl, domain });
+      }
       collegeMatch = collegeRegex.exec(collegeSource);
     }
 
@@ -33,7 +39,9 @@ function parseDomains() {
       const [, label, sourceUrl] = hrefMatch;
       try {
         const domain = new URL(sourceUrl).hostname.replace(/^www\./, '');
-        entries.set(domain, { label, sourceUrl, domain });
+        if (isValidDomain(domain)) {
+          entries.set(domain, { label, sourceUrl, domain });
+        }
       } catch {
         // ignore malformed url
       }
@@ -46,6 +54,56 @@ function parseDomains() {
 
 function safeName(domain) {
   return domain.replace(/[^a-zA-Z0-9.-]/g, '_');
+}
+
+function buildInitials(label = '', domain = '') {
+  const cleanLabel = label.replace(/\s+/g, '').trim();
+  const cjkChars = [...cleanLabel].filter((char) => /[\u3400-\u9fff]/u.test(char));
+  if (cjkChars.length >= 2) {
+    return cjkChars.slice(0, 2).join('');
+  }
+
+  const alphaParts = cleanLabel
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (alphaParts.length >= 2) {
+    return `${alphaParts[0][0]}${alphaParts[1][0]}`.toUpperCase();
+  }
+
+  if (alphaParts.length === 1) {
+    return alphaParts[0].slice(0, 2).toUpperCase();
+  }
+
+  return domain.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || 'SK';
+}
+
+function paletteFromSeed(seed) {
+  let hash = 0;
+  for (const char of seed) {
+    hash = (hash * 31 + char.charCodeAt(0)) % 360;
+  }
+
+  return {
+    bg: `hsl(${hash} 70% 96%)`,
+    ring: `hsl(${hash} 36% 80%)`,
+    ink: `hsl(${hash} 52% 28%)`
+  };
+}
+
+function buildFallbackSvg(entry) {
+  const initials = buildInitials(entry.label, entry.domain);
+  const palette = paletteFromSeed(entry.domain || entry.label);
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="${palette.bg}"/>
+  <rect x="8.75" y="8.75" width="110.5" height="110.5" rx="27.25" stroke="${palette.ring}" stroke-width="1.5"/>
+  <text x="64" y="72" text-anchor="middle" font-family="PingFang SC, Microsoft YaHei, Arial, sans-serif" font-size="${
+    initials.length > 1 ? 38 : 52
+  }" font-weight="700" fill="${palette.ink}">${initials}</text>
+</svg>`;
 }
 
 function resolveAbsoluteUrl(url, baseUrl) {
@@ -186,12 +244,14 @@ async function main() {
 
   for (const entry of entries) {
     const icon = await fetchBestIcon(entry);
-    if (!icon) {
-      continue;
+    const fileName = `${safeName(entry.domain)}${icon?.ext || '.svg'}`;
+
+    if (icon) {
+      await fs.writeFile(path.join(publicDir, fileName), icon.buffer);
+    } else {
+      await fs.writeFile(path.join(publicDir, fileName), buildFallbackSvg(entry), 'utf8');
     }
 
-    const fileName = `${safeName(entry.domain)}${icon.ext}`;
-    await fs.writeFile(path.join(publicDir, fileName), icon.buffer);
     manifest[entry.domain] = `/site-marks/${fileName}`;
   }
 
