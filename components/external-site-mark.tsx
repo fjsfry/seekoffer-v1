@@ -85,7 +85,8 @@ export function ExternalSiteMark({
   const radius = rounded === 'full' ? 'rounded-full' : 'rounded-2xl';
   const initial = buildFallbackInitial(label, domain);
   const palette = pickBadgePalette(domain || label);
-  const shouldUseImage = variant === 'image' || (variant === 'auto' && Boolean(imageSrc) && extension === 'svg');
+  const shouldUseImage =
+    variant === 'image' ? Boolean(imageSrc) : variant === 'badge' ? false : Boolean(imageSrc) && extension !== 'ico';
   const textSize =
     size === 'sm' ? 'text-sm' : size === 'xl' ? 'text-[1.3rem]' : size === 'lg' ? 'text-[1.05rem]' : 'text-base';
 
@@ -105,7 +106,7 @@ export function ExternalSiteMark({
         <img
           src={imageSrc}
           alt={`${label} logo`}
-          className="h-full w-full object-contain p-1.5"
+          className="h-full w-full bg-white object-contain p-1.5"
           loading="lazy"
           onError={(event) => {
             const target = event.currentTarget;

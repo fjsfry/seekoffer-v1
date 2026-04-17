@@ -148,7 +148,7 @@ export default function CollegesPage() {
             className="surface-card rounded-[32px] p-6 transition hover:-translate-y-1 hover:shadow-soft"
           >
             <div className="flex items-start gap-4">
-              <ExternalSiteMark source={item.website} label={item.name} size="xl" rounded="full" variant="badge" />
+              <ExternalSiteMark source={item.website} label={item.name} size="lg" rounded="full" />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap gap-2">
                   {item.groups.map((entry) => (
