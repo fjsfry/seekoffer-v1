@@ -16,6 +16,16 @@ function isValidDomain(value = '') {
   return /^[a-z0-9.-]+$/i.test(value);
 }
 
+function normalizeSchoolName(value = '') {
+  return value
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/\(/g, '（')
+    .replace(/\)/g, '）')
+    .replace(/·/g, '')
+    .replace(/—/g, '-');
+}
+
 function parseDomains() {
   return Promise.all([
     fs.readFile(path.join(projectRoot, 'lib', 'college-directory.ts'), 'utf8'),
@@ -23,24 +33,24 @@ function parseDomains() {
   ]).then(([collegeSource, portalSource]) => {
     const entries = new Map();
 
-    const collegeRegex = /\['([^']+)',\s*'[^']*',\s*'[^']*',\s*'([^']+)',\s*'([^']+)'\]/g;
+    const collegeRegex = /^\s*\['([^']+)',\s*'[^']*',\s*'[^']*',\s*'([^']+)',\s*'([^']+)'\],?$/gm;
     let collegeMatch = collegeRegex.exec(collegeSource);
     while (collegeMatch) {
       const [, label, sourceUrl, domain] = collegeMatch;
       if (isValidDomain(domain)) {
-        entries.set(domain, { label, sourceUrl, domain });
+        entries.set(domain, { label, sourceUrl, domain, kind: 'college' });
       }
       collegeMatch = collegeRegex.exec(collegeSource);
     }
 
-    const hrefRegex = /title:\s*'([^']+)'[\s\S]*?href:\s*'([^']+)'/g;
+    const hrefRegex = /\{[^{}]*title:\s*'([^']+)'[^{}]*href:\s*'([^']+)'[^{}]*\}/g;
     let hrefMatch = hrefRegex.exec(portalSource);
     while (hrefMatch) {
       const [, label, sourceUrl] = hrefMatch;
       try {
         const domain = new URL(sourceUrl).hostname.replace(/^www\./, '');
         if (isValidDomain(domain)) {
-          entries.set(domain, { label, sourceUrl, domain });
+          entries.set(domain, { label, sourceUrl, domain, kind: 'resource' });
         }
       } catch {
         // ignore malformed url
@@ -50,6 +60,35 @@ function parseDomains() {
 
     return Array.from(entries.values());
   });
+}
+
+async function fetchUrongdaSchoolLogos() {
+  try {
+    const response = await fetch('https://www.urongda.com/logos', {
+      headers: REQUEST_HEADERS,
+      redirect: 'follow'
+    });
+
+    if (!response.ok) {
+      return new Map();
+    }
+
+    const html = await response.text();
+    const matches = [
+      ...html.matchAll(
+        /<img[^>]+src="(https:\/\/cdn\.urongda\.com\/images\/schools\/[^"]+\/1024w\/[^"]+)"[^>]+alt="([^"]+?)校徽矢量图"/g
+      )
+    ];
+    const logoMap = new Map();
+
+    for (const [, imageUrl, schoolName] of matches) {
+      logoMap.set(normalizeSchoolName(schoolName), imageUrl);
+    }
+
+    return logoMap;
+  } catch {
+    return new Map();
+  }
 }
 
 function safeName(domain) {
@@ -240,10 +279,24 @@ async function fetchBestIcon(entry) {
 async function main() {
   await fs.mkdir(publicDir, { recursive: true });
   const entries = await parseDomains();
+  const urongdaLogos = await fetchUrongdaSchoolLogos();
   const manifest = {};
+  const writtenFiles = new Set();
 
   for (const entry of entries) {
-    const icon = await fetchBestIcon(entry);
+    let icon = null;
+
+    if (entry.kind === 'college') {
+      const urongdaLogoUrl = urongdaLogos.get(normalizeSchoolName(entry.label));
+      if (urongdaLogoUrl) {
+        icon = await fetchImage(urongdaLogoUrl);
+      }
+    }
+
+    if (!icon) {
+      icon = await fetchBestIcon(entry);
+    }
+
     const fileName = `${safeName(entry.domain)}${icon?.ext || '.svg'}`;
 
     if (icon) {
@@ -252,8 +305,16 @@ async function main() {
       await fs.writeFile(path.join(publicDir, fileName), buildFallbackSvg(entry), 'utf8');
     }
 
+    writtenFiles.add(fileName);
     manifest[entry.domain] = `/site-marks/${fileName}`;
   }
+
+  const existingFiles = await fs.readdir(publicDir);
+  await Promise.all(
+    existingFiles
+      .filter((fileName) => !writtenFiles.has(fileName))
+      .map((fileName) => fs.rm(path.join(publicDir, fileName), { force: true }))
+  );
 
   const manifestFile = `export const siteMarkManifest: Record<string, string> = ${JSON.stringify(
     Object.fromEntries(Object.entries(manifest).sort(([left], [right]) => left.localeCompare(right))),
