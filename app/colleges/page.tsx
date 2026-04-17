@@ -97,14 +97,14 @@ export default function CollegesPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-4 xl:grid-cols-2">
         {filteredColleges.map((item) => (
           <article
             key={item.name}
             className="surface-card rounded-[32px] p-6 transition hover:-translate-y-1 hover:shadow-soft"
           >
             <div className="flex items-start gap-4">
-              <ExternalSiteMark source={item.website} label={item.name} size="lg" rounded="full" />
+              <ExternalSiteMark source={item.website} label={item.name} size="xl" rounded="full" />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap gap-2">
                   {item.groups.map((entry) => (
