@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="wos-accent" x1="24" y1="24" x2="104" y2="104" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4B6DFF"/>
+      <stop offset="1" stop-color="#67C1FF"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="#EEF2FF"/>
+  <rect x="8.75" y="8.75" width="110.5" height="110.5" rx="27.25" stroke="#D8E1FF" stroke-width="1.5"/>
+  <path d="M27 79C35 53 55 37 80 34" stroke="url(#wos-accent)" stroke-width="8" stroke-linecap="round"/>
+  <path d="M33 91C48 84 66 83 87 88" stroke="#91A8FF" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="90" cy="36" r="7" fill="#4B6DFF"/>
+  <circle cx="90" cy="89" r="6" fill="#67C1FF"/>
+  <text x="48" y="64" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="800" fill="#3558B8">WoS</text>
+</svg>
