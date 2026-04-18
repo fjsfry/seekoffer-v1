@@ -12,6 +12,20 @@ const REQUEST_HEADERS = {
   accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
 };
 
+const resourceLogoSources = {
+  'cnki.net': 'https://piccache.cnki.net/kdn/index/kns8s/nimages/logo.png',
+  'wanfangdata.com.cn': 'https://www.wanfangdata.com.cn/www/file/logo/default.svg',
+  'webofscience.com': 'https://upload.wikimedia.org/wikipedia/commons/c/c9/Web_of_Science_Logo_12.2023.svg',
+  'researchgate.net': 'https://upload.wikimedia.org/wikipedia/commons/9/94/ResearchGate_logo.svg',
+  'moe.gov.cn': 'https://www.moe.gov.cn/images/scy_jyb_lgo_03.png',
+  'nsfc.gov.cn': 'https://www.nsfc.gov.cn/r/cms/www/default/images/jggk/wh-imh3.png',
+  'acge.org.cn': 'https://www.acge.org.cn/source/cms/template/default/img/logo_top.png',
+  'yz.chsi.com.cn': 'https://t2.chei.com.cn/yz/assets/images/logo.svg',
+  'deepl.com': 'https://www.deepl.com/img/logo/deepl-logo-blue.svg',
+  'overleaf.com': 'https://cdn.overleaf.com/favicon.svg',
+  'obsidian.md': 'https://obsidian.md/images/obsidian-logo-gradient.svg'
+};
+
 const resourceLogoOverrides = {
   'wanfangdata.com.cn': {
     kind: 'wanfang',
@@ -446,6 +460,13 @@ async function main() {
       const urongdaLogoUrl = urongdaLogos.get(normalizeSchoolName(entry.label));
       if (urongdaLogoUrl) {
         icon = await fetchImage(urongdaLogoUrl);
+      }
+    }
+
+    if (!icon && entry.kind === 'resource') {
+      const resourceLogoUrl = resourceLogoSources[entry.domain];
+      if (resourceLogoUrl) {
+        icon = await fetchImage(resourceLogoUrl);
       }
     }
 
