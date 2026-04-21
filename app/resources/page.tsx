@@ -4,6 +4,27 @@ import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { officialResourceSections } from '@/lib/portal-data';
 
+const squareMarkDomains = new Set([
+  'cas.cn',
+  'chsi.com.cn',
+  'daoshipingjia.net',
+  'deepl.com',
+  'grammarly.com',
+  'notion.so',
+  'obsidian.md',
+  'overleaf.com',
+  'xmind.app'
+]);
+
+function getResourceMarkLayout(source: string) {
+  try {
+    const domain = new URL(source).hostname.replace(/^www\./, '');
+    return squareMarkDomains.has(domain) ? 'square' : 'landscape';
+  } catch {
+    return 'landscape';
+  }
+}
+
 const sectionIcons = {
   高频学术工具: BookOpenText,
   官方入口: Landmark,
@@ -41,7 +62,12 @@ export default function ResourcesPage() {
                 className="rounded-[26px] bg-slate-50 px-4 py-4 transition hover:bg-slate-100"
               >
                 <div className="flex items-center gap-3">
-                  <ExternalSiteMark source={item.href} label={item.title} size="lg" />
+                  <ExternalSiteMark
+                    source={item.href}
+                    label={item.title}
+                    size="lg"
+                    layout={getResourceMarkLayout(item.href)}
+                  />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-ink">{item.title}</div>
                     <div className="mt-1 truncate text-xs text-slate-500">{item.badge}</div>
@@ -80,7 +106,12 @@ export default function ResourcesPage() {
                     className="rounded-[28px] border border-black/5 bg-slate-50 p-5 transition hover:-translate-y-1 hover:bg-white hover:shadow-soft"
                   >
                     <div className="flex items-start gap-4">
-                      <ExternalSiteMark source={item.href} label={item.title} size="xl" />
+                      <ExternalSiteMark
+                        source={item.href}
+                        label={item.title}
+                        size="xl"
+                        layout={getResourceMarkLayout(item.href)}
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="text-lg font-semibold text-ink">{item.title}</div>
                         <div className="mt-2 inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-brand shadow-sm">

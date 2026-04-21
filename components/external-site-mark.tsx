@@ -60,13 +60,15 @@ export function ExternalSiteMark({
   label,
   size = 'md',
   rounded = 'xl',
-  variant = 'auto'
+  variant = 'auto',
+  layout = 'square'
 }: {
   source: string;
   label: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   rounded?: 'full' | 'xl';
   variant?: 'auto' | 'badge' | 'image';
+  layout?: 'square' | 'landscape';
 }) {
   const domain = useMemo(() => resolveDomain(source), [source]);
   const localSrc = domain ? siteMarkManifest[domain] : '';
@@ -74,21 +76,44 @@ export function ExternalSiteMark({
   const extension = imageSrc.split('?')[0].split('.').pop()?.toLowerCase() || '';
 
   const dimensions =
-    size === 'sm'
-      ? 'h-10 w-10 text-sm'
-      : size === 'xl'
-        ? 'h-[4.5rem] w-[4.5rem] text-2xl'
-      : size === 'lg'
-        ? 'h-[3.5rem] w-[3.5rem] text-xl'
-        : 'h-12 w-12 text-base';
+    layout === 'landscape'
+      ? size === 'sm'
+        ? 'h-10 w-16 text-sm'
+        : size === 'xl'
+          ? 'h-[4.5rem] w-[7.5rem] text-xl'
+          : size === 'lg'
+            ? 'h-[3.5rem] w-[5.75rem] text-lg'
+            : 'h-12 w-[4.5rem] text-base'
+      : size === 'sm'
+        ? 'h-10 w-10 text-sm'
+        : size === 'xl'
+          ? 'h-[4.5rem] w-[4.5rem] text-2xl'
+          : size === 'lg'
+            ? 'h-[3.5rem] w-[3.5rem] text-xl'
+            : 'h-12 w-12 text-base';
 
-  const radius = rounded === 'full' ? 'rounded-full' : 'rounded-2xl';
+  const radius =
+    layout === 'landscape' ? 'rounded-[1.35rem]' : rounded === 'full' ? 'rounded-full' : 'rounded-2xl';
   const initial = buildFallbackInitial(label, domain);
   const palette = pickBadgePalette(domain || label);
   const shouldUseImage =
     variant === 'image' ? Boolean(imageSrc) : variant === 'badge' ? false : Boolean(imageSrc) && extension !== 'ico';
   const textSize =
-    size === 'sm' ? 'text-sm' : size === 'xl' ? 'text-[1.3rem]' : size === 'lg' ? 'text-[1.05rem]' : 'text-base';
+    layout === 'landscape'
+      ? size === 'sm'
+        ? 'text-xs'
+        : size === 'xl'
+          ? 'text-lg'
+          : size === 'lg'
+            ? 'text-sm'
+            : 'text-xs'
+      : size === 'sm'
+        ? 'text-sm'
+        : size === 'xl'
+          ? 'text-[1.3rem]'
+          : size === 'lg'
+            ? 'text-[1.05rem]'
+            : 'text-base';
 
   return (
     <div
@@ -106,7 +131,7 @@ export function ExternalSiteMark({
         <img
           src={imageSrc}
           alt={`${label} logo`}
-          className="h-full w-full bg-white object-contain p-1.5"
+          className={`h-full w-full bg-white object-contain ${layout === 'landscape' ? 'p-2.5' : 'p-1.5'}`}
           loading="lazy"
           onError={(event) => {
             const target = event.currentTarget;

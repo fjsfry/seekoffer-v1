@@ -7,7 +7,7 @@ import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { collegeDirectory } from '@/lib/college-directory';
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 16;
 const allCityLabel = '全部城市';
 const allGroupLabel = '全部标签';
 const cityOptions = [allCityLabel, ...Array.from(new Set(collegeDirectory.map((item) => item.city)))];

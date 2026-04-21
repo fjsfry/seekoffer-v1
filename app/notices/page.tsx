@@ -29,8 +29,8 @@ function getVisiblePages(currentPage: number, totalPages: number) {
   const end = Math.min(totalPages, currentPage + 1);
   const pages: number[] = [];
 
-  for (let page = start; page <= end; page += 1) {
-    pages.push(page);
+  for (let value = start; value <= end; value += 1) {
+    pages.push(value);
   }
 
   if (!pages.includes(1)) {
@@ -51,7 +51,7 @@ function normalizeNoticeTitle(projectName: string) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  return compact.length > 80 ? `${compact.slice(0, 80)}…` : compact;
+  return compact.length > 72 ? `${compact.slice(0, 72)}...` : compact;
 }
 
 export default function NoticesPage() {
@@ -74,7 +74,7 @@ export default function NoticesPage() {
 
     fetchPublicNotices().then((rows: PublicNoticeProject[]) => {
       if (active) {
-        setProjects(rows.filter((item: PublicNoticeProject) => String(item.year) === '2026'));
+        setProjects(rows.filter((item) => String(item.year) === '2026'));
       }
     });
 
@@ -84,7 +84,7 @@ export default function NoticesPage() {
   }, []);
 
   const categoryOptions = useMemo(
-    () => ['全部', ...Array.from(new Set(projects.map((item: PublicNoticeProject) => inferDisciplineCategory(item.discipline))))],
+    () => ['全部', ...Array.from(new Set(projects.map((item) => inferDisciplineCategory(item.discipline))))],
     [projects]
   );
 
@@ -92,8 +92,9 @@ export default function NoticesPage() {
     const rows =
       category === '全部'
         ? projects
-        : projects.filter((item: PublicNoticeProject) => inferDisciplineCategory(item.discipline) === category);
-    return ['全部', ...Array.from(new Set(rows.map((item: PublicNoticeProject) => item.discipline).filter(Boolean)))];
+        : projects.filter((item) => inferDisciplineCategory(item.discipline) === category);
+
+    return ['全部', ...Array.from(new Set(rows.map((item) => item.discipline).filter(Boolean)))];
   }, [projects, category]);
 
   const filteredProjects = useMemo(() => {
@@ -101,7 +102,7 @@ export default function NoticesPage() {
     const schoolKeyword = schoolName.trim().toLowerCase();
     const majorText = majorKeyword.trim().toLowerCase();
 
-    const rows = projects.filter((item: PublicNoticeProject) => {
+    const rows = projects.filter((item) => {
       const matchesType = projectType === '全部' ? true : item.projectType === projectType;
       const matchesRange = schoolRange === '全部' ? true : inferSchoolRange(item) === schoolRange;
       const matchesSchool = !schoolKeyword || item.schoolName.toLowerCase().includes(schoolKeyword);
@@ -169,6 +170,7 @@ export default function NoticesPage() {
         <div className="flex flex-col gap-4 border-b border-black/5 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight text-ink">通知库</h1>
+            <p className="mt-2 text-sm text-slate-500">先看院校，再看项目，按发布时间或截止时间快速筛选重点通知。</p>
           </div>
 
           <div className="flex w-full max-w-[360px] items-center gap-3 rounded-2xl border border-black/5 bg-slate-50 px-4 py-3">
@@ -322,18 +324,25 @@ export default function NoticesPage() {
                   <StatusBadge status={project.status} />
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-500">
-                  <span className="font-semibold text-ink">{project.schoolName}</span>
-                  <span>{project.departmentName}</span>
+                <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="text-[1.7rem] font-semibold tracking-tight text-ink">{project.schoolName}</div>
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                      <span>{project.departmentName}</span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1">{project.publishDate}</span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1">截止：{project.deadlineDate}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="mt-3 text-xl font-semibold tracking-tight text-ink [display:-webkit-box] overflow-hidden [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+                <div className="mt-4 text-base font-semibold leading-7 text-slate-700 [display:-webkit-box] overflow-hidden [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
                   {normalizeNoticeTitle(project.projectName)}
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
-                  <span className="rounded-full bg-slate-100 px-3 py-1">{project.publishDate}</span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1">截止：{project.deadlineDate}</span>
+                  {project.discipline ? (
+                    <span className="rounded-full bg-brand-cream px-3 py-1 font-semibold text-brand">{project.discipline}</span>
+                  ) : null}
                   {project.tags.slice(0, 4).map((item) => (
                     <span key={item} className="rounded-full bg-slate-100 px-3 py-1">
                       {item}

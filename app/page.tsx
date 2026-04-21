@@ -349,7 +349,7 @@ export default function HomePage() {
                     rel="noreferrer"
                     className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-4 transition hover:bg-slate-100"
                   >
-                    <ExternalSiteMark source={item.href} label={item.title} size="lg" />
+                    <ExternalSiteMark source={item.href} label={item.title} size="lg" layout="landscape" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold text-ink">{item.title}</div>
                       <div className="mt-1 truncate text-xs text-slate-500">{item.badge}</div>
