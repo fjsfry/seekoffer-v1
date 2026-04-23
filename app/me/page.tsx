@@ -25,6 +25,11 @@ import {
   type ApplicationRow
 } from '@/lib/cloudbase-data';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
+import {
+  hydrateWorkbenchState,
+  saveWorkbenchState,
+  type WorkbenchCustomTodo
+} from '@/lib/workbench-state';
 import { updateUserProfile, type UserProfile } from '@/lib/user-session';
 
 const emptyProfile: UserProfile = {
@@ -55,11 +60,6 @@ type ActionTask = {
   href?: string;
 };
 
-type CustomTodo = {
-  id: string;
-  text: string;
-};
-
 function isProfileComplete(profile: UserProfile) {
   return Boolean(profile.undergraduateSchool && profile.major && profile.targetMajor && profile.targetRegion);
 }
@@ -83,21 +83,21 @@ function readBrowserArray(key: string) {
 
 function readCustomTodos() {
   if (typeof window === 'undefined') {
-    return [] as CustomTodo[];
+    return [] as WorkbenchCustomTodo[];
   }
 
   try {
     const raw = window.localStorage.getItem(TODO_CUSTOM_STORAGE_KEY);
     if (!raw) {
-      return [] as CustomTodo[];
+      return [] as WorkbenchCustomTodo[];
     }
 
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed)
-      ? parsed.filter((item): item is CustomTodo => Boolean(item?.id) && Boolean(item?.text))
+      ? parsed.filter((item): item is WorkbenchCustomTodo => Boolean(item?.id) && Boolean(item?.text))
       : [];
   } catch {
-    return [] as CustomTodo[];
+    return [] as WorkbenchCustomTodo[];
   }
 }
 
@@ -119,14 +119,18 @@ export default function MePage() {
     value: true
   });
   const [completedTodoIds, setCompletedTodoIds] = useState<string[]>(() => readBrowserArray(TODO_COMPLETED_STORAGE_KEY));
-  const [customTodos, setCustomTodos] = useState<CustomTodo[]>(() => readCustomTodos());
+  const [customTodos, setCustomTodos] = useState<WorkbenchCustomTodo[]>(() => readCustomTodos());
   const [todoDraft, setTodoDraft] = useState('');
+  const [todoSyncOwnerId, setTodoSyncOwnerId] = useState('');
+  const [todoSyncReady, setTodoSyncReady] = useState(false);
   const form = draftFormState.ownerId === profileOwnerId ? draftFormState.value : sessionProfile;
   const saveMessage = saveMessageState.ownerId === profileOwnerId ? saveMessageState.value : '';
   const profileExpanded =
     profileExpandedState.ownerId === profileOwnerId
       ? profileExpandedState.value
       : !isProfileComplete(sessionProfile);
+  const syncableUserId =
+    session?.loggedIn && session.authProvider !== 'anonymous' && session.userId ? session.userId : '';
 
   function setSaveMessage(value: string) {
     setSaveMessageState({
@@ -159,6 +163,43 @@ export default function MePage() {
   }, [loggedIn]);
 
   useEffect(() => {
+    if (!syncableUserId) {
+      return () => undefined;
+    }
+
+    let active = true;
+
+    const hydrateRemoteTodos = async () => {
+      try {
+        const mergedState = await hydrateWorkbenchState(syncableUserId, {
+          completedTodoIds: readBrowserArray(TODO_COMPLETED_STORAGE_KEY),
+          customTodos: readCustomTodos()
+        });
+
+        if (!active) {
+          return;
+        }
+
+        setCompletedTodoIds(mergedState.completedTodoIds);
+        setCustomTodos(mergedState.customTodos);
+      } catch (error) {
+        console.error('[Seekoffer][workbench] hydrate workbench state failed', error);
+      } finally {
+        if (active) {
+          setTodoSyncOwnerId(syncableUserId);
+          setTodoSyncReady(true);
+        }
+      }
+    };
+
+    void hydrateRemoteTodos();
+
+    return () => {
+      active = false;
+    };
+  }, [syncableUserId]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(TODO_COMPLETED_STORAGE_KEY, JSON.stringify(completedTodoIds));
     }
@@ -169,6 +210,32 @@ export default function MePage() {
       window.localStorage.setItem(TODO_CUSTOM_STORAGE_KEY, JSON.stringify(customTodos));
     }
   }, [customTodos]);
+
+  useEffect(() => {
+    if (!todoSyncReady || !syncableUserId || todoSyncOwnerId !== syncableUserId) {
+      return () => undefined;
+    }
+
+    let cancelled = false;
+    const persistRemoteTodos = async () => {
+      try {
+        await saveWorkbenchState(syncableUserId, {
+          completedTodoIds,
+          customTodos
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.error('[Seekoffer][workbench] save workbench state failed', error);
+        }
+      }
+    };
+
+    void persistRemoteTodos();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [completedTodoIds, customTodos, syncableUserId, todoSyncOwnerId, todoSyncReady]);
 
   const displayName = form.nickname || '我的';
   const profileComplete = isProfileComplete(form);

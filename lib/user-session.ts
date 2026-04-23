@@ -2,7 +2,7 @@
 
 import type { AuthChangeEvent } from '@supabase/supabase-js';
 import { getSupabaseBrowserClient } from './supabase-browser';
-import { SEEKOFFER_SITE_URL, isSupabaseConfigured } from './supabase-env';
+import { SEEKOFFER_SITE_URL, SUPABASE_ENABLE_PHONE_AUTH, isSupabaseConfigured } from './supabase-env';
 
 export type UserProfile = {
   nickname: string;
@@ -88,12 +88,25 @@ function normalizePhoneIdentifier(value: string) {
 }
 
 function isPhoneIdentifier(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed || isEmailIdentifier(trimmed)) {
+    return false;
+  }
+
+  if (!/^[+\d\s\-()]+$/.test(trimmed)) {
+    return false;
+  }
+
   const normalized = normalizePhoneIdentifier(value);
   return /^\+?\d{6,15}$/.test(normalized);
 }
 
 function normalizeIdentifier(value: string) {
   const trimmed = value.trim();
+  if (isEmailIdentifier(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+
   return isPhoneIdentifier(trimmed) ? normalizePhoneIdentifier(trimmed) : trimmed.toLowerCase();
 }
 
@@ -215,7 +228,11 @@ function formatAuthError(error: unknown, fallback: string) {
     return '密码长度不够，请至少使用 6 位。';
   }
 
-  if (/phone provider is not configured|unsupported phone provider/.test(message)) {
+  if (
+    /phone provider is not configured|unsupported phone provider|phone logins are disabled|phone signups are disabled/.test(
+      message
+    )
+  ) {
     return '当前还没有配置短信服务，手机号登录暂时不可用。';
   }
 
@@ -239,6 +256,12 @@ function buildAnonymousSession(existing?: UserSession | null) {
     email: '',
     phone: ''
   };
+}
+
+function ensurePasswordIdentifierSupported(identifier: string) {
+  if (isPhoneIdentifier(identifier) && !SUPABASE_ENABLE_PHONE_AUTH) {
+    throw new Error('当前暂未开放手机号登录，请先使用邮箱注册，或改用邮箱验证码登录。');
+  }
 }
 
 function buildMemberSession(user: {
@@ -379,6 +402,7 @@ export async function signInWithPasswordAccount(payload: CredentialsPayload) {
   }
 
   const identifier = normalizeIdentifier(payload.identifier);
+  ensurePasswordIdentifierSupported(identifier);
   const supabase = getSupabaseBrowserClient();
 
   try {
@@ -404,6 +428,7 @@ export async function signUpWithPasswordAccount(payload: CredentialsPayload): Pr
   }
 
   const identifier = normalizeIdentifier(payload.identifier);
+  ensurePasswordIdentifierSupported(identifier);
   const nicknameSeed = isEmailIdentifier(identifier)
     ? identifier.split('@')[0]
     : normalizePhoneIdentifier(identifier).slice(-4);

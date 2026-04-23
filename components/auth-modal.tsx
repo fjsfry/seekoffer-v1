@@ -96,13 +96,13 @@ export function AuthModal() {
     <div className="fixed inset-0 z-[90]">
       <button
         aria-label="关闭登录弹层"
-        className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-slate-950/55 backdrop-blur-md"
         onClick={() => setOpen(false)}
       />
 
       <div className="absolute inset-0 flex items-end justify-center p-0 sm:items-center sm:p-6">
-        <section className="relative w-full max-w-[880px] overflow-hidden rounded-t-[28px] border border-white/50 bg-white shadow-[0_32px_120px_rgba(15,76,92,0.18)] sm:rounded-[36px]">
-          <div className="border-b border-black/5 px-5 py-5 sm:px-8 sm:py-7">
+        <section className="relative w-full max-w-[960px] overflow-hidden rounded-t-[28px] border border-white/60 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] shadow-[0_40px_140px_rgba(15,76,92,0.22)] sm:rounded-[36px]">
+          <div className="border-b border-black/5 bg-[radial-gradient(circle_at_top_left,rgba(15,118,110,0.12),transparent_42%),linear-gradient(180deg,#ffffff_0%,rgba(248,250,252,0.95)_100%)] px-5 py-5 sm:px-8 sm:py-7">
             <div className="flex items-start justify-between gap-4">
               <div className="max-w-2xl">
                 <div className="inline-flex items-center gap-2 rounded-full bg-brand/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand">
@@ -124,18 +124,18 @@ export function AuthModal() {
             </div>
 
             <div className="mt-5 flex flex-wrap gap-3">
-              <div className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/80 px-3 py-2 text-xs font-medium text-slate-600 shadow-sm backdrop-blur">
                 <ShieldCheck className="h-4 w-4 text-brand" />
                 登录成功后会自动继续你刚才的动作
               </div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/80 px-3 py-2 text-xs font-medium text-slate-600 shadow-sm backdrop-blur">
                 <MonitorSmartphone className="h-4 w-4 text-brand" />
                 当前来源页：{pathname === '/me' ? '工作台' : pathname}
               </div>
             </div>
           </div>
 
-          <div className="max-h-[min(82vh,920px)] overflow-y-auto px-5 py-5 sm:px-8 sm:py-7">
+          <div className="max-h-[min(82vh,920px)] overflow-y-auto bg-[linear-gradient(180deg,rgba(248,250,252,0.58)_0%,rgba(255,255,255,0.98)_18%,#ffffff_100%)] px-5 py-5 sm:px-8 sm:py-7">
             <LoginMethodPanel mode={isMobile ? 'popover' : 'modal'} onSuccess={() => setOpen(false)} />
           </div>
         </section>
