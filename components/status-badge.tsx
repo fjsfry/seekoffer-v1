@@ -1,29 +1,158 @@
-import type { DeadlineLevel, PublicProjectStatus } from '@/lib/mock-data';
+import * as React from 'react';
+import type { DeadlineLevel } from '@/lib/mock-data';
 
-export function StatusBadge({ status }: { status: PublicProjectStatus }) {
-  const tone =
-    status === '即将截止'
-      ? 'bg-orange-50 text-orange-700'
-      : status === '报名中'
-        ? 'bg-emerald-50 text-emerald-700'
-        : status === '已截止'
-          ? 'bg-slate-100 text-slate-500'
-          : status === '活动中'
-            ? 'bg-cyan-50 text-cyan-700'
-            : 'bg-slate-100 text-slate-600';
+type BadgeTone =
+  | 'default'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'info'
+  | 'muted';
 
-  return <span className={`rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>{status}</span>;
+type BadgeSize = 'sm' | 'md';
+
+export interface StatusBadgeProps {
+  status?: string | null;
+  label?: string;
+  children?: React.ReactNode;
+  className?: string;
+  tone?: BadgeTone;
+  variant?: BadgeTone;
+  size?: BadgeSize;
 }
 
-export function DeadlineBadge({ level }: { level: DeadlineLevel }) {
-  const mapping = {
-    today: { label: '今日截止', tone: 'bg-rose-50 text-rose-700' },
-    within3days: { label: '3 天内截止', tone: 'bg-orange-50 text-orange-700' },
-    within7days: { label: '7 天内截止', tone: 'bg-amber-50 text-amber-700' },
-    future: { label: '正常跟进', tone: 'bg-emerald-50 text-emerald-700' },
-    expired: { label: '已截止', tone: 'bg-slate-100 text-slate-500' }
-  } as const;
-
-  const current = mapping[level];
-  return <span className={`rounded-full px-3 py-1 text-xs font-semibold ${current.tone}`}>{current.label}</span>;
+function joinClasses(...parts: Array<string | undefined | false | null>) {
+  return parts.filter(Boolean).join(' ');
 }
+
+function normalizeTone(input?: string | null): BadgeTone {
+  if (!input) return 'default';
+
+  const value = input.toLowerCase().trim();
+
+  if (
+    ['success', 'active', 'open', 'published', 'done', 'completed', 'available'].includes(value)
+  ) {
+    return 'success';
+  }
+
+  if (
+    ['warning', 'pending', 'soon', 'reviewing', 'draft'].includes(value)
+  ) {
+    return 'warning';
+  }
+
+  if (
+    ['danger', 'error', 'failed', 'closed', 'expired', 'rejected'].includes(value)
+  ) {
+    return 'danger';
+  }
+
+  if (
+    ['info', 'new', 'notice'].includes(value)
+  ) {
+    return 'info';
+  }
+
+  if (
+    ['muted', 'unknown', 'inactive'].includes(value)
+  ) {
+    return 'muted';
+  }
+
+  return 'default';
+}
+
+function resolveDeadlineMeta(level?: DeadlineLevel | null) {
+  switch (level) {
+    case 'today':
+      return {
+        label: '今日截止',
+        tone: 'danger' as const,
+      };
+    case 'within3days':
+      return {
+        label: '3天内截止',
+        tone: 'warning' as const,
+      };
+    case 'within7days':
+      return {
+        label: '7天内截止',
+        tone: 'info' as const,
+      };
+    case 'expired':
+      return {
+        label: '已截止',
+        tone: 'muted' as const,
+      };
+    case 'future':
+    default:
+      return {
+        label: '可跟进',
+        tone: 'success' as const,
+      };
+  }
+}
+
+const toneClassMap: Record<BadgeTone, string> = {
+  default: 'bg-slate-100 text-slate-700 border border-slate-200',
+  success: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  warning: 'bg-amber-50 text-amber-700 border border-amber-200',
+  danger: 'bg-rose-50 text-rose-700 border border-rose-200',
+  info: 'bg-sky-50 text-sky-700 border border-sky-200',
+  muted: 'bg-zinc-100 text-zinc-600 border border-zinc-200',
+};
+
+const sizeClassMap: Record<BadgeSize, string> = {
+  sm: 'px-2 py-0.5 text-xs',
+  md: 'px-2.5 py-1 text-sm',
+};
+
+export function StatusBadge({
+  status,
+  label,
+  children,
+  className,
+  tone,
+  variant,
+  size = 'sm',
+}: StatusBadgeProps) {
+  const finalTone = tone ?? variant ?? normalizeTone(status);
+  const content = children ?? label ?? status ?? '未知状态';
+
+  return (
+    <span
+      className={joinClasses(
+        'inline-flex items-center rounded-full font-medium whitespace-nowrap',
+        sizeClassMap[size],
+        toneClassMap[finalTone],
+        className
+      )}
+    >
+      {content}
+    </span>
+  );
+}
+
+export function DeadlineBadge({
+  level,
+  className,
+  size = 'sm',
+}: {
+  level?: DeadlineLevel | null;
+  className?: string;
+  size?: BadgeSize;
+}) {
+  const meta = resolveDeadlineMeta(level);
+
+  return (
+    <StatusBadge
+      label={meta.label}
+      tone={meta.tone}
+      size={size}
+      className={className}
+    />
+  );
+}
+
+export default StatusBadge;
