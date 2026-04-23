@@ -66,8 +66,20 @@ export default function NoticesPage() {
   const [projectType, setProjectType] = useState('全部');
   const [year, setYear] = useState('2026');
   const [sortBy, setSortBy] = useState<SortOption>('publish');
-  const [page, setPage] = useState(1);
+  const [pageState, setPageState] = useState({ page: 1, filterKey: '' });
   const [jumpPage, setJumpPage] = useState('');
+  const filterKey = [
+    keyword.trim().toLowerCase(),
+    schoolName.trim().toLowerCase(),
+    majorKeyword.trim().toLowerCase(),
+    category,
+    discipline,
+    schoolRange,
+    progress,
+    projectType,
+    year,
+    sortBy
+  ].join('|');
 
   useEffect(() => {
     let active = true;
@@ -148,19 +160,28 @@ export default function NoticesPage() {
     });
   }, [projects, keyword, schoolName, majorKeyword, category, discipline, schoolRange, progress, projectType, year, sortBy]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [keyword, schoolName, majorKeyword, category, discipline, schoolRange, progress, projectType, year, sortBy]);
-
   const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
+  const requestedPage = pageState.filterKey === filterKey ? pageState.page : 1;
+  const currentPage = Math.min(requestedPage, totalPages);
   const pagedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const visiblePages = getVisiblePages(currentPage, totalPages);
+
+  function updatePage(nextPage: number | ((currentPage: number) => number)) {
+    setPageState((current) => {
+      const basePage = current.filterKey === filterKey ? current.page : 1;
+      const resolvedPage = typeof nextPage === 'function' ? nextPage(basePage) : nextPage;
+
+      return {
+        filterKey,
+        page: resolvedPage
+      };
+    });
+  }
 
   function handleJumpPage() {
     const parsed = Number(jumpPage);
     if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= totalPages) {
-      setPage(parsed);
+      updatePage(parsed);
     }
   }
 
@@ -376,7 +397,7 @@ export default function NoticesPage() {
         <section className="rounded-[30px] bg-white px-5 py-6 shadow-soft">
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              onClick={() => updatePage((current) => Math.max(1, current - 1))}
               disabled={currentPage === 1}
               className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-45"
             >
@@ -387,7 +408,7 @@ export default function NoticesPage() {
             {visiblePages.map((pageNumber) => (
               <button
                 key={pageNumber}
-                onClick={() => setPage(pageNumber)}
+                onClick={() => updatePage(pageNumber)}
                 className={`h-12 min-w-12 rounded-2xl px-4 text-sm font-semibold ${
                   currentPage === pageNumber ? 'bg-brand text-white' : 'bg-slate-100 text-slate-700'
                 }`}
@@ -397,7 +418,7 @@ export default function NoticesPage() {
             ))}
 
             <button
-              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              onClick={() => updatePage((current) => Math.min(totalPages, current + 1))}
               disabled={currentPage === totalPages}
               className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-45"
             >

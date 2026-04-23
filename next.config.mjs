@@ -2,12 +2,6 @@
 const nextConfig = {
   distDir: '.next-web',
   output: 'export',
-  eslint: {
-    ignoreDuringBuilds: true
-  },
-  typescript: {
-    ignoreBuildErrors: true
-  },
   experimental: {
     webpackBuildWorker: false,
     workerThreads: false

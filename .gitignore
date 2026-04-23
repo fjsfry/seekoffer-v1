@@ -26,3 +26,5 @@ tsconfig.tsbuildinfo
 .DS_Store
 Thumbs.db
 .vercel/
+supabase/.temp/
+public/site-marks/_preview/

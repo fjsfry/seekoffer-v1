@@ -6,9 +6,11 @@ import { LoginRequiredCard } from '@/components/login-required-card';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { useUserSessionState } from '@/hooks/use-user-session';
+import { isMemberSession } from '@/lib/user-session';
 
 export default function PublishPage() {
-  const { ready, loggedIn } = useUserSessionState();
+  const { ready, loggedIn, session } = useUserSessionState();
+  const canPublish = isMemberSession(session);
 
   if (!ready) {
     return (
@@ -16,7 +18,7 @@ export default function PublishPage() {
         <PageSectionTitle
           eyebrow="Share Offer"
           title="发布 Offer 动态"
-          subtitle="分享去向与释放 Offer，帮助候补池中的同学更快判断机会。"
+          subtitle="分享你的去向与释放 Offer，帮助候补池中的同学更快判断机会变化。"
         />
         <section className="rounded-[30px] border border-black/5 bg-white px-6 py-10 text-sm text-slate-500 shadow-soft">
           正在检查登录状态，请稍等。
@@ -25,7 +27,7 @@ export default function PublishPage() {
     );
   }
 
-  if (!loggedIn) {
+  if (!loggedIn || !canPublish) {
     return (
       <SiteShell>
         <PageSectionTitle
@@ -34,8 +36,20 @@ export default function PublishPage() {
           subtitle="分享你的保研去向与释放的 Offer，帮助候补池中的同学更快预判机会变化。"
         />
         <LoginRequiredCard
-          title="发布动态前需要先登录"
-          description="登录后即可发布 Offer 动态、管理个人申请记录，并在后续开放实名认证时优先完成身份升级。"
+          title={loggedIn ? '试用态还不能直接发布 Offer' : '发布动态前需要先登录'}
+          description={
+            loggedIn
+              ? '试用模式可以先体验通知库和基础工作台，但发布 Offer 会影响社区可信度，所以需要升级到正式账号登录后再继续。'
+              : '登录后即可发布 Offer 动态、管理个人申请记录，并在后续开放实名认证时优先完成身份升级。'
+          }
+          requiredAuth="member"
+          actionLabel={loggedIn ? '升级正式账号后继续' : '登录后继续'}
+          intent={{
+            type: 'publish-offer',
+            returnTo: '/publish',
+            reason: 'publish-gate',
+            requiredAuth: 'member'
+          }}
         />
       </SiteShell>
     );

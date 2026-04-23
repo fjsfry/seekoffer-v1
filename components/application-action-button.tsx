@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Check, LoaderCircle, Plus } from 'lucide-react';
 import { addProjectToApplicationTable, fetchUserProjects, watchApplicationTable } from '@/lib/cloudbase-data';
-import { getUserSession, signInWithWechat, watchUserSession } from '@/lib/user-session';
+import { openAuthModal, writeAuthIntent } from '@/lib/auth-intent';
+import { useUserSessionState } from '@/hooks/use-user-session';
 
 export function ApplicationActionButton({
   projectId,
@@ -12,6 +14,8 @@ export function ApplicationActionButton({
   projectId: string;
   variant?: 'primary' | 'secondary';
 }) {
+  const pathname = usePathname();
+  const { loggedIn } = useUserSessionState();
   const [added, setAdded] = useState(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
@@ -20,8 +24,7 @@ export function ApplicationActionButton({
     let active = true;
 
     async function load() {
-      const session = getUserSession();
-      if (!session) {
+      if (!loggedIn) {
         if (active) {
           setAdded(false);
         }
@@ -36,14 +39,12 @@ export function ApplicationActionButton({
 
     void load();
     const disposeApplications = watchApplicationTable(load);
-    const disposeSession = watchUserSession(load);
 
     return () => {
       active = false;
       disposeApplications();
-      disposeSession();
     };
-  }, [projectId]);
+  }, [loggedIn, projectId]);
 
   async function handleAdd() {
     if (pending || added) {
@@ -54,14 +55,23 @@ export function ApplicationActionButton({
     setMessage('');
 
     try {
-      if (!getUserSession()) {
-        await signInWithWechat();
+      if (!loggedIn) {
+        const intent = {
+          type: 'add-project' as const,
+          projectId,
+          returnTo: pathname,
+          reason: 'application-action',
+          requiredAuth: 'session' as const
+        };
+        writeAuthIntent(intent);
+        openAuthModal(intent);
+        return;
       }
 
       await addProjectToApplicationTable(projectId);
       setAdded(true);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '请先完成微信登录后再加入申请表。');
+      setMessage(error instanceof Error ? error.message : '请先完成正式账号登录后再加入申请表。');
     } finally {
       setPending(false);
     }

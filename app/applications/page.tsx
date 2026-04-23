@@ -58,7 +58,6 @@ export default function ApplicationsPage() {
 
   useEffect(() => {
     if (!loggedIn) {
-      setRows([]);
       return () => undefined;
     }
 

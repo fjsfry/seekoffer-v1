@@ -8,7 +8,6 @@ import {
   CheckSquare2,
   ClipboardList,
   PencilLine,
-  Plus,
   Save,
   Settings2,
   Square,
@@ -104,23 +103,40 @@ function readCustomTodos() {
 
 export default function MePage() {
   const { session, ready, loggedIn } = useUserSessionState();
-  const [form, setForm] = useState<UserProfile>(emptyProfile);
+  const sessionProfile = session?.profile || emptyProfile;
+  const profileOwnerId = session?.userId || session?.email || session?.phone || 'guest';
+  const [draftFormState, setDraftFormState] = useState<{ ownerId: string; value: UserProfile }>({
+    ownerId: '',
+    value: emptyProfile
+  });
   const [rows, setRows] = useState<ApplicationRow[]>([]);
-  const [saveMessage, setSaveMessage] = useState('');
-  const [profileExpanded, setProfileExpanded] = useState(true);
-  const [completedTodoIds, setCompletedTodoIds] = useState<string[]>([]);
-  const [customTodos, setCustomTodos] = useState<CustomTodo[]>([]);
+  const [saveMessageState, setSaveMessageState] = useState<{ ownerId: string; value: string }>({
+    ownerId: '',
+    value: ''
+  });
+  const [profileExpandedState, setProfileExpandedState] = useState<{ ownerId: string; value: boolean }>({
+    ownerId: '',
+    value: true
+  });
+  const [completedTodoIds, setCompletedTodoIds] = useState<string[]>(() => readBrowserArray(TODO_COMPLETED_STORAGE_KEY));
+  const [customTodos, setCustomTodos] = useState<CustomTodo[]>(() => readCustomTodos());
   const [todoDraft, setTodoDraft] = useState('');
+  const form = draftFormState.ownerId === profileOwnerId ? draftFormState.value : sessionProfile;
+  const saveMessage = saveMessageState.ownerId === profileOwnerId ? saveMessageState.value : '';
+  const profileExpanded =
+    profileExpandedState.ownerId === profileOwnerId
+      ? profileExpandedState.value
+      : !isProfileComplete(sessionProfile);
 
-  useEffect(() => {
-    const nextProfile = session?.profile || emptyProfile;
-    setForm(nextProfile);
-    setProfileExpanded(!isProfileComplete(nextProfile));
-  }, [session]);
+  function setSaveMessage(value: string) {
+    setSaveMessageState({
+      ownerId: profileOwnerId,
+      value
+    });
+  }
 
   useEffect(() => {
     if (!loggedIn) {
-      setRows([]);
       return () => undefined;
     }
 
@@ -141,11 +157,6 @@ export default function MePage() {
       dispose();
     };
   }, [loggedIn]);
-
-  useEffect(() => {
-    setCompletedTodoIds(readBrowserArray(TODO_COMPLETED_STORAGE_KEY));
-    setCustomTodos(readCustomTodos());
-  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -259,7 +270,13 @@ export default function MePage() {
     : 'grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]';
 
   function handleProfileChange<K extends keyof UserProfile>(key: K, value: UserProfile[K]) {
-    setForm((current) => ({ ...current, [key]: value }));
+    setDraftFormState({
+      ownerId: profileOwnerId,
+      value: {
+        ...form,
+        [key]: value
+      }
+    });
   }
 
   async function handleSaveProfile() {
@@ -268,7 +285,10 @@ export default function MePage() {
     setSaveMessage(synced ? '基本信息已保存并同步。' : '基本信息已保存。');
 
     if (isProfileComplete(form)) {
-      setProfileExpanded(false);
+      setProfileExpandedState({
+        ownerId: profileOwnerId,
+        value: false
+      });
     }
   }
 
@@ -311,7 +331,7 @@ export default function MePage() {
       <SiteShell>
         <LoginRequiredCard
           title="登录后开启你的工作台"
-          description="通知库、资源库和院校库可以直接浏览；申请表、行动清单和收藏功能需要先完成微信登录。"
+          description="通知库、资源库和院校库可以直接浏览；申请表、行动清单和收藏功能需要先完成正式账号登录。"
         />
       </SiteShell>
     );
@@ -340,7 +360,12 @@ export default function MePage() {
           <div className="flex flex-wrap items-center gap-3">
             {profileComplete ? (
               <button
-                onClick={() => setProfileExpanded((current) => !current)}
+                onClick={() =>
+                  setProfileExpandedState({
+                    ownerId: profileOwnerId,
+                    value: !profileExpanded
+                  })
+                }
                 className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"
               >
                 <PencilLine className="h-4 w-4" />
@@ -558,7 +583,7 @@ export default function MePage() {
                         )}
                       </button>
                       <div className="min-w-0 flex-1">
-                        {task.href ? (
+                        {'href' in task && task.href ? (
                           <Link href={task.href} className="text-sm font-semibold leading-6 text-ink hover:text-brand">
                             {task.text}
                           </Link>

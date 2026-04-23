@@ -28,7 +28,6 @@ export default function TodosPage() {
 
   useEffect(() => {
     if (!loggedIn) {
-      setRows([]);
       return () => undefined;
     }
 

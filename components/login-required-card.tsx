@@ -1,35 +1,38 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { LoaderCircle, LockKeyhole } from 'lucide-react';
-import { openCloudbaseLoginPage } from '@/lib/user-session';
+import { usePathname } from 'next/navigation';
+import { ArrowRight, LockKeyhole } from 'lucide-react';
+import { openAuthModal, type AuthIntent, writeAuthIntent } from '@/lib/auth-intent';
+import type { AuthRequirement } from '@/lib/user-session';
 
 export function LoginRequiredCard({
   title = '登录后开启你的工作台',
-  description = '通知库、资源库和院校库可以直接浏览；申请表、行动清单和收藏功能需要先完成登录。'
+  description = '通知库、资源库和院校库可以先浏览；申请表、待办、收藏和发布这类个人动作需要先完成登录。',
+  intent,
+  requiredAuth = 'session',
+  actionLabel = '登录后继续'
 }: {
   title?: string;
   description?: string;
+  intent?: AuthIntent;
+  requiredAuth?: AuthRequirement;
+  actionLabel?: string;
 }) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState('');
+  const pathname = usePathname();
 
-  async function handleOpenLogin() {
-    if (pending) {
-      return;
-    }
+  function handleOpenLogin() {
+    const nextIntent =
+      intent ||
+      ({
+        type: 'open-workspace',
+        returnTo: pathname,
+        reason: 'login-required-card',
+        requiredAuth
+      } satisfies AuthIntent);
 
-    setPending(true);
-    setError('');
-
-    try {
-      await openCloudbaseLoginPage();
-    } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : '登录页暂时不可用，请稍后重试。');
-    } finally {
-      setPending(false);
-    }
+    writeAuthIntent(nextIntent);
+    openAuthModal(nextIntent);
   }
 
   return (
@@ -46,8 +49,8 @@ export function LoginRequiredCard({
           onClick={handleOpenLogin}
           className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white"
         >
-          {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-          打开 CloudBase 登录页
+          {actionLabel}
+          <ArrowRight className="h-4 w-4" />
         </button>
         <Link
           href="/notices"
@@ -56,8 +59,6 @@ export function LoginRequiredCard({
           先去浏览通知库
         </Link>
       </div>
-
-      {error ? <div className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
     </section>
   );
 }

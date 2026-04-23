@@ -8,7 +8,6 @@ import {
   BellRing,
   BookOpenText,
   BriefcaseBusiness,
-  Building2,
   GraduationCap,
   HeartHandshake,
   ShieldAlert,

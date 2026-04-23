@@ -1,13 +1,12 @@
 'use client';
 
-import { getCloudbaseApp } from './cloudbase-web';
-import { getUserSession, type UserProfile } from './user-session';
+import { getSupabaseBrowserClient } from './supabase-browser';
+import { getUserSession, type UserProfile, updateUserProfile } from './user-session';
 import {
   materialChecklistDefinitions,
-  sampleUserProjects,
   type DeadlineLevel,
-  type ProjectType,
   type MaterialChecklistKey,
+  type ProjectType,
   type PublicNoticeProject,
   type UserProjectRecord,
   type UserProjectStatus
@@ -17,28 +16,12 @@ import { baseNoticeProjects } from './notice-source';
 const APPLICATION_STORAGE_KEY = 'seekoffer-my-application-table';
 const MANUAL_PROJECT_STORAGE_KEY = 'seekoffer-manual-projects';
 const APPLICATION_EVENT_NAME = 'seekoffer-applications-updated';
-const CLOUD_WORKSPACE_COLLECTION = 'web_user_workspace';
-const NOTICE_COLLECTION_CANDIDATES = ['project_notices', 'calendar_notices'];
-const WORKSPACE_SCHEMA_VERSION = 1;
+const NOTICE_TARGET_YEAR = 2026;
+const PUBLIC_NOTICE_QUERY_LIMIT = 1500;
 
 type StoredPayload<T> = {
   updatedAt: string;
   items: T[];
-};
-
-type CloudWorkspaceDocument = {
-  _id: string;
-  userId: string;
-  schemaVersion: number;
-  updatedAt: string;
-  applicationUpdatedAt?: string;
-  applications?: UserProjectRecord[];
-  manualProjectsUpdatedAt?: string;
-  manualProjects?: PublicNoticeProject[];
-  profileUpdatedAt?: string;
-  profile?: UserProfile;
-  aiWaitlistUpdatedAt?: string;
-  aiWaitlistLead?: AiWaitlistLead;
 };
 
 export type AiWaitlistNeed = '测算胜率' | '精修申请表' | '提炼简章要求';
@@ -69,11 +52,11 @@ export type ManualProjectInput = {
 };
 
 export const WORKSPACE_SYNC_NOTICE =
-  '当前为体验版微信登录。申请表会同步到当前浏览器绑定的云端工作区，正式微信登录上线后将开放稳定的跨设备同步。';
+  '当前已切换到 Supabase 账号体系。试用态只保存在当前浏览器；完成正式登录后，申请表、个人资料和手动录入项目会自动同步到你的个人工作区。';
 
-let cloudCollectionChecked = false;
-let cloudCollectionAvailable = false;
 let hydrateWorkspacePromise: Promise<void> | null = null;
+let hydratedWorkspaceUserId = '';
+let publicNoticeCachePromise: Promise<PublicNoticeProject[]> | null = null;
 
 function canUseBrowserStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -81,6 +64,22 @@ function canUseBrowserStorage() {
 
 function nowIsoText() {
   return new Date().toISOString();
+}
+
+function nowText() {
+  return new Date().toISOString().slice(0, 16).replace('T', ' ');
+}
+
+function emitApplicationUpdate() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(APPLICATION_EVENT_NAME));
+  }
+}
+
+function normalizeStringArray(input: unknown) {
+  return Array.isArray(input)
+    ? input.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
 }
 
 function readStoragePayload<T>(storageKey: string): StoredPayload<T> | null {
@@ -94,9 +93,12 @@ function readStoragePayload<T>(storageKey: string): StoredPayload<T> | null {
       return null;
     }
 
-    const parsed = JSON.parse(raw) as T[] | StoredPayload<T>;
+    const parsed = JSON.parse(raw) as StoredPayload<T> | T[];
     if (Array.isArray(parsed)) {
-      return { updatedAt: '', items: parsed };
+      return {
+        updatedAt: '',
+        items: parsed
+      };
     }
 
     if (parsed && Array.isArray(parsed.items)) {
@@ -110,107 +112,6 @@ function readStoragePayload<T>(storageKey: string): StoredPayload<T> | null {
   }
 
   return null;
-}
-
-function mapCloudNoticeDocument(document: Record<string, any>): PublicNoticeProject | null {
-  const id = String(document.id || document._id || '').trim();
-  const schoolName = String(document.school_name || document.schoolName || '').trim();
-  const projectName = String(document.project_name || document.projectName || '').trim();
-
-  if (!id || !schoolName || !projectName) {
-    return null;
-  }
-
-  const project = normalizeManualProject({
-    id,
-    schoolName,
-    departmentName: String(document.department_name || document.departmentName || '').trim() || '待补充',
-    projectName,
-    projectType: document.project_type || document.projectType || '夏令营',
-    discipline: String(document.discipline || '').trim() || '待补充',
-    publishDate: String(document.publish_date || document.publishDate || '').trim(),
-    deadlineDate: String(document.deadline_date || document.deadlineDate || '').trim(),
-    eventStartDate: String(document.event_start_date || document.eventStartDate || '').trim(),
-    eventEndDate: String(document.event_end_date || document.eventEndDate || '').trim(),
-    applyLink: String(document.apply_link || document.applyLink || '').trim(),
-    sourceLink: String(document.source_link || document.sourceLink || '').trim(),
-    requirements: String(document.requirements || '').trim(),
-    materialsRequired: Array.isArray(document.materials_required)
-      ? document.materials_required
-      : Array.isArray(document.materialsRequired)
-        ? document.materialsRequired
-        : undefined,
-    examInterviewInfo: String(document.exam_interview_info || document.examInterviewInfo || '').trim(),
-    contactInfo: String(document.contact_info || document.contactInfo || '').trim(),
-    remarks: String(document.remarks || '').trim(),
-    tags: Array.isArray(document.tags) ? document.tags : undefined,
-    status: document.status,
-    year: Number(document.year || 2026),
-    deadlineLevel: document.deadline_level || document.deadlineLevel,
-    sourceSite: String(document.source_site || document.sourceSite || '').trim() || '保研通知网',
-    collectedAt: String(document.created_at || document.collectedAt || '').trim(),
-    updatedAt: String(document.updated_at || document.updatedAt || '').trim(),
-    lastCheckedAt: String(document.last_checked_at || document.lastCheckedAt || '').trim(),
-    isVerified: Boolean(document.is_verified ?? document.isVerified),
-    changeLog: Array.isArray(document.change_log)
-      ? document.change_log
-      : Array.isArray(document.changeLog)
-        ? document.changeLog
-        : undefined,
-    historyRecords: Array.isArray(document.history_records)
-      ? document.history_records
-      : Array.isArray(document.historyRecords)
-        ? document.historyRecords
-        : undefined
-  });
-
-  return project.year === 2026 ? project : null;
-}
-
-async function readCloudNoticeProjects() {
-  if (!canUseBrowserStorage()) {
-    return [] as PublicNoticeProject[];
-  }
-
-  try {
-    const app = await getCloudbaseApp();
-    const db = app.database();
-
-    for (const collectionName of NOTICE_COLLECTION_CANDIDATES) {
-      try {
-        const result = await db.collection(collectionName).limit(500).get();
-        const rows = Array.isArray(result.data) ? result.data : [];
-        const mapped = rows
-          .map((item: unknown) =>
-            item && typeof item === 'object' ? mapCloudNoticeDocument(item as Record<string, any>) : null
-          )
-          .filter((item: PublicNoticeProject | null): item is PublicNoticeProject => Boolean(item))
-          .sort((left: PublicNoticeProject, right: PublicNoticeProject) =>
-            right.publishDate.localeCompare(left.publishDate)
-          );
-
-        if (mapped.length) {
-          return mapped;
-        }
-      } catch {
-        continue;
-      }
-    }
-  } catch {
-    return [];
-  }
-
-  return [];
-}
-
-function emitApplicationUpdate() {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent(APPLICATION_EVENT_NAME));
-  }
-}
-
-function isCloudSyncEnabled() {
-  return canUseBrowserStorage() && Boolean(getUserSession());
 }
 
 function parseDeadline(deadlineDate: string) {
@@ -245,10 +146,47 @@ export function calculateMaterialsProgress(record: Pick<UserProjectRecord, Mater
   return Math.round((completed / total) * 100);
 }
 
-function buildDefaultRecord(projectId: string): UserProjectRecord {
+function normalizeManualProject(project: Partial<PublicNoticeProject>) {
+  const deadlineDate = String(project.deadlineDate || '').trim();
+  const deadlineLevel = resolveDeadlineLevel(deadlineDate);
+  const publishDate = String(project.publishDate || '').trim() || nowText().slice(0, 10);
+
+  return {
+    id: String(project.id || '').trim(),
+    schoolName: String(project.schoolName || '').trim(),
+    departmentName: String(project.departmentName || '').trim() || '待补充',
+    projectName: String(project.projectName || '').trim(),
+    projectType: (project.projectType || '夏令营') as ProjectType,
+    discipline: String(project.discipline || '').trim() || '待补充',
+    publishDate,
+    deadlineDate,
+    eventStartDate: String(project.eventStartDate || '').trim(),
+    eventEndDate: String(project.eventEndDate || '').trim(),
+    applyLink: String(project.applyLink || '').trim(),
+    sourceLink: String(project.sourceLink || '').trim(),
+    requirements: String(project.requirements || '').trim() || '以原文通知要求为准',
+    materialsRequired: normalizeStringArray(project.materialsRequired),
+    examInterviewInfo: String(project.examInterviewInfo || '').trim(),
+    contactInfo: String(project.contactInfo || '').trim(),
+    remarks: String(project.remarks || '').trim(),
+    tags: normalizeStringArray(project.tags),
+    status: (project.status || resolvePublicStatus(deadlineLevel)) as PublicNoticeProject['status'],
+    year: Number(project.year || NOTICE_TARGET_YEAR),
+    deadlineLevel,
+    sourceSite: String(project.sourceSite || '').trim() || '保研通知网',
+    collectedAt: String(project.collectedAt || '').trim() || nowText(),
+    updatedAt: String(project.updatedAt || '').trim() || nowText(),
+    lastCheckedAt: String(project.lastCheckedAt || '').trim() || nowText(),
+    isVerified: Boolean(project.isVerified),
+    changeLog: Array.isArray(project.changeLog) ? project.changeLog : [],
+    historyRecords: Array.isArray(project.historyRecords) ? project.historyRecords : []
+  } satisfies PublicNoticeProject;
+}
+
+function buildDefaultRecord(projectId: string) {
   const base: UserProjectRecord = {
     userProjectId: `user-${projectId}`,
-    userId: 'demo-user',
+    userId: getUserSession()?.userId || 'local-user',
     projectId,
     isFavorited: true,
     myStatus: '已收藏',
@@ -273,225 +211,50 @@ function buildDefaultRecord(projectId: string): UserProjectRecord {
   };
 }
 
-function normalizeManualProject(project: Partial<PublicNoticeProject>) {
-  const deadlineDate = project.deadlineDate || '';
-  const deadlineLevel = resolveDeadlineLevel(deadlineDate);
-  const today = new Date().toISOString().slice(0, 10);
-
-  return {
-    id: project.id || `custom-${Date.now()}`,
-    schoolName: project.schoolName || '手动录入项目',
-    departmentName: project.departmentName || '待补充',
-    projectName: project.projectName || '未命名项目',
-    projectType: project.projectType || '夏令营',
-    discipline: project.discipline || '待补充',
-    publishDate: project.publishDate || today,
-    deadlineDate,
-    eventStartDate: project.eventStartDate || '',
-    eventEndDate: project.eventEndDate || '',
-    applyLink: project.applyLink || '',
-    sourceLink: project.sourceLink || '',
-    requirements: project.requirements || '用户手动录入，后续可在备注中继续补充要求。',
-    materialsRequired: project.materialsRequired || ['简历', '成绩单'],
-    examInterviewInfo: project.examInterviewInfo || '待补充',
-    contactInfo: project.contactInfo || '待补充',
-    remarks: project.remarks || '用户手动录入项目',
-    tags: project.tags || ['手动录入'],
-    status: project.status || resolvePublicStatus(deadlineLevel),
-    year: project.year || new Date().getFullYear(),
-    deadlineLevel,
-    sourceSite: project.sourceSite || '用户手动录入',
-    collectedAt: project.collectedAt || '',
-    updatedAt: project.updatedAt || '',
-    lastCheckedAt: project.lastCheckedAt || '',
-    isVerified: project.isVerified || false,
-    changeLog: project.changeLog || [],
-    historyRecords: project.historyRecords || []
-  } satisfies PublicNoticeProject;
-}
-
 function normalizeRecord(record: Partial<UserProjectRecord>) {
-  const base = buildDefaultRecord(record.projectId || '');
-  const merged = {
-    ...base,
+  const base = {
+    ...buildDefaultRecord(String(record.projectId || '')),
     ...record
   } as UserProjectRecord;
 
-  return {
-    ...merged,
-    materialsProgress: calculateMaterialsProgress(merged)
-  };
-}
-
-function isNewerTimestamp(left: string, right: string) {
-  const leftValue = left ? new Date(left).getTime() : 0;
-  const rightValue = right ? new Date(right).getTime() : 0;
-  return leftValue > rightValue;
-}
-
-async function getCloudWorkspaceContext() {
-  if (!isCloudSyncEnabled()) {
-    return null;
-  }
-
-  return getBrowserCloudWorkspaceContext();
-}
-
-async function getBrowserCloudWorkspaceContext() {
-  if (!canUseBrowserStorage()) {
-    return null;
-  }
-
-  try {
-    const app = await getCloudbaseApp();
-    const auth = app.auth({ persistence: 'local' });
-    const loginState = await auth.getLoginState();
-    const uid = loginState?.user?.uid;
-
-    if (!uid) {
-      return null;
-    }
-
-    return {
-      uid,
-      docId: `workspace-${uid}`,
-      db: app.database()
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function ensureCloudWorkspaceCollection(options: { allowAnonymous?: boolean } = {}) {
-  const context = options.allowAnonymous ? await getBrowserCloudWorkspaceContext() : await getCloudWorkspaceContext();
-  if (!context) {
-    return null;
-  }
-
-  if (!cloudCollectionChecked) {
-    cloudCollectionChecked = true;
-
-    try {
-      await context.db.collection(CLOUD_WORKSPACE_COLLECTION).limit(1).get();
-      cloudCollectionAvailable = true;
-    } catch {
-      try {
-        await context.db.createCollection(CLOUD_WORKSPACE_COLLECTION);
-        cloudCollectionAvailable = true;
-      } catch {
-        cloudCollectionAvailable = false;
-      }
-    }
-  }
-
-  return cloudCollectionAvailable ? context : null;
-}
-
-async function readCloudWorkspace(options: { allowAnonymous?: boolean } = {}) {
-  const context = await ensureCloudWorkspaceCollection(options);
-  if (!context) {
-    return null;
-  }
-
-  try {
-    const result = await context.db.collection(CLOUD_WORKSPACE_COLLECTION).doc(context.docId).get();
-    const document = Array.isArray(result.data) ? result.data[0] : null;
-    return document as CloudWorkspaceDocument | null;
-  } catch {
-    return null;
-  }
-}
-
-async function writeCloudWorkspace(
-  patch: Partial<CloudWorkspaceDocument> = {},
-  options: { allowAnonymous?: boolean } = {}
-) {
-  const context = await ensureCloudWorkspaceCollection(options);
-  if (!context) {
-    return false;
-  }
-
-  const existing = await readCloudWorkspace(options);
-  const shouldIncludeLocalWorkspace = !options.allowAnonymous || Boolean(getUserSession());
-  const applicationPayload = shouldIncludeLocalWorkspace ? readStoredRecordsPayload() : null;
-  const manualPayload = shouldIncludeLocalWorkspace ? readStoredManualProjectsPayload() : null;
-
-  const payload: CloudWorkspaceDocument = {
-    ...(existing || {}),
-    _id: context.docId,
-    userId: context.uid,
-    schemaVersion: WORKSPACE_SCHEMA_VERSION,
-    updatedAt: nowIsoText(),
-    ...(applicationPayload
-      ? {
-          applicationUpdatedAt: applicationPayload.updatedAt,
-          applications: applicationPayload.items
-        }
-      : {}),
-    ...(manualPayload
-      ? {
-          manualProjectsUpdatedAt: manualPayload.updatedAt,
-          manualProjects: manualPayload.items
-        }
-      : {}),
-    ...patch
+  const normalized: UserProjectRecord = {
+    ...base,
+    userProjectId: String(base.userProjectId || `user-${base.projectId}`),
+    userId: String(base.userId || getUserSession()?.userId || 'local-user'),
+    projectId: String(base.projectId || ''),
+    isFavorited: Boolean(base.isFavorited),
+    myStatus: (base.myStatus || '已收藏') as UserProjectStatus,
+    priorityLevel: (base.priorityLevel || '中') as UserProjectRecord['priorityLevel'],
+    cvReady: Boolean(base.cvReady),
+    transcriptReady: Boolean(base.transcriptReady),
+    rankingProofReady: Boolean(base.rankingProofReady),
+    recommendationReady: Boolean(base.recommendationReady),
+    personalStatementReady: Boolean(base.personalStatementReady),
+    contactSupervisorDone: Boolean(base.contactSupervisorDone),
+    submittedAt: String(base.submittedAt || ''),
+    interviewTime: String(base.interviewTime || ''),
+    resultStatus: (base.resultStatus || '未出结果') as UserProjectRecord['resultStatus'],
+    myNotes: String(base.myNotes || ''),
+    customReminderEnabled: Boolean(base.customReminderEnabled)
   };
 
-  try {
-    await context.db.collection(CLOUD_WORKSPACE_COLLECTION).doc(context.docId).set(payload);
-    return true;
-  } catch {
-    // Silent fallback keeps the site usable when collection permissions are not ready.
-    return false;
-  }
+  normalized.materialsProgress =
+    Number.isFinite(Number(base.materialsProgress)) && Number(base.materialsProgress) > 0
+      ? Number(base.materialsProgress)
+      : calculateMaterialsProgress(normalized);
+
+  return normalized;
 }
 
-async function hydrateWorkspaceFromCloud() {
-  if (!isCloudSyncEnabled()) {
-    return;
-  }
+function getProjectFreshness(project: Pick<PublicNoticeProject, 'updatedAt' | 'lastCheckedAt' | 'publishDate'>) {
+  return project.updatedAt || project.lastCheckedAt || project.publishDate || '';
+}
 
-  if (!hydrateWorkspacePromise) {
-    hydrateWorkspacePromise = (async () => {
-      const cloudWorkspace = await readCloudWorkspace();
-      if (!cloudWorkspace) {
-        return;
-      }
-
-      const localApplications = readStoredRecordsPayload();
-      const localManualProjects = readStoredManualProjectsPayload();
-
-      if (isNewerTimestamp(cloudWorkspace.applicationUpdatedAt || '', localApplications.updatedAt)) {
-        persistStoredRecords(
-          (cloudWorkspace.applications || []).map((item: UserProjectRecord) => normalizeRecord(item)),
-          cloudWorkspace.applicationUpdatedAt || '',
-          false
-        );
-      }
-
-      if (isNewerTimestamp(cloudWorkspace.manualProjectsUpdatedAt || '', localManualProjects.updatedAt)) {
-        persistStoredManualProjects(
-          (cloudWorkspace.manualProjects || []).map((item: PublicNoticeProject) => normalizeManualProject(item)),
-          cloudWorkspace.manualProjectsUpdatedAt || '',
-          false
-        );
-      }
-    })().finally(() => {
-      hydrateWorkspacePromise = null;
-    });
-  }
-
-  await hydrateWorkspacePromise;
+function sortProjectsByFreshness(projects: PublicNoticeProject[]) {
+  return [...projects].sort((left, right) => getProjectFreshness(right).localeCompare(getProjectFreshness(left)));
 }
 
 function readStoredManualProjectsPayload() {
-  if (!canUseBrowserStorage()) {
-    return {
-      updatedAt: '',
-      items: [] as PublicNoticeProject[]
-    };
-  }
-
   const payload = readStoragePayload<Partial<PublicNoticeProject>>(MANUAL_PROJECT_STORAGE_KEY);
   if (!payload) {
     return {
@@ -504,25 +267,25 @@ function readStoredManualProjectsPayload() {
     updatedAt: payload.updatedAt,
     items: payload.items
       .filter((item): item is Partial<PublicNoticeProject> => Boolean(item && typeof item === 'object'))
-      .map((item: Partial<PublicNoticeProject>) => normalizeManualProject(item))
+      .map((item) => normalizeManualProject(item))
   };
 }
 
-function persistStoredManualProjects(projects: PublicNoticeProject[], updatedAt = nowIsoText(), syncCloud = true) {
+function persistStoredManualProjects(projects: PublicNoticeProject[], updatedAt = nowIsoText(), emit = true) {
   if (!canUseBrowserStorage()) {
     return;
   }
 
-  const payload: StoredPayload<PublicNoticeProject> = {
-    updatedAt,
-    items: projects
-  };
+  window.localStorage.setItem(
+    MANUAL_PROJECT_STORAGE_KEY,
+    JSON.stringify({
+      updatedAt,
+      items: projects
+    } satisfies StoredPayload<PublicNoticeProject>)
+  );
 
-  window.localStorage.setItem(MANUAL_PROJECT_STORAGE_KEY, JSON.stringify(payload));
-  emitApplicationUpdate();
-
-  if (syncCloud) {
-    void writeCloudWorkspace();
+  if (emit) {
+    emitApplicationUpdate();
   }
 }
 
@@ -530,30 +293,12 @@ function readStoredManualProjects() {
   return readStoredManualProjectsPayload().items;
 }
 
-function writeStoredManualProjects(projects: PublicNoticeProject[]) {
-  persistStoredManualProjects(projects);
-}
-
-function getAllProjects() {
-  return [...baseNoticeProjects, ...readStoredManualProjects()];
-}
-
 function readStoredRecordsPayload() {
-  const seeded = sampleUserProjects.map((item: UserProjectRecord) => normalizeRecord(item));
-
-  if (!canUseBrowserStorage()) {
-    return {
-      updatedAt: '',
-      items: seeded
-    };
-  }
-
   const payload = readStoragePayload<Partial<UserProjectRecord>>(APPLICATION_STORAGE_KEY);
   if (!payload) {
-    persistStoredRecords(seeded, nowIsoText(), false);
     return {
-      updatedAt: nowIsoText(),
-      items: seeded
+      updatedAt: '',
+      items: [] as UserProjectRecord[]
     };
   }
 
@@ -561,25 +306,25 @@ function readStoredRecordsPayload() {
     updatedAt: payload.updatedAt,
     items: payload.items
       .filter((item): item is Partial<UserProjectRecord> => Boolean(item && typeof item === 'object'))
-      .map((item: Partial<UserProjectRecord>) => normalizeRecord(item))
+      .map((item) => normalizeRecord(item))
   };
 }
 
-function persistStoredRecords(records: UserProjectRecord[], updatedAt = nowIsoText(), syncCloud = true) {
+function persistStoredRecords(records: UserProjectRecord[], updatedAt = nowIsoText(), emit = true) {
   if (!canUseBrowserStorage()) {
     return;
   }
 
-  const payload: StoredPayload<UserProjectRecord> = {
-    updatedAt,
-    items: records
-  };
+  window.localStorage.setItem(
+    APPLICATION_STORAGE_KEY,
+    JSON.stringify({
+      updatedAt,
+      items: records
+    } satisfies StoredPayload<UserProjectRecord>)
+  );
 
-  window.localStorage.setItem(APPLICATION_STORAGE_KEY, JSON.stringify(payload));
-  emitApplicationUpdate();
-
-  if (syncCloud) {
-    void writeCloudWorkspace();
+  if (emit) {
+    emitApplicationUpdate();
   }
 }
 
@@ -587,8 +332,332 @@ function readStoredRecords() {
   return readStoredRecordsPayload().items;
 }
 
-function writeStoredRecords(records: UserProjectRecord[]) {
-  persistStoredRecords(records);
+function getSupabaseMemberContext() {
+  const session = getUserSession();
+  if (!session || session.authProvider === 'anonymous' || !session.userId) {
+    return null;
+  }
+
+  return {
+    userId: session.userId,
+    session
+  };
+}
+
+function mapNoticeRowToProject(row: Record<string, unknown>) {
+  if (!row) {
+    return null;
+  }
+
+  return normalizeManualProject({
+    id: String(row.id || '').trim(),
+    schoolName: String(row.school_name || row.schoolName || '').trim(),
+    departmentName: String(row.department_name || row.departmentName || '').trim(),
+    projectName: String(row.project_name || row.projectName || '').trim(),
+    projectType: String(row.project_type || row.projectType || '夏令营') as ProjectType,
+    discipline: String(row.discipline || '').trim(),
+    publishDate: String(row.publish_date || row.publishDate || '').trim(),
+    deadlineDate: String(row.deadline_date || row.deadlineDate || '').trim(),
+    eventStartDate: String(row.event_start_date || row.eventStartDate || '').trim(),
+    eventEndDate: String(row.event_end_date || row.eventEndDate || '').trim(),
+    applyLink: String(row.apply_link || row.applyLink || '').trim(),
+    sourceLink: String(row.source_link || row.sourceLink || '').trim(),
+    requirements: String(row.requirements || '').trim(),
+    materialsRequired: normalizeStringArray(row.materials_required || row.materialsRequired),
+    examInterviewInfo: String(row.exam_interview_info || row.examInterviewInfo || '').trim(),
+    contactInfo: String(row.contact_info || row.contactInfo || '').trim(),
+    remarks: String(row.remarks || '').trim(),
+    tags: normalizeStringArray(row.tags),
+    status: String(row.status || '') as PublicNoticeProject['status'],
+    year: Number(row.year || NOTICE_TARGET_YEAR),
+    deadlineLevel: String(row.deadline_level || row.deadlineLevel || 'future') as DeadlineLevel,
+    sourceSite: String(row.source_site || row.sourceSite || '').trim(),
+    collectedAt: String(row.collected_at || row.collectedAt || '').trim(),
+    updatedAt: String(row.updated_at || row.updatedAt || '').trim(),
+    lastCheckedAt: String(row.last_checked_at || row.lastCheckedAt || '').trim(),
+    isVerified: Boolean(row.is_verified ?? row.isVerified),
+    changeLog: (Array.isArray(row.change_log) ? row.change_log : row.changeLog || []) as PublicNoticeProject['changeLog'],
+    historyRecords: (Array.isArray(row.history_records) ? row.history_records : row.historyRecords || []) as PublicNoticeProject['historyRecords']
+  });
+}
+
+function mapApplicationRowToRecord(row: Record<string, unknown>) {
+  return normalizeRecord({
+    userProjectId: String(row.id || `user-${row.project_id || row.projectId}`),
+    userId: String(row.user_id || row.userId || ''),
+    projectId: String(row.project_id || row.projectId || ''),
+    isFavorited: Boolean(row.is_favorited ?? row.isFavorited ?? true),
+    myStatus: String(row.my_status || row.myStatus || '已收藏') as UserProjectStatus,
+    priorityLevel: String(row.priority_level || row.priorityLevel || '中') as UserProjectRecord['priorityLevel'],
+    materialsProgress: Number(row.materials_progress ?? row.materialsProgress ?? 0),
+    cvReady: Boolean(row.cv_ready ?? row.cvReady),
+    transcriptReady: Boolean(row.transcript_ready ?? row.transcriptReady),
+    rankingProofReady: Boolean(row.ranking_proof_ready ?? row.rankingProofReady),
+    recommendationReady: Boolean(row.recommendation_ready ?? row.recommendationReady),
+    personalStatementReady: Boolean(row.personal_statement_ready ?? row.personalStatementReady),
+    contactSupervisorDone: Boolean(row.contact_supervisor_done ?? row.contactSupervisorDone),
+    submittedAt: String(row.submitted_at || row.submittedAt || ''),
+    interviewTime: String(row.interview_time || row.interviewTime || ''),
+    resultStatus: String(row.result_status || row.resultStatus || '未出结果') as UserProjectRecord['resultStatus'],
+    myNotes: String(row.my_notes || row.myNotes || ''),
+    customReminderEnabled: Boolean(row.custom_reminder_enabled ?? row.customReminderEnabled ?? true)
+  });
+}
+
+function mapProjectToNoticeUpsert(project: PublicNoticeProject, userId: string, isPrivate: boolean) {
+  return {
+    id: project.id,
+    school_name: project.schoolName,
+    department_name: project.departmentName,
+    project_name: project.projectName,
+    project_type: project.projectType,
+    discipline: project.discipline,
+    publish_date: project.publishDate,
+    deadline_date: project.deadlineDate,
+    event_start_date: project.eventStartDate,
+    event_end_date: project.eventEndDate,
+    apply_link: project.applyLink,
+    source_link: project.sourceLink,
+    requirements: project.requirements,
+    materials_required: project.materialsRequired,
+    exam_interview_info: project.examInterviewInfo,
+    contact_info: project.contactInfo,
+    remarks: project.remarks,
+    tags: project.tags,
+    status: project.status,
+    year: project.year,
+    deadline_level: project.deadlineLevel,
+    source_site: project.sourceSite,
+    is_private: isPrivate,
+    collected_at: project.collectedAt,
+    updated_at: project.updatedAt,
+    last_checked_at: project.lastCheckedAt,
+    is_verified: project.isVerified,
+    change_log: project.changeLog,
+    history_records: project.historyRecords,
+    created_by: userId
+  };
+}
+
+function mapRecordToApplicationUpsert(record: UserProjectRecord, userId: string) {
+  return {
+    user_id: userId,
+    project_id: record.projectId,
+    is_favorited: record.isFavorited,
+    my_status: record.myStatus,
+    priority_level: record.priorityLevel,
+    materials_progress: record.materialsProgress,
+    cv_ready: record.cvReady,
+    transcript_ready: record.transcriptReady,
+    ranking_proof_ready: record.rankingProofReady,
+    recommendation_ready: record.recommendationReady,
+    personal_statement_ready: record.personalStatementReady,
+    contact_supervisor_done: record.contactSupervisorDone,
+    submitted_at: record.submittedAt,
+    interview_time: record.interviewTime,
+    result_status: record.resultStatus,
+    my_notes: record.myNotes,
+    custom_reminder_enabled: record.customReminderEnabled
+  };
+}
+
+function profileHasMeaningfulContent(profile: UserProfile | null | undefined) {
+  if (!profile) {
+    return false;
+  }
+
+  return Object.values(profile).some((value) => String(value || '').trim());
+}
+
+async function upsertRemoteManualProjects(projects: PublicNoticeProject[]) {
+  const context = getSupabaseMemberContext();
+  if (!context || !projects.length) {
+    return;
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  const payload = projects.map((project) => mapProjectToNoticeUpsert(project, context.userId, true));
+
+  const { error } = await supabase.from('notices').upsert(payload, {
+    onConflict: 'id'
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function upsertRemoteApplications(records: UserProjectRecord[]) {
+  const context = getSupabaseMemberContext();
+  if (!context || !records.length) {
+    return;
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  const payload = records.map((record) => mapRecordToApplicationUpsert(record, context.userId));
+  const { error } = await supabase.from('applications').upsert(payload, {
+    onConflict: 'user_id,project_id'
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function upsertRemoteProfile(profile: UserProfile | null | undefined) {
+  const context = getSupabaseMemberContext();
+  if (!context || !profileHasMeaningfulContent(profile)) {
+    return;
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  const { error } = await supabase.from('profiles').upsert(
+    {
+      id: context.userId,
+      nickname: profile?.nickname || '',
+      age: profile?.age || '',
+      undergraduate_school: profile?.undergraduateSchool || '',
+      major: profile?.major || '',
+      grade: profile?.grade || '大四',
+      target_major: profile?.targetMajor || '',
+      target_region: profile?.targetRegion || ''
+    },
+    {
+      onConflict: 'id'
+    }
+  );
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function fetchRemoteManualProjects() {
+  const context = getSupabaseMemberContext();
+  if (!context) {
+    return [] as PublicNoticeProject[];
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from('notices')
+    .select('*')
+    .eq('created_by', context.userId)
+    .eq('is_private', true)
+    .order('updated_at_ts', { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []).map((row) => mapNoticeRowToProject(row)).filter(Boolean) as PublicNoticeProject[];
+}
+
+async function fetchRemoteApplications() {
+  const context = getSupabaseMemberContext();
+  if (!context) {
+    return [] as UserProjectRecord[];
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('user_id', context.userId)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []).map((row) => mapApplicationRowToRecord(row));
+}
+
+async function fetchRemoteProfile() {
+  const context = getSupabaseMemberContext();
+  if (!context) {
+    return null;
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', context.userId).maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    nickname: String(data.nickname || ''),
+    age: String(data.age || ''),
+    undergraduateSchool: String(data.undergraduate_school || ''),
+    major: String(data.major || ''),
+    grade: String(data.grade || '大四'),
+    targetMajor: String(data.target_major || ''),
+    targetRegion: String(data.target_region || '')
+  } satisfies UserProfile;
+}
+
+async function hydrateWorkspaceFromSupabase() {
+  const context = getSupabaseMemberContext();
+  if (!context) {
+    hydratedWorkspaceUserId = '';
+    hydrateWorkspacePromise = null;
+    return;
+  }
+
+  if (hydratedWorkspaceUserId !== context.userId) {
+    hydratedWorkspaceUserId = context.userId;
+    hydrateWorkspacePromise = null;
+  }
+
+  if (!hydrateWorkspacePromise) {
+    hydrateWorkspacePromise = (async () => {
+      const localManualProjects = readStoredManualProjectsPayload().items;
+      const localApplications = readStoredRecordsPayload().items;
+      const localProfile = getUserSession()?.profile;
+
+      await Promise.all([
+        upsertRemoteManualProjects(localManualProjects),
+        upsertRemoteApplications(localApplications),
+        upsertRemoteProfile(localProfile)
+      ]);
+
+      const [remoteManualProjects, remoteApplications, remoteProfile] = await Promise.all([
+        fetchRemoteManualProjects(),
+        fetchRemoteApplications(),
+        fetchRemoteProfile()
+      ]);
+
+      persistStoredManualProjects(remoteManualProjects, nowIsoText(), false);
+      persistStoredRecords(remoteApplications, nowIsoText(), false);
+
+      if (remoteProfile && profileHasMeaningfulContent(remoteProfile)) {
+        updateUserProfile(remoteProfile);
+      }
+    })();
+  }
+
+  await hydrateWorkspacePromise;
+}
+
+async function readRemotePublicNotices() {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from('notices')
+    .select('*')
+    .eq('year', NOTICE_TARGET_YEAR)
+    .eq('is_private', false)
+    .range(0, PUBLIC_NOTICE_QUERY_LIMIT - 1);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []).map((row) => mapNoticeRowToProject(row)).filter(Boolean) as PublicNoticeProject[];
 }
 
 export function watchApplicationTable(callback: () => void) {
@@ -607,8 +676,30 @@ export function watchApplicationTable(callback: () => void) {
 }
 
 export async function fetchPublicNotices() {
-  const cloudProjects = await readCloudNoticeProjects();
-  return cloudProjects.length ? cloudProjects : baseNoticeProjects;
+  if (!publicNoticeCachePromise) {
+    publicNoticeCachePromise = (async () => {
+      try {
+        const remoteProjects = await readRemotePublicNotices();
+        if (!remoteProjects.length) {
+          return baseNoticeProjects;
+        }
+
+        const merged = new Map<string, PublicNoticeProject>();
+        baseNoticeProjects.forEach((project) => {
+          merged.set(project.id, project);
+        });
+        remoteProjects.forEach((project) => {
+          merged.set(project.id, project);
+        });
+
+        return sortProjectsByFreshness(Array.from(merged.values()));
+      } catch {
+        return baseNoticeProjects;
+      }
+    })();
+  }
+
+  return publicNoticeCachePromise;
 }
 
 async function getAllProjectsAsync() {
@@ -616,7 +707,7 @@ async function getAllProjectsAsync() {
   const manualProjects = readStoredManualProjects();
   const projectMap = new Map<string, PublicNoticeProject>();
 
-  [...noticeProjects, ...manualProjects].forEach((project: PublicNoticeProject) => {
+  [...noticeProjects, ...manualProjects].forEach((project) => {
     projectMap.set(project.id, project);
   });
 
@@ -625,55 +716,56 @@ async function getAllProjectsAsync() {
 
 export async function fetchNoticeById(id: string) {
   const source = await getAllProjectsAsync();
-  return source.find((item: PublicNoticeProject) => item.id === id) || null;
+  return source.find((item) => item.id === id) || null;
 }
 
 export async function fetchDeadlineNotices() {
   const projects = await fetchPublicNotices();
-  return projects.filter((item: PublicNoticeProject) => item.deadlineLevel !== 'future');
+  return projects.filter((item) => item.deadlineLevel !== 'future');
 }
 
 export async function fetchUserProjects() {
-  await hydrateWorkspaceFromCloud();
+  await hydrateWorkspaceFromSupabase();
   return readStoredRecords();
 }
 
 export async function fetchApplicationRows() {
-  await hydrateWorkspaceFromCloud();
+  await hydrateWorkspaceFromSupabase();
   const records = readStoredRecords();
   const projects = await getAllProjectsAsync();
+  const projectMap = new Map(projects.map((project) => [project.id, project]));
+
   const rows = records.reduce<ApplicationRow[]>((list, item) => {
-    const project = projects.find((notice) => notice.id === item.projectId);
+    const project = projectMap.get(item.projectId);
     if (project) {
       list.push({ item, project });
     }
     return list;
   }, []);
 
-  return rows.sort((left: ApplicationRow, right: ApplicationRow) =>
-    left.project.deadlineDate.localeCompare(right.project.deadlineDate)
-  );
+  return rows.sort((left, right) => left.project.deadlineDate.localeCompare(right.project.deadlineDate));
 }
 
 export async function addProjectToApplicationTable(projectId: string) {
-  await hydrateWorkspaceFromCloud();
+  await hydrateWorkspaceFromSupabase();
   const current = readStoredRecords();
-  const existing = current.find((item: UserProjectRecord) => item.projectId === projectId);
+  const existing = current.find((item) => item.projectId === projectId);
 
   if (existing) {
     return existing;
   }
 
   const created = buildDefaultRecord(projectId);
-  writeStoredRecords([...current, created]);
+  persistStoredRecords([...current, created]);
+  await upsertRemoteApplications([...current, created]);
   return created;
 }
 
 export async function createManualApplicationEntry(input: ManualProjectInput) {
-  await hydrateWorkspaceFromCloud();
+  await hydrateWorkspaceFromSupabase();
   const manualProjects = readStoredManualProjects();
   const projectId = `custom-${Date.now()}`;
-  const nowText = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const timestamp = nowText();
   const project = normalizeManualProject({
     id: projectId,
     schoolName: input.schoolName.trim(),
@@ -681,7 +773,7 @@ export async function createManualApplicationEntry(input: ManualProjectInput) {
     projectName: input.projectName.trim(),
     projectType: input.projectType,
     discipline: input.discipline.trim() || '待补充',
-    publishDate: nowText.slice(0, 10),
+    publishDate: timestamp.slice(0, 10),
     deadlineDate: input.deadlineDate.trim(),
     eventStartDate: input.eventStartDate?.trim() || '',
     eventEndDate: input.eventEndDate?.trim() || '',
@@ -689,32 +781,35 @@ export async function createManualApplicationEntry(input: ManualProjectInput) {
     sourceLink: input.applyLink?.trim() || '',
     remarks: '用户手动录入项目',
     sourceSite: '用户手动录入',
-    collectedAt: nowText,
-    updatedAt: nowText,
-    lastCheckedAt: nowText,
+    collectedAt: timestamp,
+    updatedAt: timestamp,
+    lastCheckedAt: timestamp,
     tags: ['手动录入']
   });
 
-  writeStoredManualProjects([...manualProjects, project]);
-
-  const current = readStoredRecords();
   const record = normalizeRecord({
     ...buildDefaultRecord(project.id),
     projectId: project.id
   });
-  writeStoredRecords([...current, record]);
+
+  const nextManualProjects = [...manualProjects, project];
+  const nextRecords = [...readStoredRecords(), record];
+  persistStoredManualProjects(nextManualProjects);
+  persistStoredRecords(nextRecords);
+
+  await Promise.all([upsertRemoteManualProjects(nextManualProjects), upsertRemoteApplications(nextRecords)]);
+
   return { item: record, project };
 }
 
 export async function saveUserProfileToWorkspace(profile: UserProfile) {
-  if (!getUserSession()) {
+  const context = getSupabaseMemberContext();
+  if (!context) {
     return false;
   }
 
-  return writeCloudWorkspace({
-    profile,
-    profileUpdatedAt: nowIsoText()
-  });
+  await upsertRemoteProfile(profile);
+  return true;
 }
 
 export async function submitAiWaitlistLead(input: {
@@ -726,17 +821,30 @@ export async function submitAiWaitlistLead(input: {
     wechatId: input.wechatId.trim(),
     primaryNeed: input.primaryNeed,
     details: input.details?.trim() || '',
-    submittedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+    submittedAt: nowText(),
     source: 'ai-page'
   };
 
-  const ok = await writeCloudWorkspace(
-    {
-      aiWaitlistLead: lead,
-      aiWaitlistUpdatedAt: nowIsoText()
-    },
-    { allowAnonymous: true }
-  );
+  let ok = false;
+
+  try {
+    const supabase = getSupabaseBrowserClient();
+    const session = getUserSession();
+    const { error } = await supabase.from('ai_waitlist_leads').insert({
+      user_id: session?.authProvider === 'anonymous' ? null : session?.userId || null,
+      wechat_id: lead.wechatId,
+      primary_need: lead.primaryNeed,
+      details: lead.details,
+      submitted_at_text: lead.submittedAt,
+      source: lead.source
+    });
+
+    if (!error) {
+      ok = true;
+    }
+  } catch {
+    ok = false;
+  }
 
   if (canUseBrowserStorage()) {
     window.localStorage.setItem('seekoffer-ai-waitlist-lead', JSON.stringify(lead));
@@ -749,9 +857,9 @@ export async function submitAiWaitlistLead(input: {
 }
 
 export async function updateUserProject(userProjectId: string, patch: Partial<UserProjectRecord>) {
-  await hydrateWorkspaceFromCloud();
+  await hydrateWorkspaceFromSupabase();
   const current = readStoredRecords();
-  const next = current.map((item: UserProjectRecord) => {
+  const next = current.map((item) => {
     if (item.userProjectId !== userProjectId) {
       return item;
     }
@@ -761,15 +869,17 @@ export async function updateUserProject(userProjectId: string, patch: Partial<Us
     if (patch.myStatus === '已提交' && !merged.submittedAt) {
       return {
         ...merged,
-        submittedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
+        submittedAt: nowText()
       };
     }
 
     return merged;
   });
 
-  writeStoredRecords(next);
-  return next.find((item: UserProjectRecord) => item.userProjectId === userProjectId) || null;
+  persistStoredRecords(next);
+  await upsertRemoteApplications(next);
+
+  return next.find((item) => item.userProjectId === userProjectId) || null;
 }
 
 export async function updateUserProjectStatus(userProjectId: string, myStatus: UserProjectStatus) {
@@ -777,5 +887,10 @@ export async function updateUserProjectStatus(userProjectId: string, myStatus: U
 }
 
 export function getApplicationProject(projectId: string): PublicNoticeProject | null {
-  return getAllProjects().find((item: PublicNoticeProject) => item.id === projectId) || null;
+  const manualProject = readStoredManualProjects().find((item) => item.id === projectId);
+  if (manualProject) {
+    return manualProject;
+  }
+
+  return baseNoticeProjects.find((item) => item.id === projectId) || null;
 }

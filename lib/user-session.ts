@@ -1,6 +1,8 @@
 'use client';
 
-import { getCloudbaseApp } from './cloudbase-web';
+import type { AuthChangeEvent } from '@supabase/supabase-js';
+import { getSupabaseBrowserClient } from './supabase-browser';
+import { SEEKOFFER_SITE_URL, isSupabaseConfigured } from './supabase-env';
 
 export type UserProfile = {
   nickname: string;
@@ -12,18 +14,32 @@ export type UserProfile = {
   targetRegion: string;
 };
 
-export type AuthProviderType = 'wechat' | 'password' | 'anonymous';
+export type AuthProviderType = 'password' | 'otp' | 'anonymous';
+export type AuthRequirement = 'session' | 'member';
 
 export type UserSession = {
   loggedIn: boolean;
   authProvider: AuthProviderType;
   profile: UserProfile;
+  userId: string | null;
+  email: string;
+  phone: string;
 };
 
-type CredentialsPayload = {
-  username: string;
+export type CredentialsPayload = {
+  identifier: string;
   password: string;
 };
+
+export type PasswordSignUpResult =
+  | {
+      status: 'signed_in';
+      session: UserSession;
+    }
+  | {
+      status: 'pending_confirmation';
+      message: string;
+    };
 
 const SESSION_STORAGE_KEY = 'seekoffer-user-session';
 const SESSION_EVENT_NAME = 'seekoffer-user-session-updated';
@@ -56,64 +72,102 @@ function normalizeProfile(profile?: Partial<UserProfile>) {
 }
 
 function normalizeProvider(provider?: unknown): AuthProviderType {
-  if (provider === 'password' || provider === 'anonymous') {
+  if (provider === 'otp' || provider === 'anonymous') {
     return provider;
   }
 
-  return 'wechat';
+  return 'password';
 }
 
-function isAnonymousCloudUser(user: Record<string, any> | null | undefined) {
-  if (!user) {
-    return true;
-  }
-
-  return Boolean(user.is_anonymous) || user.name === 'anonymous' || user.loginType === 'ANONYMOUS';
+function isEmailIdentifier(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
-function extractCloudNickname(userInfo: Record<string, any> | null | undefined) {
-  if (!userInfo) {
-    return '';
-  }
-
-  return (
-    userInfo.nickName ||
-    userInfo.nickname ||
-    userInfo.name ||
-    userInfo.username ||
-    userInfo.email ||
-    userInfo.phone_number ||
-    userInfo.user_metadata?.nickName ||
-    userInfo.user_metadata?.nickname ||
-    userInfo.user_metadata?.name ||
-    ''
-  );
+function normalizePhoneIdentifier(value: string) {
+  return value.replace(/[^\d+]/g, '');
 }
 
-async function resolveCloudUserInfo(auth: Record<string, any>) {
-  if (typeof auth.getUserInfo === 'function') {
-    const userInfo = await auth.getUserInfo();
-    if (userInfo) {
-      return userInfo as Record<string, any>;
+function isPhoneIdentifier(value: string) {
+  const normalized = normalizePhoneIdentifier(value);
+  return /^\+?\d{6,15}$/.test(normalized);
+}
+
+function normalizeIdentifier(value: string) {
+  const trimmed = value.trim();
+  return isPhoneIdentifier(trimmed) ? normalizePhoneIdentifier(trimmed) : trimmed.toLowerCase();
+}
+
+function readRecordText(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+
+    if (typeof value === 'number') {
+      return String(value);
     }
   }
 
-  if (typeof auth.getUser === 'function') {
-    const result = await auth.getUser();
-    const user = result?.data?.user || result?.user;
-    if (user) {
-      return user as Record<string, any>;
-    }
+  return '';
+}
+
+function toObjectRecord(value: unknown) {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
+}
+
+function extractProfileMetadata(metadata?: Record<string, unknown> | null) {
+  if (!metadata) {
+    return {};
   }
 
-  return null;
+  return {
+    nickname: readRecordText(metadata, 'nickname', 'nickName', 'name', 'display_name'),
+    age: readRecordText(metadata, 'age'),
+    undergraduateSchool: readRecordText(metadata, 'undergraduateSchool', 'undergraduate_school'),
+    major: readRecordText(metadata, 'major'),
+    grade: readRecordText(metadata, 'grade'),
+    targetMajor: readRecordText(metadata, 'targetMajor', 'target_major'),
+    targetRegion: readRecordText(metadata, 'targetRegion', 'target_region')
+  } satisfies Partial<UserProfile>;
+}
+
+export function getAuthProviderLabel(provider: AuthProviderType) {
+  if (provider === 'otp') {
+    return '邮箱验证码';
+  }
+
+  if (provider === 'anonymous') {
+    return '本地试用';
+  }
+
+  return '密码登录';
+}
+
+export function isLoggedInSession(session: UserSession | null | undefined) {
+  return Boolean(session?.loggedIn);
+}
+
+export function isMemberSession(session: UserSession | null | undefined) {
+  return Boolean(session?.loggedIn && session.authProvider !== 'anonymous');
+}
+
+export function satisfiesAuthRequirement(
+  session: UserSession | null | undefined,
+  requirement: AuthRequirement = 'session'
+) {
+  if (requirement === 'member') {
+    return isMemberSession(session);
+  }
+
+  return isLoggedInSession(session);
 }
 
 function normalizeErrorText(raw: string) {
   return raw.replace(/\s+/g, ' ').trim();
 }
 
-function extractErrorText(error: unknown): string {
+function extractErrorText(error: unknown) {
   if (!error) {
     return '';
   }
@@ -127,17 +181,12 @@ function extractErrorText(error: unknown): string {
   }
 
   if (typeof error === 'object') {
-    const record = error as Record<string, any>;
-    const nested = record.error_description || record.message || record.msg || record.error;
-
-    if (typeof nested === 'string') {
-      return normalizeErrorText(nested);
-    }
-
-    try {
-      return normalizeErrorText(JSON.stringify(record));
-    } catch {
-      return '';
+    const record = toObjectRecord(error);
+    if (record) {
+      const nested = readRecordText(record, 'error_description', 'message', 'msg', 'error');
+      if (nested) {
+        return normalizeErrorText(nested);
+      }
     }
   }
 
@@ -145,25 +194,72 @@ function extractErrorText(error: unknown): string {
 }
 
 function formatAuthError(error: unknown, fallback: string) {
-  const message = extractErrorText(error);
-
+  const message = extractErrorText(error).toLowerCase();
   if (!message) {
     return fallback;
   }
 
-  if (/publishable|access.?key|api.?key/i.test(message)) {
-    return '网页登录配置未完成：缺少 CloudBase Publishable Key。';
+  if (/supabase|environment variables|missing/.test(message)) {
+    return '网页登录配置未完成：缺少 Supabase 环境变量。';
   }
 
-  if (/domain|origin|security|forbidden|illegal|非法来源/i.test(message)) {
-    return '当前访问域名还没有加入 CloudBase 安全来源，请稍等配置生效或检查控制台域名配置。';
+  if (/invalid login credentials|invalid_credentials/.test(message)) {
+    return '账号或密码不正确，请检查后重试。';
   }
 
-  if (/provider|oauth|wx_open|not support/i.test(message)) {
-    return 'CloudBase 登录方式尚未完全就绪，请检查微信开放平台登录和网页回调配置。';
+  if (/email not confirmed|email_not_confirmed/.test(message)) {
+    return '邮箱还未完成验证，请先打开验证邮件。';
   }
 
-  return message;
+  if (/password should be at least/.test(message)) {
+    return '密码长度不够，请至少使用 6 位。';
+  }
+
+  if (/phone provider is not configured|unsupported phone provider/.test(message)) {
+    return '当前还没有配置短信服务，手机号登录暂时不可用。';
+  }
+
+  if (/user already registered|already been registered/.test(message)) {
+    return '该账号已经注册，可以直接登录。';
+  }
+
+  if (/otp|token/.test(message)) {
+    return '验证码无效或已过期，请重新发送。';
+  }
+
+  return extractErrorText(error) || fallback;
+}
+
+function buildAnonymousSession(existing?: UserSession | null) {
+  return {
+    loggedIn: true,
+    authProvider: 'anonymous' as const,
+    profile: normalizeProfile(existing?.profile),
+    userId: null,
+    email: '',
+    phone: ''
+  };
+}
+
+function buildMemberSession(user: {
+  id: string;
+  email?: string | null;
+  phone?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+}, provider: AuthProviderType, existing?: UserSession | null) {
+  const metadataProfile = extractProfileMetadata(user.user_metadata);
+
+  return {
+    loggedIn: true,
+    authProvider: provider,
+    profile: normalizeProfile({
+      ...(existing?.profile || {}),
+      ...metadataProfile
+    }),
+    userId: user.id,
+    email: user.email || existing?.email || '',
+    phone: user.phone || existing?.phone || ''
+  } satisfies UserSession;
 }
 
 export function getUserSession(): UserSession | null {
@@ -185,7 +281,10 @@ export function getUserSession(): UserSession | null {
     return {
       loggedIn: true,
       authProvider: normalizeProvider(parsed.authProvider),
-      profile: normalizeProfile(parsed.profile)
+      profile: normalizeProfile(parsed.profile),
+      userId: typeof parsed.userId === 'string' ? parsed.userId : null,
+      email: typeof parsed.email === 'string' ? parsed.email : '',
+      phone: typeof parsed.phone === 'string' ? parsed.phone : ''
     };
   } catch {
     return null;
@@ -206,185 +305,235 @@ function writeUserSession(session: UserSession | null) {
   emitSessionUpdate();
 }
 
-function persistCloudSession(userInfo: Record<string, any> | null | undefined, provider: AuthProviderType) {
+async function getSupabaseUser() {
+  if (!isSupabaseConfigured()) {
+    return null;
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  const {
+    data: { user },
+    error
+  } = await supabase.auth.getUser();
+
+  if (error) {
+    throw error;
+  }
+
+  return user;
+}
+
+export async function hydrateSupabaseSession() {
   const current = getUserSession();
-  const next: UserSession = {
-    loggedIn: true,
-    authProvider: provider,
-    profile: normalizeProfile({
-      ...(current?.profile || {}),
-      nickname: extractCloudNickname(userInfo) || current?.profile.nickname || ''
-    })
-  };
 
-  writeUserSession(next);
-  return next;
-}
-
-async function getAuthInstance() {
-  const app = await getCloudbaseApp();
-  return app.auth({ persistence: 'local' });
-}
-
-export async function hydrateCloudbaseSession() {
-  if (!canUseBrowserStorage()) {
-    return getUserSession();
+  if (!isSupabaseConfigured()) {
+    return current;
   }
 
   try {
-    const auth = await getAuthInstance();
-    const loginState = await auth.getLoginState();
-    const cloudUser = loginState?.user as Record<string, any> | undefined;
+    const supabase = getSupabaseBrowserClient();
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
 
-    if (!cloudUser) {
-      return getUserSession();
-    }
-
-    if (isAnonymousCloudUser(cloudUser)) {
-      const current = getUserSession();
-      return current?.authProvider === 'anonymous' ? current : getUserSession();
-    }
-
-    const userInfo = await resolveCloudUserInfo(auth);
-    const current = getUserSession();
-    return persistCloudSession(userInfo, current?.authProvider === 'password' ? 'password' : 'wechat');
-  } catch (error) {
-    console.error('[Seekoffer][auth] hydrateCloudbaseSession failed', error);
-    return getUserSession();
-  }
-}
-
-export async function signInWithWechat() {
-  const auth = await getAuthInstance();
-
-  try {
-    if (typeof auth.signInWithOAuth === 'function') {
-      for (const provider of ['wechat', 'wx_open']) {
-        try {
-          const oauthResult = await auth.signInWithOAuth({ provider });
-          const oauthError = oauthResult?.error;
-
-          if (oauthError) {
-            throw oauthError;
-          }
-
-          const redirectUrl = oauthResult?.data?.url || oauthResult?.url;
-          if (redirectUrl && typeof window !== 'undefined') {
-            window.location.assign(redirectUrl);
-            return null;
-          }
-        } catch (providerError) {
-          if (provider === 'wx_open') {
-            throw providerError;
-          }
-        }
-      }
-    }
-
-    if (typeof auth.signInWithWechat === 'function') {
-      await auth.signInWithWechat();
-      const userInfo = await resolveCloudUserInfo(auth);
-      return persistCloudSession(userInfo, 'wechat');
-    }
-
-    if (typeof auth.toDefaultLoginPage === 'function') {
-      const result = await auth.toDefaultLoginPage();
-      const loginError = result?.error;
-
-      if (loginError) {
-        throw loginError;
+    if (!session) {
+      if (current?.authProvider === 'anonymous') {
+        return current;
       }
 
+      writeUserSession(null);
       return null;
     }
 
-    throw new Error('当前环境尚未开启网页微信登录。');
+    const user = await getSupabaseUser();
+    if (!user) {
+      writeUserSession(null);
+      return null;
+    }
+
+    const provider = current?.authProvider === 'otp' ? 'otp' : 'password';
+    const nextSession = buildMemberSession(user, provider, current);
+    writeUserSession(nextSession);
+    return nextSession;
   } catch (error) {
-    console.error('[Seekoffer][auth] signInWithWechat failed', error);
-    throw new Error(formatAuthError(error, '微信登录暂时不可用，请稍后重试。'));
+    console.error('[Seekoffer][auth] hydrateSupabaseSession failed', error);
+    return current;
   }
+}
+
+async function persistMemberSession(provider: AuthProviderType) {
+  const current = getUserSession();
+  const user = await getSupabaseUser();
+  if (!user) {
+    throw new Error('当前登录状态无效，请重新登录。');
+  }
+
+  const nextSession = buildMemberSession(user, provider, current);
+  writeUserSession(nextSession);
+  return nextSession;
 }
 
 export async function signInWithPasswordAccount(payload: CredentialsPayload) {
-  const auth = await getAuthInstance();
+  if (!isSupabaseConfigured()) {
+    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+  }
+
+  const identifier = normalizeIdentifier(payload.identifier);
+  const supabase = getSupabaseBrowserClient();
 
   try {
-    await auth.signInWithPassword({
-      username: payload.username,
-      password: payload.password
-    });
+    const credentials = isPhoneIdentifier(identifier)
+      ? { phone: normalizePhoneIdentifier(identifier), password: payload.password }
+      : { email: identifier, password: payload.password };
 
-    const userInfo = await resolveCloudUserInfo(auth);
-    return persistCloudSession(userInfo, 'password');
+    const { error } = await supabase.auth.signInWithPassword(credentials);
+    if (error) {
+      throw error;
+    }
+
+    return persistMemberSession('password');
   } catch (error) {
     console.error('[Seekoffer][auth] signInWithPasswordAccount failed', error);
-    throw new Error(formatAuthError(error, '用户名或密码登录失败，请稍后重试。'));
+    throw new Error(formatAuthError(error, '密码登录暂时不可用，请稍后重试。'));
   }
 }
 
-export async function signUpWithPasswordAccount(payload: CredentialsPayload) {
-  const auth = await getAuthInstance();
+export async function signUpWithPasswordAccount(payload: CredentialsPayload): Promise<PasswordSignUpResult> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+  }
+
+  const identifier = normalizeIdentifier(payload.identifier);
+  const nicknameSeed = isEmailIdentifier(identifier)
+    ? identifier.split('@')[0]
+    : normalizePhoneIdentifier(identifier).slice(-4);
+
+  const supabase = getSupabaseBrowserClient();
 
   try {
-    await auth.signUp({
-      username: payload.username,
-      password: payload.password,
-      nickname: payload.username
-    });
+    const credentials = isPhoneIdentifier(identifier)
+      ? {
+          phone: normalizePhoneIdentifier(identifier),
+          password: payload.password,
+          options: {
+            data: {
+              nickname: nicknameSeed
+            }
+          }
+        }
+      : {
+          email: identifier,
+          password: payload.password,
+          options: {
+            emailRedirectTo: SEEKOFFER_SITE_URL,
+            data: {
+              nickname: nicknameSeed
+            }
+          }
+        };
 
-    return signInWithPasswordAccount(payload);
+    const { data, error } = await supabase.auth.signUp(credentials);
+    if (error) {
+      throw error;
+    }
+
+    if (data.session) {
+      const session = await persistMemberSession('password');
+      return {
+        status: 'signed_in',
+        session
+      };
+    }
+
+    return {
+      status: 'pending_confirmation',
+      message: isPhoneIdentifier(identifier)
+        ? '注册成功，请使用短信验证码完成后续验证。'
+        : '注册成功，请先打开邮箱中的验证邮件，再回来登录。'
+    };
   } catch (error) {
     console.error('[Seekoffer][auth] signUpWithPasswordAccount failed', error);
-    throw new Error(formatAuthError(error, '用户名注册失败，请稍后重试。'));
+    throw new Error(formatAuthError(error, '注册失败，请稍后再试。'));
+  }
+}
+
+export async function sendEmailLoginCode(email: string) {
+  if (!isSupabaseConfigured()) {
+    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+  }
+
+  const normalizedEmail = normalizeIdentifier(email);
+  if (!isEmailIdentifier(normalizedEmail)) {
+    throw new Error('请输入正确的邮箱地址。');
+  }
+
+  const supabase = getSupabaseBrowserClient();
+
+  try {
+    const { error } = await supabase.auth.signInWithOtp({
+      email: normalizedEmail,
+      options: {
+        emailRedirectTo: SEEKOFFER_SITE_URL,
+        shouldCreateUser: true
+      }
+    });
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    console.error('[Seekoffer][auth] sendEmailLoginCode failed', error);
+    throw new Error(formatAuthError(error, '验证码发送失败，请稍后重试。'));
+  }
+}
+
+export async function verifyEmailLoginCode(email: string, token: string) {
+  if (!isSupabaseConfigured()) {
+    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+  }
+
+  const normalizedEmail = normalizeIdentifier(email);
+  const normalizedToken = token.trim();
+  if (!isEmailIdentifier(normalizedEmail)) {
+    throw new Error('请输入正确的邮箱地址。');
+  }
+
+  if (!normalizedToken) {
+    throw new Error('请先输入邮箱验证码。');
+  }
+
+  const supabase = getSupabaseBrowserClient();
+
+  try {
+    const { error } = await supabase.auth.verifyOtp({
+      email: normalizedEmail,
+      token: normalizedToken,
+      type: 'email'
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return persistMemberSession('otp');
+  } catch (error) {
+    console.error('[Seekoffer][auth] verifyEmailLoginCode failed', error);
+    throw new Error(formatAuthError(error, '验证码校验失败，请重新发送后再试。'));
   }
 }
 
 export async function signInAsGuest() {
-  const auth = await getAuthInstance();
-
-  try {
-    if (typeof auth.signInAnonymously === 'function') {
-      await auth.signInAnonymously({});
-    } else if (typeof auth.anonymousAuthProvider === 'function') {
-      await auth.anonymousAuthProvider().signIn();
-    } else {
-      throw new Error('当前环境未开启匿名登录。');
-    }
-
-    const userInfo = await resolveCloudUserInfo(auth);
-    return persistCloudSession(userInfo, 'anonymous');
-  } catch (error) {
-    console.error('[Seekoffer][auth] signInAsGuest failed', error);
-    throw new Error(formatAuthError(error, '匿名试用暂时不可用，请稍后重试。'));
-  }
-}
-
-export async function openCloudbaseLoginPage() {
-  const auth = await getAuthInstance();
-
-  try {
-    if (typeof auth.toDefaultLoginPage !== 'function') {
-      throw new Error('当前环境尚未提供 CloudBase 默认登录页。');
-    }
-
-    const result = await auth.toDefaultLoginPage();
-    const loginError = result?.error;
-
-    if (loginError) {
-      throw loginError;
-    }
-  } catch (error) {
-    console.error('[Seekoffer][auth] openCloudbaseLoginPage failed', error);
-    throw new Error(formatAuthError(error, '更多登录方式暂时不可用，请稍后重试。'));
-  }
+  const current = getUserSession();
+  const nextSession = buildAnonymousSession(current);
+  writeUserSession(nextSession);
+  return nextSession;
 }
 
 export async function signOutUser() {
   try {
-    const auth = await getAuthInstance();
-    await auth.signOut();
-    if (typeof auth.anonymousAuthProvider === 'function') {
-      await auth.anonymousAuthProvider().signIn();
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabaseBrowserClient();
+      await supabase.auth.signOut();
     }
   } catch {
     // Ignore and continue clearing the local session.
@@ -423,5 +572,23 @@ export function watchUserSession(callback: () => void) {
   return () => {
     window.removeEventListener(SESSION_EVENT_NAME, handler);
     window.removeEventListener('storage', handler);
+  };
+}
+
+export function watchSupabaseAuthState(callback: (event: AuthChangeEvent) => void) {
+  if (typeof window === 'undefined' || !isSupabaseConfigured()) {
+    return () => undefined;
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  const {
+    data: { subscription }
+  } = supabase.auth.onAuthStateChange(async (event) => {
+    await hydrateSupabaseSession();
+    callback(event);
+  });
+
+  return () => {
+    subscription.unsubscribe();
   };
 }

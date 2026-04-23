@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
+import Image from 'next/image';
+import { useMemo, useState } from 'react';
 import { siteMarkManifest } from '@/lib/site-mark-manifest';
 
 function resolveDomain(urlOrDomain: string) {
@@ -70,6 +71,7 @@ export function ExternalSiteMark({
   variant?: 'auto' | 'badge' | 'image';
   layout?: 'square' | 'landscape';
 }) {
+  const [failedImageSrcs, setFailedImageSrcs] = useState<Record<string, true>>({});
   const domain = useMemo(() => resolveDomain(source), [source]);
   const localSrc = domain ? siteMarkManifest[domain] : '';
   const imageSrc = localSrc || '';
@@ -96,8 +98,13 @@ export function ExternalSiteMark({
     layout === 'landscape' ? 'rounded-[1.35rem]' : rounded === 'full' ? 'rounded-full' : 'rounded-2xl';
   const initial = buildFallbackInitial(label, domain);
   const palette = pickBadgePalette(domain || label);
+  const imageFailed = Boolean(imageSrc && failedImageSrcs[imageSrc]);
   const shouldUseImage =
-    variant === 'image' ? Boolean(imageSrc) : variant === 'badge' ? false : Boolean(imageSrc) && extension !== 'ico';
+    variant === 'image'
+      ? Boolean(imageSrc) && !imageFailed
+      : variant === 'badge'
+        ? false
+        : Boolean(imageSrc) && extension !== 'ico' && !imageFailed;
   const textSize =
     layout === 'landscape'
       ? size === 'sm'
@@ -126,20 +133,30 @@ export function ExternalSiteMark({
               borderColor: palette.border
             }
       }
-    >
+      >
       {shouldUseImage ? (
-        <img
+        <Image
           src={imageSrc}
           alt={`${label} logo`}
-          className={`h-full w-full bg-white object-contain ${layout === 'landscape' ? 'p-2.5' : 'p-1.5'}`}
-          loading="lazy"
-          onError={(event) => {
-            const target = event.currentTarget;
-            target.style.display = 'none';
-            const fallback = target.nextElementSibling;
-            if (fallback instanceof HTMLElement) {
-              fallback.style.display = 'flex';
+          fill
+          unoptimized
+          sizes={layout === 'landscape' ? '120px' : '72px'}
+          className={`bg-white object-contain ${layout === 'landscape' ? 'p-2.5' : 'p-1.5'}`}
+          onError={() => {
+            if (!imageSrc) {
+              return;
             }
+
+            setFailedImageSrcs((current) => {
+              if (current[imageSrc]) {
+                return current;
+              }
+
+              return {
+                ...current,
+                [imageSrc]: true
+              };
+            });
           }}
         />
       ) : null}

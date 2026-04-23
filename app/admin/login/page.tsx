@@ -49,7 +49,8 @@ export default function AdminLoginPage() {
             </div>
             <h1 className="mt-6 text-4xl font-semibold tracking-tight text-ink">先用一个轻后台，把运营最重要的动作收进来。</h1>
             <p className="mt-5 max-w-2xl text-sm leading-8 text-slate-600">
-              这版后台 MVP 只先解决四件事：看数据、改通知、管 Offer 池、看爬虫状态。后面再把高风险写操作逐步迁到 CloudBase 云函数。
+              这版后台 MVP 只先解决四件事：看数据、改通知、管 Offer 池、看爬虫状态。后面再把高风险写操作逐步迁到
+              Supabase Edge Functions。
             </p>
 
             <div className="mt-8 grid gap-4 md:grid-cols-2">
@@ -74,7 +75,7 @@ export default function AdminLoginPage() {
             </div>
             <h2 className="mt-4 text-2xl font-semibold text-ink">进入运营工作区</h2>
             <p className="mt-3 text-sm leading-7 text-slate-500">
-              当前先用管理员账号进入后台，下一步再接 CloudBase 的 <code>admin_users</code> 和角色校验。
+              当前先用管理员账号进入后台，下一步再接入 Supabase 管理员表与角色校验。
             </p>
 
             <form onSubmit={handleSubmit} className="mt-6 grid gap-4">

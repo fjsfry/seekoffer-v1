@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+import { AuthActionBridge } from '@/components/auth-action-bridge';
+import { AuthModal } from '@/components/auth-modal';
+import { UserSessionProvider } from '@/components/user-session-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -9,7 +12,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        <UserSessionProvider>
+          <AuthActionBridge />
+          <AuthModal />
+          {children}
+        </UserSessionProvider>
+      </body>
     </html>
   );
 }

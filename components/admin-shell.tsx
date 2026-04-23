@@ -33,10 +33,9 @@ export function AdminShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [session, setSession] = useState<AdminSession | null>(null);
+  const [session, setSession] = useState<AdminSession | null>(() => getAdminSession());
 
   useEffect(() => {
-    setSession(getAdminSession());
     const dispose = watchAdminSession(() => {
       setSession(getAdminSession());
     });
@@ -127,7 +126,7 @@ export function AdminShell({
               </div>
               <h2 className="mt-6 text-2xl font-semibold text-ink">请先登录后台</h2>
               <p className="mt-3 text-sm leading-7 text-slate-500">
-                轻后台 MVP 当前先用独立管理员账号访问，后续再接入 CloudBase 的 admin_users 与云函数校验。
+                轻后台 MVP 当前先用独立管理员账号访问，后续再接入 Supabase 管理员表与服务端权限校验。
               </p>
               <Link
                 href="/admin/login"

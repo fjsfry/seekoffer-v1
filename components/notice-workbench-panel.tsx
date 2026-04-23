@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Bell, LoaderCircle, Plus, Save } from 'lucide-react';
 import {
   addProjectToApplicationTable,
@@ -9,6 +10,8 @@ import {
   watchApplicationTable,
   type ApplicationRow
 } from '@/lib/cloudbase-data';
+import { openAuthModal, writeAuthIntent } from '@/lib/auth-intent';
+import { useUserSessionState } from '@/hooks/use-user-session';
 import {
   materialChecklistDefinitions,
   priorityOptions,
@@ -17,21 +20,24 @@ import {
   type PriorityLevel,
   type UserProjectRecord
 } from '@/lib/mock-data';
-import { getUserSession, signInWithWechat, watchUserSession } from '@/lib/user-session';
 
 export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
+  const pathname = usePathname();
+  const { loggedIn, ready: sessionReady } = useUserSessionState();
   const [row, setRow] = useState<ApplicationRow | null>(null);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState('');
 
-  const loggedIn = Boolean(getUserSession());
-
   useEffect(() => {
     let active = true;
 
     const load = async () => {
-      if (!getUserSession()) {
+      if (!sessionReady) {
+        return;
+      }
+
+      if (!loggedIn) {
         if (active) {
           setRow(null);
           setReady(true);
@@ -50,14 +56,12 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
 
     void load();
     const disposeApplications = watchApplicationTable(load);
-    const disposeSession = watchUserSession(load);
 
     return () => {
       active = false;
       disposeApplications();
-      disposeSession();
     };
-  }, [projectId]);
+  }, [loggedIn, projectId, sessionReady]);
 
   const progress = useMemo(() => row?.item.materialsProgress || 0, [row]);
 
@@ -65,8 +69,17 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
     setSaving(true);
 
     try {
-      if (!getUserSession()) {
-        await signInWithWechat();
+      if (!loggedIn) {
+        const intent = {
+          type: 'add-project' as const,
+          projectId,
+          returnTo: pathname,
+          reason: 'notice-workbench',
+          requiredAuth: 'session' as const
+        };
+        writeAuthIntent(intent);
+        openAuthModal(intent);
+        return;
       }
 
       await addProjectToApplicationTable(projectId);
@@ -126,7 +139,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
           className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white"
         >
           {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          微信登录并加入
+          登录并加入
         </button>
       </section>
     );

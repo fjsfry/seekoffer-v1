@@ -2,74 +2,70 @@
 
 import { useState } from 'react';
 import {
-  ExternalLink,
+  KeyRound,
   LoaderCircle,
-  QrCode,
+  LogIn,
+  Mail,
   ShieldCheck,
-  Smartphone,
+  Sparkles,
   UserRound,
-  UserRoundPlus,
-  WandSparkles
+  UserRoundPlus
 } from 'lucide-react';
 import {
-  openCloudbaseLoginPage,
+  sendEmailLoginCode,
   signInAsGuest,
   signInWithPasswordAccount,
-  signInWithWechat,
-  signUpWithPasswordAccount
+  signUpWithPasswordAccount,
+  verifyEmailLoginCode
 } from '@/lib/user-session';
 
-function MethodCard({
+function AuthCard({
   icon,
   title,
   description,
-  action,
   actionLabel,
-  busy,
-  disabled = false,
-  tone = 'light'
+  onClick,
+  pending,
+  tone = 'default'
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
-  action: () => void;
   actionLabel: string;
-  busy: boolean;
-  disabled?: boolean;
-  tone?: 'light' | 'brand';
+  onClick: () => void;
+  pending?: boolean;
+  tone?: 'default' | 'brand';
 }) {
   return (
     <div
-      className={`rounded-[24px] border p-4 ${
-        tone === 'brand'
-          ? 'border-brand/15 bg-brand/5'
-          : 'border-black/5 bg-white'
+      className={`rounded-[28px] border p-5 ${
+        tone === 'brand' ? 'border-brand/15 bg-brand/5' : 'border-black/5 bg-slate-50'
       }`}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-4">
         <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
-            tone === 'brand' ? 'bg-brand text-white' : 'bg-slate-100 text-brand'
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+            tone === 'brand' ? 'bg-brand text-white' : 'bg-white text-brand shadow-sm'
           }`}
         >
           {icon}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-ink">{title}</div>
-          <p className="mt-1 text-xs leading-6 text-slate-500">{description}</p>
+        <div className="min-w-0">
+          <div className="text-base font-semibold text-ink">{title}</div>
+          <p className="mt-2 text-sm leading-7 text-slate-600">{description}</p>
         </div>
       </div>
 
       <button
-        onClick={action}
-        disabled={disabled || busy}
-        className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+        onClick={onClick}
+        disabled={pending}
+        className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
           tone === 'brand'
-            ? 'bg-brand text-white hover:bg-brand-deep disabled:bg-brand/60'
-            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:bg-slate-100 disabled:text-slate-400'
+            ? 'bg-brand text-white hover:bg-brand-deep disabled:bg-brand/70'
+            : 'bg-white text-slate-700 shadow-sm hover:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400'
         }`}
       >
-        {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+        {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
         {actionLabel}
       </button>
     </div>
@@ -77,165 +73,272 @@ function MethodCard({
 }
 
 export function LoginMethodPanel({
-  mode = 'card',
+  mode = 'modal',
   onSuccess
 }: {
-  mode?: 'card' | 'popover';
+  mode?: 'card' | 'popover' | 'modal';
   onSuccess?: () => void;
 }) {
-  const [username, setUsername] = useState('');
+  const compact = mode === 'popover';
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [otpEmail, setOtpEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [pending, setPending] = useState<
-    '' | 'wechat' | 'guest' | 'password' | 'register' | 'wx-helper' | 'wx-mini'
+    '' | 'guest' | 'password' | 'register' | 'send-code' | 'verify-code'
   >('');
+  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const compact = mode === 'popover';
-  const rootClassName = compact
-    ? 'w-[400px] max-w-[calc(100vw-24px)] rounded-[28px] border border-black/5 bg-white p-5 shadow-2xl'
-    : 'rounded-[28px] border border-black/5 bg-white p-5 shadow-soft';
-
-  async function runTask(
+  async function runTask<T>(
     key: typeof pending,
-    task: () => Promise<unknown>,
-    callback?: () => void
+    task: () => Promise<T>,
+    options: {
+      closeOnSuccess?: boolean;
+      successMessage?: string;
+    } = {}
   ) {
     if (pending) {
-      return;
+      return null;
     }
 
     setPending(key);
     setError('');
+    setMessage('');
 
     try {
-      await task();
-      callback?.();
-      onSuccess?.();
+      const result = await task();
+      if (options.successMessage) {
+        setMessage(options.successMessage);
+      }
+
+      if (options.closeOnSuccess ?? true) {
+        onSuccess?.();
+      }
+
+      return result;
     } catch (taskError) {
-      setError(taskError instanceof Error ? taskError.message : '当前登录方式暂时不可用，请稍后重试。');
+      setError(taskError instanceof Error ? taskError.message : '当前登录暂时不可用，请稍后重试。');
+      return null;
     } finally {
       setPending('');
     }
   }
 
   async function handlePasswordLogin() {
-    if (!username.trim() || !password.trim()) {
-      setError('请输入用户名和密码。');
+    if (!identifier.trim() || !password.trim()) {
+      setError('请先输入邮箱/手机号和密码。');
       return;
     }
 
     await runTask('password', () =>
       signInWithPasswordAccount({
-        username: username.trim(),
+        identifier: identifier.trim(),
         password
       })
     );
   }
 
   async function handlePasswordRegister() {
-    if (!username.trim() || !password.trim()) {
-      setError('注册前请先填写用户名和密码。');
+    if (!identifier.trim() || !password.trim()) {
+      setError('请先填写邮箱/手机号和密码，再完成注册。');
       return;
     }
 
-    await runTask('register', () =>
-      signUpWithPasswordAccount({
-        username: username.trim(),
-        password
-      })
+    const result = await runTask(
+      'register',
+      () =>
+        signUpWithPasswordAccount({
+          identifier: identifier.trim(),
+          password
+        }),
+      { closeOnSuccess: false }
     );
+
+    if (!result) {
+      return;
+    }
+
+    if (result.status === 'signed_in') {
+      setMessage('注册并登录成功，已自动进入当前会话。');
+      onSuccess?.();
+      return;
+    }
+
+    setMessage(result.message);
+  }
+
+  async function handleSendCode() {
+    if (!otpEmail.trim()) {
+      setError('请先输入邮箱地址。');
+      return;
+    }
+
+    await runTask('send-code', () => sendEmailLoginCode(otpEmail.trim()), {
+      closeOnSuccess: false,
+      successMessage: '验证码已发送，请查看你的邮箱并输入 6 位验证码。'
+    });
+  }
+
+  async function handleVerifyCode() {
+    if (!otpEmail.trim() || !otpCode.trim()) {
+      setError('请先输入邮箱和验证码。');
+      return;
+    }
+
+    await runTask('verify-code', () => verifyEmailLoginCode(otpEmail.trim(), otpCode.trim()));
   }
 
   return (
-    <section className={rootClassName}>
-      <div className="space-y-5">
-        <div>
-          <div className="text-sm font-semibold text-ink">已接入的登录方式</div>
-          <p className="mt-2 text-xs leading-6 text-slate-500">
-            下面这 5 种方式，已经和你 CloudBase 控制台当前开放的登录配置保持一致。
-          </p>
-        </div>
+    <section className={compact ? 'space-y-4' : 'space-y-6'}>
+      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <AuthCard
+          icon={<Mail className="h-5 w-5" />}
+          title={compact ? '邮箱验证码' : '邮箱验证码登录'}
+          description={
+            compact
+              ? '输入邮箱后发送验证码，适合第一次进入 Seekoffer 或临时登录。'
+              : '适合第一次进入 Seekoffer、临时在新设备登录，或者你不想记密码时快速进入当前页面。'
+          }
+          actionLabel={pending === 'send-code' ? '正在发送...' : '先发送验证码'}
+          onClick={() => void handleSendCode()}
+          pending={pending === 'send-code'}
+          tone="brand"
+        />
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <MethodCard
-            icon={<QrCode className="h-4 w-4" />}
-            title="微信开放平台登录"
-            description="适合在电脑网页和浏览器里直接完成登录，进入工作台继续管理申请进度。"
-            action={() => void runTask('wechat', () => signInWithWechat())}
-            actionLabel={pending === 'wechat' ? '连接中...' : '立即使用微信登录'}
-            busy={pending === 'wechat'}
-            tone="brand"
-          />
+        <AuthCard
+          icon={<Sparkles className="h-5 w-5" />}
+          title="先本地试用"
+          description="先用本地试用体验通知库、资源库和基础工作台流程，不会立刻要求你绑定正式账号。"
+          actionLabel={pending === 'guest' ? '创建中...' : '先进入试用态'}
+          onClick={() => void runTask('guest', () => signInAsGuest())}
+          pending={pending === 'guest'}
+        />
+      </div>
 
-          <MethodCard
-            icon={<WandSparkles className="h-4 w-4" />}
-            title="匿名登录"
-            description="无需注册即可先体验通知库、申请表和工作台流程，适合快速试用。"
-            action={() => void runTask('guest', () => signInAsGuest())}
-            actionLabel={pending === 'guest' ? '创建中...' : '先匿名试用'}
-            busy={pending === 'guest'}
-          />
-
-          <MethodCard
-            icon={<Smartphone className="h-4 w-4" />}
-            title="微信云服务助手小程序"
-            description="适合在微信环境中继续登录，网页端会跳到 CloudBase 默认登录页承接。"
-            action={() => void runTask('wx-helper', () => openCloudbaseLoginPage())}
-            actionLabel={pending === 'wx-helper' ? '打开中...' : '在微信中继续'}
-            busy={pending === 'wx-helper'}
-          />
-
-          <MethodCard
-            icon={<ShieldCheck className="h-4 w-4" />}
-            title="小程序授权登录"
-            description="对应你已开启的 wx2a3a6dd9cc6ea678 小程序登录，适合微信 / 小程序环境。"
-            action={() => void runTask('wx-mini', () => openCloudbaseLoginPage())}
-            actionLabel={pending === 'wx-mini' ? '打开中...' : '打开小程序登录入口'}
-            busy={pending === 'wx-mini'}
-          />
-        </div>
-
-        <div className="rounded-[24px] bg-slate-50 p-4">
-          <div className="text-sm font-semibold text-ink">用户名密码</div>
-          <p className="mt-1 text-xs leading-6 text-slate-500">
-            你控制台里已经启用用户名密码登录，这里同时提供账号登录和首次注册。
-          </p>
-
-          <div className="mt-3 grid gap-3">
-            <input
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="输入用户名"
-              className="w-full rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm outline-none"
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="输入密码"
-              className="w-full rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm outline-none"
-            />
-            <div className="grid gap-2 sm:grid-cols-2">
-              <button
-                onClick={() => void handlePasswordLogin()}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
-              >
-                {pending === 'password' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UserRound className="h-4 w-4" />}
-                {pending === 'password' ? '登录中...' : '账号登录'}
-              </button>
-              <button
-                onClick={() => void handlePasswordRegister()}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
-              >
-                {pending === 'register' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UserRoundPlus className="h-4 w-4" />}
-                {pending === 'register' ? '注册中...' : '首次注册'}
-              </button>
-            </div>
+      <div className="rounded-[28px] border border-black/5 bg-slate-50 p-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand shadow-sm">
+            <UserRound className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-base font-semibold text-ink">邮箱 / 手机号 + 密码</div>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              适合长期使用 Seekoffer。邮箱和手机号都可以走密码登录，正式账号登录后数据会稳定同步到 Supabase。
+            </p>
           </div>
         </div>
 
-        {error ? <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
+        <div className="mt-4 grid gap-3">
+          <input
+            value={identifier}
+            onChange={(event) => setIdentifier(event.target.value)}
+            placeholder="输入邮箱或手机号"
+            className="w-full rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm outline-none"
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="输入密码"
+            className="w-full rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm outline-none"
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              onClick={() => void handlePasswordLogin()}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
+            >
+              {pending === 'password' ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <LogIn className="h-4 w-4" />
+              )}
+              {pending === 'password' ? '登录中...' : '密码登录'}
+            </button>
+            <button
+              onClick={() => void handlePasswordRegister()}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
+            >
+              {pending === 'register' ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <UserRoundPlus className="h-4 w-4" />
+              )}
+              {pending === 'register' ? '注册中...' : '首次注册'}
+            </button>
+          </div>
+        </div>
       </div>
+
+      <div className="rounded-[28px] border border-black/5 bg-slate-50 p-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand shadow-sm">
+            <KeyRound className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-base font-semibold text-ink">邮箱验证码</div>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              使用 Resend 发信，适合快速登录。发送验证码后，直接在当前弹层输入 6 位验证码即可完成登录。
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          <input
+            value={otpEmail}
+            onChange={(event) => setOtpEmail(event.target.value)}
+            placeholder="输入接收验证码的邮箱"
+            className="w-full rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm outline-none"
+          />
+          <input
+            value={otpCode}
+            onChange={(event) => setOtpCode(event.target.value)}
+            placeholder="输入 6 位邮箱验证码"
+            className="w-full rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm outline-none"
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              onClick={() => void handleSendCode()}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
+            >
+              {pending === 'send-code' ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <Mail className="h-4 w-4" />
+              )}
+              {pending === 'send-code' ? '发送中...' : '发送验证码'}
+            </button>
+            <button
+              onClick={() => void handleVerifyCode()}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
+            >
+              {pending === 'verify-code' ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="h-4 w-4" />
+              )}
+              {pending === 'verify-code' ? '验证中...' : '验证码登录'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-[24px] border border-dashed border-black/8 bg-white px-4 py-4">
+        <div className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
+          <ShieldCheck className="h-4 w-4 text-brand" />
+          登录说明
+        </div>
+        <p className="mt-3 text-sm leading-7 text-slate-600">
+          Seekoffer 仍然允许先浏览通知库、院校库和资源库。只有加入申请表、进入工作台、发布 Offer
+          这类需要保存个人状态的动作，才会触发登录。
+        </p>
+        <p className="mt-2 text-sm leading-7 text-slate-600">
+          登录成功后会自动回到当前页面，并继续你刚才的动作，不需要重新找入口。
+        </p>
+      </div>
+
+      {message ? <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div> : null}
+      {error ? <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
     </section>
   );
 }
