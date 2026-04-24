@@ -79,8 +79,12 @@ function normalizeProvider(provider?: unknown): AuthProviderType {
   return 'password';
 }
 
-function isEmailIdentifier(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+export function normalizeEmailIdentifier(value: string) {
+  return value.trim().toLowerCase();
+}
+
+export function isEmailIdentifier(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normalizeEmailIdentifier(value));
 }
 
 function normalizePhoneIdentifier(value: string) {
@@ -104,7 +108,7 @@ function isPhoneIdentifier(value: string) {
 function normalizeIdentifier(value: string) {
   const trimmed = value.trim();
   if (isEmailIdentifier(trimmed)) {
-    return trimmed.toLowerCase();
+    return normalizeEmailIdentifier(trimmed);
   }
 
   return isPhoneIdentifier(trimmed) ? normalizePhoneIdentifier(trimmed) : trimmed.toLowerCase();
@@ -487,7 +491,7 @@ export async function sendEmailLoginCode(email: string) {
     throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
   }
 
-  const normalizedEmail = normalizeIdentifier(email);
+  const normalizedEmail = normalizeEmailIdentifier(email);
   if (!isEmailIdentifier(normalizedEmail)) {
     throw new Error('请输入正确的邮箱地址。');
   }
@@ -517,7 +521,7 @@ export async function verifyEmailLoginCode(email: string, token: string) {
     throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
   }
 
-  const normalizedEmail = normalizeIdentifier(email);
+  const normalizedEmail = normalizeEmailIdentifier(email);
   const normalizedToken = token.trim();
   if (!isEmailIdentifier(normalizedEmail)) {
     throw new Error('请输入正确的邮箱地址。');
