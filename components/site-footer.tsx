@@ -36,8 +36,14 @@ export function SiteFooter() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>© 2026 寻鹿 Seekoffer. 保研通知、申请管理与资源整合平台。</div>
           <div className="flex flex-wrap gap-4">
+            <Link href="/terms" className="hover:text-white">
+              用户协议
+            </Link>
             <Link href="/privacy" className="hover:text-white">
               隐私政策
+            </Link>
+            <Link href="/disclaimer" className="hover:text-white">
+              免责声明
             </Link>
             <Link href="/about" className="hover:text-white">
               关于我们

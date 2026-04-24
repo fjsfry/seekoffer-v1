@@ -120,9 +120,10 @@ export default function ApplicationsPage() {
           title="我的申请表"
           subtitle="告别繁杂的本地表格，统一管理目标院校、材料进度与高危截止日期。"
         />
-        <section className="rounded-[30px] border border-black/5 bg-white px-6 py-10 text-sm text-slate-500 shadow-soft">
-          正在检查登录状态，请稍等。
-        </section>
+        <LoginRequiredCard
+          title="登录后即可启用申请管理"
+          description="登录后可加入项目、记录材料完成度、设置优先级与提醒，并在待办页自动生成今天最该处理的事项。"
+        />
       </SiteShell>
     );
   }

@@ -24,7 +24,7 @@ type StoredPayload<T> = {
   items: T[];
 };
 
-export type AiWaitlistNeed = '测算胜率' | '精修申请表' | '提炼简章要求';
+export type AiWaitlistNeed = '申请风险评估' | '材料短板提示' | '提炼简章要求';
 
 export type AiWaitlistLead = {
   wechatId: string;

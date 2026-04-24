@@ -5,6 +5,19 @@ import { ApplicationActionButton } from '@/components/application-action-button'
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge, StatusBadge } from '@/components/status-badge';
+import {
+  buildNoticeFeedbackHref,
+  formatNoticeDate,
+  formatNoticeDateOnly,
+  getDisplayDepartmentName,
+  getDisplayDiscipline,
+  getDisplayProjectType,
+  getDisplaySchoolName,
+  getDisplaySourceLabel,
+  getDisplayTags,
+  getVerificationLabel,
+  normalizeNoticeTitle
+} from '@/lib/notice-display';
 import { baseNoticeProjects } from '@/lib/notice-source';
 
 function getCountdown(deadlineDate: string) {
@@ -52,7 +65,7 @@ export default async function NoticeDetailPage({
     <SiteShell>
       <PageSectionTitle
         eyebrow="Project Detail"
-        title={`${project.schoolName} · ${project.projectName}`}
+        title={`${getDisplaySchoolName(project.schoolName)} · ${normalizeNoticeTitle(project.projectName, 80)}`}
         subtitle="查看项目详情、截止时间、材料要求与原文入口，并可一键加入我的申请表。"
       />
 
@@ -63,17 +76,22 @@ export default async function NoticeDetailPage({
               <DeadlineBadge level={project.deadlineLevel} />
               <StatusBadge status={project.status} />
               <span className="rounded-full bg-brand-cream px-3 py-1 text-xs font-semibold text-slate-700">
-                {project.projectType}
+                {getDisplayProjectType(project.projectType)}
               </span>
+              {getDisplayTags(project.tags).slice(0, 3).map((tag) => (
+                <span key={tag} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                  {tag}
+                </span>
+              ))}
             </div>
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <InfoItem label="学校" value={project.schoolName} />
-              <InfoItem label="学院 / 系" value={project.departmentName} />
-              <InfoItem label="学科方向" value={project.discipline} />
-              <InfoItem label="发布时间" value={project.publishDate} />
-              <InfoItem label="截止时间" value={project.deadlineDate} />
-              <InfoItem label="活动时间" value={`${project.eventStartDate} 至 ${project.eventEndDate}`} />
+              <InfoItem label="学校" value={getDisplaySchoolName(project.schoolName)} />
+              <InfoItem label="学院 / 系" value={getDisplayDepartmentName(project.departmentName)} />
+              <InfoItem label="学科方向" value={getDisplayDiscipline(project.discipline)} />
+              <InfoItem label="发布时间" value={formatNoticeDateOnly(project.publishDate)} />
+              <InfoItem label="截止时间" value={formatNoticeDate(project.deadlineDate)} />
+              <InfoItem label="活动时间" value={formatEventRange(project.eventStartDate, project.eventEndDate)} />
             </div>
 
             <div className="mt-5 rounded-2xl bg-brand-cream px-4 py-4 text-sm text-slate-700">
@@ -151,6 +169,12 @@ export default async function NoticeDetailPage({
                 查看平台详情页
                 <ArrowUpRight className="h-4 w-4" />
               </a>
+              <a
+                href={buildNoticeFeedbackHref(project)}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800"
+              >
+                反馈通知错误
+              </a>
               <Link
                 href="/deadlines"
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
@@ -166,12 +190,15 @@ export default async function NoticeDetailPage({
               数据来源标识
             </div>
             <div className="mt-4 grid gap-3 text-sm text-slate-600">
-              <InfoItem label="来源网站" value={project.sourceSite} />
+              <InfoItem label="来源说明" value={getDisplaySourceLabel(project.sourceSite)} />
               <InfoItem label="平台录入时间" value={project.collectedAt} />
               <InfoItem label="最近更新时间" value={project.updatedAt} />
               <InfoItem label="最近核验时间" value={project.lastCheckedAt} />
-              <InfoItem label="人工校验" value={project.isVerified ? '已校验' : '待校验'} />
+              <InfoItem label="核验状态" value={getVerificationLabel(project)} />
             </div>
+            <p className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500">
+              Seekoffer 会尽力清洗和核对公开信息，但正式报名、材料要求和截止时间请以院校官网原文为准。
+            </p>
           </section>
 
           <section className="rounded-[30px] border border-black/5 bg-white p-6 shadow-soft">
@@ -197,9 +224,20 @@ function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-slate-50 px-4 py-4">
       <div className="text-sm font-semibold text-ink">{label}</div>
-      <div className="mt-2 text-sm leading-7 text-slate-600">{value}</div>
+      <div className="mt-2 text-sm leading-7 text-slate-600">{value || '待补充'}</div>
     </div>
   );
+}
+
+function formatEventRange(start: string, end: string) {
+  const startText = formatNoticeDate(start, '');
+  const endText = formatNoticeDate(end, '');
+
+  if (startText && endText) {
+    return `${startText} 至 ${endText}`;
+  }
+
+  return startText || endText || '以原文通知为准';
 }
 
 function ContentCard({ title, children }: { title: string; children: React.ReactNode }) {

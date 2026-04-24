@@ -18,11 +18,20 @@ export default function PublishPage() {
         <PageSectionTitle
           eyebrow="Share Offer"
           title="发布 Offer 动态"
-          subtitle="分享你的去向与释放 Offer，帮助候补池中的同学更快判断机会变化。"
+          subtitle="真实 Offer 发布会影响候补判断，因此需要登录、审核和后续举报机制。"
         />
-        <section className="rounded-[30px] border border-black/5 bg-white px-6 py-10 text-sm text-slate-500 shadow-soft">
-          正在检查登录状态，请稍等。
-        </section>
+        <LoginRequiredCard
+          title="发布动态前需要先登录"
+          description="为了减少虚假信息，发布 Offer 动态会记录账号状态；正式通道开放后会支持匿名展示、审核和举报。"
+          requiredAuth="member"
+          actionLabel="登录后继续"
+          intent={{
+            type: 'publish-offer',
+            returnTo: '/publish',
+            reason: 'publish-gate',
+            requiredAuth: 'member'
+          }}
+        />
       </SiteShell>
     );
   }

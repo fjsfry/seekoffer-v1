@@ -68,7 +68,11 @@ export const footerColumns = [
   {
     title: '政策',
     links: [
+      { label: '用户协议', href: '/terms' },
       { label: '隐私政策', href: '/privacy' },
+      { label: '免责声明', href: '/disclaimer' },
+      { label: '社区规范', href: '/community' },
+      { label: '反馈纠错', href: 'mailto:feedback@seekoffer.com.cn', external: true },
       { label: '研招网', href: 'https://yz.chsi.com.cn/', external: true }
     ]
   }

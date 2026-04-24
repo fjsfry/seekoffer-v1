@@ -6,11 +6,11 @@ import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { submitAiWaitlistLead, type AiWaitlistNeed } from '@/lib/cloudbase-data';
 
-const needOptions: AiWaitlistNeed[] = ['测算胜率', '精修申请表', '提炼简章要求'];
+const needOptions: AiWaitlistNeed[] = ['申请风险评估', '材料短板提示', '提炼简章要求'];
 
 export default function AiPage() {
   const [wechatId, setWechatId] = useState('');
-  const [primaryNeed, setPrimaryNeed] = useState<AiWaitlistNeed>('测算胜率');
+  const [primaryNeed, setPrimaryNeed] = useState<AiWaitlistNeed>('申请风险评估');
   const [details, setDetails] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
@@ -45,8 +45,8 @@ export default function AiPage() {
     <SiteShell>
       <PageSectionTitle
         eyebrow="AI Lab"
-        title="Seekoffer 胜率预测大模型"
-        subtitle="基于 2024-2025 届真实录取样本与项目字段做深度调优。当前开放内测收集，不做空能力堆叠，只先收最真实的需求。"
+        title="AI 申请定位助手"
+        subtitle="基于公开通知、申请字段和经验规则，辅助你判断目标层级、材料短板和申请优先级。"
       />
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
@@ -57,18 +57,18 @@ export default function AiPage() {
           </div>
           <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink">先把最真实、最刚需的问题收集清楚。</h2>
           <p className="mt-4 text-sm leading-8 text-slate-600">
-            我们不会让“AI”只是一个吸引点击的空入口。当前内测收集会直接沉淀你的联系方式和需求方向，用来决定模型优先做什么。
+            我们不会把 AI 包装成录取保证。当前内测会先收集你最真实的申请问题，用来决定优先做风险评估、材料清单还是简章提炼。
           </p>
 
           <div className="mt-6 grid gap-4">
             {[
               {
-                title: '测算胜率',
-                text: '围绕背景、目标层级、时间窗口和项目画像，输出更贴近现实的区间判断。'
+                title: '申请风险评估',
+                text: '围绕背景、目标层级、时间窗口和项目画像，提示风险区间与优先级，而不是承诺录取结果。'
               },
               {
-                title: '精修申请表',
-                text: '把通知、材料进度和高风险 Deadline 接成一条真正可执行的申请路径。'
+                title: '材料短板提示',
+                text: '结合目标项目和个人字段，提醒简历、成绩单、推荐信、科研经历等材料缺口。'
               },
               {
                 title: '提炼简章要求',
@@ -88,7 +88,7 @@ export default function AiPage() {
               当前状态
             </div>
             <p className="mt-3 text-sm leading-7 text-white/80">
-              为保证预测的严谨性，模型正在做最后一轮参数调优。当前先收集前 500 位内测用户的真实需求。
+              AI 输出仅供申请规划参考，不构成录取承诺、升学保证或替代院校官网要求。当前先收集前 500 位内测用户的真实需求。
             </p>
           </div>
         </div>

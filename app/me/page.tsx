@@ -388,7 +388,10 @@ export default function MePage() {
   if (!ready) {
     return (
       <SiteShell>
-        <section className="surface-card rounded-[34px] px-6 py-10 text-sm text-slate-500">正在加载工作台...</section>
+        <LoginRequiredCard
+          title="登录后开启你的申请工作台"
+          description="登录后可以保存目标院校、管理申请状态、记录材料进度和维护行动清单。通知库、资源库和院校库仍可直接浏览。"
+        />
       </SiteShell>
     );
   }

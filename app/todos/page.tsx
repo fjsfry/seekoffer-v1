@@ -125,8 +125,15 @@ export default function TodosPage() {
   if (!ready) {
     return (
       <SiteShell>
-        <PageSectionTitle eyebrow="My Todos" title="我的待办" subtitle="正在检查登录状态，请稍等。" />
-        <section className="surface-card rounded-[34px] px-6 py-10 text-sm text-slate-500">正在加载登录态...</section>
+        <PageSectionTitle
+          eyebrow="My Todos"
+          title="我的待办"
+          subtitle="登录后系统会根据申请表自动生成优先级清单，帮你先处理今天和本周最该做的事。"
+        />
+        <LoginRequiredCard
+          title="我的待办需要先登录"
+          description="登录后系统会根据截止时间、材料进度、面试安排和结果状态自动生成行动清单。"
+        />
       </SiteShell>
     );
   }

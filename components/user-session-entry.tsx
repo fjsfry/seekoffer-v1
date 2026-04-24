@@ -53,10 +53,13 @@ export function UserSessionEntry() {
 
   if (!ready) {
     return (
-      <div className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-white px-3 text-sm font-semibold text-slate-600 shadow-sm md:h-11 md:px-4">
-        <LoaderCircle className="h-4 w-4 animate-spin" />
-        正在检查登录态
-      </div>
+      <button
+        onClick={handleOpenLogin}
+        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-white px-3 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5 hover:bg-white/95 md:h-11 md:px-4"
+      >
+        <LogIn className="h-4 w-4" />
+        登录
+      </button>
     );
   }
 

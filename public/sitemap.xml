@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://www.seekoffer.com.cn/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://www.seekoffer.com.cn/notices/</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://www.seekoffer.com.cn/me/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.seekoffer.com.cn/offers/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.seekoffer.com.cn/resources/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.seekoffer.com.cn/colleges/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.seekoffer.com.cn/ai/</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://www.seekoffer.com.cn/about/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://www.seekoffer.com.cn/privacy/</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://www.seekoffer.com.cn/terms/</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://www.seekoffer.com.cn/disclaimer/</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://www.seekoffer.com.cn/community/</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
+</urlset>

@@ -17,23 +17,24 @@ import { DeadlineBadge } from '@/components/status-badge';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
 import { fetchPublicNotices } from '@/lib/cloudbase-data';
+import {
+  formatNoticeDate,
+  formatNoticeDateOnly,
+  getDisplayDepartmentName,
+  getDisplayProjectType,
+  getDisplaySchoolName,
+  normalizeNoticeTitle
+} from '@/lib/notice-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
 import { collegeDirectory } from '@/lib/college-directory';
+import { baseNoticeProjects } from '@/lib/notice-source';
 import { offerFeedItems, officialResourceSections } from '@/lib/portal-data';
 import type { PublicNoticeProject } from '@/lib/mock-data';
 
-function normalizeNoticeTitle(projectName: string) {
-  const compact = projectName
-    .replace(/发布时间[:：].*$/i, '')
-    .replace(/报名通知发布时间[:：].*$/i, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  return compact.length > 46 ? `${compact.slice(0, 46)}…` : compact;
-}
-
 export default function HomePage() {
-  const [projects, setProjects] = useState<PublicNoticeProject[]>([]);
+  const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
+    baseNoticeProjects.filter((item) => String(item.year) === '2026')
+  );
 
   useEffect(() => {
     let active = true;
@@ -80,14 +81,14 @@ export default function HomePage() {
   const offerPreview = [...offerFeedItems].sort((left, right) => right.heat - left.heat).slice(0, 4);
 
   const heroMetrics = [
-    { label: '通知覆盖', value: projects.length ? `${projects.length}+` : '--', hint: '持续同步 2026 年通知' },
+    { label: '通知覆盖', value: `${projects.length}+`, hint: '持续同步 2026 年公开通知' },
     { label: '院校官网', value: `${collegeDirectory.length}`, hint: '重点院校入口持续整理' },
     {
       label: '资源入口',
       value: `${officialResourceSections.flatMap((item) => item.links).length}`,
       hint: '资源库长期可回访'
     },
-    { label: 'Offer 动态', value: `${offerFeedItems.length}`, hint: '补录与放弃信息持续更新' }
+    { label: 'Offer 动态', value: `${offerFeedItems.length}`, hint: '公开内测演示，正式发布需审核' }
   ];
 
   const valueCards = [
@@ -234,25 +235,21 @@ export default function HomePage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <DeadlineBadge level={project.deadlineLevel} />
                       <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
-                        {project.projectType}
+                        {getDisplayProjectType(project.projectType)}
                       </span>
                       <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
-                        {project.publishDate}
+                        {formatNoticeDateOnly(project.publishDate)}
                       </span>
                     </div>
-                    <div className="mt-4 text-base font-semibold text-ink">{project.schoolName}</div>
-                    <div className="mt-2 text-xl font-semibold leading-8 text-ink">{normalizeNoticeTitle(project.projectName)}</div>
+                    <div className="mt-4 text-base font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</div>
+                    <div className="mt-2 text-xl font-semibold leading-8 text-ink">{normalizeNoticeTitle(project.projectName, 46)}</div>
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
-                      <span>{project.departmentName}</span>
-                      <span>截止：{project.deadlineDate}</span>
+                      <span>{getDisplayDepartmentName(project.departmentName)}</span>
+                      <span>截止：{formatNoticeDate(project.deadlineDate)}</span>
                     </div>
                   </Link>
                 ))
-              ) : (
-                <div className="rounded-[26px] border border-dashed border-black/10 px-5 py-12 text-center text-sm text-slate-500">
-                  正在同步最新通知，请稍后刷新页面查看。
-                </div>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -281,7 +278,7 @@ export default function HomePage() {
                           href={buildNoticeDetailHref(project.id)}
                           className="rounded-[20px] bg-white px-4 py-4 transition hover:bg-slate-100"
                         >
-                          <div className="text-sm font-semibold text-ink">{project.schoolName}</div>
+                          <div className="text-sm font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</div>
                           <div className="mt-1 text-sm leading-6 text-slate-600">{normalizeNoticeTitle(project.projectName)}</div>
                         </Link>
                       ))
@@ -414,6 +411,9 @@ export default function HomePage() {
                     <div className="mt-2 text-sm leading-7 text-slate-600">{item.message}</div>
                   </div>
                 ))}
+              </div>
+              <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-800">
+                Offer 池当前为公开内测演示区，正式发布会加入账号记录、审核与举报机制。
               </div>
             </div>
           </div>

@@ -42,8 +42,12 @@ export default function OffersPage() {
       <PageSectionTitle
         eyebrow="Offer Flow"
         title="Offer 池"
-        subtitle="把动态热度、院校维度聚合和补录流向放在一起看，让 Offer 池更像真实社区而不只是信息流。"
+        subtitle="公开内测阶段先演示 Offer 流动的产品形态；真实发布会接入账号记录、审核、举报与匿名展示。"
       />
+
+      <section className="rounded-[30px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-900 shadow-soft">
+        当前页面为演示数据，用来展示未来 Offer 池的信息结构。请勿将演示内容作为真实补录依据；真实 Offer 发布通道开放前，会先补齐审核、举报和删除机制。
+      </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
         {offerMetrics.map((item) => (
@@ -112,7 +116,7 @@ export default function OffersPage() {
                           <span className="font-semibold text-ink">{offer.author}</span>
                           {offer.verified ? (
                             <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                              身份已核验
+                              核验样式演示
                             </span>
                           ) : null}
                           <span className="text-xs text-slate-400">{offer.time}</span>
@@ -179,7 +183,7 @@ export default function OffersPage() {
           <div className="surface-card rounded-[34px] p-6">
             <div className="text-lg font-semibold text-ink">使用建议</div>
             <p className="mt-4 text-sm leading-7 text-slate-600">
-              Offer 池适合观察候补流动与去向变化。涉及正式报名、截止时间和材料要求时，仍建议同步核对通知库和学校官网。
+              Offer 池适合观察候补流动与去向变化。正式版本会标注已核验、未核验和举报状态；涉及报名、截止时间和材料要求时，仍必须核对学校官网。
             </p>
           </div>
         </aside>

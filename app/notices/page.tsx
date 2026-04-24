@@ -7,8 +7,18 @@ import { ApplicationActionButton } from '@/components/application-action-button'
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge, StatusBadge } from '@/components/status-badge';
 import { fetchPublicNotices } from '@/lib/cloudbase-data';
+import {
+  formatNoticeDate,
+  formatNoticeDateOnly,
+  getDisplayDepartmentName,
+  getDisplayDiscipline,
+  getDisplayProjectType,
+  getDisplaySchoolName,
+  getDisplayTags,
+  normalizeNoticeTitle
+} from '@/lib/notice-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
-import { inferDisciplineCategory, inferSchoolRange } from '@/lib/notice-source';
+import { baseNoticeProjects, inferDisciplineCategory, inferSchoolRange } from '@/lib/notice-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
 
 type SortOption = 'publish' | 'deadline' | 'school';
@@ -44,18 +54,10 @@ function getVisiblePages(currentPage: number, totalPages: number) {
   return Array.from(new Set(pages));
 }
 
-function normalizeNoticeTitle(projectName: string) {
-  const compact = projectName
-    .replace(/发布时间[:：].*$/i, '')
-    .replace(/报名通知发布时间[:：].*$/i, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  return compact.length > 72 ? `${compact.slice(0, 72)}...` : compact;
-}
-
 export default function NoticesPage() {
-  const [projects, setProjects] = useState<PublicNoticeProject[]>([]);
+  const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
+    baseNoticeProjects.filter((item) => String(item.year) === '2026')
+  );
   const [keyword, setKeyword] = useState('');
   const [schoolName, setSchoolName] = useState('');
   const [majorKeyword, setMajorKeyword] = useState('');
@@ -106,7 +108,7 @@ export default function NoticesPage() {
         ? projects
         : projects.filter((item) => inferDisciplineCategory(item.discipline) === category);
 
-    return ['全部', ...Array.from(new Set(rows.map((item) => item.discipline).filter(Boolean)))];
+    return ['全部', ...Array.from(new Set(rows.map((item) => getDisplayDiscipline(item.discipline)).filter(Boolean)))];
   }, [projects, category]);
 
   const filteredProjects = useMemo(() => {
@@ -119,7 +121,7 @@ export default function NoticesPage() {
       const matchesRange = schoolRange === '全部' ? true : inferSchoolRange(item) === schoolRange;
       const matchesSchool = !schoolKeyword || item.schoolName.toLowerCase().includes(schoolKeyword);
       const matchesCategory = category === '全部' ? true : inferDisciplineCategory(item.discipline) === category;
-      const matchesDiscipline = discipline === '全部' ? true : item.discipline === discipline;
+      const matchesDiscipline = discipline === '全部' ? true : getDisplayDiscipline(item.discipline) === discipline;
       const matchesMajor =
         !majorText ||
         [item.discipline, item.departmentName, item.projectName].join(' ').toLowerCase().includes(majorText);
@@ -127,7 +129,7 @@ export default function NoticesPage() {
       const matchesYear = year === '全部' ? true : String(item.year) === year;
       const matchesKeyword =
         !noticeKeyword ||
-        [item.schoolName, item.departmentName, item.projectName, item.discipline, item.tags.join(' ')]
+        [getDisplaySchoolName(item.schoolName), item.departmentName, item.projectName, item.discipline, item.tags.join(' ')]
           .join(' ')
           .toLowerCase()
           .includes(noticeKeyword);
@@ -203,6 +205,10 @@ export default function NoticesPage() {
               className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
             />
           </div>
+        </div>
+
+        <div className="rounded-[24px] border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm leading-7 text-emerald-800">
+          通知库优先展示 2026 年公开院校通知，数据来自院校官网和公开入口自动同步；每条通知都保留原文链接，关键申请动作请以官网原文为准。
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -339,7 +345,7 @@ export default function NoticesPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-brand-cream px-3 py-1 text-xs font-semibold text-brand">
-                    {project.projectType}
+                    {getDisplayProjectType(project.projectType)}
                   </span>
                   <DeadlineBadge level={project.deadlineLevel} />
                   <StatusBadge status={project.status} />
@@ -347,11 +353,11 @@ export default function NoticesPage() {
 
                 <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                   <div className="min-w-0">
-                    <div className="text-[1.7rem] font-semibold tracking-tight text-ink">{project.schoolName}</div>
+                    <div className="text-[1.7rem] font-semibold tracking-tight text-ink">{getDisplaySchoolName(project.schoolName)}</div>
                     <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-500">
-                      <span>{project.departmentName}</span>
-                      <span className="rounded-full bg-slate-100 px-3 py-1">{project.publishDate}</span>
-                      <span className="rounded-full bg-slate-100 px-3 py-1">截止：{project.deadlineDate}</span>
+                      <span>{getDisplayDepartmentName(project.departmentName)}</span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1">{formatNoticeDateOnly(project.publishDate)}</span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1">截止：{formatNoticeDate(project.deadlineDate)}</span>
                     </div>
                   </div>
                 </div>
@@ -362,9 +368,11 @@ export default function NoticesPage() {
 
                 <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
                   {project.discipline ? (
-                    <span className="rounded-full bg-brand-cream px-3 py-1 font-semibold text-brand">{project.discipline}</span>
+                    <span className="rounded-full bg-brand-cream px-3 py-1 font-semibold text-brand">
+                      {getDisplayDiscipline(project.discipline)}
+                    </span>
                   ) : null}
-                  {project.tags.slice(0, 4).map((item) => (
+                  {getDisplayTags(project.tags).slice(0, 4).map((item) => (
                     <span key={item} className="rounded-full bg-slate-100 px-3 py-1">
                       {item}
                     </span>
