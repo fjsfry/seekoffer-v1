@@ -23,8 +23,13 @@ auth/data while keeping the CloudBase crawler as the hourly executor.
    - Optionally enable Anonymous Sign-Ins if you want to preserve trial mode.
 3. In Email:
    - Configure your verified Resend sender.
-   - Use OTP-based email templates if you want users to enter a code instead of
-     clicking a magic link.
+   - For the login panel's 6-digit code tab, edit the **Magic Link** template so
+     the email contains `{{ .Token }}` and does not only rely on
+     `{{ .ConfirmationURL }}`. Supabase sends a link when the template uses
+     `{{ .ConfirmationURL }}`, and sends a 6-digit OTP when it uses
+     `{{ .Token }}`.
+   - Keep **Confirm sign up** as the first-registration confirmation email
+     unless you also add a dedicated signup-code verification flow.
 4. Run the SQL migration in the SQL editor.
 
 ## Environment variables

@@ -519,6 +519,8 @@ export async function sendEmailLoginCode(email: string, options: EmailLoginCodeO
       email: normalizedEmail,
       options: {
         emailRedirectTo: SEEKOFFER_SITE_URL,
+        // Keep the code-login path from creating new users, which would send
+        // Supabase's signup-confirmation email instead of the login OTP.
         shouldCreateUser: options.shouldCreateUser ?? false
       }
     });

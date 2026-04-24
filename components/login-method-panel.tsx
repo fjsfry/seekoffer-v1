@@ -128,6 +128,12 @@ export function LoginMethodPanel({
   const isEmailAccount = isEmailIdentifier(account);
   const passwordActionLabel = passwordMode === 'login' ? '密码登录' : '创建账号';
   const passwordPending = pending === 'password' || pending === 'register';
+  const idleHint =
+    activeView === 'otp'
+      ? '验证码登录仅用于已经完成邮箱确认的账号；第一次使用请先切到“密码”创建账号。'
+      : passwordMode === 'register'
+        ? '首次注册会发送邮箱确认邮件，完成确认后即可使用密码或验证码登录。'
+        : '已注册账号可直接密码登录；想用 6 位登录码时可以切换到“验证码”。';
 
   const helperText = useMemo(() => {
     if (!account.trim()) {
@@ -266,7 +272,7 @@ export function LoginMethodPanel({
 
     const result = await runTask('send-code', () => sendEmailLoginCode(email), {
       closeOnSuccess: false,
-      successMessage: '验证码已发送，请查看邮箱并输入 6 位验证码。'
+      successMessage: '登录码已发送。邮件里应显示 6 位数字；如果看到“确认注册”，请先完成首次邮箱确认。'
     });
 
     if (result === null) {
@@ -516,7 +522,7 @@ export function LoginMethodPanel({
           ) : null}
           {!message && !error ? (
             <p className="text-sm leading-6 text-slate-500">
-              注册会向邮箱发送确认邮件；验证码登录会自动创建或进入已有账号。
+              {idleHint}
             </p>
           ) : null}
         </div>
