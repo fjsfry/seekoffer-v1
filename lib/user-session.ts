@@ -494,11 +494,76 @@ export async function signUpWithPasswordAccount(payload: CredentialsPayload): Pr
       status: 'pending_confirmation',
       message: isPhoneIdentifier(identifier)
         ? '注册成功，请使用短信验证码完成后续验证。'
-        : '注册成功，请先打开邮箱中的验证邮件，再回来登录。'
+        : '注册验证码已发送，请输入邮件里的 6 位数字完成注册。'
     };
   } catch (error) {
     console.error('[Seekoffer][auth] signUpWithPasswordAccount failed', error);
     throw new Error(formatAuthError(error, '注册失败，请稍后再试。'));
+  }
+}
+
+export async function resendSignupConfirmationCode(email: string) {
+  if (!isSupabaseConfigured()) {
+    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+  }
+
+  const normalizedEmail = normalizeEmailIdentifier(email);
+  if (!isEmailIdentifier(normalizedEmail)) {
+    throw new Error('请输入正确的邮箱地址。');
+  }
+
+  const supabase = getSupabaseBrowserClient();
+
+  try {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: normalizedEmail,
+      options: {
+        emailRedirectTo: SEEKOFFER_SITE_URL
+      }
+    });
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    console.error('[Seekoffer][auth] resendSignupConfirmationCode failed', error);
+    throw new Error(formatAuthError(error, '注册验证码发送失败，请稍后重试。'));
+  }
+}
+
+export async function verifySignupConfirmationCode(email: string, token: string) {
+  if (!isSupabaseConfigured()) {
+    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+  }
+
+  const normalizedEmail = normalizeEmailIdentifier(email);
+  const normalizedToken = token.trim();
+  if (!isEmailIdentifier(normalizedEmail)) {
+    throw new Error('请输入正确的邮箱地址。');
+  }
+
+  if (!normalizedToken) {
+    throw new Error('请先输入注册邮件中的 6 位验证码。');
+  }
+
+  const supabase = getSupabaseBrowserClient();
+
+  try {
+    const { error } = await supabase.auth.verifyOtp({
+      email: normalizedEmail,
+      token: normalizedToken,
+      type: 'signup'
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return persistMemberSession('password');
+  } catch (error) {
+    console.error('[Seekoffer][auth] verifySignupConfirmationCode failed', error);
+    throw new Error(formatAuthError(error, '注册验证码校验失败，请重新发送后再试。'));
   }
 }
 

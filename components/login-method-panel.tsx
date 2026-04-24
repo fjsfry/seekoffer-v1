@@ -14,11 +14,13 @@ import {
 import { SUPABASE_ENABLE_ANONYMOUS, SUPABASE_ENABLE_PHONE_AUTH } from '@/lib/supabase-env';
 import {
   isEmailIdentifier,
+  resendSignupConfirmationCode,
   sendEmailLoginCode,
   signInAsGuest,
   signInWithPasswordAccount,
   signUpWithPasswordAccount,
-  verifyEmailLoginCode
+  verifyEmailLoginCode,
+  verifySignupConfirmationCode
 } from '@/lib/user-session';
 
 type AuthView = 'password' | 'otp';
@@ -114,11 +116,15 @@ export function LoginMethodPanel({
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [signupCode, setSignupCode] = useState('');
+  const [signupCodeSent, setSignupCodeSent] = useState(false);
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupResendIn, setSignupResendIn] = useState(0);
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const [pending, setPending] = useState<
-    '' | 'guest' | 'password' | 'register' | 'send-code' | 'verify-code'
+    '' | 'guest' | 'password' | 'register' | 'resend-signup' | 'verify-signup' | 'send-code' | 'verify-code'
   >('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -126,13 +132,13 @@ export function LoginMethodPanel({
   const accountLabel = SUPABASE_ENABLE_PHONE_AUTH ? '邮箱或手机号' : '邮箱';
   const accountPlaceholder = SUPABASE_ENABLE_PHONE_AUTH ? 'name@example.com / 手机号' : 'name@example.com';
   const isEmailAccount = isEmailIdentifier(account);
-  const passwordActionLabel = passwordMode === 'login' ? '密码登录' : '创建账号';
-  const passwordPending = pending === 'password' || pending === 'register';
+  const passwordActionLabel = passwordMode === 'login' ? '密码登录' : signupCodeSent ? '完成注册' : '发送注册验证码';
+  const passwordPending = pending === 'password' || pending === 'register' || pending === 'verify-signup';
   const idleHint =
     activeView === 'otp'
-      ? '验证码登录仅用于已经完成邮箱确认的账号；第一次使用请先切到“密码”创建账号。'
+      ? '已完成注册后，可用邮箱验证码直接登录，不需要输入密码。'
       : passwordMode === 'register'
-        ? '首次注册会发送邮箱确认邮件，完成确认后即可使用密码或验证码登录。'
+        ? '注册会发送 6 位邮箱验证码；输入后即完成账号确认并登录。'
         : '已注册账号可直接密码登录；想用 6 位登录码时可以切换到“验证码”。';
 
   const helperText = useMemo(() => {
@@ -160,9 +166,25 @@ export function LoginMethodPanel({
     return () => window.clearTimeout(timer);
   }, [resendIn]);
 
+  useEffect(() => {
+    if (signupResendIn <= 0) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => setSignupResendIn((current) => Math.max(0, current - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [signupResendIn]);
+
   function resetFeedback() {
     setError('');
     setMessage('');
+  }
+
+  function resetSignupChallenge() {
+    setSignupCode('');
+    setSignupCodeSent(false);
+    setSignupEmail('');
+    setSignupResendIn(0);
   }
 
   function validateAccount(options: { emailOnly?: boolean } = {}) {
@@ -245,6 +267,25 @@ export function LoginMethodPanel({
       return;
     }
 
+    if (signupCodeSent) {
+      if (!signupCode.trim()) {
+        setError('请输入注册邮件中的 6 位验证码。');
+        return;
+      }
+
+      const result = await runTask(
+        'verify-signup',
+        () => verifySignupConfirmationCode(signupEmail || identifier, signupCode.trim()),
+        { successMessage: '注册完成，已经进入当前会话。' }
+      );
+
+      if (result) {
+        resetSignupChallenge();
+      }
+
+      return;
+    }
+
     const result = await runTask(
       'register',
       () => signUpWithPasswordAccount({ identifier, password }),
@@ -261,7 +302,33 @@ export function LoginMethodPanel({
       return;
     }
 
+    setSignupEmail(identifier);
+    setSignupCode('');
+    setSignupCodeSent(true);
+    setSignupResendIn(60);
     setMessage(result.message);
+  }
+
+  async function handleResendSignupCode() {
+    if (signupResendIn > 0) {
+      return;
+    }
+
+    const email = signupEmail || validateAccount({ emailOnly: true });
+    if (!email) {
+      return;
+    }
+
+    const result = await runTask('resend-signup', () => resendSignupConfirmationCode(email), {
+      closeOnSuccess: false,
+      successMessage: '新的注册验证码已发送，请查看邮箱里的 6 位数字。'
+    });
+
+    if (result !== null) {
+      setSignupEmail(email);
+      setSignupCodeSent(true);
+      setSignupResendIn(60);
+    }
   }
 
   async function handleSendCode() {
@@ -272,7 +339,7 @@ export function LoginMethodPanel({
 
     const result = await runTask('send-code', () => sendEmailLoginCode(email), {
       closeOnSuccess: false,
-      successMessage: '登录码已发送。邮件里应显示 6 位数字；如果看到“确认注册”，请先完成首次邮箱确认。'
+      successMessage: '登录验证码已发送，请查看邮箱里的 6 位数字。'
     });
 
     if (result === null) {
@@ -333,7 +400,7 @@ export function LoginMethodPanel({
           <FeatureRow
             icon={<ShieldCheck className="h-4 w-4" />}
             title="邮箱优先"
-            description="当前生产环境使用邮箱密码和邮箱验证码，避免手机号通道未开通造成失败。"
+            description="注册和登录都使用邮箱 6 位验证码，避免手机号通道未开通造成失败。"
           />
           <FeatureRow
             icon={<CheckCircle2 className="h-4 w-4" />}
@@ -377,6 +444,7 @@ export function LoginMethodPanel({
               icon={<Mail className="h-4 w-4" />}
               onClick={() => {
                 resetFeedback();
+                resetSignupChallenge();
                 setActiveView('otp');
               }}
             >
@@ -396,6 +464,7 @@ export function LoginMethodPanel({
               onChange={(event) => {
                 setAccount(event.target.value);
                 resetFeedback();
+                resetSignupChallenge();
               }}
               placeholder={accountPlaceholder}
               className="mt-2 h-12 w-full rounded-xl border border-black/8 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand/50 focus:ring-4 focus:ring-brand/10"
@@ -416,6 +485,7 @@ export function LoginMethodPanel({
                   type="button"
                   onClick={() => {
                     resetFeedback();
+                    resetSignupChallenge();
                     setPasswordMode('login');
                   }}
                   className={`min-h-10 rounded-xl text-sm font-semibold transition ${
@@ -428,6 +498,7 @@ export function LoginMethodPanel({
                   type="button"
                   onClick={() => {
                     resetFeedback();
+                    resetSignupChallenge();
                     setPasswordMode('register');
                   }}
                   className={`min-h-10 rounded-xl text-sm font-semibold transition ${
@@ -447,6 +518,7 @@ export function LoginMethodPanel({
                   onChange={(event) => {
                     setPassword(event.target.value);
                     resetFeedback();
+                    resetSignupChallenge();
                   }}
                   placeholder="至少 6 位"
                   className="mt-2 h-12 w-full rounded-xl border border-black/8 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand/50 focus:ring-4 focus:ring-brand/10"
@@ -463,6 +535,7 @@ export function LoginMethodPanel({
                     onChange={(event) => {
                       setPasswordConfirm(event.target.value);
                       resetFeedback();
+                      resetSignupChallenge();
                     }}
                     placeholder="再次输入密码"
                     className="mt-2 h-12 w-full rounded-xl border border-black/8 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand/50 focus:ring-4 focus:ring-brand/10"
@@ -470,8 +543,49 @@ export function LoginMethodPanel({
                 </label>
               ) : null}
 
+              {passwordMode === 'register' && signupCodeSent ? (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3">
+                  <div className="flex items-start gap-2 text-sm leading-6 text-emerald-800">
+                    <Mail className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      注册验证码已发送至 <strong>{signupEmail || account}</strong>，请输入邮件里的 6 位数字完成注册。
+                    </span>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      value={signupCode}
+                      onChange={(event) => {
+                        setSignupCode(event.target.value.replace(/\D/g, '').slice(0, 6));
+                        resetFeedback();
+                      }}
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="6 位注册验证码"
+                      className="h-12 min-w-0 flex-1 rounded-xl border border-emerald-200 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand/50 focus:ring-4 focus:ring-brand/10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleResendSignupCode()}
+                      disabled={pending === 'resend-signup' || signupResendIn > 0}
+                      className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 disabled:text-emerald-400"
+                    >
+                      {pending === 'resend-signup' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                      {signupResendIn > 0 ? `${signupResendIn}s` : '重发'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               <PrimaryButton
-                icon={passwordMode === 'login' ? <LogIn className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                icon={
+                  passwordMode === 'login' ? (
+                    <LogIn className="h-4 w-4" />
+                  ) : signupCodeSent ? (
+                    <ShieldCheck className="h-4 w-4" />
+                  ) : (
+                    <UserPlus className="h-4 w-4" />
+                  )
+                }
                 pending={passwordPending}
               >
                 {passwordPending ? '处理中...' : passwordActionLabel}
