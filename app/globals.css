@@ -4,7 +4,7 @@
 
 :root {
   color-scheme: light;
-  --page-bg: #f6faf8;
+  --page-bg: #f7faf9;
   --page-ink: #122026;
   --panel: rgba(255, 255, 255, 0.96);
 }
@@ -22,7 +22,9 @@ body {
 
 body {
   background:
-    linear-gradient(180deg, rgba(22, 92, 80, 0.06) 0%, rgba(22, 92, 80, 0) 180px),
+    radial-gradient(circle at 78% 8%, rgba(126, 189, 184, 0.16), transparent 34rem),
+    radial-gradient(circle at 10% 0%, rgba(224, 170, 85, 0.09), transparent 24rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(247, 250, 249, 0) 28rem),
     var(--page-bg);
   color: var(--page-ink);
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
@@ -47,8 +49,8 @@ select {
 .glass-panel {
   background: var(--panel);
   backdrop-filter: blur(18px);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(18, 32, 38, 0.07);
+  box-shadow: 0 18px 55px rgba(18, 32, 38, 0.07);
 }
 
 .eyebrow {
@@ -56,10 +58,10 @@ select {
   align-items: center;
   gap: 0.5rem;
   border-radius: 999px;
-  border: 1px solid rgba(23, 73, 77, 0.12);
-  background: rgba(255, 255, 255, 0.92);
-  padding: 0.4rem 0.8rem;
-  font-size: 0.75rem;
+  border: 1px solid rgba(23, 73, 77, 0.1);
+  background: rgba(239, 247, 246, 0.92);
+  padding: 0.42rem 0.78rem;
+  font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -71,13 +73,29 @@ select {
 }
 
 .hero-shadow {
-  box-shadow: 0 24px 60px rgba(16, 47, 52, 0.12);
+  box-shadow: 0 24px 70px rgba(16, 47, 52, 0.12);
 }
 
 .surface-card {
   background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(18, 32, 38, 0.07);
+  box-shadow: 0 18px 55px rgba(18, 32, 38, 0.06);
+}
+
+.product-card {
+  border: 1px solid rgba(18, 32, 38, 0.07);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 40px rgba(18, 32, 38, 0.045);
+}
+
+.soft-input {
+  border: 1px solid rgba(18, 32, 38, 0.08);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 30px rgba(18, 32, 38, 0.035);
+}
+
+.brand-divider {
+  background: linear-gradient(90deg, transparent, rgba(23, 73, 77, 0.25), transparent);
 }
 
 .no-scrollbar {

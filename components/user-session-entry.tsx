@@ -55,10 +55,10 @@ export function UserSessionEntry() {
     return (
       <button
         onClick={handleOpenLogin}
-        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-white px-3 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5 hover:bg-white/95 md:h-11 md:px-4"
+        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-brand-deep md:h-11 md:px-4"
       >
         <LogIn className="h-4 w-4" />
-        登录
+        登录 / 注册
       </button>
     );
   }
@@ -67,10 +67,10 @@ export function UserSessionEntry() {
     return (
       <button
         onClick={handleOpenLogin}
-        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-white px-3 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5 hover:bg-white/95 md:h-11 md:px-4"
+        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-brand-deep md:h-11 md:px-4"
       >
         <LogIn className="h-4 w-4" />
-        登录
+        登录 / 注册
       </button>
     );
   }
@@ -79,7 +79,7 @@ export function UserSessionEntry() {
     <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
       <Link
         href="/me"
-        className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-3 pr-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/95 md:h-11 md:px-3 md:pr-4"
+        className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-100 px-3 pr-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white md:h-11 md:px-3 md:pr-4"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand/10 text-brand md:h-8 md:w-8">
           <LayoutGrid className="h-4 w-4" />
@@ -95,7 +95,7 @@ export function UserSessionEntry() {
       {session.authProvider === 'anonymous' ? (
         <button
           onClick={handleUpgrade}
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-3 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5 hover:bg-white/95 md:h-11 md:px-4"
+          className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-brand-deep md:h-11 md:px-4"
         >
           <ArrowUpRight className="h-4 w-4" />
           升级正式登录
@@ -104,7 +104,7 @@ export function UserSessionEntry() {
 
       <button
         onClick={handleSignOut}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/12 text-white ring-1 ring-white/12 transition hover:bg-white/18 md:h-11 md:w-11"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-200 md:h-11 md:w-11"
         aria-label="退出登录"
       >
         {pendingAction === 'logout' ? (

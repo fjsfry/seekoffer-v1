@@ -18,6 +18,9 @@ export type OfferFeedItem = {
   avatar: string;
   verified: boolean;
   time: string;
+  type: '录取' | '放弃' | '补录';
+  major: string;
+  field: string;
   giveUp: string;
   goTo: string;
   message: string;
@@ -189,6 +192,9 @@ export const offerFeedItems: OfferFeedItem[] = [
     avatar: '鹿',
     verified: true,
     time: '2 分钟前',
+    type: '录取',
+    major: '计算机科学',
+    field: '人工智能',
     giveUp: '复旦大学 · 软件工程',
     goTo: '上海交通大学 · 电院',
     message: '老师确认今天还会继续顺延，候补同学注意电话、短信和系统通知。',
@@ -203,6 +209,9 @@ export const offerFeedItems: OfferFeedItem[] = [
     avatar: 'A',
     verified: true,
     time: '18 分钟前',
+    type: '放弃',
+    major: '电子信息',
+    field: '自动化',
     giveUp: '中国科学技术大学 · 自动化',
     goTo: '清华大学 · 电子系',
     message: '我这边已经正式放弃该 offer，老师说今晚前会补录，大家及时查邮件。',
@@ -217,6 +226,9 @@ export const offerFeedItems: OfferFeedItem[] = [
     avatar: '研',
     verified: false,
     time: '1 小时前',
+    type: '录取',
+    major: '网络空间安全',
+    field: '系统安全',
     giveUp: '武汉大学 · 网安',
     goTo: '浙江大学 · 计算机',
     message: '刚刚电话确认不去，后面应该会继续往下放，祝后面的同学接好运。',
@@ -231,6 +243,9 @@ export const offerFeedItems: OfferFeedItem[] = [
     avatar: '补',
     verified: true,
     time: '2 小时前',
+    type: '补录',
+    major: '计算机科学',
+    field: '机器学习',
     giveUp: '同济大学 · 智能科学',
     goTo: '南京大学 · 计算机',
     message: '院里刚刚给我确认了释放，后续大概率会继续联系候补，南京方向同学可以盯一下。',

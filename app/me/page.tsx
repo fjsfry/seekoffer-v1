@@ -4,14 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowUp,
+  BellRing,
   BookCheck,
   CheckSquare2,
   ClipboardList,
   PencilLine,
   Save,
+  Send,
   Settings2,
-  Square,
-  UserRound
+  Square
 } from 'lucide-react';
 import { LoginRequiredCard } from '@/components/login-required-card';
 import { ManualProjectEntryCard } from '@/components/manual-project-entry-card';
@@ -409,15 +410,62 @@ export default function MePage() {
 
   return (
     <SiteShell>
-      <section className="surface-card rounded-[32px] px-6 py-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <section className="py-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="text-4xl font-semibold tracking-tight text-ink">我的工作台</h1>
+            <p className="mt-4 text-base leading-8 text-slate-600">集中管理你的申请进度与任务，高效推进每一步。</p>
+          </div>
+          {profileComplete ? (
+            <button
+              onClick={() =>
+                setProfileExpandedState({
+                  ownerId: profileOwnerId,
+                  value: !profileExpanded
+                })
+              }
+              className="inline-flex items-center gap-2 rounded-xl border border-brand/25 bg-white px-5 py-3 text-sm font-semibold text-brand shadow-sm transition hover:border-brand"
+            >
+              <PencilLine className="h-4 w-4" />
+              {profileExpanded ? '收起资料' : '编辑资料'}
+            </button>
+          ) : null}
+        </div>
+
+        <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: '申请中', value: stats.total.toString(), hint: '正在推进的申请', icon: ClipboardList },
+            { label: '待准备', value: stats.actionCount.toString(), hint: '材料待补充/完善', icon: BookCheck },
+            { label: '已提交', value: stats.submitted.toString(), hint: '已提交，等待结果', icon: Send },
+            { label: '截止提醒', value: stats.highRisk.toString(), hint: '7天内到期', icon: BellRing }
+          ].map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <div key={item.label} className="product-card rounded-[22px] p-6">
+                <div className="flex items-center gap-4">
+                  <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-brand/8 text-brand">
+                    <Icon className="h-7 w-7" />
+                  </span>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-600">{item.label}</div>
+                    <div className="mt-2 text-3xl font-semibold text-brand">{item.value}</div>
+                    <div className="mt-2 text-sm text-slate-500">{item.hint}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="product-card mt-7 rounded-[24px] px-6 py-5">
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/10 text-brand">
-              <UserRound className="h-7 w-7" />
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand text-xl font-semibold text-white">
+              {(displayName || '我').slice(0, 1)}
             </div>
             <div>
-              <h1 className="text-2xl font-semibold text-ink">{displayName}的工作台</h1>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+              <h2 className="text-xl font-semibold text-ink">{displayName}同学</h2>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
                 <span>{form.undergraduateSchool || '待完善本科院校'}</span>
                 <span className="text-slate-300">|</span>
                 <span>{form.major || '待完善本科专业'}</span>
@@ -425,27 +473,6 @@ export default function MePage() {
                 <span>{form.targetMajor || '待完善目标方向'}</span>
               </div>
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {profileComplete ? (
-              <button
-                onClick={() =>
-                  setProfileExpandedState({
-                    ownerId: profileOwnerId,
-                    value: !profileExpanded
-                  })
-                }
-                className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"
-              >
-                <PencilLine className="h-4 w-4" />
-                {profileExpanded ? '收起资料' : '编辑资料'}
-              </button>
-            ) : null}
-            <StatPill label="申请项目数" value={stats.total.toString()} />
-            <StatPill label="已提交" value={stats.submitted.toString()} />
-            <StatPill label="高风险项目" value={stats.highRisk.toString()} />
-            <StatPill label="行动清单" value={stats.actionCount.toString()} />
           </div>
         </div>
       </section>
@@ -713,11 +740,3 @@ function CompactField({ label, children }: { label: string; children: React.Reac
   );
 }
 
-function StatPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-full bg-slate-50 px-4 py-3 text-center shadow-sm">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="mt-1 text-lg font-semibold text-ink">{value}</div>
-    </div>
-  );
-}

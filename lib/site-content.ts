@@ -49,31 +49,32 @@ export const aboutOriginParagraphs = [
 
 export const footerColumns = [
   {
-    title: '功能',
+    title: '产品',
     links: [
       { label: '通知库', href: '/notices' },
-      { label: '资源库', href: '/resources' },
       { label: '院校库', href: '/colleges' },
-      { label: 'Offer 池', href: '/offers' }
+      { label: '资源库', href: '/resources' },
+      { label: 'Offer 池', href: '/offers' },
+      { label: 'AI 定位', href: '/ai' },
+      { label: '工作台', href: '/me' }
     ]
   },
   {
-    title: '关于',
+    title: '帮助',
     links: [
-      { label: '关于我们', href: '/about' },
-      { label: 'AI 内测', href: '/ai' },
-      { label: '我的工作台', href: '/me' }
+      { label: '使用指南', href: '/about' },
+      { label: '常见问题', href: '/disclaimer' },
+      { label: '意见反馈', href: 'mailto:feedback@seekoffer.com.cn', external: true },
+      { label: '更新日志', href: '/about' }
     ]
   },
   {
-    title: '政策',
+    title: '关于我们',
     links: [
+      { label: '关于寻鹿', href: '/about' },
       { label: '用户协议', href: '/terms' },
       { label: '隐私政策', href: '/privacy' },
-      { label: '免责声明', href: '/disclaimer' },
-      { label: '社区规范', href: '/community' },
-      { label: '反馈纠错', href: 'mailto:feedback@seekoffer.com.cn', external: true },
-      { label: '研招网', href: 'https://yz.chsi.com.cn/', external: true }
+      { label: '社区规范', href: '/community' }
     ]
   }
 ] as const;
