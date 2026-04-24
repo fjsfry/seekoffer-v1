@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { usePathname } from 'next/navigation';
-import { MonitorSmartphone, ShieldCheck, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { LoginMethodPanel } from '@/components/login-method-panel';
 import { type AuthIntent, watchAuthModal } from '@/lib/auth-intent';
 
@@ -47,7 +46,6 @@ function resolveModalCopy(intent: AuthIntent | null, isMobile: boolean) {
 }
 
 export function AuthModal() {
-  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [intent, setIntent] = useState<AuthIntent | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -94,48 +92,31 @@ export function AuthModal() {
 
   return (
     <div className="fixed inset-0 z-[90]">
-      <button
-        aria-label="关闭登录弹层"
-        className="absolute inset-0 bg-slate-950/56 backdrop-blur-md"
-        onClick={() => setOpen(false)}
-      />
+      <button aria-label="关闭登录弹层" className="absolute inset-0 bg-brand/18 backdrop-blur-lg" onClick={() => setOpen(false)} />
 
       <div className="absolute inset-0 flex items-end justify-center p-0 sm:items-center sm:p-6">
-        <section className="relative w-full max-w-[920px] overflow-hidden rounded-t-[26px] border border-white/60 bg-white shadow-[0_34px_120px_rgba(15,76,92,0.22)] sm:rounded-[30px]">
-          <div className="border-b border-black/6 bg-white px-5 py-4 sm:px-7 sm:py-5">
+        <section className="relative w-full max-w-[1040px] overflow-hidden rounded-t-[28px] border border-white/70 bg-white shadow-[0_34px_120px_rgba(18,32,38,0.22)] sm:rounded-[28px]">
+          <div className="bg-white px-6 py-6 sm:px-10 sm:py-9">
             <div className="flex items-start justify-between gap-4">
-              <div className="max-w-2xl">
-                <div className="text-xs font-semibold text-brand">
-                  {copy.eyebrow}
-                </div>
-                <h2 className="mt-2 text-[24px] font-semibold leading-tight text-ink sm:text-[28px]">
+              <div className="max-w-3xl">
+                <div className="text-sm font-semibold text-brand">{copy.eyebrow}</div>
+                <h2 className="mt-3 text-[26px] font-semibold leading-tight text-ink sm:text-[32px]">
                   {copy.title}
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{copy.description}</p>
+                <p className="mt-3 text-sm leading-7 text-slate-600">{copy.description}</p>
               </div>
 
               <button
                 onClick={() => setOpen(false)}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
                 aria-label="关闭"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <div className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
-                <ShieldCheck className="h-4 w-4 text-brand" />
-                登录成功后会自动继续你刚才的动作
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
-                <MonitorSmartphone className="h-4 w-4 text-brand" />
-                当前来源页：{pathname === '/me' ? '工作台' : pathname}
-              </div>
             </div>
           </div>
 
-          <div className="max-h-[min(78vh,760px)] overflow-y-auto bg-slate-50 px-4 py-4 sm:px-5 sm:py-5">
+          <div className="max-h-[min(80vh,760px)] overflow-y-auto px-4 pb-5 sm:px-10 sm:pb-10">
             <LoginMethodPanel mode={isMobile ? 'popover' : 'modal'} onSuccess={() => setOpen(false)} />
           </div>
         </section>

@@ -1,11 +1,13 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
-  CheckCircle2,
+  BellRing,
   KeyRound,
   LoaderCircle,
+  LockKeyhole,
   LogIn,
   Mail,
   ShieldCheck,
@@ -40,40 +42,15 @@ function FeatureRow({
   description: string;
 }) {
   return (
-    <div className="flex gap-3">
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/10 text-brand-gold">
+    <div className="flex gap-4">
+      <div className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/16 text-emerald-100">
         {icon}
       </div>
       <div>
-        <div className="text-sm font-semibold text-white">{title}</div>
-        <p className="mt-1 text-sm leading-6 text-white/68">{description}</p>
+        <div className="text-base font-semibold text-white">{title}</div>
+        <p className="mt-1 text-sm leading-6 text-white/74">{description}</p>
       </div>
     </div>
-  );
-}
-
-function ModeButton({
-  active,
-  icon,
-  children,
-  onClick
-}: {
-  active: boolean;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold transition ${
-        active ? 'bg-white text-ink shadow-sm' : 'text-slate-500 hover:text-slate-700'
-      }`}
-    >
-      {icon}
-      {children}
-    </button>
   );
 }
 
@@ -95,11 +72,26 @@ function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={pending}
-      className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white shadow-[0_12px_26px_rgba(23,73,77,0.18)] transition hover:bg-brand-deep disabled:bg-brand/70"
+      className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 text-base font-semibold text-white shadow-[0_16px_30px_rgba(23,73,77,0.18)] transition hover:bg-brand-deep disabled:bg-brand/70"
     >
-      {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : icon}
+      {pending ? <LoaderCircle className="h-5 w-5 animate-spin" /> : icon}
       {children}
     </button>
+  );
+}
+
+function IconInput({
+  icon,
+  children
+}: {
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mt-2 flex h-14 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 transition focus-within:border-brand/50 focus-within:ring-4 focus-within:ring-brand/10">
+      <span className="text-slate-400">{icon}</span>
+      {children}
+    </div>
   );
 }
 
@@ -130,16 +122,16 @@ export function LoginMethodPanel({
   const [error, setError] = useState('');
 
   const accountLabel = SUPABASE_ENABLE_PHONE_AUTH ? '邮箱或手机号' : '邮箱';
-  const accountPlaceholder = SUPABASE_ENABLE_PHONE_AUTH ? 'name@example.com / 手机号' : 'name@example.com';
+  const accountPlaceholder = SUPABASE_ENABLE_PHONE_AUTH ? '请输入邮箱或手机号' : '请输入邮箱地址';
   const isEmailAccount = isEmailIdentifier(account);
-  const passwordActionLabel = passwordMode === 'login' ? '密码登录' : signupCodeSent ? '完成注册' : '发送注册验证码';
+  const passwordActionLabel = passwordMode === 'login' ? '立即登录' : signupCodeSent ? '完成注册' : '发送注册验证码';
   const passwordPending = pending === 'password' || pending === 'register' || pending === 'verify-signup';
   const idleHint =
     activeView === 'otp'
       ? '已完成注册后，可用邮箱验证码直接登录，不需要输入密码。'
       : passwordMode === 'register'
         ? '注册会发送 6 位邮箱验证码；输入后即完成账号确认并登录。'
-        : '已注册账号可直接密码登录；想用 6 位登录码时可以切换到“验证码”。';
+        : '登录后会自动继续你刚才的动作，申请表和待办也会同步保存。';
 
   const helperText = useMemo(() => {
     if (!account.trim()) {
@@ -383,92 +375,138 @@ export function LoginMethodPanel({
 
   return (
     <section
-      className={`overflow-hidden border border-black/8 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)] ${
-        compact ? 'rounded-3xl' : 'rounded-[28px] lg:grid lg:grid-cols-[320px_minmax(0,1fr)]'
+      className={`overflow-hidden border border-slate-100 bg-white shadow-[0_20px_70px_rgba(18,32,38,0.08)] ${
+        compact ? 'rounded-[24px]' : 'rounded-[24px] lg:grid lg:grid-cols-[360px_minmax(0,1fr)]'
       }`}
     >
-      <aside className="bg-brand px-5 py-6 text-white sm:px-6">
-        <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/78">
-          Seekoffer Account
-        </div>
-        <h3 className="mt-4 text-2xl font-semibold leading-tight">一个账号，接住你的申请进度</h3>
-        <p className="mt-3 text-sm leading-7 text-white/70">
-          登录后，申请表、待办、手动项目和个人资料会持续同步。你刚才的动作会在登录后继续执行。
-        </p>
+      <aside className="relative hidden overflow-hidden bg-brand px-9 py-10 text-white lg:block">
+        <div className="relative z-10">
+          <div className="flex items-center gap-3">
+            <Image src="/logo.png" alt="寻鹿 Seekoffer" width={42} height={42} className="h-10 w-10 rounded-xl bg-white object-cover" />
+            <div className="text-xl font-semibold">寻鹿 Seekoffer</div>
+          </div>
 
-        <div className="mt-6 space-y-5">
-          <FeatureRow
-            icon={<ShieldCheck className="h-4 w-4" />}
-            title="邮箱优先"
-            description="注册和登录都使用邮箱 6 位验证码，避免手机号通道未开通造成失败。"
-          />
-          <FeatureRow
-            icon={<CheckCircle2 className="h-4 w-4" />}
-            title="状态同步"
-            description="登录后的申请表、工作台待办和资料会进入 Supabase。"
-          />
+          <h3 className="mt-12 text-[30px] font-semibold leading-tight">
+            一个账号，
+            <br />
+            接住你的申请进度
+          </h3>
+
+          <div className="mt-10 space-y-9">
+            <FeatureRow
+              icon={<ShieldCheck className="h-5 w-5" />}
+              title="安全可靠"
+              description="数据加密保护，信息安全无忧。"
+            />
+            <FeatureRow
+              icon={<BellRing className="h-5 w-5" />}
+              title="高效同步"
+              description="多端同步进度，随时继续申请。"
+            />
+          </div>
+
+          {SUPABASE_ENABLE_ANONYMOUS ? (
+            <button
+              type="button"
+              onClick={() => void runTask('guest', () => signInAsGuest())}
+              disabled={pending === 'guest'}
+              className="mt-12 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-white/40 bg-white/8 px-4 text-sm font-semibold text-white transition hover:bg-white/14 disabled:text-white/50"
+            >
+              {pending === 'guest' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+              {pending === 'guest' ? '进入中...' : '先以试用态浏览'}
+            </button>
+          ) : null}
         </div>
 
-        {SUPABASE_ENABLE_ANONYMOUS ? (
-          <button
-            type="button"
-            onClick={() => void runTask('guest', () => signInAsGuest())}
-            disabled={pending === 'guest'}
-            className="mt-8 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/18 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/16 disabled:text-white/50"
-          >
-            {pending === 'guest' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-            {pending === 'guest' ? '进入中...' : '先以试用态浏览'}
-          </button>
-        ) : null}
+        <div className="absolute inset-x-0 bottom-0 h-44 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.14),transparent_24%),linear-gradient(180deg,transparent,rgba(5,45,48,0.72))]" />
+        <div className="absolute bottom-0 left-0 right-0 h-20 bg-brand-deep/55" />
+        <div className="absolute bottom-12 left-10 text-6xl text-white/12">鹿</div>
+        <div className="absolute -bottom-7 left-0 right-0 h-24 rounded-[50%] bg-brand-deep/70" />
       </aside>
 
-      <form className="px-5 py-6 sm:px-7" onSubmit={handleFormSubmit}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-brand">正式账号</div>
-            <h3 className="mt-1 text-2xl font-semibold leading-tight text-ink">登录或创建你的 Seekoffer 账号</h3>
-          </div>
-          <div className="inline-flex rounded-2xl bg-slate-100 p-1">
-            <ModeButton
-              active={activeView === 'password'}
-              icon={<KeyRound className="h-4 w-4" />}
-              onClick={() => {
-                resetFeedback();
-                setActiveView('password');
-              }}
-            >
-              密码
-            </ModeButton>
-            <ModeButton
-              active={activeView === 'otp'}
-              icon={<Mail className="h-4 w-4" />}
-              onClick={() => {
-                resetFeedback();
+      <form className="px-6 py-7 sm:px-10 sm:py-10" onSubmit={handleFormSubmit}>
+        <div className="grid grid-cols-2 gap-1 rounded-2xl border border-slate-200 bg-slate-100 p-1">
+          <button
+            type="button"
+            onClick={() => {
+              resetFeedback();
+              if (passwordMode === 'register') {
                 resetSignupChallenge();
-                setActiveView('otp');
-              }}
-            >
-              验证码
-            </ModeButton>
-          </div>
+                setActiveView('password');
+              }
+              setPasswordMode('login');
+            }}
+            className={`min-h-12 rounded-xl text-base font-semibold transition ${
+              passwordMode === 'login' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            登录
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              resetFeedback();
+              resetSignupChallenge();
+              setActiveView('password');
+              setPasswordMode('register');
+            }}
+            className={`min-h-12 rounded-xl text-base font-semibold transition ${
+              passwordMode === 'register' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            注册
+          </button>
         </div>
 
-        <div className="mt-6 space-y-4">
+        <div className="mt-8 inline-flex rounded-2xl bg-slate-100 p-1">
+          <button
+            type="button"
+            onClick={() => {
+              resetFeedback();
+              setActiveView('password');
+            }}
+            className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold transition ${
+              activeView === 'password' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <LockKeyhole className="h-4 w-4" />
+            {passwordMode === 'register' ? '密码注册' : '密码'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              resetFeedback();
+              resetSignupChallenge();
+              setPasswordMode('login');
+              setActiveView('otp');
+            }}
+            className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold transition ${
+              activeView === 'otp' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Mail className="h-4 w-4" />
+            验证码
+          </button>
+        </div>
+
+        <div className="mt-7 space-y-5">
           <label className="block">
             <span className="text-sm font-medium text-slate-700">{accountLabel}</span>
-            <input
-              type={SUPABASE_ENABLE_PHONE_AUTH ? 'text' : 'email'}
-              inputMode={SUPABASE_ENABLE_PHONE_AUTH ? 'text' : 'email'}
-              autoComplete="email"
-              value={account}
-              onChange={(event) => {
-                setAccount(event.target.value);
-                resetFeedback();
-                resetSignupChallenge();
-              }}
-              placeholder={accountPlaceholder}
-              className="mt-2 h-12 w-full rounded-xl border border-black/8 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand/50 focus:ring-4 focus:ring-brand/10"
-            />
+            <IconInput icon={<Mail className="h-5 w-5" />}>
+              <input
+                type={SUPABASE_ENABLE_PHONE_AUTH ? 'text' : 'email'}
+                inputMode={SUPABASE_ENABLE_PHONE_AUTH ? 'text' : 'email'}
+                autoComplete="email"
+                value={account}
+                onChange={(event) => {
+                  setAccount(event.target.value);
+                  resetFeedback();
+                  resetSignupChallenge();
+                }}
+                placeholder={accountPlaceholder}
+                className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+              />
+            </IconInput>
             <span
               className={`mt-2 block text-xs ${
                 isEmailAccount ? 'text-emerald-600' : account.trim() ? 'text-amber-700' : 'text-slate-500'
@@ -479,72 +517,57 @@ export function LoginMethodPanel({
           </label>
 
           {activeView === 'password' ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetFeedback();
-                    resetSignupChallenge();
-                    setPasswordMode('login');
-                  }}
-                  className={`min-h-10 rounded-xl text-sm font-semibold transition ${
-                    passwordMode === 'login' ? 'bg-white text-ink shadow-sm' : 'text-slate-500'
-                  }`}
-                >
-                  登录
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetFeedback();
-                    resetSignupChallenge();
-                    setPasswordMode('register');
-                  }}
-                  className={`min-h-10 rounded-xl text-sm font-semibold transition ${
-                    passwordMode === 'register' ? 'bg-white text-ink shadow-sm' : 'text-slate-500'
-                  }`}
-                >
-                  注册
-                </button>
-              </div>
-
+            <div className="space-y-5">
               <label className="block">
                 <span className="text-sm font-medium text-slate-700">密码</span>
-                <input
-                  type="password"
-                  autoComplete={passwordMode === 'login' ? 'current-password' : 'new-password'}
-                  value={password}
-                  onChange={(event) => {
-                    setPassword(event.target.value);
-                    resetFeedback();
-                    resetSignupChallenge();
-                  }}
-                  placeholder="至少 6 位"
-                  className="mt-2 h-12 w-full rounded-xl border border-black/8 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand/50 focus:ring-4 focus:ring-brand/10"
-                />
+                <IconInput icon={<KeyRound className="h-5 w-5" />}>
+                  <input
+                    type="password"
+                    autoComplete={passwordMode === 'login' ? 'current-password' : 'new-password'}
+                    value={password}
+                    onChange={(event) => {
+                      setPassword(event.target.value);
+                      resetFeedback();
+                      resetSignupChallenge();
+                    }}
+                    placeholder="请输入密码"
+                    className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                  />
+                </IconInput>
               </label>
 
               {passwordMode === 'register' ? (
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700">确认密码</span>
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    value={passwordConfirm}
-                    onChange={(event) => {
-                      setPasswordConfirm(event.target.value);
-                      resetFeedback();
-                      resetSignupChallenge();
-                    }}
-                    placeholder="再次输入密码"
-                    className="mt-2 h-12 w-full rounded-xl border border-black/8 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand/50 focus:ring-4 focus:ring-brand/10"
-                  />
+                  <IconInput icon={<KeyRound className="h-5 w-5" />}>
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      value={passwordConfirm}
+                      onChange={(event) => {
+                        setPasswordConfirm(event.target.value);
+                        resetFeedback();
+                        resetSignupChallenge();
+                      }}
+                      placeholder="再次输入密码"
+                      className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                    />
+                  </IconInput>
                 </label>
-              ) : null}
+              ) : (
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <label className="inline-flex items-center gap-2 text-slate-500">
+                    <input type="checkbox" className="h-4 w-4 rounded border-slate-300" />
+                    下次自动登录
+                  </label>
+                  <button type="button" className="font-semibold text-brand">
+                    忘记密码？
+                  </button>
+                </div>
+              )}
 
               {passwordMode === 'register' && signupCodeSent ? (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
                   <div className="flex items-start gap-2 text-sm leading-6 text-emerald-800">
                     <Mail className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>
@@ -579,11 +602,11 @@ export function LoginMethodPanel({
               <PrimaryButton
                 icon={
                   passwordMode === 'login' ? (
-                    <LogIn className="h-4 w-4" />
+                    <LogIn className="h-5 w-5" />
                   ) : signupCodeSent ? (
-                    <ShieldCheck className="h-4 w-4" />
+                    <ShieldCheck className="h-5 w-5" />
                   ) : (
-                    <UserPlus className="h-4 w-4" />
+                    <UserPlus className="h-5 w-5" />
                   )
                 }
                 pending={passwordPending}
@@ -592,38 +615,40 @@ export function LoginMethodPanel({
               </PrimaryButton>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <input
-                  value={otpCode}
-                  onChange={(event) => {
-                    setOtpCode(event.target.value.replace(/\D/g, '').slice(0, 6));
-                    resetFeedback();
-                  }}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="6 位验证码"
-                  className="h-12 min-w-0 flex-1 rounded-xl border border-black/8 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand/50 focus:ring-4 focus:ring-brand/10"
-                />
+            <div className="space-y-5">
+              <div className="flex gap-3">
+                <IconInput icon={<ShieldCheck className="h-5 w-5" />}>
+                  <input
+                    value={otpCode}
+                    onChange={(event) => {
+                      setOtpCode(event.target.value.replace(/\D/g, '').slice(0, 6));
+                      resetFeedback();
+                    }}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="6 位验证码"
+                    className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                  />
+                </IconInput>
                 <button
                   type="button"
                   onClick={() => void handleSendCode()}
                   disabled={pending === 'send-code' || resendIn > 0}
-                  className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-black/8 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:text-slate-400"
+                  className="mt-2 inline-flex h-14 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:text-slate-400"
                 >
                   {pending === 'send-code' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
                   {resendIn > 0 ? `${resendIn}s` : otpSent ? '重发' : '发送'}
                 </button>
               </div>
 
-              <PrimaryButton icon={<ShieldCheck className="h-4 w-4" />} pending={pending === 'verify-code'}>
+              <PrimaryButton icon={<ShieldCheck className="h-5 w-5" />} pending={pending === 'verify-code'}>
                 {pending === 'verify-code' ? '验证中...' : '验证码登录'}
               </PrimaryButton>
             </div>
           )}
         </div>
 
-        <div className="mt-5 min-h-11">
+        <div className="mt-5 min-h-12">
           {message ? (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
               {message}
@@ -634,11 +659,42 @@ export function LoginMethodPanel({
               {error}
             </div>
           ) : null}
-          {!message && !error ? (
-            <p className="text-sm leading-6 text-slate-500">
-              {idleHint}
-            </p>
-          ) : null}
+          {!message && !error ? <p className="text-sm leading-6 text-slate-500">{idleHint}</p> : null}
+        </div>
+
+        <div className="mt-4 text-center text-sm text-slate-500">
+          {passwordMode === 'login' ? (
+            <>
+              还没有账号？
+              <button
+                type="button"
+                onClick={() => {
+                  resetFeedback();
+                  resetSignupChallenge();
+                  setActiveView('password');
+                  setPasswordMode('register');
+                }}
+                className="ml-2 font-semibold text-brand"
+              >
+                立即注册
+              </button>
+            </>
+          ) : (
+            <>
+              已有账号？
+              <button
+                type="button"
+                onClick={() => {
+                  resetFeedback();
+                  resetSignupChallenge();
+                  setPasswordMode('login');
+                }}
+                className="ml-2 font-semibold text-brand"
+              >
+                现在登录
+              </button>
+            </>
+          )}
         </div>
       </form>
     </section>
