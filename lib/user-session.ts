@@ -31,6 +31,10 @@ export type CredentialsPayload = {
   password: string;
 };
 
+export type EmailLoginCodeOptions = {
+  shouldCreateUser?: boolean;
+};
+
 export type PasswordSignUpResult =
   | {
       status: 'signed_in';
@@ -226,6 +230,18 @@ function formatAuthError(error: unknown, fallback: string) {
 
   if (/email not confirmed|email_not_confirmed/.test(message)) {
     return '邮箱还未完成验证，请先打开验证邮件。';
+  }
+
+  if (/error sending confirmation email|error sending magic link|error sending otp|smtp|send.*email|email.*send/.test(message)) {
+    return '邮件发送失败：请检查 Supabase Auth 的 Resend/SMTP 发信配置，或稍后再试。';
+  }
+
+  if (/email rate limit exceeded|rate limit/.test(message)) {
+    return '邮件发送太频繁了，请稍等一会儿再重新发送。';
+  }
+
+  if (/user not found|signup.*disabled|signups not allowed|no user/.test(message)) {
+    return '这个邮箱还没有注册，请切到“密码”并选择“注册”创建账号。';
   }
 
   if (/password should be at least/.test(message)) {
@@ -486,7 +502,7 @@ export async function signUpWithPasswordAccount(payload: CredentialsPayload): Pr
   }
 }
 
-export async function sendEmailLoginCode(email: string) {
+export async function sendEmailLoginCode(email: string, options: EmailLoginCodeOptions = {}) {
   if (!isSupabaseConfigured()) {
     throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
   }
@@ -503,7 +519,7 @@ export async function sendEmailLoginCode(email: string) {
       email: normalizedEmail,
       options: {
         emailRedirectTo: SEEKOFFER_SITE_URL,
-        shouldCreateUser: true
+        shouldCreateUser: options.shouldCreateUser ?? false
       }
     });
 

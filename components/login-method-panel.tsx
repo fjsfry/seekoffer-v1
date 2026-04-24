@@ -264,10 +264,17 @@ export function LoginMethodPanel({
       return;
     }
 
-    await runTask('send-code', () => sendEmailLoginCode(email), {
+    const result = await runTask('send-code', () => sendEmailLoginCode(email), {
       closeOnSuccess: false,
       successMessage: '验证码已发送，请查看邮箱并输入 6 位验证码。'
     });
+
+    if (result === null) {
+      setOtpSent(false);
+      setResendIn(0);
+      return;
+    }
+
     setOtpSent(true);
     setResendIn(60);
   }
