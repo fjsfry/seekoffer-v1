@@ -88,7 +88,7 @@ export default function CollegesPage() {
       <PageSectionTitle
         eyebrow="College Directory"
         title="院校库"
-        subtitle="只保留官网直达入口，优先服务真实回访场景。按城市、标签和关键词快速筛选，找到学校后直接回到官网继续核对信息。"
+        subtitle="高频目标院校一页直达。按城市、层次和关键词快速筛选，找到学校后直接回到官网核对。"
       />
 
       <section className="surface-card rounded-[34px] p-7 lg:p-8">
@@ -155,30 +155,32 @@ export default function CollegesPage() {
         {pagedColleges.map((item) => (
           <article
             key={item.name}
-            className="surface-card rounded-[32px] p-6 transition hover:-translate-y-1 hover:shadow-soft"
+            className="surface-card rounded-[26px] p-5 transition hover:-translate-y-1 hover:shadow-soft"
           >
             <div className="flex items-start gap-4">
               <ExternalSiteMark source={item.website} label={item.name} size="lg" rounded="full" />
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap gap-2">
-                  {item.groups.map((entry) => (
-                    <span key={entry} className="rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-brand">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {item.city}
+                  </span>
+                  {item.groups.slice(0, 4).map((entry) => (
+                    <span key={entry} className="rounded-full bg-brand/10 px-3 py-1 text-brand">
                       {entry}
                     </span>
                   ))}
                 </div>
                 <div className="mt-4 text-2xl font-semibold tracking-tight text-ink">{item.name}</div>
-                <p className="mt-3 text-sm leading-7 text-slate-600">{item.focus}</p>
-                <div className="mt-4 inline-flex items-center gap-2 text-sm text-slate-500">
-                  <MapPin className="h-4 w-4" />
-                  {item.city}
+                <div className="mt-2 text-sm text-slate-500">
+                  {[item.city, ...item.groups.slice(0, 4)].join('｜')}
                 </div>
-                <div className="mt-6">
+                <div className="mt-5">
                   <a
                     href={item.website}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white"
+                    className="inline-flex items-center gap-2 rounded-xl border border-brand/25 bg-white px-4 py-2.5 text-sm font-semibold text-brand transition hover:border-brand"
                   >
                     打开学校官网
                     <ExternalLink className="h-4 w-4" />

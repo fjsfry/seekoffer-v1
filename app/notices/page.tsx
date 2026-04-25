@@ -66,6 +66,23 @@ function getVisiblePages(currentPage: number, totalPages: number) {
   return Array.from(new Set(pages));
 }
 
+function getNoticeCardTags(project: PublicNoticeProject) {
+  const seen = new Set<string>();
+  const tags = [getDisplayDiscipline(project.discipline), ...getDisplayTags(project.tags)]
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item) => {
+      if (seen.has(item)) {
+        return false;
+      }
+
+      seen.add(item);
+      return true;
+    });
+
+  return tags.slice(0, 3);
+}
+
 export default function NoticesPage() {
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
     baseNoticeProjects.filter((item) => String(item.year) === '2026')
@@ -80,6 +97,7 @@ export default function NoticesPage() {
   const [projectType, setProjectType] = useState('全部');
   const [year, setYear] = useState('2026');
   const [sortBy, setSortBy] = useState<SortOption>('publish');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [pageState, setPageState] = useState({ page: 1, filterKey: '' });
   const filterKey = [
     keyword.trim().toLowerCase(),
@@ -236,81 +254,94 @@ export default function NoticesPage() {
       </section>
 
       <section className="product-card rounded-[24px] p-6">
-        <div className="flex flex-wrap gap-3">
-          {['全部', '夏令营', '预推免', '正式推免'].map((item) => (
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-wrap gap-3">
+            {['全部', '夏令营', '预推免', '正式推免'].map((item) => (
+              <button
+                key={item}
+                onClick={() => setProjectType(item)}
+                className={`rounded-xl px-6 py-3 text-sm font-semibold transition ${
+                  projectType === item ? 'bg-brand text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <FilterSelect label="年份" value={year} onChange={setYear}>
+              <option value="2026">2026</option>
+            </FilterSelect>
             <button
-              key={item}
-              onClick={() => setProjectType(item)}
-              className={`rounded-xl px-6 py-3 text-sm font-semibold transition ${
-                projectType === item ? 'bg-brand text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-50'
-              }`}
+              type="button"
+              onClick={() => setAdvancedOpen((current) => !current)}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-brand/25 bg-white px-5 text-sm font-semibold text-brand transition hover:border-brand"
             >
-              {item}
+              <Filter className="h-4 w-4" />
+              {advancedOpen ? '收起筛选' : '高级筛选'}
             </button>
-          ))}
+          </div>
         </div>
 
-        <div className="my-6 h-px bg-slate-100" />
+        {advancedOpen ? (
+          <div className="mt-6 border-t border-slate-100 pt-6">
+            <div className="grid gap-4 lg:grid-cols-[repeat(5,minmax(0,1fr))_auto] lg:items-end">
+              <FilterSelect label="学校层次" value={schoolRange} onChange={(value) => setSchoolRange(value as RangeFilter)}>
+                {(['全部', '985', '211', '双一流', '其他'] as RangeFilter[]).map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </FilterSelect>
+              <FilterInput label="城市 / 学校" value={schoolName} onChange={setSchoolName} placeholder="全部" />
+              <FilterSelect
+                label="专业大类"
+                value={category}
+                onChange={(value) => {
+                  setCategory(value);
+                  setDiscipline('全部');
+                }}
+              >
+                {categoryOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </FilterSelect>
+              <FilterSelect label="状态" value={progress} onChange={(value) => setProgress(value as ProgressFilter)}>
+                {(['全部', '报名中', '未开始', '已结束'] as ProgressFilter[]).map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </FilterSelect>
+              <FilterSelect label="排序" value={sortBy} onChange={(value) => setSortBy(value as SortOption)}>
+                <option value="publish">按发布时间</option>
+                <option value="deadline">按截止日期</option>
+                <option value="school">按学校名称</option>
+              </FilterSelect>
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="h-12 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-500 transition hover:border-brand hover:text-brand"
+              >
+                重置
+              </button>
+            </div>
 
-        <div className="grid gap-4 lg:grid-cols-[repeat(5,minmax(0,1fr))_auto_auto] lg:items-end">
-          <FilterSelect label="学校层次" value={schoolRange} onChange={(value) => setSchoolRange(value as RangeFilter)}>
-            {(['全部', '985', '211', '双一流', '其他'] as RangeFilter[]).map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </FilterSelect>
-          <FilterInput label="城市 / 学校" value={schoolName} onChange={setSchoolName} placeholder="全部" />
-          <FilterSelect
-            label="专业大类"
-            value={category}
-            onChange={(value) => {
-              setCategory(value);
-              setDiscipline('全部');
-            }}
-          >
-            {categoryOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </FilterSelect>
-          <FilterSelect label="状态" value={progress} onChange={(value) => setProgress(value as ProgressFilter)}>
-            {(['全部', '报名中', '未开始', '已结束'] as ProgressFilter[]).map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </FilterSelect>
-          <FilterSelect label="年份" value={year} onChange={setYear}>
-            <option value="2026">2026</option>
-          </FilterSelect>
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="h-12 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-500 transition hover:border-brand hover:text-brand"
-          >
-            重置
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-brand px-5 text-sm font-semibold text-white"
-          >
-            筛选
-            <Filter className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-          <FilterInput label="专业关键词" value={majorKeyword} onChange={setMajorKeyword} placeholder="例如 人工智能" />
-          <FilterSelect label="细分专业" value={discipline} onChange={setDiscipline}>
-            {disciplineOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </FilterSelect>
-        </div>
+            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+              <FilterInput label="专业关键词" value={majorKeyword} onChange={setMajorKeyword} placeholder="例如 人工智能" />
+              <FilterSelect label="细分专业" value={discipline} onChange={setDiscipline}>
+                {disciplineOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </FilterSelect>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="flex flex-wrap items-center justify-between gap-4">
@@ -322,15 +353,9 @@ export default function NoticesPage() {
           {keyword ? <span className="rounded-full bg-slate-100 px-3 py-1">{keyword}</span> : null}
         </div>
 
-        <select
-          value={sortBy}
-          onChange={(event) => setSortBy(event.target.value as SortOption)}
-          className="soft-input rounded-xl px-4 py-3 text-sm font-semibold text-slate-600 outline-none"
-        >
-          <option value="publish">按发布时间</option>
-          <option value="deadline">按截止日期</option>
-          <option value="school">按学校名称</option>
-        </select>
+        <div className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-500">
+          {sortBy === 'publish' ? '按发布时间' : sortBy === 'deadline' ? '按截止日期' : '按学校名称'}
+        </div>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -362,10 +387,7 @@ export default function NoticesPage() {
                     {normalizeNoticeTitle(project.projectName, 70)}
                   </Link>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                    {project.discipline ? (
-                      <span className="rounded-full bg-slate-100 px-3 py-1">{getDisplayDiscipline(project.discipline)}</span>
-                    ) : null}
-                    {getDisplayTags(project.tags).slice(0, 3).map((item) => (
+                    {getNoticeCardTags(project).map((item) => (
                       <span key={item} className="rounded-full bg-slate-100 px-3 py-1">
                         {item}
                       </span>

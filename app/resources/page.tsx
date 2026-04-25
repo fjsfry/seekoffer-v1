@@ -39,27 +39,25 @@ export default function ResourcesPage() {
       <PageSectionTitle
         eyebrow="Resource Toolbox"
         title="资源库"
-        subtitle="把高频学术工具、官方入口和常用服务整理成一个可持续回访的保研工具箱。"
+        subtitle="常用学术工具、官方入口和申请服务，一页直达。"
       />
 
       <section className="surface-card rounded-[34px] p-7 lg:p-8">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
           <div>
-            <div className="eyebrow">Stable Toolbox</div>
-            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink">少一点重复搜索，多一点直接行动。</h2>
-            <p className="mt-4 max-w-3xl text-sm leading-8 text-slate-600">
-              资源库不追求花哨，而是优先整理那些会在申请期被反复打开的网站。你可以把它当成稳定回访的工具层。
-            </p>
+            <div className="eyebrow">Quick Access</div>
+            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-ink">高频入口</h2>
+            <p className="mt-3 text-sm leading-7 text-slate-500">把申请期反复打开的网站放在最前面。</p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {heroLinks.map((item) => (
               <a
                 key={item.title}
                 href={item.href}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-[26px] bg-slate-50 px-4 py-4 transition hover:bg-slate-100"
+                className="rounded-2xl bg-slate-50 px-4 py-4 transition hover:bg-slate-100"
               >
                 <div className="flex items-center gap-3">
                   <ExternalSiteMark
@@ -92,7 +90,6 @@ export default function ResourcesPage() {
                     {section.title}
                   </div>
                   <h3 className="mt-3 text-2xl font-semibold text-ink">{section.title}</h3>
-                  <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">{section.description}</p>
                 </div>
               </div>
 
@@ -103,7 +100,7 @@ export default function ResourcesPage() {
                     href={item.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-[28px] border border-black/5 bg-slate-50 p-5 transition hover:-translate-y-1 hover:bg-white hover:shadow-soft"
+                    className="rounded-[24px] border border-black/5 bg-slate-50 p-5 transition hover:-translate-y-1 hover:bg-white hover:shadow-soft"
                   >
                     <div className="flex items-start gap-4">
                       <ExternalSiteMark
@@ -117,7 +114,6 @@ export default function ResourcesPage() {
                         <div className="mt-2 inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-brand shadow-sm">
                           {item.badge}
                         </div>
-                        <p className="mt-4 text-sm leading-7 text-slate-600">{item.description}</p>
                         <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand">
                           打开入口
                           <ArrowUpRight className="h-4 w-4" />

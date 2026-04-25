@@ -184,13 +184,13 @@ export default function OffersPage() {
                     <div className="mt-5 flex items-center justify-between gap-4 text-sm text-slate-500">
                       <span>{offer.time}</span>
                       <div className="flex items-center gap-4">
-                        <span className="inline-flex items-center gap-1.5 font-semibold text-ink">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400">
                           <Flame className="h-4 w-4 text-brand" />
-                          {offer.heat}
+                          关注 {offer.heat}
                         </span>
                         <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-semibold text-brand">
                           <Heart className="h-4 w-4" />
-                          支持一下
+                          我也关注
                         </button>
                       </div>
                     </div>

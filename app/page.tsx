@@ -83,27 +83,27 @@ export default function HomePage() {
 
   const heroMetrics = [
     {
-      label: '通知数',
+      label: '2026 通知',
       value: `${projects.length}+`,
-      hint: '覆盖最新保研通知',
+      hint: '持续同步中',
       icon: BellRing
     },
     {
-      label: '院校覆盖',
+      label: '院校入口',
       value: `${collegeDirectory.length}`,
-      hint: '国内外高校及院所',
+      hint: '官网快速回访',
       icon: GraduationCap
     },
     {
-      label: '资源入口',
+      label: '资源工具',
       value: `${officialResourceSections.flatMap((item) => item.links).length}`,
-      hint: '权威平台与工具',
+      hint: '高频申请入口',
       icon: FileText
     },
     {
       label: 'Offer动态',
       value: `${offerFeedItems.length}`,
-      hint: '内测演示与经验更新',
+      hint: '内测演示中',
       icon: TrendingUp
     }
   ];

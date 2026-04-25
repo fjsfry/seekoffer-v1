@@ -180,7 +180,7 @@ export const officialResourceSections: ResourceSection[] = [
 export const offerMetrics = [
   { label: '内测演示动态', value: '4', hint: '用于展示信息结构，不代表真实补录' },
   { label: '发布机制', value: '审核中', hint: '正式发布前会接入举报和删除入口' },
-  { label: '高热方向', value: '计算机 / 电院 / 电子信息', hint: '仅作为演示标签，真实数据以审核后为准' }
+  { label: '关注方向', value: '计算机 / 电院 / 电子信息', hint: '仅作为演示标签，真实数据以审核后为准' }
 ];
 
 export const hotKeywords = ['清华', '上交', '浙大', '计算机', '电院', '预推免'];

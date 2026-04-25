@@ -55,27 +55,27 @@ export default function AiPage() {
             <BrainCircuit className="h-4 w-4" />
             模型能力方向
           </div>
-          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink">先把最真实、最刚需的问题收集清楚。</h2>
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink">左手看风险，右手拆材料。</h2>
           <p className="mt-4 text-sm leading-8 text-slate-600">
-            我们不会把 AI 包装成录取保证。当前内测会先收集你最真实的申请问题，用来决定优先做风险评估、材料清单还是简章提炼。
+            内测阶段先聚焦三个最刚需的申请动作：判断目标层级、发现材料缺口、拆解简章要求。
           </p>
 
           <div className="mt-6 grid gap-4">
             {[
               {
                 title: '申请风险评估',
-                text: '围绕背景、目标层级、时间窗口和项目画像，提示风险区间与优先级，而不是承诺录取结果。'
+                text: '判断目标层级与申请优先级，帮助你少做无效投递。'
               },
               {
                 title: '材料短板提示',
-                text: '结合目标项目和个人字段，提醒简历、成绩单、推荐信、科研经历等材料缺口。'
+                text: '检查简历、成绩单、推荐信、科研经历等关键缺口。'
               },
               {
                 title: '提炼简章要求',
-                text: '把冗长通知拆成关键条件、材料清单、时间节点和风险提醒。'
+                text: '拆解申请条件、材料清单和时间节点。'
               }
             ].map((item) => (
-              <div key={item.title} className="rounded-[28px] bg-slate-50 px-5 py-5">
+              <div key={item.title} className="rounded-[24px] bg-slate-50 px-5 py-5">
                 <div className="text-lg font-semibold text-ink">{item.title}</div>
                 <p className="mt-3 text-sm leading-7 text-slate-600">{item.text}</p>
               </div>
