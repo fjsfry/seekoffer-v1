@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "start": "next start",
     "cache:logos": "node ./scripts/cache-site-marks.mjs",
+    "sync:school-logos": "node ./scripts/sync-urongda-logo-map.mjs",
     "sync:notices": "node ./scripts/sync-public-notice-data.mjs",
     "import:cloudbase-export": "node ./scripts/import-cloudbase-export-to-supabase.mjs",
     "build:hosting": "npm run build && node ./scripts/prepare-hosting.mjs",

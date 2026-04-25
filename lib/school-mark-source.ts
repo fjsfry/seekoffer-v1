@@ -1,6 +1,7 @@
 import { collegeDirectory } from './college-directory';
 import type { PublicNoticeProject } from './mock-data';
 import { siteMarkManifest } from './site-mark-manifest';
+import { urongdaSchoolLogoMap } from './urongda-school-logo-map';
 
 const aggregatorDomains = new Set([
   'baoyantongzhi.com',
@@ -13,8 +14,13 @@ const aggregatorDomains = new Set([
 ]);
 
 function normalizeName(value: string, stripParenthetical = false) {
-  const text = stripParenthetical ? value.replace(/[（(].*?[）)]/g, '') : value;
-  return text.replace(/\s+/g, '').trim();
+  const normalized = value.normalize('NFKC');
+  const text = stripParenthetical ? normalized.replace(/\([^)]*\)/g, '') : normalized;
+  return text
+    .replace(/\s+/g, '')
+    .replace(/[()（）]/g, '')
+    .replace(/^[【\[\]】]+|[【\[\]】]+$/g, '')
+    .trim();
 }
 
 function resolveDomain(source: string) {
@@ -48,6 +54,17 @@ const schoolDomainEntries = collegeDirectory.map((college) => ({
   domain: college.domain
 }));
 
+const urongdaLogoEntries = Object.entries(urongdaSchoolLogoMap);
+
+const schoolLogoAliasNames = [
+  { match: '中国社科院大学', target: '中国社会科学院大学' },
+  { match: '国防科技大学', target: '中国人民解放军国防科技大学' },
+  { match: '清华经管学院', target: '清华大学' }
+].map((item) => ({
+  match: normalizeName(item.match),
+  target: normalizeName(item.target)
+}));
+
 function resolveDomainBySchoolName(schoolName: string) {
   const normalized = normalizeName(schoolName);
   const normalizedBase = normalizeName(schoolName, true);
@@ -57,9 +74,44 @@ function resolveDomainBySchoolName(schoolName: string) {
   if (exact) return exact.domain;
 
   const partial = schoolDomainEntries.find(
-    (entry) => normalizedBase.includes(entry.baseName) || entry.baseName.includes(normalizedBase)
+    (entry) =>
+      entry.baseName &&
+      normalizedBase &&
+      (normalizedBase.includes(entry.baseName) || entry.baseName.includes(normalizedBase))
   );
   return partial?.domain || '';
+}
+
+function resolveRemoteSchoolLogoByName(schoolName: string) {
+  const normalized = normalizeName(schoolName);
+  const normalizedBase = normalizeName(schoolName, true);
+  if (!normalized) return '';
+
+  const candidates = [normalized, normalizedBase].filter(Boolean);
+  for (const alias of schoolLogoAliasNames) {
+    if (normalized.includes(alias.match)) {
+      candidates.push(alias.target);
+    }
+  }
+
+  for (const candidate of [...new Set(candidates)]) {
+    const exact = urongdaSchoolLogoMap[candidate];
+    if (exact) return exact;
+
+    if (candidate.length < 4) {
+      continue;
+    }
+
+    const matches = urongdaLogoEntries.filter(
+      ([entryName]) => entryName.includes(candidate) || candidate.includes(entryName)
+    );
+
+    if (matches.length === 1) {
+      return matches[0][1];
+    }
+  }
+
+  return '';
 }
 
 function resolveLogoSourceFromLink(link: string) {
@@ -75,6 +127,7 @@ export function resolveNoticeLogoSource(project: Pick<PublicNoticeProject, 'scho
   }
 
   return (
+    resolveRemoteSchoolLogoByName(project.schoolName) ||
     resolveLogoSourceFromLink(project.sourceLink) ||
     resolveLogoSourceFromLink(project.applyLink) ||
     project.sourceLink ||

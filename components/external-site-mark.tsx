@@ -30,6 +30,18 @@ function resolveManifestDomain(domain: string) {
   return '';
 }
 
+function isDirectImageSource(source: string) {
+  if (!source || !/^https?:\/\//i.test(source)) {
+    return false;
+  }
+
+  const cleanSource = source.split('?')[0].toLowerCase();
+  return (
+    cleanSource.includes('cdn.urongda.com/images/schools/') ||
+    /\.(?:png|jpe?g|webp|svg|gif)$/.test(cleanSource)
+  );
+}
+
 function buildFallbackInitial(label: string, domain: string) {
   const cleanLabel = label.replace(/\s+/g, '').trim();
   const cjkChars = [...cleanLabel].filter((char) => /[\u3400-\u9fff]/u.test(char));
@@ -90,7 +102,8 @@ export function ExternalSiteMark({
   const domain = useMemo(() => resolveDomain(source), [source]);
   const manifestDomain = useMemo(() => resolveManifestDomain(domain), [domain]);
   const localSrc = manifestDomain ? siteMarkManifest[manifestDomain] : '';
-  const imageSrc = localSrc || '';
+  const remoteSrc = useMemo(() => (isDirectImageSource(source) ? source : ''), [source]);
+  const imageSrc = localSrc || remoteSrc;
   const extension = imageSrc.split('?')[0].split('.').pop()?.toLowerCase() || '';
 
   const dimensions =
