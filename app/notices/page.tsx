@@ -34,6 +34,7 @@ import {
 } from '@/lib/notice-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
 import { baseNoticeProjects, inferDisciplineCategory, inferSchoolRange } from '@/lib/notice-source';
+import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
 
 type SortOption = 'deadline' | 'publish' | 'school';
@@ -467,7 +468,7 @@ export default function NoticesPage() {
 
                 <div className="grid gap-5 sm:grid-cols-[76px_minmax(0,1fr)_190px]">
                   <ExternalSiteMark
-                    source={project.sourceLink}
+                    source={resolveNoticeLogoSource(project)}
                     label={getDisplaySchoolName(project.schoolName)}
                     size="lg"
                     rounded="full"

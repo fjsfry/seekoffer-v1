@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node ./scripts/sync-public-notice-data.mjs && next build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "start": "next start",

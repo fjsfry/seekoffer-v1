@@ -14,6 +14,28 @@ const collegeDirectoryPath = path.join(repoRoot, 'lib', 'college-directory.ts');
 const INTERNAL_TAG_PATTERN = /^calendar_|^project_notices|^cloudbase/i;
 const NOISY_TAG_PATTERN = /https?:|www\.|\.(com|cn|edu|org)|(^|\s)com($|\s)/i;
 
+function loadLocalEnv() {
+  for (const fileName of ['.env.local', '.env']) {
+    const filePath = path.join(repoRoot, fileName);
+    if (!fs.existsSync(filePath)) {
+      continue;
+    }
+
+    const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) {
+        continue;
+      }
+
+      const [key, ...rest] = trimmed.split('=');
+      if (!process.env[key]) {
+        process.env[key] = rest.join('=').replace(/^['"]|['"]$/g, '');
+      }
+    }
+  }
+}
+
 function readJson(filePath, fallback = []) {
   if (!fs.existsSync(filePath)) {
     return fallback;
@@ -257,15 +279,96 @@ function loadExportRows() {
   return readJson(calendarNoticesPath).filter((item) => item && (item.sourceKey || item.project || item.detailUrl));
 }
 
+function mapSupabaseNoticeRow(row) {
+  return normalizeProject({
+    id: row.id,
+    schoolName: row.school_name,
+    departmentName: row.department_name,
+    projectName: row.project_name,
+    projectType: row.project_type,
+    discipline: row.discipline,
+    publishDate: row.publish_date,
+    deadlineDate: row.deadline_date,
+    eventStartDate: row.event_start_date,
+    eventEndDate: row.event_end_date,
+    applyLink: row.apply_link,
+    sourceLink: row.source_link,
+    requirements: row.requirements,
+    materialsRequired: row.materials_required,
+    examInterviewInfo: row.exam_interview_info,
+    contactInfo: row.contact_info,
+    remarks: row.remarks,
+    tags: row.tags,
+    status: row.status,
+    year: row.year,
+    deadlineLevel: row.deadline_level,
+    sourceSite: row.source_site,
+    collectedAt: row.collected_at,
+    updatedAt: row.updated_at,
+    lastCheckedAt: row.last_checked_at,
+    isVerified: row.is_verified,
+    changeLog: row.change_log,
+    historyRecords: row.history_records
+  });
+}
+
+async function fetchSupabaseNoticeRows() {
+  loadLocalEnv();
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey || typeof fetch !== 'function') {
+    return [];
+  }
+
+  const rows = [];
+  const pageSize = 1000;
+
+  for (let offset = 0; ; offset += pageSize) {
+    const endpoint = new URL('/rest/v1/notices', supabaseUrl);
+    endpoint.searchParams.set('select', '*');
+    endpoint.searchParams.set('year', 'eq.2026');
+    endpoint.searchParams.set('is_private', 'eq.false');
+    endpoint.searchParams.set('limit', String(pageSize));
+    endpoint.searchParams.set('offset', String(offset));
+
+    const response = await fetch(endpoint, {
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`
+      }
+    });
+
+    if (!response.ok) {
+      console.warn(`Supabase notice sync skipped: ${response.status} ${await response.text()}`);
+      return [];
+    }
+
+    const page = await response.json();
+    if (!Array.isArray(page) || page.length === 0) {
+      break;
+    }
+
+    rows.push(...page);
+    if (page.length < pageSize) {
+      break;
+    }
+  }
+
+  return rows.map(mapSupabaseNoticeRow).filter((item) => item.id && item.year === 2026);
+}
+
 const exportRows = loadExportRows().map(normalizeProject).filter((item) => item.id && item.year === 2026);
 const supplementRows = readJson(dataPath)
   .filter((item) => String(item.id || '').startsWith('baoyantongzhi-'))
   .map(normalizeProject)
   .filter((item) => item.id && item.year === 2026);
+const supabaseRows = await fetchSupabaseNoticeRows();
 
 const merged = new Map();
 exportRows.forEach((item) => merged.set(item.id, item));
 supplementRows.forEach((item) => merged.set(item.id, item));
+supabaseRows.forEach((item) => merged.set(item.id, item));
 
 const result = Array.from(merged.values()).sort((left, right) => {
   const publishCompare = right.publishDate.localeCompare(left.publishDate);
@@ -283,6 +386,7 @@ console.log(
     {
       exportRows: exportRows.length,
       supplements: supplementRows.length,
+      supabaseRows: supabaseRows.length,
       output: result.length,
       dataPath
     },

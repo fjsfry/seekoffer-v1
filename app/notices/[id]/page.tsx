@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowUpRight, Clock3, History, ShieldCheck } from 'lucide-react';
 import { ApplicationActionButton } from '@/components/application-action-button';
+import { ExternalSiteMark } from '@/components/external-site-mark';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge, StatusBadge } from '@/components/status-badge';
@@ -19,6 +20,7 @@ import {
   normalizeNoticeTitle
 } from '@/lib/notice-display';
 import { baseNoticeProjects } from '@/lib/notice-source';
+import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 
 function getCountdown(deadlineDate: string) {
   const value = new Date(`${deadlineDate.replace(' ', 'T')}:00+08:00`);
@@ -72,6 +74,19 @@ export default async function NoticeDetailPage({
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="grid gap-6">
           <section className="rounded-[30px] border border-black/5 bg-white p-6 shadow-soft">
+            <div className="mb-5 flex flex-wrap items-center gap-4">
+              <ExternalSiteMark
+                source={resolveNoticeLogoSource(project)}
+                label={getDisplaySchoolName(project.schoolName)}
+                size="xl"
+                rounded="full"
+              />
+              <div>
+                <div className="text-sm font-semibold text-slate-500">{getDisplayDepartmentName(project.departmentName)}</div>
+                <div className="mt-1 text-2xl font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</div>
+              </div>
+            </div>
+
             <div className="flex flex-wrap items-center gap-2">
               <DeadlineBadge level={project.deadlineLevel} />
               <StatusBadge status={project.status} />

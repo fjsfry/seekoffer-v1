@@ -32,6 +32,7 @@ import { buildNoticeDetailHref } from '@/lib/notice-links';
 import { collegeDirectory } from '@/lib/college-directory';
 import { baseNoticeProjects } from '@/lib/notice-source';
 import { offerFeedItems, officialResourceSections } from '@/lib/portal-data';
+import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
 
 const RECOMMENDATION_TARGET_TIME = new Date('2026-09-22T00:00:00+08:00').getTime();
@@ -278,7 +279,7 @@ export default function HomePage() {
                 className="group grid gap-4 rounded-2xl border border-slate-100 bg-white p-4 transition hover:-translate-y-0.5 hover:border-brand/20 hover:shadow-soft sm:grid-cols-[64px_minmax(0,1fr)_150px]"
               >
                 <ExternalSiteMark
-                  source={project.sourceLink}
+                  source={resolveNoticeLogoSource(project)}
                   label={getDisplaySchoolName(project.schoolName)}
                   size="lg"
                   rounded="full"

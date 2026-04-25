@@ -15,6 +15,21 @@ function resolveDomain(urlOrDomain: string) {
   }
 }
 
+function resolveManifestDomain(domain: string) {
+  if (!domain) return '';
+  if (siteMarkManifest[domain]) return domain;
+
+  const parts = domain.split('.');
+  for (let index = 1; index < parts.length - 1; index += 1) {
+    const candidate = parts.slice(index).join('.');
+    if (siteMarkManifest[candidate]) {
+      return candidate;
+    }
+  }
+
+  return '';
+}
+
 function buildFallbackInitial(label: string, domain: string) {
   const cleanLabel = label.replace(/\s+/g, '').trim();
   const cjkChars = [...cleanLabel].filter((char) => /[\u3400-\u9fff]/u.test(char));
@@ -73,7 +88,8 @@ export function ExternalSiteMark({
 }) {
   const [failedImageSrcs, setFailedImageSrcs] = useState<Record<string, true>>({});
   const domain = useMemo(() => resolveDomain(source), [source]);
-  const localSrc = domain ? siteMarkManifest[domain] : '';
+  const manifestDomain = useMemo(() => resolveManifestDomain(domain), [domain]);
+  const localSrc = manifestDomain ? siteMarkManifest[manifestDomain] : '';
   const imageSrc = localSrc || '';
   const extension = imageSrc.split('?')[0].split('.').pop()?.toLowerCase() || '';
 
