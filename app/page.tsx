@@ -8,6 +8,7 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
+  Clock3,
   ClipboardList,
   FileText,
   FolderOpen,
@@ -33,10 +34,36 @@ import { baseNoticeProjects } from '@/lib/notice-source';
 import { offerFeedItems, officialResourceSections } from '@/lib/portal-data';
 import type { PublicNoticeProject } from '@/lib/mock-data';
 
+const RECOMMENDATION_TARGET_TIME = new Date('2026-09-22T00:00:00+08:00').getTime();
+
+type CountdownState = {
+  days: string;
+  hours: string;
+  minutes: string;
+  seconds: string;
+};
+
+function getRecommendationCountdown(): CountdownState {
+  const diff = Math.max(0, RECOMMENDATION_TARGET_TIME - Date.now());
+  const totalSeconds = Math.floor(diff / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return {
+    days: String(days),
+    hours: String(hours).padStart(2, '0'),
+    minutes: String(minutes).padStart(2, '0'),
+    seconds: String(seconds).padStart(2, '0')
+  };
+}
+
 export default function HomePage() {
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
     baseNoticeProjects.filter((item) => String(item.year) === '2026')
   );
+  const [recommendationCountdown, setRecommendationCountdown] = useState<CountdownState>(() => getRecommendationCountdown());
 
   useEffect(() => {
     let active = true;
@@ -52,8 +79,20 @@ export default function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setRecommendationCountdown(getRecommendationCountdown());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
   const latestProjects = useMemo(
-    () => [...projects].sort((left, right) => right.publishDate.localeCompare(left.publishDate)).slice(0, 5),
+    () =>
+      [...projects]
+        .filter((item) => item.deadlineLevel !== 'expired')
+        .sort((left, right) => right.publishDate.localeCompare(left.publishDate))
+        .slice(0, 5),
     [projects]
   );
 
@@ -131,6 +170,8 @@ export default function HomePage() {
 
   return (
     <SiteShell>
+      <CountdownBanner countdown={recommendationCountdown} />
+
       <section className="grid items-center gap-10 py-6 lg:grid-cols-[minmax(0,1fr)_520px] lg:py-10">
         <div>
           <div className="eyebrow">公开内测中</div>
@@ -340,6 +381,57 @@ export default function HomePage() {
         />
       </section>
     </SiteShell>
+  );
+}
+
+function CountdownBanner({ countdown }: { countdown: CountdownState }) {
+  return (
+    <section className="relative overflow-hidden rounded-[26px] border border-brand/15 bg-gradient-to-r from-white via-emerald-50/80 to-white px-5 py-5 shadow-soft lg:px-8">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 opacity-50">
+        <div className="absolute -left-12 bottom-1 h-24 w-[42%] rounded-[50%] border-t border-brand/20" />
+        <div className="absolute -right-12 bottom-2 h-24 w-[46%] rounded-[50%] border-t border-brand/20" />
+      </div>
+
+      <div className="relative z-10 flex flex-col items-center justify-between gap-5 lg:flex-row">
+        <div className="flex items-center gap-4 text-center lg:text-left">
+          <span className="hidden h-16 w-16 shrink-0 items-center justify-center rounded-full bg-brand text-white shadow-float sm:inline-flex">
+            <CalendarDays className="h-8 w-8" />
+          </span>
+          <div>
+            <div className="text-xl font-semibold tracking-tight text-ink md:text-2xl">
+              距离 2026 年推免系统填报志愿（9.22）还有
+            </div>
+            <div className="mt-2 inline-flex items-center gap-2 text-sm text-slate-500">
+              <Clock3 className="h-4 w-4" />
+              信息实时更新，建议提前准备个人材料与目标院校清单
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <CountdownUnit value={countdown.days} label="天" wide />
+          <CountdownUnit value={countdown.hours} label="时" />
+          <CountdownUnit value={countdown.minutes} label="分" />
+          <CountdownUnit value={countdown.seconds} label="秒" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CountdownUnit({ value, label, wide = false }: { value: string; label: string; wide?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        suppressHydrationWarning
+        className={`inline-flex h-14 items-center justify-center rounded-xl bg-gradient-to-b from-rose-400 to-rose-500 px-4 text-2xl font-bold tabular-nums text-white shadow-[0_14px_30px_rgba(244,63,94,0.28)] ${
+          wide ? 'min-w-[86px]' : 'min-w-[64px]'
+        }`}
+      >
+        {value}
+      </span>
+      <span className="text-sm font-semibold text-ink">{label}</span>
+    </div>
   );
 }
 

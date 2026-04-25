@@ -27,7 +27,7 @@ export function isWeakNoticeValue(value: string | undefined | null) {
 
 export function getDisplaySchoolName(value: string | undefined | null) {
   const text = compactText(String(value || ''));
-  return isWeakNoticeValue(text) || text === '其他' ? '待识别院校' : text;
+  return isWeakNoticeValue(text) || text === '其他' || /^20\d{2}年大学$/.test(text) ? '待识别院校' : text;
 }
 
 export function getDisplayDepartmentName(value: string | undefined | null) {
@@ -58,7 +58,11 @@ export function getDisplayTags(tags: string[] | undefined | null) {
 export function normalizeNoticeTitle(projectName: string, limit = 72) {
   const compact = compactText(
     String(projectName || '')
+      .replace(/^(招生通知|通知公告|通知)\s*[|｜]\s*/i, '')
       .replace(DATE_FIELD_PATTERN, '')
+      .replace(/\s*(报名中|即将截止|已截止|未开始|活动中|已结束)\s*(其他|夏令营|预推免|正式推免|春令营报名|夏令营报名)?\s*(由请|申请|报名)?开始时间[:：]?.*$/i, '')
+      .replace(/\s*[^，。；;|｜]{0,16}报名截止时间[:：]?.*$/i, '')
+      .replace(/\s*距离(报名)?截止\s*\d+\s*天.*$/i, '')
       .replace(/\s*(春令营|夏令营)?报名\s*(由请|申请)?开始时间[:：]?.*$/i, '')
   );
 
