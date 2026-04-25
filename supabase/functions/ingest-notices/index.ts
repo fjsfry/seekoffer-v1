@@ -83,6 +83,16 @@ function normalizeNotice(notice: NoticePayload) {
   };
 }
 
+function dedupeNoticesById(notices: ReturnType<typeof normalizeNotice>[]) {
+  const byId = new Map<string, ReturnType<typeof normalizeNotice>>();
+
+  for (const notice of notices) {
+    byId.set(notice.id, notice);
+  }
+
+  return Array.from(byId.values());
+}
+
 Deno.serve(async (request) => {
   if (request.method !== 'POST') {
     return json(405, { error: 'method_not_allowed' });
@@ -112,7 +122,8 @@ Deno.serve(async (request) => {
     return json(400, { error: 'invalid_json' });
   }
 
-  const notices = Array.isArray(body.notices) ? body.notices.map(normalizeNotice) : [];
+  const normalizedNotices = Array.isArray(body.notices) ? body.notices.map(normalizeNotice) : [];
+  const notices = dedupeNoticesById(normalizedNotices);
   if (!notices.length) {
     return json(400, { error: 'empty_notices' });
   }
@@ -153,7 +164,7 @@ Deno.serve(async (request) => {
 
   return json(200, {
     ok: true,
-    noticesReceived: notices.length,
+    noticesReceived: normalizedNotices.length,
     noticesUpserted: notices.length
   });
 });
