@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { BrainCircuit, Sparkles } from 'lucide-react';
 import { PageSectionTitle } from '@/components/page-section-title';
+import { ProductHeroVisual } from '@/components/product-hero-visual';
 import { SiteShell } from '@/components/site-shell';
 import { submitAiWaitlistLead, type AiWaitlistNeed } from '@/lib/cloudbase-data';
 
@@ -43,11 +44,14 @@ export default function AiPage() {
 
   return (
     <SiteShell>
-      <PageSectionTitle
-        eyebrow="AI Lab"
-        title="AI 申请定位助手"
-        subtitle="基于公开通知、申请字段和经验规则，辅助你判断目标层级、材料短板和申请优先级。"
-      />
+      <section className="grid gap-8 py-5 lg:grid-cols-[minmax(0,1fr)_430px] lg:items-center">
+        <PageSectionTitle
+          eyebrow="AI Lab"
+          title="AI 申请定位助手"
+          subtitle="基于公开通知、申请字段和经验规则，辅助你判断目标层级、材料短板和申请优先级。"
+        />
+        <ProductHeroVisual variant="ai" compact />
+      </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
         <div className="surface-card rounded-[34px] p-7">
@@ -75,14 +79,14 @@ export default function AiPage() {
                 text: '拆解申请条件、材料清单和时间节点。'
               }
             ].map((item) => (
-              <div key={item.title} className="rounded-[24px] bg-slate-50 px-5 py-5">
+              <div key={item.title} className="rounded-[24px] border border-slate-100 bg-white px-5 py-5 shadow-sm">
                 <div className="text-lg font-semibold text-ink">{item.title}</div>
                 <p className="mt-3 text-sm leading-7 text-slate-600">{item.text}</p>
               </div>
             ))}
           </div>
 
-          <div className="mt-6 rounded-[28px] bg-brand p-5 text-white">
+          <div className="mt-6 rounded-[28px] bg-gradient-to-br from-brand to-brand-deep p-5 text-white shadow-float">
             <div className="inline-flex items-center gap-2 text-sm font-semibold text-white/85">
               <Sparkles className="h-4 w-4" />
               当前状态

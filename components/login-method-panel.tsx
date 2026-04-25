@@ -72,7 +72,7 @@ function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={pending}
-      className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 text-base font-semibold text-white shadow-[0_16px_30px_rgba(23,73,77,0.18)] transition hover:bg-brand-deep disabled:bg-brand/70"
+      className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand to-brand-deep px-4 text-base font-semibold text-white shadow-[0_18px_36px_rgba(23,73,77,0.22)] transition hover:-translate-y-0.5 disabled:translate-y-0 disabled:bg-brand/70"
     >
       {pending ? <LoaderCircle className="h-5 w-5 animate-spin" /> : icon}
       {children}
@@ -375,11 +375,11 @@ export function LoginMethodPanel({
 
   return (
     <section
-      className={`overflow-hidden border border-slate-100 bg-white shadow-[0_20px_70px_rgba(18,32,38,0.08)] ${
-        compact ? 'rounded-[24px]' : 'rounded-[24px] lg:grid lg:grid-cols-[360px_minmax(0,1fr)]'
+      className={`overflow-hidden border border-slate-100 bg-white shadow-[0_26px_90px_rgba(18,32,38,0.12)] ${
+        compact ? 'rounded-[24px]' : 'rounded-[32px] lg:grid lg:grid-cols-[400px_minmax(0,1fr)]'
       }`}
     >
-      <aside className="relative hidden overflow-hidden bg-brand px-9 py-10 text-white lg:block">
+      <aside className="relative hidden overflow-hidden bg-gradient-to-br from-brand via-[#0f5b5d] to-brand-deep px-10 py-11 text-white lg:block">
         <div className="relative z-10">
           <div className="flex items-center gap-3">
             <Image src="/logo.png" alt="寻鹿 Seekoffer" width={42} height={42} className="h-10 w-10 rounded-xl bg-white object-cover" />
@@ -410,7 +410,7 @@ export function LoginMethodPanel({
               type="button"
               onClick={() => void runTask('guest', () => signInAsGuest())}
               disabled={pending === 'guest'}
-              className="mt-12 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-white/40 bg-white/8 px-4 text-sm font-semibold text-white transition hover:bg-white/14 disabled:text-white/50"
+              className="mt-12 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-white/45 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/16 disabled:text-white/50"
             >
               {pending === 'guest' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
               {pending === 'guest' ? '进入中...' : '先以试用态浏览'}
@@ -418,13 +418,13 @@ export function LoginMethodPanel({
           ) : null}
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 h-44 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.14),transparent_24%),linear-gradient(180deg,transparent,rgba(5,45,48,0.72))]" />
+        <div className="absolute inset-x-0 bottom-0 h-56 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.16),transparent_24%),linear-gradient(180deg,transparent,rgba(5,45,48,0.78))]" />
         <div className="absolute bottom-0 left-0 right-0 h-20 bg-brand-deep/55" />
         <div className="absolute bottom-12 left-10 text-6xl text-white/12">鹿</div>
         <div className="absolute -bottom-7 left-0 right-0 h-24 rounded-[50%] bg-brand-deep/70" />
       </aside>
 
-      <form className="px-6 py-7 sm:px-10 sm:py-10" onSubmit={handleFormSubmit}>
+      <form className="px-6 py-7 sm:px-11 sm:py-11" onSubmit={handleFormSubmit}>
         <div className="grid grid-cols-2 gap-1 rounded-2xl border border-slate-200 bg-slate-100 p-1">
           <button
             type="button"

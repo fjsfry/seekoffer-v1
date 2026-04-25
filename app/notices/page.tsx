@@ -79,7 +79,7 @@ function getNoticeCardTags(project: PublicNoticeProject) {
       return true;
     });
 
-  return tags.slice(0, 4);
+  return tags.slice(0, 3);
 }
 
 function parseDeadline(project: PublicNoticeProject) {
@@ -291,7 +291,7 @@ export default function NoticesPage() {
 
   return (
     <SiteShell>
-      <section className="grid gap-6 py-5 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center">
+      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
           <div className="eyebrow">Notice Library</div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight text-ink">通知库</h1>
@@ -305,7 +305,7 @@ export default function NoticesPage() {
             const Icon = item.icon;
 
             return (
-              <div key={item.label} className="rounded-full border border-slate-200 bg-white px-5 py-4 shadow-sm">
+              <div key={item.label} className="soft-stat-pill rounded-full px-5 py-4">
                 <div className="flex items-center gap-3">
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
                     <Icon className="h-5 w-5" />
@@ -321,7 +321,7 @@ export default function NoticesPage() {
         </div>
       </section>
 
-      <section className="product-card rounded-[24px] p-5 lg:p-6">
+      <section className="product-card rounded-[30px] p-5 lg:p-6">
         <div className="flex flex-wrap gap-4 border-b border-slate-100 pb-5">
           {['全部', '夏令营', '预推免', '正式推免'].map((item) => (
             <button
@@ -354,7 +354,7 @@ export default function NoticesPage() {
           <button
             type="button"
             onClick={() => setAdvancedOpen((current) => !current)}
-            className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-brand px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep"
+            className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-brand px-5 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
           >
             <SlidersHorizontal className="h-4 w-4" />
             {advancedOpen ? '收起筛选' : '高级筛选'}
@@ -456,12 +456,12 @@ export default function NoticesPage() {
             return (
               <article
                 key={project.id}
-                className={`relative overflow-hidden rounded-[24px] border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft ${
+                className={`relative overflow-hidden rounded-[26px] border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft ${
                   highlighted ? 'border-emerald-300 bg-emerald-50/35' : 'border-slate-200'
                 }`}
               >
                 {highlighted ? (
-                  <div className="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-br-2xl bg-emerald-500 text-sm font-bold text-white">
+                    <div className="absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-br-2xl bg-emerald-500 text-sm font-bold text-white shadow-sm">
                     急
                   </div>
                 ) : null}

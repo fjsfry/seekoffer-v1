@@ -38,9 +38,10 @@ export function LoginRequiredCard({
   }
 
   return (
-    <section className="rounded-[32px] border border-black/5 bg-white p-6 shadow-soft lg:p-8">
+    <section className="relative overflow-hidden rounded-[38px] border border-black/5 bg-white p-6 shadow-[0_26px_80px_rgba(18,32,38,0.08)] lg:p-10">
+      <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 bg-[radial-gradient(circle_at_70%_24%,rgba(113,202,193,0.2),transparent_28rem)] lg:block" />
       <div className={`grid gap-7 ${showPreview ? 'lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center' : ''}`}>
-        <div>
+        <div className="relative z-10">
           <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
             <LockKeyhole className="h-4 w-4" />
             登录后使用
@@ -51,14 +52,14 @@ export function LoginRequiredCard({
           <div className="mt-6 flex flex-wrap gap-3">
             <button
               onClick={handleOpenLogin}
-              className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white"
+              className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
             >
               {actionLabel}
               <ArrowRight className="h-4 w-4" />
             </button>
             <Link
               href="/notices"
-              className="inline-flex items-center justify-center rounded-xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
+              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-brand/25 hover:text-brand"
             >
               先浏览通知库
             </Link>
@@ -73,7 +74,7 @@ export function LoginRequiredCard({
 
 function WorkbenchPreview() {
   return (
-    <div className="rounded-[26px] border border-slate-100 bg-slate-50 p-5">
+    <div className="relative z-10 rounded-[30px] border border-slate-100 bg-white/90 p-5 shadow-soft backdrop-blur">
       <div className="grid grid-cols-3 gap-3">
         {[
           { label: '申请中', value: '2', icon: ClipboardList },

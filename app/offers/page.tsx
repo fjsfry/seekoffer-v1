@@ -54,7 +54,7 @@ export default function OffersPage() {
 
   return (
     <SiteShell>
-      <section className="grid gap-6 py-5 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-center">
+      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-center lg:px-8">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">Offer池</h1>
           <p className="mt-4 text-base leading-8 text-slate-600">
@@ -70,7 +70,7 @@ export default function OffersPage() {
         </Link>
       </section>
 
-      <section className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-900">
+      <section className="rounded-2xl border border-amber-200 bg-amber-50/80 px-5 py-4 text-sm leading-7 text-amber-900 shadow-sm">
         本信息仅供参考，请结合自身情况理性决策。涉及个人隐私、联系方式或敏感账户内容将进行审核处理。
       </section>
 
@@ -79,7 +79,7 @@ export default function OffersPage() {
           const Icon = metricIcons[index] || TrendingUp;
 
           return (
-            <div key={item.label} className="product-card rounded-[22px] p-6">
+            <div key={item.label} className="product-card rounded-[26px] p-6">
               <div className="flex items-center gap-5">
                 <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-brand/8 text-brand">
                   <Icon className="h-7 w-7" />
@@ -96,7 +96,7 @@ export default function OffersPage() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="product-card rounded-[24px] p-6">
+        <div className="product-card rounded-[30px] p-6">
           <div className="flex flex-col gap-5 border-b border-slate-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
               {['全部', '录取', '放弃', '补录'].map((item) => (
@@ -136,7 +136,7 @@ export default function OffersPage() {
 
           <div className="mt-5 grid gap-4">
             {filteredOffers.map((offer) => (
-              <article key={offer.id} className="rounded-[20px] border border-slate-100 bg-white p-5 transition hover:shadow-soft">
+              <article key={offer.id} className="rounded-[24px] border border-slate-100 bg-white p-5 transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft">
                 <div className="flex items-start gap-4">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand text-lg font-semibold text-white">
                     {offer.avatar}

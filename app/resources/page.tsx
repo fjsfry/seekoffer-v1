@@ -1,6 +1,7 @@
 import { ArrowUpRight, BookOpenText, Landmark, Wrench } from 'lucide-react';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { PageSectionTitle } from '@/components/page-section-title';
+import { ProductHeroVisual } from '@/components/product-hero-visual';
 import { SiteShell } from '@/components/site-shell';
 import { officialResourceSections } from '@/lib/portal-data';
 
@@ -36,11 +37,14 @@ export default function ResourcesPage() {
 
   return (
     <SiteShell>
-      <PageSectionTitle
-        eyebrow="Resource Toolbox"
-        title="资源库"
-        subtitle="常用学术工具、官方入口和申请服务，一页直达。"
-      />
+      <section className="grid gap-8 py-5 lg:grid-cols-[minmax(0,1fr)_410px] lg:items-center">
+        <PageSectionTitle
+          eyebrow="Resource Toolbox"
+          title="资源库"
+          subtitle="常用学术工具、官方入口和申请服务，一页直达。"
+        />
+        <ProductHeroVisual variant="resource" compact />
+      </section>
 
       <section className="surface-card rounded-[34px] p-7 lg:p-8">
         <div className="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
@@ -57,7 +61,7 @@ export default function ResourcesPage() {
                 href={item.href}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-2xl bg-slate-50 px-4 py-4 transition hover:bg-slate-100"
+                className="rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft"
               >
                 <div className="flex items-center gap-3">
                   <ExternalSiteMark
@@ -100,7 +104,7 @@ export default function ResourcesPage() {
                     href={item.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-[24px] border border-black/5 bg-slate-50 p-5 transition hover:-translate-y-1 hover:bg-white hover:shadow-soft"
+                    className="rounded-[24px] border border-slate-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-brand/15 hover:shadow-soft"
                   >
                     <div className="flex items-start gap-4">
                       <ExternalSiteMark

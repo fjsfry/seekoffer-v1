@@ -7,7 +7,6 @@ import {
   BellRing,
   Building2,
   CalendarDays,
-  CheckCircle2,
   Clock3,
   ClipboardList,
   FileText,
@@ -19,6 +18,7 @@ import {
 } from 'lucide-react';
 import { DeadlineBadge } from '@/components/status-badge';
 import { ExternalSiteMark } from '@/components/external-site-mark';
+import { ProductHeroVisual } from '@/components/product-hero-visual';
 import { SiteShell } from '@/components/site-shell';
 import { fetchPublicNotices } from '@/lib/cloudbase-data';
 import {
@@ -203,7 +203,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <HeroVisual />
+        <ProductHeroVisual variant="dashboard" />
       </section>
 
       <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -432,50 +432,6 @@ function CountdownUnit({ value, label, wide = false }: { value: string; label: s
         {value}
       </span>
       <span className="text-sm font-semibold text-ink">{label}</span>
-    </div>
-  );
-}
-
-function HeroVisual() {
-  return (
-    <div className="relative hidden min-h-[390px] lg:block">
-      <div className="absolute inset-x-8 top-8 h-64 rounded-[38px] bg-gradient-to-br from-brand/8 via-white to-brand/5 blur-sm" />
-      <div className="absolute left-20 top-20 h-40 w-56 rotate-[-4deg] rounded-[24px] border border-brand/12 bg-white/70 shadow-soft backdrop-blur" />
-      <div className="absolute left-32 top-6 h-44 w-60 rotate-[8deg] rounded-[28px] border border-brand/10 bg-white shadow-soft">
-        <div className="m-5 h-24 rounded-[20px] bg-brand text-center text-white">
-          <div className="pt-8 text-4xl">鹿</div>
-        </div>
-        <div className="mx-5 mt-4 grid gap-2">
-          <div className="h-2 rounded-full bg-slate-100" />
-          <div className="h-2 w-3/4 rounded-full bg-slate-100" />
-        </div>
-      </div>
-
-      <div className="absolute right-8 top-16 w-44 rounded-[22px] border border-slate-100 bg-white p-5 shadow-soft">
-        <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-full border-[8px] border-brand/25 border-t-brand" />
-          <div className="grid flex-1 gap-2">
-            <div className="h-2 rounded-full bg-slate-100" />
-            <div className="h-2 w-2/3 rounded-full bg-slate-100" />
-          </div>
-        </div>
-      </div>
-
-      <div className="absolute bottom-12 right-16 w-64 rounded-[26px] border border-brand/10 bg-white/95 p-5 shadow-hero">
-        {[0, 1, 2].map((item) => (
-          <div key={item} className="flex items-center gap-3 border-b border-slate-100 py-3 last:border-0">
-            <CheckCircle2 className="h-5 w-5 text-brand" />
-            <div className="grid flex-1 gap-2">
-              <div className="h-2 rounded-full bg-slate-100" />
-              <div className="h-2 w-2/3 rounded-full bg-slate-100" />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="absolute bottom-6 left-14 rounded-[22px] bg-brand px-5 py-4 text-sm font-semibold text-white shadow-float">
-        申请路径已整理
-      </div>
     </div>
   );
 }

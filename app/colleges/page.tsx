@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, ExternalLink, MapPin, Search } from 'lucide-react';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { PageSectionTitle } from '@/components/page-section-title';
+import { ProductHeroVisual } from '@/components/product-hero-visual';
 import { SiteShell } from '@/components/site-shell';
 import { collegeDirectory } from '@/lib/college-directory';
 
@@ -85,11 +86,14 @@ export default function CollegesPage() {
 
   return (
     <SiteShell>
-      <PageSectionTitle
-        eyebrow="College Directory"
-        title="院校库"
-        subtitle="高频目标院校一页直达。按城市、层次和关键词快速筛选，找到学校后直接回到官网核对。"
-      />
+      <section className="grid gap-8 py-5 lg:grid-cols-[minmax(0,1fr)_390px] lg:items-center">
+        <PageSectionTitle
+          eyebrow="College Directory"
+          title="院校库"
+          subtitle="高频目标院校一页直达。按城市、层次和关键词快速筛选，找到学校后直接回到官网核对。"
+        />
+        <ProductHeroVisual variant="college" compact />
+      </section>
 
       <section className="surface-card rounded-[34px] p-7 lg:p-8">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px_240px]">
@@ -155,7 +159,7 @@ export default function CollegesPage() {
         {pagedColleges.map((item) => (
           <article
             key={item.name}
-            className="surface-card rounded-[26px] p-5 transition hover:-translate-y-1 hover:shadow-soft"
+            className="surface-card rounded-[26px] p-5 transition hover:-translate-y-1 hover:border-brand/15 hover:shadow-soft"
           >
             <div className="flex items-start gap-4">
               <ExternalSiteMark source={item.website} label={item.name} size="lg" rounded="full" />
