@@ -15,6 +15,11 @@ function compactText(value: string) {
   return value.replace(/\s+/g, ' ').trim();
 }
 
+function isNoisyTag(value: string) {
+  const lower = value.toLowerCase();
+  return /https?:|www\.|\.(com|cn|edu|org)|(^|\s)com($|\s)/i.test(lower) || value.length > 16;
+}
+
 export function isWeakNoticeValue(value: string | undefined | null) {
   const text = compactText(String(value || ''));
   return !text || text === '???' || text === '-' || text === '待补充' || text.toLowerCase() === 'unknown';
@@ -43,7 +48,9 @@ export function getDisplayProjectType(value: string | undefined | null) {
 export function getDisplayTags(tags: string[] | undefined | null) {
   const normalized = (tags || [])
     .map((item) => compactText(item))
-    .filter((item) => item && item !== '???' && !/^calendar_|^project_notices|^cloudbase/.test(item));
+    .filter(
+      (item) => item && item !== '???' && !/^calendar_|^project_notices|^cloudbase/.test(item) && !isNoisyTag(item)
+    );
 
   return normalized.length ? normalized : ['待分类'];
 }
