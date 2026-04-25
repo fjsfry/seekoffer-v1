@@ -45,6 +45,13 @@ export type PasswordSignUpResult =
       message: string;
     };
 
+type SupabaseUserLike = {
+  id: string;
+  email?: string | null;
+  phone?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+};
+
 const SESSION_STORAGE_KEY = 'seekoffer-user-session';
 const SESSION_EVENT_NAME = 'seekoffer-user-session-updated';
 
@@ -284,12 +291,7 @@ function ensurePasswordIdentifierSupported(identifier: string) {
   }
 }
 
-function buildMemberSession(user: {
-  id: string;
-  email?: string | null;
-  phone?: string | null;
-  user_metadata?: Record<string, unknown> | null;
-}, provider: AuthProviderType, existing?: UserSession | null) {
+function buildMemberSession(user: SupabaseUserLike, provider: AuthProviderType, existing?: UserSession | null) {
   const metadataProfile = extractProfileMetadata(user.user_metadata);
 
   return {
@@ -388,7 +390,7 @@ export async function hydrateSupabaseSession() {
       return null;
     }
 
-    const user = await getSupabaseUser();
+    const user = session.user || (await getSupabaseUser());
     if (!user) {
       writeUserSession(null);
       return null;
@@ -416,6 +418,13 @@ async function persistMemberSession(provider: AuthProviderType) {
   return nextSession;
 }
 
+function persistMemberSessionFromUser(user: SupabaseUserLike, provider: AuthProviderType) {
+  const current = getUserSession();
+  const nextSession = buildMemberSession(user, provider, current);
+  writeUserSession(nextSession);
+  return nextSession;
+}
+
 export async function signInWithPasswordAccount(payload: CredentialsPayload) {
   if (!isSupabaseConfigured()) {
     throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
@@ -430,9 +439,13 @@ export async function signInWithPasswordAccount(payload: CredentialsPayload) {
       ? { phone: normalizePhoneIdentifier(identifier), password: payload.password }
       : { email: identifier, password: payload.password };
 
-    const { error } = await supabase.auth.signInWithPassword(credentials);
+    const { data, error } = await supabase.auth.signInWithPassword(credentials);
     if (error) {
       throw error;
+    }
+
+    if (data.user) {
+      return persistMemberSessionFromUser(data.user, 'password');
     }
 
     return persistMemberSession('password');
@@ -483,7 +496,9 @@ export async function signUpWithPasswordAccount(payload: CredentialsPayload): Pr
     }
 
     if (data.session) {
-      const session = await persistMemberSession('password');
+      const session = data.user
+        ? persistMemberSessionFromUser(data.user, 'password')
+        : await persistMemberSession('password');
       return {
         status: 'signed_in',
         session
@@ -532,6 +547,32 @@ export async function resendSignupConfirmationCode(email: string) {
   }
 }
 
+export async function sendPasswordResetEmail(email: string) {
+  if (!isSupabaseConfigured()) {
+    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+  }
+
+  const normalizedEmail = normalizeEmailIdentifier(email);
+  if (!isEmailIdentifier(normalizedEmail)) {
+    throw new Error('请输入正确的邮箱地址。');
+  }
+
+  const supabase = getSupabaseBrowserClient();
+
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: SEEKOFFER_SITE_URL
+    });
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    console.error('[Seekoffer][auth] sendPasswordResetEmail failed', error);
+    throw new Error(formatAuthError(error, '密码重置邮件发送失败，请稍后重试。'));
+  }
+}
+
 export async function verifySignupConfirmationCode(email: string, token: string) {
   if (!isSupabaseConfigured()) {
     throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
@@ -550,7 +591,7 @@ export async function verifySignupConfirmationCode(email: string, token: string)
   const supabase = getSupabaseBrowserClient();
 
   try {
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email: normalizedEmail,
       token: normalizedToken,
       type: 'signup'
@@ -560,7 +601,7 @@ export async function verifySignupConfirmationCode(email: string, token: string)
       throw error;
     }
 
-    return persistMemberSession('password');
+    return data.user ? persistMemberSessionFromUser(data.user, 'password') : persistMemberSession('password');
   } catch (error) {
     console.error('[Seekoffer][auth] verifySignupConfirmationCode failed', error);
     throw new Error(formatAuthError(error, '注册验证码校验失败，请重新发送后再试。'));
@@ -617,7 +658,7 @@ export async function verifyEmailLoginCode(email: string, token: string) {
   const supabase = getSupabaseBrowserClient();
 
   try {
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email: normalizedEmail,
       token: normalizedToken,
       type: 'email'
@@ -627,7 +668,7 @@ export async function verifyEmailLoginCode(email: string, token: string) {
       throw error;
     }
 
-    return persistMemberSession('otp');
+    return data.user ? persistMemberSessionFromUser(data.user, 'otp') : persistMemberSession('otp');
   } catch (error) {
     console.error('[Seekoffer][auth] verifyEmailLoginCode failed', error);
     throw new Error(formatAuthError(error, '验证码校验失败，请重新发送后再试。'));
@@ -695,9 +736,10 @@ export function watchSupabaseAuthState(callback: (event: AuthChangeEvent) => voi
   const supabase = getSupabaseBrowserClient();
   const {
     data: { subscription }
-  } = supabase.auth.onAuthStateChange(async (event) => {
-    await hydrateSupabaseSession();
-    callback(event);
+  } = supabase.auth.onAuthStateChange((event) => {
+    window.setTimeout(() => {
+      void hydrateSupabaseSession().finally(() => callback(event));
+    }, 0);
   });
 
   return () => {

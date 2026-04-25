@@ -18,6 +18,7 @@ import {
   isEmailIdentifier,
   resendSignupConfirmationCode,
   sendEmailLoginCode,
+  sendPasswordResetEmail,
   signInAsGuest,
   signInWithPasswordAccount,
   signUpWithPasswordAccount,
@@ -116,7 +117,15 @@ export function LoginMethodPanel({
   const [otpSent, setOtpSent] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const [pending, setPending] = useState<
-    '' | 'guest' | 'password' | 'register' | 'resend-signup' | 'verify-signup' | 'send-code' | 'verify-code'
+    | ''
+    | 'guest'
+    | 'password'
+    | 'register'
+    | 'resend-signup'
+    | 'verify-signup'
+    | 'reset-password'
+    | 'send-code'
+    | 'verify-code'
   >('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -199,6 +208,25 @@ export function LoginMethodPanel({
     return value;
   }
 
+  async function runWithTimeout<T>(task: () => Promise<T>, timeoutMs = 25000) {
+    let timer: number | undefined;
+
+    try {
+      return await Promise.race([
+        task(),
+        new Promise<never>((_, reject) => {
+          timer = window.setTimeout(() => {
+            reject(new Error('认证服务响应超时，请稍后重试。'));
+          }, timeoutMs);
+        })
+      ]);
+    } finally {
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+    }
+  }
+
   async function runTask<T>(
     key: typeof pending,
     task: () => Promise<T>,
@@ -215,7 +243,7 @@ export function LoginMethodPanel({
     resetFeedback();
 
     try {
-      const result = await task();
+      const result = await runWithTimeout(task);
       if (options.successMessage) {
         setMessage(options.successMessage);
       }
@@ -321,6 +349,18 @@ export function LoginMethodPanel({
       setSignupCodeSent(true);
       setSignupResendIn(60);
     }
+  }
+
+  async function handlePasswordReset() {
+    const email = validateAccount({ emailOnly: true });
+    if (!email) {
+      return;
+    }
+
+    await runTask('reset-password', () => sendPasswordResetEmail(email), {
+      closeOnSuccess: false,
+      successMessage: '密码重置邮件已发送，请打开邮箱里的链接完成重设。也可以切换到“验证码”直接登录。'
+    });
   }
 
   async function handleSendCode() {
@@ -560,8 +600,14 @@ export function LoginMethodPanel({
                     <input type="checkbox" className="h-4 w-4 rounded border-slate-300" />
                     下次自动登录
                   </label>
-                  <button type="button" className="font-semibold text-brand">
-                    忘记密码？
+                  <button
+                    type="button"
+                    onClick={() => void handlePasswordReset()}
+                    disabled={pending === 'reset-password'}
+                    className="inline-flex items-center gap-1 font-semibold text-brand transition hover:text-brand-deep disabled:text-slate-400"
+                  >
+                    {pending === 'reset-password' ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : null}
+                    {pending === 'reset-password' ? '发送中...' : '忘记密码？'}
                   </button>
                 </div>
               )}
