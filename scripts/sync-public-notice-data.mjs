@@ -192,7 +192,7 @@ function inferDeadlineLevel(deadlineDate, status) {
   const now = Date.now();
   const diffDays = Math.ceil((deadlineTime - now) / (1000 * 60 * 60 * 24));
 
-  if (diffDays < 0 || text.includes('已截止') || text.includes('已结束')) return 'expired';
+  if (deadlineTime <= now || text.includes('已截止') || text.includes('已结束')) return 'expired';
   if (diffDays <= 1) return 'today';
   if (diffDays <= 3) return 'within3days';
   if (diffDays <= 7) return 'within7days';
@@ -201,12 +201,13 @@ function inferDeadlineLevel(deadlineDate, status) {
 
 function inferStatus(deadlineLevel, rawStatus) {
   const status = compact(rawStatus);
+  if (deadlineLevel === 'expired') return '已截止';
+  if (deadlineLevel === 'today' || deadlineLevel === 'within3days' || deadlineLevel === 'within7days') return '即将截止';
+
   if (['未开始', '报名中', '即将截止', '已截止', '活动中', '已结束'].includes(status)) {
     return status;
   }
 
-  if (deadlineLevel === 'expired') return '已截止';
-  if (deadlineLevel === 'today' || deadlineLevel === 'within3days' || deadlineLevel === 'within7days') return '即将截止';
   return '报名中';
 }
 
@@ -280,6 +281,9 @@ function loadExportRows() {
 }
 
 function mapSupabaseNoticeRow(row) {
+  const deadlineLevel = inferDeadlineLevel(row.deadline_date, row.status);
+  const status = inferStatus(deadlineLevel, row.status);
+
   return normalizeProject({
     id: row.id,
     schoolName: row.school_name,
@@ -299,9 +303,9 @@ function mapSupabaseNoticeRow(row) {
     contactInfo: row.contact_info,
     remarks: row.remarks,
     tags: row.tags,
-    status: row.status,
+    status,
     year: row.year,
-    deadlineLevel: row.deadline_level,
+    deadlineLevel,
     sourceSite: row.source_site,
     collectedAt: row.collected_at,
     updatedAt: row.updated_at,

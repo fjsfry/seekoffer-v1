@@ -58,7 +58,7 @@ export default function OffersPage() {
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">Offer池</h1>
           <p className="mt-4 text-base leading-8 text-slate-600">
-            分享你的录取、放弃、补录动态，帮助更多同学少走弯路。
+            用低噪音、可纠错的方式分享录取、放弃、补录动态。当前为内测演示，不作为真实补录依据。
           </p>
         </div>
         <Link
@@ -71,7 +71,7 @@ export default function OffersPage() {
       </section>
 
       <section className="rounded-2xl border border-amber-200 bg-amber-50/80 px-5 py-4 text-sm leading-7 text-amber-900 shadow-sm">
-        本信息仅供参考，请结合自身情况理性决策。涉及个人隐私、联系方式或敏感账户内容将进行审核处理。
+        Offer 池正式开放前会接入实名登录、匿名展示、举报撤回和平台核验记录。请勿发布身份证、联系方式、导师隐私或未经证实的补录信息。
       </section>
 
       <section className="grid gap-5 lg:grid-cols-3">
@@ -149,9 +149,12 @@ export default function OffersPage() {
                           {offer.verified ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-brand">
                               <BadgeCheck className="h-3.5 w-3.5" />
-                              已实名
+                              已实名匿名展示
                             </span>
                           ) : null}
+                          <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                            内测演示
+                          </span>
                         </div>
                         <div className="mt-1 text-sm text-slate-500">{offer.major} · 硕士</div>
                       </div>

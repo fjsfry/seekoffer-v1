@@ -7,6 +7,7 @@ import {
   BellRing,
   Building2,
   CalendarDays,
+  CheckCircle2,
   Clock3,
   ClipboardList,
   FileText,
@@ -14,6 +15,8 @@ import {
   GraduationCap,
   Grid3X3,
   Search,
+  ShieldCheck,
+  Target,
   TrendingUp
 } from 'lucide-react';
 import { DeadlineBadge } from '@/components/status-badge';
@@ -148,6 +151,36 @@ export default function HomePage() {
     }
   ];
 
+  const valuePromises = [
+    {
+      title: '怕错过通知',
+      description: '关注目标院校和专业方向，最新通知、关键变更和临近截止都会优先浮到你眼前。',
+      icon: BellRing
+    },
+    {
+      title: '怕材料漏交',
+      description: '每个项目都会被拆成材料清单、提交状态和下一步行动，减少临近截止时的混乱。',
+      icon: ClipboardList
+    },
+    {
+      title: '怕不知道值不值得申',
+      description: '把机会分成优先处理、持续关注和历史参考，让你把精力放在最值得推进的项目上。',
+      icon: Target
+    }
+  ];
+
+  const priorityActions = useMemo(
+    () =>
+      [...projects]
+        .filter((item) => item.deadlineLevel !== 'expired')
+        .sort((left, right) => {
+          const urgentRank = { today: 0, within3days: 1, within7days: 2, future: 3, expired: 4 } as const;
+          return urgentRank[left.deadlineLevel] - urgentRank[right.deadlineLevel] || right.publishDate.localeCompare(left.publishDate);
+        })
+        .slice(0, 3),
+    [projects]
+  );
+
   const stepCards = [
     {
       index: '1',
@@ -182,7 +215,7 @@ export default function HomePage() {
             整理成清晰的申请路径
           </h1>
           <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600">
-            通知、院校、资源、进度一站管理，让保研从信息焦虑变成有节奏的行动计划。
+            不只是收集通知，而是帮你判断机会、追踪截止、管理材料、减少漏申，让保研从信息焦虑变成有节奏的行动计划。
           </p>
 
           <div className="mt-9 flex flex-wrap gap-4">
@@ -227,6 +260,22 @@ export default function HomePage() {
         })}
       </section>
 
+      <section className="grid gap-5 lg:grid-cols-3">
+        {valuePromises.map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <div key={item.title} className="product-card rounded-[24px] p-6">
+              <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand/8 text-brand">
+                <Icon className="h-6 w-6" />
+              </div>
+              <h2 className="mt-5 text-xl font-semibold text-ink">{item.title}</h2>
+              <p className="mt-3 text-sm leading-7 text-slate-500">{item.description}</p>
+            </div>
+          );
+        })}
+      </section>
+
       <section className="product-card rounded-[24px] p-7">
         <div className="mb-6 inline-flex items-center gap-2 text-xl font-semibold text-ink">
           <Grid3X3 className="h-5 w-5 text-brand" />
@@ -255,6 +304,102 @@ export default function HomePage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="product-card rounded-[28px] p-7">
+          <div className="eyebrow">Personal Decision Desk</div>
+          <h2 className="mt-5 text-3xl font-semibold tracking-tight text-ink">今天先处理什么，工作台会直接告诉你。</h2>
+          <p className="mt-4 text-sm leading-8 text-slate-600">
+            从通知库加入申请表后，Seekoffer 会把截止时间、材料缺口和申请状态转成行动清单。你不需要每天重新整理一遍 Excel。
+          </p>
+
+          <div className="mt-6 grid gap-3">
+            {priorityActions.map((project, index) => (
+              <Link
+                key={project.id}
+                href={buildNoticeDetailHref(project.id)}
+                className="group rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/20"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="mt-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</span>
+                      <DeadlineBadge level={project.deadlineLevel} />
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500 group-hover:text-brand">
+                      {normalizeNoticeTitle(project.projectName, 60)}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          <Link
+            href="/me"
+            className="mt-7 inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:bg-brand-deep"
+          >
+            查看我的工作台
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="relative overflow-hidden rounded-[28px] border border-brand/10 bg-gradient-to-br from-white via-emerald-50/70 to-white p-7 shadow-soft">
+          <div className="absolute right-8 top-8 h-32 w-32 rounded-full bg-brand/10 blur-2xl" />
+          <div className="relative">
+            <div className="flex flex-wrap gap-4">
+              {[
+                { label: '申请中', value: '2', icon: FileText },
+                { label: '待办', value: '4', icon: CheckCircle2 },
+                { label: '7天截止', value: '1', icon: BellRing }
+              ].map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <div key={item.label} className="flex-1 rounded-2xl bg-white/86 px-5 py-5 shadow-sm">
+                    <Icon className="h-5 w-5 text-brand" />
+                    <div className="mt-4 text-3xl font-semibold text-ink">{item.value}</div>
+                    <div className="mt-1 text-sm text-slate-500">{item.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              {[
+                { school: '复旦大学', status: '材料待补充', tone: 'amber' },
+                { school: '中国科学技术大学', status: '3天内截止', tone: 'rose' },
+                { school: '清华大学', status: '待确认导师', tone: 'emerald' }
+              ].map((item) => (
+                <div key={item.school} className="flex items-center justify-between gap-4 rounded-2xl bg-white px-5 py-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="h-5 w-5 text-brand" />
+                    <span className="font-semibold text-ink">{item.school}</span>
+                  </div>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      item.tone === 'amber'
+                        ? 'bg-amber-50 text-amber-700'
+                        : item.tone === 'rose'
+                          ? 'bg-rose-50 text-rose-600'
+                          : 'bg-emerald-50 text-brand'
+                    }`}
+                  >
+                    {item.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-dashed border-brand/20 bg-white/70 px-5 py-4 text-sm leading-7 text-slate-600">
+              Demo 工作流：加入通知、自动拆材料、生成待办、临近截止提醒。正式保存和多端同步需要登录。
+            </div>
+          </div>
         </div>
       </section>
 

@@ -10,6 +10,11 @@ export function SiteFooter() {
         <div>
           <div className="text-2xl font-semibold tracking-tight text-brand">寻鹿 Seekoffer</div>
           <p className="mt-4 max-w-2xl text-sm leading-8 text-slate-500">{footerAbout}</p>
+          <div className="mt-4 grid gap-2 text-xs leading-6 text-slate-500">
+            <div>联系邮箱：feedback@seekoffer.com.cn</div>
+            <div>数据删除 / 账号注销：通过反馈邮箱提交申请，我们会在核验后处理。</div>
+            <div>当前阶段：公开内测版，通知与材料要求请以院校官网原文为准。</div>
+          </div>
           <div className="mt-5 flex items-center gap-3">
             {[MessageCircle, Share2, Send, Play].map((Icon, index) => (
               <span
@@ -77,6 +82,7 @@ export function SiteFooter() {
             <Link href="/about" className="hover:text-brand">
               关于我们
             </Link>
+            <span>备案信息以上线主体公示为准</span>
           </div>
         </div>
       </div>

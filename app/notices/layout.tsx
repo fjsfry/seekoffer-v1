@@ -1,0 +1,11 @@
+import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
+
+export const metadata: Metadata = {
+  title: '2026 保研通知库 - Seekoffer',
+  description: '持续同步 2026 保研夏令营、预推免和正式推免通知，整理截止时间、院校来源和申请入口。'
+};
+
+export default function NoticesLayout({ children }: { children: ReactNode }) {
+  return children;
+}

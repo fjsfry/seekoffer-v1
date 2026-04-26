@@ -1,3 +1,3 @@
 export function buildNoticeDetailHref(id: string) {
-  return `/notices/${encodeURIComponent(id)}`;
+  return `/notices/detail?id=${encodeURIComponent(id)}`;
 }

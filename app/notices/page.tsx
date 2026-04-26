@@ -7,6 +7,7 @@ import {
   BellRing,
   BookOpenText,
   CalendarDays,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -15,6 +16,7 @@ import {
   MapPin,
   RefreshCw,
   Search,
+  ShieldCheck,
   SlidersHorizontal,
   Sparkles
 } from 'lucide-react';
@@ -506,6 +508,19 @@ export default function NoticesPage() {
                         </span>
                       ))}
                     </div>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-brand">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        官网来源
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-slate-500">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        截止已提取
+                      </span>
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">
+                        {project.isVerified ? '人工复核' : '自动同步待抽检'}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="grid gap-3 sm:justify-items-end">
@@ -614,6 +629,23 @@ export default function NoticesPage() {
               了解更多
               <ArrowRight className="h-4 w-4" />
             </Link>
+          </SideCard>
+
+          <SideCard title="可信度说明" icon={ShieldCheck}>
+            <div className="grid gap-3 text-sm leading-7 text-slate-600">
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                <span className="font-semibold text-ink">字段分层：</span>
+                截止时间、报名入口和材料要求会单独清洗，前台不展示爬虫内部字段。
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                <span className="font-semibold text-ink">状态一致：</span>
+                列表和详情页都按当前时间重新判断“报名中 / 即将截止 / 已截止”。
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                <span className="font-semibold text-ink">纠错闭环：</span>
+                每条详情页都可以反馈错误，后续进入核验队列。
+              </div>
+            </div>
           </SideCard>
         </aside>
       </section>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { BrainCircuit, Sparkles } from 'lucide-react';
+import { BrainCircuit, CheckCircle2, Sparkles } from 'lucide-react';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { ProductHeroVisual } from '@/components/product-hero-visual';
 import { SiteShell } from '@/components/site-shell';
@@ -84,6 +84,27 @@ export default function AiPage() {
                 <p className="mt-3 text-sm leading-7 text-slate-600">{item.text}</p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-6 rounded-[28px] border border-brand/15 bg-white p-5 shadow-sm">
+            <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
+              <CheckCircle2 className="h-4 w-4" />
+              匿名样例输出
+            </div>
+            <p className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600">
+              输入：某 211 计算机，GPA 3.7/4，四级 580，一段科研，无论文，目标华东计算机。
+            </p>
+            <div className="mt-4 grid gap-3 text-sm leading-7 text-slate-600">
+              <div className="rounded-2xl bg-emerald-50 px-4 py-3">
+                推荐层级：冲刺 3 所、稳妥 6 所、保底 4 所，先处理截止 7 天内项目。
+              </div>
+              <div className="rounded-2xl bg-amber-50 px-4 py-3">
+                材料短板：科研证明、推荐信、英文简历和个人陈述需要优先补齐。
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                近期任务：本周完成个人陈述初稿，并把目标院校加入工作台跟进。
+              </div>
+            </div>
           </div>
 
           <div className="mt-6 rounded-[28px] bg-gradient-to-br from-brand to-brand-deep p-5 text-white shadow-float">

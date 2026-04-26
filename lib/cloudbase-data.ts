@@ -136,8 +136,24 @@ function resolveDeadlineLevel(deadlineDate: string): DeadlineLevel {
 
 function resolvePublicStatus(level: DeadlineLevel): PublicNoticeProject['status'] {
   if (level === 'expired') return '已截止';
-  if (level === 'today' || level === 'within3days') return '即将截止';
+  if (level === 'today' || level === 'within3days' || level === 'within7days') return '即将截止';
   return '报名中';
+}
+
+function normalizeProjectStatus(
+  status: PublicNoticeProject['status'] | undefined,
+  deadlineLevel: DeadlineLevel
+): PublicNoticeProject['status'] {
+  if (
+    deadlineLevel === 'expired' ||
+    deadlineLevel === 'today' ||
+    deadlineLevel === 'within3days' ||
+    deadlineLevel === 'within7days'
+  ) {
+    return resolvePublicStatus(deadlineLevel);
+  }
+
+  return status || resolvePublicStatus(deadlineLevel);
 }
 
 export function calculateMaterialsProgress(record: Pick<UserProjectRecord, MaterialChecklistKey>) {
@@ -170,7 +186,7 @@ function normalizeManualProject(project: Partial<PublicNoticeProject>) {
     contactInfo: String(project.contactInfo || '').trim(),
     remarks: String(project.remarks || '').trim(),
     tags: normalizeStringArray(project.tags),
-    status: (project.status || resolvePublicStatus(deadlineLevel)) as PublicNoticeProject['status'],
+    status: normalizeProjectStatus(project.status as PublicNoticeProject['status'] | undefined, deadlineLevel),
     year: Number(project.year || NOTICE_TARGET_YEAR),
     deadlineLevel,
     sourceSite: String(project.sourceSite || '').trim() || '保研通知网',
