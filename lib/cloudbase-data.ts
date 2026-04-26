@@ -11,6 +11,7 @@ import {
   type UserProjectRecord,
   type UserProjectStatus
 } from './mock-data';
+import { filterMainNoticeProjects } from './notice-quality';
 import { baseNoticeProjects } from './notice-source';
 
 const APPLICATION_STORAGE_KEY = 'seekoffer-my-application-table';
@@ -734,7 +735,7 @@ export async function fetchPublicNotices() {
       try {
         const remoteProjects = await readRemotePublicNotices();
         if (!remoteProjects.length) {
-          return baseNoticeProjects;
+          return filterMainNoticeProjects(baseNoticeProjects);
         }
 
         const merged = new Map<string, PublicNoticeProject>();
@@ -745,9 +746,9 @@ export async function fetchPublicNotices() {
           merged.set(project.id, project);
         });
 
-        return sortProjectsByFreshness(Array.from(merged.values()));
+        return sortProjectsByFreshness(filterMainNoticeProjects(Array.from(merged.values())));
       } catch {
-        return baseNoticeProjects;
+        return filterMainNoticeProjects(baseNoticeProjects);
       }
     })();
   }

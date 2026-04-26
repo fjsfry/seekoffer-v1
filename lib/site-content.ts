@@ -63,6 +63,7 @@ export const footerColumns = [
     title: '帮助',
     links: [
       { label: '使用指南', href: '/about' },
+      { label: '数据如何更新', href: '/data-quality' },
       { label: '常见问题', href: '/disclaimer' },
       { label: '意见反馈', href: 'mailto:feedback@seekoffer.com.cn', external: true },
       { label: '更新日志', href: '/about' }

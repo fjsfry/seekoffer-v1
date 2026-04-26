@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowUpRight, Clock3, History, ShieldCheck } from 'lucide-react';
@@ -20,7 +21,10 @@ import {
   normalizeNoticeTitle
 } from '@/lib/notice-display';
 import { baseNoticeProjects } from '@/lib/notice-source';
+import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
+
+const visibleNoticeProjects = filterMainNoticeProjects(baseNoticeProjects);
 
 function getCountdown(deadlineDate: string) {
   const value = new Date(`${deadlineDate.replace(' ', 'T')}:00+08:00`);
@@ -46,9 +50,52 @@ function getCountdown(deadlineDate: string) {
 }
 
 export function generateStaticParams() {
-  return baseNoticeProjects.map((item) => ({
+  return visibleNoticeProjects.map((item) => ({
     id: item.id
   }));
+}
+
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const project = visibleNoticeProjects.find((item) => item.id === id);
+
+  if (!project) {
+    return {
+      title: '通知详情 - Seekoffer'
+    };
+  }
+
+  const school = getDisplaySchoolName(project.schoolName);
+  const title = normalizeNoticeTitle(project.projectName, 72);
+  const description = `${school} ${getDisplayDepartmentName(project.departmentName)} ${formatNoticeDateOnly(project.deadlineDate)} 截止。查看原文、材料要求和申请进度管理入口。`;
+  const url = `/notices/${encodeURIComponent(project.id)}`;
+
+  return {
+    title: `${school} ${title} - 2026 保研通知 | Seekoffer`,
+    description,
+    alternates: {
+      canonical: url
+    },
+    openGraph: {
+      title: `${school} ${title}`,
+      description,
+      url,
+      siteName: '寻鹿 Seekoffer',
+      images: ['/logo.png'],
+      type: 'article',
+      locale: 'zh_CN'
+    },
+    twitter: {
+      card: 'summary',
+      title: `${school} ${title}`,
+      description,
+      images: ['/logo.png']
+    }
+  };
 }
 
 export default async function NoticeDetailPage({
@@ -57,7 +104,7 @@ export default async function NoticeDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const project = baseNoticeProjects.find((item) => item.id === id);
+  const project = visibleNoticeProjects.find((item) => item.id === id);
 
   if (!project) {
     notFound();

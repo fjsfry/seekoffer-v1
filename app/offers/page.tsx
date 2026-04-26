@@ -99,7 +99,7 @@ export default function OffersPage() {
         <div className="product-card rounded-[30px] p-6">
           <div className="flex flex-col gap-5 border-b border-slate-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
-              {['全部', '录取', '放弃', '补录'].map((item) => (
+              {['全部', '录取', '放弃', '候补', '补录传闻', '官方确认'].map((item) => (
                 <button
                   key={item}
                   onClick={() => setTab(item)}
@@ -136,7 +136,13 @@ export default function OffersPage() {
 
           <div className="mt-5 grid gap-4">
             {filteredOffers.map((offer) => (
-              <article key={offer.id} className="rounded-[24px] border border-slate-100 bg-white p-5 transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft">
+              <article key={offer.id} className="relative overflow-hidden rounded-[24px] border border-slate-100 bg-white p-5 transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft">
+                <div className="pointer-events-none absolute right-5 top-5 rounded-full border border-amber-200 bg-amber-50/90 px-4 py-2 text-xs font-bold tracking-[0.22em] text-amber-700">
+                  演示数据
+                </div>
+                <div className="pointer-events-none absolute -right-8 top-24 rotate-[-10deg] text-5xl font-black tracking-widest text-slate-100">
+                  DEMO
+                </div>
                 <div className="flex items-start gap-4">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand text-lg font-semibold text-white">
                     {offer.avatar}
@@ -155,6 +161,9 @@ export default function OffersPage() {
                           <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
                             内测演示
                           </span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                            {offer.credibility}
+                          </span>
                         </div>
                         <div className="mt-1 text-sm text-slate-500">{offer.major} · 硕士</div>
                       </div>
@@ -168,8 +177,10 @@ export default function OffersPage() {
                         className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
                           offer.type === '放弃'
                             ? 'bg-rose-50 text-rose-600'
-                            : offer.type === '补录'
+                            : offer.type === '候补' || offer.type === '补录传闻'
                               ? 'bg-amber-50 text-amber-700'
+                              : offer.type === '官方确认'
+                                ? 'bg-blue-50 text-blue-700'
                               : 'bg-emerald-50 text-brand'
                         }`}
                       >
@@ -188,12 +199,12 @@ export default function OffersPage() {
                       <span>{offer.time}</span>
                       <div className="flex items-center gap-4">
                         <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-                          <Flame className="h-4 w-4 text-brand" />
-                          关注 {offer.heat}
+                          <ShieldCheck className="h-4 w-4 text-brand" />
+                          正式开放后接入核验记录
                         </span>
                         <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-semibold text-brand">
                           <Heart className="h-4 w-4" />
-                          我也关注
+                          查看结构
                         </button>
                       </div>
                     </div>

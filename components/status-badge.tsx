@@ -67,7 +67,7 @@ function resolveDeadlineMeta(level?: DeadlineLevel | null) {
   switch (level) {
     case 'today':
       return {
-        label: '今日截止',
+        label: '24 小时内截止',
         tone: 'danger' as const,
       };
     case 'within3days':

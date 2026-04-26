@@ -35,6 +35,7 @@ import {
   normalizeNoticeTitle
 } from '@/lib/notice-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
+import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { baseNoticeProjects, inferDisciplineCategory, inferSchoolRange } from '@/lib/notice-source';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
@@ -124,7 +125,7 @@ function getCityTag(project: PublicNoticeProject) {
 
 export default function NoticesPage() {
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
-    baseNoticeProjects.filter((item) => String(item.year) === '2026')
+    filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
   );
   const [keyword, setKeyword] = useState('');
   const [schoolName, setSchoolName] = useState('');

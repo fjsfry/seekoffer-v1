@@ -18,12 +18,13 @@ export type OfferFeedItem = {
   avatar: string;
   verified: boolean;
   time: string;
-  type: '录取' | '放弃' | '补录';
+  type: '录取' | '放弃' | '候补' | '补录传闻' | '官方确认';
   major: string;
   field: string;
   giveUp: string;
   goTo: string;
   message: string;
+  credibility: '本人发布' | '多人佐证' | '平台未核验' | '官方来源';
   tags: string[];
   likes: number;
   school: string;
@@ -191,67 +192,71 @@ export const offerFeedItems: OfferFeedItem[] = [
     author: '小鹿同学',
     avatar: '鹿',
     verified: true,
-    time: '2 分钟前',
+    time: '内测结构样例',
     type: '录取',
     major: '计算机科学',
     field: '人工智能',
     giveUp: '复旦大学 · 软件工程',
     goTo: '上海交通大学 · 电院',
-    message: '老师确认今天还会继续顺延，候补同学注意电话、短信和系统通知。',
+    message: '演示样例：用于展示“录取动态”字段结构，不代表真实补录、候补或院校通知。',
+    credibility: '平台未核验',
     tags: ['985', '上海', '电子信息'],
-    likes: 128,
+    likes: 0,
     school: '上海交通大学',
-    heat: 96
+    heat: 12
   },
   {
     id: 'offer-2',
     author: 'AI 冲刺党',
     avatar: 'A',
     verified: true,
-    time: '18 分钟前',
+    time: '内测结构样例',
     type: '放弃',
     major: '电子信息',
     field: '自动化',
     giveUp: '中国科学技术大学 · 自动化',
     goTo: '清华大学 · 电子系',
-    message: '我这边已经正式放弃该 offer，老师说今晚前会补录，大家及时查邮件。',
+    message: '演示样例：用于展示“放弃去向”字段结构，正式开放前不会展示未经核验的实时补录表述。',
+    credibility: '平台未核验',
     tags: ['顶尖院校', '自动化', '候补补录'],
-    likes: 94,
+    likes: 0,
     school: '清华大学',
-    heat: 89
+    heat: 10
   },
   {
     id: 'offer-3',
     author: '保研打工人',
     avatar: '研',
     verified: false,
-    time: '1 小时前',
-    type: '录取',
+    time: '内测结构样例',
+    type: '候补',
     major: '网络空间安全',
     field: '系统安全',
     giveUp: '武汉大学 · 网安',
     goTo: '浙江大学 · 计算机',
-    message: '刚刚电话确认不去，后面应该会继续往下放，祝后面的同学接好运。',
+    message: '演示样例：用于展示“匿名分享”卡片样式，真实版本会要求登录、匿名展示和举报撤回。',
+    credibility: '平台未核验',
     tags: ['网安', '浙大', '电话确认'],
-    likes: 57,
+    likes: 0,
     school: '浙江大学',
-    heat: 76
+    heat: 9
   },
   {
     id: 'offer-4',
     author: '候补观察员',
     avatar: '补',
     verified: true,
-    time: '2 小时前',
-    type: '补录',
+    time: '内测结构样例',
+    type: '补录传闻',
     major: '计算机科学',
     field: '机器学习',
     giveUp: '同济大学 · 智能科学',
     goTo: '南京大学 · 计算机',
-    message: '院里刚刚给我确认了释放，后续大概率会继续联系候补，南京方向同学可以盯一下。',
+    message: '演示样例：用于展示“补录传闻 / 候补”信息结构，不作为真实决策依据。',
+    credibility: '平台未核验',
     tags: ['华五', '计算机', '候补'],
-    likes: 61,
+    likes: 0,
     school: '南京大学',
-    heat: 72
+    heat: 8
   }
 ];

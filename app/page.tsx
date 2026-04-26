@@ -32,6 +32,7 @@ import {
 } from '@/lib/notice-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
 import { collegeDirectory } from '@/lib/college-directory';
+import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { baseNoticeProjects } from '@/lib/notice-source';
 import { offerFeedItems, officialResourceSections } from '@/lib/portal-data';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
@@ -51,15 +52,15 @@ function getDeadlineHint(project: PublicNoticeProject) {
 
   const diffDays = Math.max(0, Math.ceil((timestamp - Date.now()) / (1000 * 60 * 60 * 24)));
   if (project.deadlineLevel === 'today') {
-    return '今日截止';
+    return '24 小时内截止';
   }
 
-  return diffDays <= 0 ? '已截止' : `${diffDays}天后`;
+  return diffDays <= 0 ? '已截止' : `${diffDays} 天后`;
 }
 
 export default function HomePage() {
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
-    baseNoticeProjects.filter((item) => String(item.year) === '2026')
+    filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
   );
 
   useEffect(() => {
