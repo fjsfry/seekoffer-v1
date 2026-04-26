@@ -176,9 +176,6 @@ export default function CollegesPage() {
                   ))}
                 </div>
                 <div className="mt-4 text-2xl font-semibold tracking-tight text-ink">{item.name}</div>
-                <div className="mt-2 text-sm text-slate-500">
-                  {[item.city, ...item.groups.slice(0, 4)].join('｜')}
-                </div>
                 <div className="mt-5">
                   <a
                     href={item.website}

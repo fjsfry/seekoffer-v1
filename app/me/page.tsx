@@ -500,7 +500,6 @@ export default function MePage() {
         <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[52%] overflow-hidden lg:block">
           <div className="absolute bottom-[-5rem] right-[-3rem] h-72 w-[38rem] rounded-[50%] bg-brand/8" />
           <div className="absolute bottom-[-4rem] right-16 h-52 w-[32rem] rounded-[50%] border-t border-brand/20" />
-          <div className="absolute right-28 top-16 text-7xl text-brand/12">鹿</div>
         </div>
 
         <div className="relative z-10 max-w-3xl">
