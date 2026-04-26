@@ -520,6 +520,43 @@ async function upsertRemoteApplications(records: UserProjectRecord[]) {
   }
 }
 
+async function deleteRemoteApplication(projectId: string) {
+  const context = getSupabaseMemberContext();
+  if (!context || !projectId) {
+    return;
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  const { error } = await supabase
+    .from('applications')
+    .delete()
+    .eq('user_id', context.userId)
+    .eq('project_id', projectId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function deleteRemoteManualProject(projectId: string) {
+  const context = getSupabaseMemberContext();
+  if (!context || !projectId) {
+    return;
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  const { error } = await supabase
+    .from('notices')
+    .delete()
+    .eq('id', projectId)
+    .eq('created_by', context.userId)
+    .eq('is_private', true);
+
+  if (error) {
+    throw error;
+  }
+}
+
 async function upsertRemoteProfile(profile: UserProfile | null | undefined) {
   const context = getSupabaseMemberContext();
   if (!context || !profileHasMeaningfulContent(profile)) {
@@ -896,6 +933,35 @@ export async function updateUserProject(userProjectId: string, patch: Partial<Us
   await upsertRemoteApplications(next);
 
   return next.find((item) => item.userProjectId === userProjectId) || null;
+}
+
+export async function deleteUserProject(userProjectId: string) {
+  await hydrateWorkspaceFromSupabase();
+
+  const currentRecords = readStoredRecords();
+  const target = currentRecords.find((item) => item.userProjectId === userProjectId);
+  if (!target) {
+    return false;
+  }
+
+  const nextRecords = currentRecords.filter((item) => item.userProjectId !== userProjectId);
+  const manualProjects = readStoredManualProjects();
+  const isManualProject = manualProjects.some((project) => project.id === target.projectId);
+  const nextManualProjects = isManualProject
+    ? manualProjects.filter((project) => project.id !== target.projectId)
+    : manualProjects;
+
+  persistStoredRecords(nextRecords);
+  if (isManualProject) {
+    persistStoredManualProjects(nextManualProjects);
+  }
+
+  await deleteRemoteApplication(target.projectId);
+  if (isManualProject) {
+    await deleteRemoteManualProject(target.projectId);
+  }
+
+  return true;
 }
 
 export async function updateUserProjectStatus(userProjectId: string, myStatus: UserProjectStatus) {

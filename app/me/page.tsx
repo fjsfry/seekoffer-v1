@@ -21,14 +21,17 @@ import {
   Search,
   Settings2,
   Sparkles,
-  Square
+  Square,
+  Trash2
 } from 'lucide-react';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { LoginRequiredCard } from '@/components/login-required-card';
 import { ManualProjectEntryCard } from '@/components/manual-project-entry-card';
+import { RecommendationCountdownCard } from '@/components/recommendation-countdown-card';
 import { SiteShell } from '@/components/site-shell';
 import { useUserSessionState } from '@/hooks/use-user-session';
 import {
+  deleteUserProject,
   fetchApplicationRows,
   saveUserProfileToWorkspace,
   watchApplicationTable,
@@ -180,6 +183,7 @@ export default function MePage() {
   const [todoDraft, setTodoDraft] = useState('');
   const [todoSyncOwnerId, setTodoSyncOwnerId] = useState('');
   const [todoSyncReady, setTodoSyncReady] = useState(false);
+  const [deletingProjectId, setDeletingProjectId] = useState('');
   const form = draftFormState.ownerId === profileOwnerId ? draftFormState.value : sessionProfile;
   const saveMessage = saveMessageState.ownerId === profileOwnerId ? saveMessageState.value : '';
   const profileExpanded =
@@ -462,6 +466,23 @@ export default function MePage() {
     );
   }
 
+  async function handleDeleteApplication(row: ApplicationRow) {
+    const schoolName = getDisplaySchoolName(row.project.schoolName);
+    const confirmed = window.confirm(`确定要从申请表删除「${schoolName}」吗？相关待办和材料进度也会一并移除。`);
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingProjectId(row.item.userProjectId);
+    try {
+      await deleteUserProject(row.item.userProjectId);
+      const merged = await fetchApplicationRows();
+      setRows(merged);
+    } finally {
+      setDeletingProjectId('');
+    }
+  }
+
   if (!loggedIn) {
     return (
       <SiteShell>
@@ -526,6 +547,8 @@ export default function MePage() {
         </div>
       </section>
 
+      <RecommendationCountdownCard />
+
       <section className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: '申请中', value: stats.total.toString(), hint: '正在推进的项目', icon: ClipboardList, tone: 'brand' },
@@ -574,7 +597,14 @@ export default function MePage() {
 
           <div className="mt-5 grid gap-3">
             {applicationPreview.length ? (
-              applicationPreview.map((row) => <ApplicationProgressCard key={row.item.userProjectId} row={row} />)
+              applicationPreview.map((row) => (
+                <ApplicationProgressCard
+                  key={row.item.userProjectId}
+                  row={row}
+                  isDeleting={deletingProjectId === row.item.userProjectId}
+                  onDelete={handleDeleteApplication}
+                />
+              ))
             ) : (
               <div className="rounded-[28px] border border-dashed border-black/10 px-5 py-12 text-center">
                 <div className="text-lg font-semibold text-ink">你的申请表还是空的</div>
@@ -874,7 +904,16 @@ function StatCard({
   );
 }
 
-function ApplicationProgressCard({ row }: { row: ApplicationRow }) {
+function ApplicationProgressCard({
+  row,
+  isDeleting,
+  onDelete
+}: {
+  row: ApplicationRow;
+  isDeleting: boolean;
+  onDelete: (row: ApplicationRow) => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const { item, project } = row;
   const completed = getMaterialCompletedCount(item.materialsProgress);
   const total = materialChecklistDefinitions.length;
@@ -945,7 +984,32 @@ function ApplicationProgressCard({ row }: { row: ApplicationRow }) {
           <ListChecks className="h-3.5 w-3.5" />
           材料清单
         </Link>
-        <MoreHorizontal className="h-4 w-4" />
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((current) => !current)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-500 transition hover:bg-slate-100 hover:text-brand"
+            aria-label="更多操作"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+          {menuOpen ? (
+            <div className="absolute bottom-10 right-0 z-20 w-44 rounded-2xl border border-black/5 bg-white p-2 text-left shadow-float">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDelete(row);
+                }}
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+              >
+                <Trash2 className="h-4 w-4" />
+                {isDeleting ? '删除中...' : '从申请表删除'}
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
     </article>
   );
