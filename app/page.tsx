@@ -63,6 +63,26 @@ function getRecommendationCountdown(): CountdownState {
   };
 }
 
+function getDeadlineTimestamp(project: PublicNoticeProject) {
+  const date = project.deadlineDate || '9999-12-31 23:59';
+  const timestamp = new Date(`${date.replace(' ', 'T')}:00+08:00`).getTime();
+  return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp;
+}
+
+function getDeadlineHint(project: PublicNoticeProject) {
+  const timestamp = getDeadlineTimestamp(project);
+  if (timestamp === Number.MAX_SAFE_INTEGER) {
+    return '时间待补充';
+  }
+
+  const diffDays = Math.max(0, Math.ceil((timestamp - Date.now()) / (1000 * 60 * 60 * 24)));
+  if (project.deadlineLevel === 'today') {
+    return '今日截止';
+  }
+
+  return diffDays <= 0 ? '已截止' : `${diffDays}天后`;
+}
+
 export default function HomePage() {
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
     baseNoticeProjects.filter((item) => String(item.year) === '2026')
@@ -100,29 +120,32 @@ export default function HomePage() {
     [projects]
   );
 
-  const riskBuckets = useMemo(
-    () => [
+  const riskBuckets = useMemo(() => {
+    const sortedProjects = [...projects].sort((left, right) => getDeadlineTimestamp(left) - getDeadlineTimestamp(right));
+    const pickByLevel = (level: PublicNoticeProject['deadlineLevel']) =>
+      sortedProjects.filter((item) => item.deadlineLevel === level);
+
+    return [
       {
         key: 'today',
         title: '今日截止',
-        count: projects.filter((item) => item.deadlineLevel === 'today').length,
-        items: projects.filter((item) => item.deadlineLevel === 'today').slice(0, 2)
+        count: pickByLevel('today').length,
+        items: pickByLevel('today').slice(0, 2)
       },
       {
         key: 'within3days',
         title: '3天内截止',
-        count: projects.filter((item) => item.deadlineLevel === 'within3days').length,
-        items: projects.filter((item) => item.deadlineLevel === 'within3days').slice(0, 3)
+        count: pickByLevel('within3days').length,
+        items: pickByLevel('within3days').slice(0, 3)
       },
       {
         key: 'within7days',
         title: '7天内截止',
-        count: projects.filter((item) => item.deadlineLevel === 'within7days').length,
-        items: projects.filter((item) => item.deadlineLevel === 'within7days').slice(0, 3)
+        count: pickByLevel('within7days').length,
+        items: pickByLevel('within7days').slice(0, 3)
       }
-    ],
-    [projects]
-  );
+    ];
+  }, [projects]);
 
   const heroMetrics = [
     {
@@ -469,12 +492,14 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="mt-6 grid gap-6">
+          <div className="mt-6 grid gap-5">
             {riskBuckets.map((bucket) => (
-              <div key={bucket.key}>
+              <div key={bucket.key} className="rounded-2xl bg-slate-50/70 p-3">
                 <div className="mb-3 flex items-center justify-between text-sm">
                   <span className="font-semibold text-ink">{bucket.title}</span>
-                  <span className="text-slate-500">{bucket.count}</span>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 shadow-sm">
+                    {bucket.count}
+                  </span>
                 </div>
                 <div className="grid gap-2">
                   {bucket.items.length ? (
@@ -482,11 +507,25 @@ export default function HomePage() {
                       <Link
                         key={project.id}
                         href={buildNoticeDetailHref(project.id)}
-                        className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm transition hover:bg-slate-50"
+                        className="grid grid-cols-[minmax(0,1fr)_78px] items-center gap-3 rounded-xl bg-white px-3 py-3 text-sm shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft"
                       >
-                        <span className="min-w-0 truncate text-slate-600">{getDisplaySchoolName(project.schoolName)}</span>
-                        <span className={bucket.key === 'today' ? 'shrink-0 font-semibold text-rose-500' : 'shrink-0 text-slate-500'}>
-                          {formatNoticeDateOnly(project.deadlineDate)}
+                        <span className="min-w-0">
+                          <span className="block truncate font-semibold text-slate-700">
+                            {normalizeNoticeTitle(getDisplaySchoolName(project.schoolName), 18)}
+                          </span>
+                          <span className="mt-1 block truncate text-xs text-slate-400">
+                            {normalizeNoticeTitle(project.projectName, 24)}
+                          </span>
+                        </span>
+                        <span className="text-right">
+                          <span
+                            className={`block text-xs font-semibold ${
+                              bucket.key === 'today' ? 'text-rose-500' : 'text-brand'
+                            }`}
+                          >
+                            {formatNoticeDateOnly(project.deadlineDate)}
+                          </span>
+                          <span className="mt-1 block text-[11px] text-slate-400">{getDeadlineHint(project)}</span>
                         </span>
                       </Link>
                     ))
