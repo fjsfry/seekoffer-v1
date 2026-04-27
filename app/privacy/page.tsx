@@ -23,7 +23,7 @@ export default function PrivacyPage() {
             在当前版本中，部分功能仍处于体验阶段。若涉及云端同步、账号登录和提醒能力扩展，我们会继续优化数据保护方式，并在能力正式上线后同步更新说明。
           </p>
           <p>
-            我们会为你提供个人信息查阅、更正、删除和账号注销的申请通道。当前内测阶段可通过 feedback@seekoffer.com.cn 联系我们处理，正式版会把这些入口放到账号中心。
+            我们会为你提供个人信息查阅、更正、删除和账号注销的申请通道。当前内测阶段可通过 seekoffer@qq.com 联系我们处理，正式版会把这些入口放到账号中心。
           </p>
           <div className="rounded-[26px] bg-slate-50 px-5 py-5">
             <div className="font-semibold text-ink">我们当前会处理的信息</div>

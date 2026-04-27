@@ -11,7 +11,8 @@ export function SiteFooter() {
           <div className="text-2xl font-semibold tracking-tight text-brand">寻鹿 Seekoffer</div>
           <p className="mt-4 max-w-2xl text-sm leading-8 text-slate-500">{footerAbout}</p>
           <div className="mt-4 grid gap-2 text-xs leading-6 text-slate-500">
-            <div>联系邮箱：feedback@seekoffer.com.cn</div>
+            <div>联系邮箱：seekoffer@qq.com</div>
+            <div>QQ 交流群：1092490793</div>
             <div>数据删除 / 账号注销：通过反馈邮箱提交申请，我们会在核验后处理。</div>
             <div>当前阶段：公开内测版，通知与材料要求请以院校官网原文为准。</div>
           </div>

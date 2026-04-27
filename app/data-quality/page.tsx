@@ -101,7 +101,7 @@ export default function DataQualityPage() {
             仍请以院校官网原文为准。你发现问题时，可以通过通知详情页的“反馈通知错误”入口告诉我们。
           </p>
           <a
-            href="mailto:feedback@seekoffer.com.cn"
+            href="mailto:seekoffer@qq.com"
             className="mt-6 inline-flex items-center justify-center rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white"
           >
             反馈数据问题

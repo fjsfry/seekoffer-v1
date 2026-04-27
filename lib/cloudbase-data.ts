@@ -163,6 +163,10 @@ export function calculateMaterialsProgress(record: Pick<UserProjectRecord, Mater
   return Math.round((completed / total) * 100);
 }
 
+function hasMaterialChecklistPatch(patch: Partial<UserProjectRecord>) {
+  return materialChecklistDefinitions.some(({ key }) => Object.prototype.hasOwnProperty.call(patch, key));
+}
+
 function normalizeManualProject(project: Partial<PublicNoticeProject>) {
   const deadlineDate = String(project.deadlineDate || '').trim();
   const deadlineLevel = resolveDeadlineLevel(deadlineDate);
@@ -918,7 +922,14 @@ export async function updateUserProject(userProjectId: string, patch: Partial<Us
       return item;
     }
 
-    const merged = normalizeRecord({ ...item, ...patch });
+    let merged = normalizeRecord({ ...item, ...patch });
+
+    if (hasMaterialChecklistPatch(patch)) {
+      merged = {
+        ...merged,
+        materialsProgress: calculateMaterialsProgress(merged)
+      };
+    }
 
     if (patch.myStatus === '已提交' && !merged.submittedAt) {
       return {

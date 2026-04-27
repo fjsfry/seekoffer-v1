@@ -113,5 +113,5 @@ export function buildNoticeFeedbackHref(project: Pick<PublicNoticeProject, 'id' 
     ].join('\n')
   );
 
-  return `mailto:feedback@seekoffer.com.cn?subject=${subject}&body=${body}`;
+  return `mailto:seekoffer@qq.com?subject=${subject}&body=${body}`;
 }

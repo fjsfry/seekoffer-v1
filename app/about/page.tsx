@@ -18,7 +18,7 @@ export default function AboutPage() {
             ['阶段', '公开内测版。通知库、院校库、资源库可直接浏览，工作台和发布类动作需要登录。'],
             ['数据来源', '院校官网、公开通知入口和人工整理的资源入口；正式报名请以学校官网原文为准。'],
             ['更新频率', '通知数据会持续自动同步，重点字段逐步加入人工抽检和纠错反馈。'],
-            ['反馈方式', '页面右下角“反馈与纠错”或邮件 feedback@seekoffer.com.cn。']
+            ['反馈方式', '页面右下角“反馈与纠错”、邮件 seekoffer@qq.com，或加入 QQ 交流群 1092490793。']
           ].map(([title, body]) => (
             <div key={title} className="rounded-[28px] bg-slate-50 px-5 py-5">
               <div className="text-sm font-semibold text-brand">{title}</div>
