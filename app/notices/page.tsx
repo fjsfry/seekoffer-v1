@@ -98,16 +98,28 @@ function getDaysLeft(project: PublicNoticeProject) {
   return Math.max(0, Math.ceil((timestamp - Date.now()) / (1000 * 60 * 60 * 24)));
 }
 
+function getBeijingDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || '';
+
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
+
 function sortProjects(rows: PublicNoticeProject[], sortBy: SortOption) {
   return rows.sort((left, right) => {
-    const leftExpired = left.deadlineLevel === 'expired' ? 1 : 0;
-    const rightExpired = right.deadlineLevel === 'expired' ? 1 : 0;
-
-    if (leftExpired !== rightExpired) {
-      return leftExpired - rightExpired;
-    }
-
     if (sortBy === 'deadline') {
+      const leftExpired = left.deadlineLevel === 'expired' ? 1 : 0;
+      const rightExpired = right.deadlineLevel === 'expired' ? 1 : 0;
+
+      if (leftExpired !== rightExpired) {
+        return leftExpired - rightExpired;
+      }
+
       return parseDeadline(left) - parseDeadline(right);
     }
 
@@ -136,7 +148,7 @@ export default function NoticesPage() {
   const [progress, setProgress] = useState<ProgressFilter>('全部');
   const [projectType, setProjectType] = useState('全部');
   const [year, setYear] = useState('2026');
-  const [sortBy, setSortBy] = useState<SortOption>('deadline');
+  const [sortBy, setSortBy] = useState<SortOption>('publish');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [pageState, setPageState] = useState({ page: 1, filterKey: '' });
   const filterKey = [
@@ -232,11 +244,13 @@ export default function NoticesPage() {
   const currentPage = Math.min(requestedPage, totalPages);
   const pagedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const visiblePages = getVisiblePages(currentPage, totalPages);
+  const todayInBeijing = getBeijingDateString();
+  const todayUpdateCount = projects.filter((item) => item.publishDate === todayInBeijing).length;
   const latestPublishDate = projects.reduce((latest, item) => (item.publishDate > latest ? item.publishDate : latest), '');
 
   const pageStats = [
     { label: '2026通知', value: `${projects.length}+`, icon: BellRing },
-    { label: '最新更新', value: `${projects.filter((item) => item.publishDate === latestPublishDate).length}`, icon: BookOpenText },
+    { label: '今日更新', value: `${todayUpdateCount}`, icon: BookOpenText },
     {
       label: '3天内截止',
       value: `${projects.filter((item) => item.deadlineLevel === 'today' || item.deadlineLevel === 'within3days').length}`,
@@ -289,7 +303,7 @@ export default function NoticesPage() {
     setProgress('全部');
     setProjectType('全部');
     setYear('2026');
-    setSortBy('deadline');
+    setSortBy('publish');
   }
 
   return (
@@ -418,8 +432,8 @@ export default function NoticesPage() {
               ))}
             </FilterSelect>
             <FilterSelect label="排序" value={sortBy} onChange={(value) => setSortBy(value as SortOption)}>
-              <option value="deadline">按截止时间排序</option>
               <option value="publish">按发布时间排序</option>
+              <option value="deadline">按截止时间排序</option>
               <option value="school">按学校名称排序</option>
             </FilterSelect>
           </div>
@@ -433,16 +447,16 @@ export default function NoticesPage() {
               <span className="font-semibold text-ink">共 {filteredProjects.length.toLocaleString('zh-CN')} 条结果</span>
               <span className="text-slate-400">|</span>
               <button
-                onClick={() => setSortBy('deadline')}
-                className={sortBy === 'deadline' ? 'font-semibold text-brand' : 'text-slate-500 hover:text-brand'}
-              >
-                按截止时间排序
-              </button>
-              <button
                 onClick={() => setSortBy('publish')}
                 className={sortBy === 'publish' ? 'font-semibold text-brand' : 'text-slate-500 hover:text-brand'}
               >
                 按发布时间排序
+              </button>
+              <button
+                onClick={() => setSortBy('deadline')}
+                className={sortBy === 'deadline' ? 'font-semibold text-brand' : 'text-slate-500 hover:text-brand'}
+              >
+                按截止时间排序
               </button>
             </div>
             <button onClick={resetFilters} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-brand">
