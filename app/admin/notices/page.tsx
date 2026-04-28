@@ -13,34 +13,86 @@ import {
   AdminSelect,
   AdminStatusBadge
 } from '@/components/admin-ui';
-import { adminNoticeRows, noticeMetrics } from '@/lib/admin-data';
-import type { AdminNoticeRow } from '@/lib/admin-data';
+import type { AdminMetric, AdminNoticeRow } from '@/lib/admin-data';
 import { invokeAdminApi } from '@/lib/admin-api';
 
 const noticeIcons = [Bell, CheckCircle2, XCircle, Trash2];
 
+const emptyNoticeMetrics: NoticeMetrics = {
+  pending: 0,
+  published: 0,
+  rejected: 0,
+  hidden: 0,
+  deleted: 0
+};
+
+const defaultFilters = {
+  query: '',
+  school: '',
+  type: '全部类型',
+  status: '全部状态',
+  dateFrom: '',
+  dateTo: ''
+};
+
+type NoticeFilters = typeof defaultFilters;
+
 export default function AdminNoticesPage() {
-  const [rows, setRows] = useState<AdminNoticeRow[]>(adminNoticeRows);
+  const [rows, setRows] = useState<AdminNoticeRow[]>([]);
+  const [metrics, setMetrics] = useState<NoticeMetrics>(emptyNoticeMetrics);
+  const [filters, setFilters] = useState<NoticeFilters>(defaultFilters);
+  const [sort, setSort] = useState('publish_desc');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
   const [pending, setPending] = useState('');
   const [message, setMessage] = useState('正在连接后台真实数据...');
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void loadNotices();
+      void loadNotices({ page: 1 });
     }, 0);
 
     return () => window.clearTimeout(timer);
+    // The notice table loads once on mount; filtering and pagination refresh it explicitly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadNotices() {
+  async function loadNotices(overrides: Partial<{ page: number; pageSize: number; filters: NoticeFilters; sort: string }> = {}) {
+    const nextPage = overrides.page ?? page;
+    const nextPageSize = overrides.pageSize ?? pageSize;
+    const nextFilters = overrides.filters ?? filters;
+    const nextSort = overrides.sort ?? sort;
+
     setPending('load');
     try {
-      const data = await invokeAdminApi<{ notices: NoticeApiRow[] }>({ resource: 'notices', action: 'list' });
+      const data = await invokeAdminApi<{
+        notices: NoticeApiRow[];
+        total: number;
+        page: number;
+        pageSize: number;
+        metrics: NoticeMetrics;
+      }>({
+        resource: 'notices',
+        action: 'list',
+        page: nextPage,
+        pageSize: nextPageSize,
+        sort: nextSort,
+        filters: serializeFilters(nextFilters)
+      });
+
       setRows(data.notices.map(mapNoticeApiRow));
-      setMessage(`已连接 Supabase，加载 ${data.notices.length} 条通知。`);
+      setTotal(data.total);
+      setMetrics(data.metrics || emptyNoticeMetrics);
+      setPage(data.page);
+      setPageSize(data.pageSize);
+      setSort(nextSort);
+      setFilters(nextFilters);
+      setSelectedIds([]);
+      setMessage(`已连接 Supabase，共匹配 ${data.total} 条通知，当前第 ${data.page} 页。`);
     } catch (error) {
-      setMessage(error instanceof Error ? `真实 API 暂不可用，当前显示降级数据：${error.message}` : '真实 API 暂不可用，当前显示降级数据。');
+      setMessage(error instanceof Error ? `真实 API 暂不可用：${error.message}` : '真实 API 暂不可用，请稍后重试。');
     } finally {
       setPending('');
     }
@@ -51,7 +103,7 @@ export default function AdminNoticesPage() {
   }
 
   function toggleAll() {
-    const visibleIds = rows.slice(0, 10).map((item) => item.id);
+    const visibleIds = rows.map((item) => item.id);
     setSelectedIds((current) => (visibleIds.every((id) => current.includes(id)) ? [] : visibleIds));
   }
 
@@ -68,20 +120,18 @@ export default function AdminNoticesPage() {
 
     setPending(`${status}:${ids.join(',')}`);
     try {
-      await Promise.all(
-        ids.map((id) =>
-          invokeAdminApi({
-            resource: 'notices',
-            action: 'update_status',
-            id,
-            status,
-            note
-          })
-        )
-      );
-      setMessage('操作成功，已写入 Supabase 并记录操作日志。');
-      setSelectedIds([]);
-      await loadNotices();
+      await invokeAdminApi({
+        resource: 'notices',
+        action: ids.length > 1 ? 'bulk_update_status' : 'update_status',
+        id: ids[0],
+        ids,
+        status,
+        note
+      });
+
+      const nextPage = rows.length === ids.length && page > 1 ? page - 1 : page;
+      setMessage('操作成功，状态已写入 Supabase，并记录到后台操作日志。');
+      await loadNotices({ page: nextPage });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '通知操作失败，请稍后重试。');
     } finally {
@@ -89,17 +139,57 @@ export default function AdminNoticesPage() {
     }
   }
 
+  function applyFilters() {
+    void loadNotices({ page: 1, filters });
+  }
+
+  function resetFilters() {
+    void loadNotices({ page: 1, filters: defaultFilters, sort: 'publish_desc' });
+  }
+
+  const metricCards = buildNoticeMetricCards(metrics);
+  const allVisibleSelected = rows.length > 0 && rows.every((item) => selectedIds.includes(item.id));
+
   return (
     <AdminShell title="通知管理">
       <div className="space-y-6">
         <AdminPanel>
           <div className="grid gap-5 p-5">
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px_220px_220px_220px_120px]">
-              <AdminInput placeholder="请输入通知标题" />
-              <AdminSelect label="" options={['请选择学校', '清华大学', '北京大学', '复旦大学', '上海交通大学']} />
-              <AdminSelect label="" options={['请选择类型', '夏令营', '预推免', '九推', '招生通知']} />
-              <AdminSelect label="" options={['请选择状态', '待审核', '已发布', '已驳回', '已下架']} />
-              <AdminInput placeholder="开始日期  至  结束日期" />
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_180px_180px_180px_160px_160px_120px]">
+              <AdminInput
+                placeholder="搜索通知标题 / 学校 / 学院"
+                value={filters.query}
+                onChange={(value) => setFilters((current) => ({ ...current, query: value }))}
+              />
+              <AdminInput
+                placeholder="学校"
+                value={filters.school}
+                onChange={(value) => setFilters((current) => ({ ...current, school: value }))}
+              />
+              <AdminSelect
+                label=""
+                value={filters.type}
+                options={['全部类型', '夏令营', '预推免', '九推', '招生通知', '宣讲会', '其他']}
+                onChange={(value) => setFilters((current) => ({ ...current, type: value }))}
+              />
+              <AdminSelect
+                label=""
+                value={filters.status}
+                options={['全部状态', '待审核', '已发布', '已驳回', '已下架', '已删除']}
+                onChange={(value) => setFilters((current) => ({ ...current, status: value }))}
+              />
+              <AdminInput
+                type="date"
+                placeholder="开始日期"
+                value={filters.dateFrom}
+                onChange={(value) => setFilters((current) => ({ ...current, dateFrom: value }))}
+              />
+              <AdminInput
+                type="date"
+                placeholder="结束日期"
+                value={filters.dateTo}
+                onChange={(value) => setFilters((current) => ({ ...current, dateTo: value }))}
+              />
               <Link
                 href="/admin/notices/new"
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
@@ -108,44 +198,60 @@ export default function AdminNoticesPage() {
                 新建通知
               </Link>
             </div>
-            <div className="flex justify-end gap-3">
-              <AdminButton onClick={loadNotices} disabled={pending === 'load'}>查询</AdminButton>
-              <AdminButton tone="secondary" onClick={() => setSelectedIds([])}>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                重置
-              </AdminButton>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <AdminSelect
+                label=""
+                value={sort}
+                options={[
+                  { label: '按发布时间排序', value: 'publish_desc' },
+                  { label: '按最近更新排序', value: 'updated_desc' },
+                  { label: '按截止时间排序', value: 'deadline_asc' }
+                ]}
+                onChange={(value) => void loadNotices({ page: 1, sort: value })}
+              />
+              <div className="flex gap-3">
+                <AdminButton onClick={applyFilters} disabled={pending === 'load'}>查询</AdminButton>
+                <AdminButton tone="secondary" onClick={resetFilters}>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  重置
+                </AdminButton>
+              </div>
             </div>
             <div className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div>
           </div>
         </AdminPanel>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {noticeMetrics.map((metric, index) => (
+          {metricCards.map((metric, index) => (
             <AdminMetricCard key={metric.label} metric={metric} icon={noticeIcons[index]} />
           ))}
         </section>
 
         <AdminPanel title="通知列表">
           <div className="flex flex-wrap gap-3 px-5 py-4">
-            <AdminButton tone="secondary" onClick={() => updateNoticeStatus(selectedIds, 'published', '批量通过通知')}>批量通过</AdminButton>
-            <AdminButton tone="danger" onClick={() => updateNoticeStatus(selectedIds, 'rejected', '批量驳回通知')}>批量驳回</AdminButton>
-            <AdminButton tone="secondary" onClick={() => updateNoticeStatus(selectedIds, 'deleted', '批量删除通知')}>批量删除</AdminButton>
+            <AdminButton tone="secondary" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'published', '批量通过通知')}>
+              批量通过
+            </AdminButton>
+            <AdminButton tone="danger" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'rejected', '批量驳回通知')}>
+              批量驳回
+            </AdminButton>
+            <AdminButton tone="secondary" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'hidden', '批量下架通知')}>
+              批量下架
+            </AdminButton>
+            <AdminButton tone="danger" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'deleted', '批量删除通知')}>
+              批量删除
+            </AdminButton>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px] text-left text-sm">
+            <table className="w-full min-w-[1240px] text-left text-sm">
               <thead className="bg-slate-50 text-xs font-semibold text-slate-500">
                 <tr>
                   <th className="px-5 py-3">
-                    <input
-                      type="checkbox"
-                      aria-label="选择全部通知"
-                      checked={rows.slice(0, 10).every((item) => selectedIds.includes(item.id))}
-                      onChange={toggleAll}
-                    />
+                    <input type="checkbox" aria-label="选择全部通知" checked={allVisibleSelected} onChange={toggleAll} />
                   </th>
                   <th className="px-5 py-3">通知标题</th>
-                  <th className="px-5 py-3">学校</th>
+                  <th className="px-5 py-3">学校 / 学院</th>
                   <th className="px-5 py-3">类型</th>
                   <th className="px-5 py-3">来源链接</th>
                   <th className="px-5 py-3">提交人</th>
@@ -155,7 +261,7 @@ export default function AdminNoticesPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.slice(0, 10).map((notice) => (
+                {rows.map((notice) => (
                   <tr key={notice.id} className="border-t border-slate-100">
                     <td className="px-5 py-4">
                       <input
@@ -165,8 +271,14 @@ export default function AdminNoticesPage() {
                         onChange={() => toggleSelected(notice.id)}
                       />
                     </td>
-                    <td className="max-w-[320px] truncate px-5 py-4 font-medium text-slate-900">{notice.title}</td>
-                    <td className="px-5 py-4 text-slate-700">{notice.school}</td>
+                    <td className="max-w-[320px] px-5 py-4">
+                      <div className="truncate font-medium text-slate-900">{notice.title}</div>
+                      <div className="mt-1 text-xs text-slate-500">截止：{notice.deadline}</div>
+                    </td>
+                    <td className="max-w-[180px] px-5 py-4 text-slate-700">
+                      <div className="font-medium">{notice.school}</div>
+                      <div className="mt-1 truncate text-xs text-slate-500">{notice.department}</div>
+                    </td>
                     <td className="px-5 py-4">
                       <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600">{notice.type}</span>
                     </td>
@@ -179,9 +291,9 @@ export default function AdminNoticesPage() {
                     <td className="px-5 py-4 text-slate-600">{notice.submittedAt}</td>
                     <td className="px-5 py-4"><AdminStatusBadge status={notice.status} /></td>
                     <td className="px-5 py-4">
-                      <div className="flex gap-3 text-sm font-medium">
-                        <button className="text-blue-600" onClick={() => window.open(notice.sourceUrl, '_blank', 'noopener,noreferrer')}>查看</button>
-                        <button className="text-blue-600" onClick={() => updateNoticeStatus([notice.id], 'published', '审核通过通知')}>审核</button>
+                      <div className="flex flex-wrap gap-3 text-sm font-medium">
+                        <button className="text-blue-600" onClick={() => window.open(`/notices/${notice.id}`, '_blank', 'noopener,noreferrer')}>详情</button>
+                        <button className="text-blue-600" onClick={() => updateNoticeStatus([notice.id], 'published', '审核通过通知')}>通过</button>
                         <button className="text-blue-600" onClick={() => updateNoticeStatus([notice.id], 'hidden', '后台下架通知')}>下架</button>
                         <button className="text-rose-600" onClick={() => updateNoticeStatus([notice.id], 'deleted', '后台删除通知')}>删除</button>
                       </div>
@@ -192,12 +304,32 @@ export default function AdminNoticesPage() {
             </table>
           </div>
 
-          <AdminPagination total={String(rows.length)} pages={5} />
+          {!rows.length ? (
+            <div className="border-t border-slate-100 px-5 py-12 text-center text-sm text-slate-500">
+              当前筛选条件下没有通知。可以重置筛选，或新建一条待审核通知。
+            </div>
+          ) : null}
+
+          <AdminPagination
+            total={total}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={(nextPage) => void loadNotices({ page: nextPage })}
+            onPageSizeChange={(nextPageSize) => void loadNotices({ page: 1, pageSize: nextPageSize })}
+          />
         </AdminPanel>
       </div>
     </AdminShell>
   );
 }
+
+type NoticeMetrics = {
+  pending: number;
+  published: number;
+  rejected: number;
+  hidden: number;
+  deleted: number;
+};
 
 type NoticeApiRow = {
   id: string;
@@ -214,6 +346,35 @@ type NoticeApiRow = {
   updated_at_ts?: string;
 };
 
+function serializeFilters(filters: NoticeFilters) {
+  return {
+    query: filters.query.trim(),
+    school: filters.school.trim(),
+    type: filters.type === '全部类型' ? 'all' : filters.type,
+    status: noticeStatusToApi(filters.status),
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo
+  };
+}
+
+function noticeStatusToApi(status: string) {
+  if (status === '待审核') return 'pending';
+  if (status === '已发布') return 'published';
+  if (status === '已驳回') return 'rejected';
+  if (status === '已下架') return 'hidden';
+  if (status === '已删除') return 'deleted';
+  return 'all';
+}
+
+function buildNoticeMetricCards(metrics: NoticeMetrics): AdminMetric[] {
+  return [
+    { label: '待审核', value: String(metrics.pending), hint: '提交后未发布', tone: 'amber' },
+    { label: '已发布', value: String(metrics.published), hint: '前台可见', tone: 'green' },
+    { label: '已驳回', value: String(metrics.rejected), hint: '不符合规范', tone: 'rose' },
+    { label: '已删除', value: String(metrics.deleted), hint: `已下架 ${metrics.hidden} 条`, tone: 'slate' }
+  ];
+}
+
 function mapNoticeApiRow(row: NoticeApiRow): AdminNoticeRow {
   return {
     id: row.id,
@@ -221,7 +382,7 @@ function mapNoticeApiRow(row: NoticeApiRow): AdminNoticeRow {
     school: row.school_name || '待识别学校',
     department: row.department_name || '待补充学院',
     type: row.project_type || '其他',
-    sourceUrl: row.source_link || '/notices',
+    sourceUrl: row.source_link || `/notices/${row.id}`,
     submitter: row.is_private ? '用户提交' : '系统同步',
     submittedAt: row.updated_at_ts?.slice(0, 16).replace('T', ' ') || row.created_at?.slice(0, 16).replace('T', ' ') || row.publish_date || '-',
     deadline: row.deadline_date || '待确认',

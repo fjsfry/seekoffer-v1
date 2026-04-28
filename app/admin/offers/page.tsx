@@ -12,33 +12,71 @@ import {
   AdminSelect,
   AdminStatusBadge
 } from '@/components/admin-ui';
-import { adminOfferRows, offerMetrics } from '@/lib/admin-data';
-import type { AdminOfferRow } from '@/lib/admin-data';
+import type { AdminMetric, AdminOfferRow } from '@/lib/admin-data';
 import { invokeAdminApi } from '@/lib/admin-api';
 
 const offerIcons = [ShieldCheck, CheckCircle2, EyeOff, Trash2];
 
+const defaultFilters = {
+  school: '',
+  major: '',
+  result: '全部结果',
+  status: '全部状态',
+  query: ''
+};
+
+type OfferFilters = typeof defaultFilters;
+
 export default function AdminOffersPage() {
-  const [rows, setRows] = useState<AdminOfferRow[]>(adminOfferRows);
+  const [rows, setRows] = useState<AdminOfferRow[]>([]);
+  const [metrics, setMetrics] = useState<OfferMetrics>({ pending: 0, approved: 0, hidden: 0, rejected: 0, deleted: 0 });
+  const [filters, setFilters] = useState<OfferFilters>(defaultFilters);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
   const [message, setMessage] = useState('正在连接后台真实 Offer 数据...');
   const [pending, setPending] = useState('');
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void loadOffers();
+      void loadOffers({ page: 1 });
     }, 0);
 
     return () => window.clearTimeout(timer);
+    // The Offer table loads once on mount; filters and pagination refresh it explicitly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadOffers() {
+  async function loadOffers(overrides: Partial<{ page: number; pageSize: number; filters: OfferFilters }> = {}) {
+    const nextPage = overrides.page ?? page;
+    const nextPageSize = overrides.pageSize ?? pageSize;
+    const nextFilters = overrides.filters ?? filters;
+
     setPending('load');
     try {
-      const data = await invokeAdminApi<{ offers: OfferApiRow[] }>({ resource: 'offers', action: 'list' });
+      const data = await invokeAdminApi<{
+        offers: OfferApiRow[];
+        total: number;
+        page: number;
+        pageSize: number;
+        metrics: OfferMetrics;
+      }>({
+        resource: 'offers',
+        action: 'list',
+        page: nextPage,
+        pageSize: nextPageSize,
+        filters: serializeOfferFilters(nextFilters)
+      });
       setRows(data.offers.map(mapOfferApiRow));
-      setMessage(`已连接 Supabase，加载 ${data.offers.length} 条 Offer。`);
+      setTotal(data.total);
+      setPage(data.page);
+      setPageSize(data.pageSize);
+      setMetrics(data.metrics);
+      setFilters(nextFilters);
+      setMessage(`已连接 Supabase，共匹配 ${data.total} 条 Offer。`);
     } catch (error) {
-      setMessage(error instanceof Error ? `真实 API 暂不可用，当前显示降级数据：${error.message}` : '真实 API 暂不可用，当前显示降级数据。');
+      setRows([]);
+      setMessage(error instanceof Error ? `真实 API 暂不可用：${error.message}` : '真实 API 暂不可用，请稍后重试。');
     } finally {
       setPending('');
     }
@@ -91,19 +129,28 @@ export default function AdminOffersPage() {
           <AdminPanel>
             <div className="grid gap-5 p-5">
               <div className="grid gap-4 xl:grid-cols-5">
-                <AdminSelect label="学校" options={['全部学校', '清华大学', '北京大学', '上海交通大学', '复旦大学']} />
-                <AdminSelect label="专业" options={['全部专业', '计算机', '电子信息', '金融', '人工智能']} />
-                <AdminSelect label="结果" options={['全部结果', '录取', '放弃', '候补', '补录传闻']} />
-                <AdminSelect label="审核状态" options={['全部状态', '待审核', '已通过', '已隐藏', '已删除']} />
-                <AdminInput placeholder="开始日期  至  结束日期" />
+                <AdminInput placeholder="学校" value={filters.school} onChange={(value) => setFilters((current) => ({ ...current, school: value }))} />
+                <AdminInput placeholder="专业" value={filters.major} onChange={(value) => setFilters((current) => ({ ...current, major: value }))} />
+                <AdminSelect
+                  label="结果"
+                  value={filters.result}
+                  options={['全部结果', '录取', '放弃', '候补', '补录传闻']}
+                  onChange={(value) => setFilters((current) => ({ ...current, result: value }))}
+                />
+                <AdminSelect
+                  label="审核状态"
+                  value={filters.status}
+                  options={['全部状态', '待审核', '已通过', '已驳回', '已隐藏', '已删除']}
+                  onChange={(value) => setFilters((current) => ({ ...current, status: value }))}
+                />
+                <AdminInput placeholder="搜索学校、专业、用户昵称等" value={filters.query} onChange={(value) => setFilters((current) => ({ ...current, query: value }))} />
               </div>
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_120px_120px]">
-                <AdminInput placeholder="搜索学校、专业、用户昵称等" />
-                <AdminButton onClick={loadOffers} disabled={pending === 'load'}>查询</AdminButton>
+              <div className="flex justify-end gap-3">
+                <AdminButton onClick={() => loadOffers({ page: 1 })} disabled={pending === 'load'}>查询</AdminButton>
                 <AdminButton
                   tone="secondary"
                   onClick={() => {
-                    void loadOffers();
+                    void loadOffers({ page: 1, filters: defaultFilters });
                     setMessage('Offer 筛选条件已重置，并重新加载真实 Offer 列表。');
                   }}
                 >
@@ -115,7 +162,7 @@ export default function AdminOffersPage() {
           </AdminPanel>
 
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {offerMetrics.map((metric, index) => (
+            {buildOfferMetrics(metrics).map((metric, index) => (
               <AdminMetricCard key={metric.label} metric={metric} icon={offerIcons[index]} />
             ))}
           </section>
@@ -139,7 +186,7 @@ export default function AdminOffersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.slice(0, 10).map((offer, index) => (
+                  {rows.map((offer, index) => (
                     <tr key={`${offer.id}-${index}`} className="border-t border-slate-100">
                       <td className="px-5 py-4"><input type="checkbox" aria-label={`选择 ${offer.user}`} /></td>
                       <td className="px-5 py-4">
@@ -165,7 +212,7 @@ export default function AdminOffersPage() {
                       <td className="px-5 py-4">
                         <div className="flex gap-3 font-medium">
                           <button className="text-blue-600" onClick={() => previewOffer(offer)}>查看</button>
-                          <button className="text-blue-600" onClick={() => updateOfferStatus(offer.id, 'approved', '审核通过 Offer')}>审核</button>
+                          <button className="text-blue-600" onClick={() => updateOfferStatus(offer.id, 'approved', '审核通过 Offer')}>通过</button>
                           <button className="text-blue-600" onClick={() => updateOfferStatus(offer.id, 'hidden', '后台隐藏 Offer')}>隐藏</button>
                           <button className="text-rose-600" onClick={() => updateOfferStatus(offer.id, 'deleted', '后台删除 Offer')}>删除</button>
                         </div>
@@ -175,7 +222,16 @@ export default function AdminOffersPage() {
                 </tbody>
               </table>
             </div>
-            <AdminPagination total={String(rows.length)} />
+
+            {!rows.length ? <div className="border-t border-slate-100 px-5 py-12 text-center text-sm text-slate-500">当前没有匹配的 Offer 动态。</div> : null}
+
+            <AdminPagination
+              total={total}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={(nextPage) => void loadOffers({ page: nextPage })}
+              onPageSizeChange={(nextPageSize) => void loadOffers({ page: 1, pageSize: nextPageSize })}
+            />
           </AdminPanel>
         </div>
 
@@ -191,6 +247,14 @@ export default function AdminOffersPage() {
   );
 }
 
+type OfferMetrics = {
+  pending: number;
+  approved: number;
+  hidden: number;
+  rejected: number;
+  deleted: number;
+};
+
 type OfferApiRow = {
   id: string;
   author_name: string;
@@ -204,6 +268,33 @@ type OfferApiRow = {
   reports_count: number;
   created_at: string;
 };
+
+function serializeOfferFilters(filters: OfferFilters) {
+  return {
+    school: filters.school.trim(),
+    major: filters.major.trim(),
+    query: filters.query.trim() || (filters.result === '全部结果' ? '' : filters.result),
+    status: offerStatusToApi(filters.status)
+  };
+}
+
+function offerStatusToApi(status: string) {
+  if (status === '待审核') return 'pending';
+  if (status === '已通过') return 'approved';
+  if (status === '已驳回') return 'rejected';
+  if (status === '已隐藏') return 'hidden';
+  if (status === '已删除') return 'deleted';
+  return 'all';
+}
+
+function buildOfferMetrics(metrics: OfferMetrics): AdminMetric[] {
+  return [
+    { label: '待审核', value: String(metrics.pending), hint: '新提交动态', tone: 'purple' },
+    { label: '已通过', value: String(metrics.approved), hint: '前台可见', tone: 'green' },
+    { label: '已隐藏', value: String(metrics.hidden), hint: `已驳回 ${metrics.rejected} 条`, tone: 'amber' },
+    { label: '已删除', value: String(metrics.deleted), hint: '逻辑删除', tone: 'rose' }
+  ];
+}
 
 function mapOfferApiRow(row: OfferApiRow): AdminOfferRow {
   return {

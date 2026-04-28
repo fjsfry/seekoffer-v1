@@ -7,11 +7,16 @@ export type AdminApiPayload = {
   resource: string;
   action?: string;
   id?: string;
+  ids?: string[];
   status?: string;
   note?: string;
   key?: string;
   value?: unknown;
   notice?: Record<string, unknown>;
+  page?: number;
+  pageSize?: number;
+  filters?: Record<string, unknown>;
+  sort?: string;
 };
 
 export type AdminApiResponse<T> = T & {

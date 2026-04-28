@@ -7,6 +7,8 @@ type AdminUser = {
   status: string;
 };
 
+type SupabaseService = ReturnType<typeof createClient>;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -21,10 +23,6 @@ function json(status: number, body: Record<string, unknown>) {
       'Content-Type': 'application/json'
     }
   });
-}
-
-function toStatusText(value: unknown) {
-  return String(value || '').trim();
 }
 
 function mapNoticeStatus(status: string) {
@@ -50,8 +48,72 @@ function mapFeedbackStatus(status: string) {
   return 'pending';
 }
 
+function readPage(body: Record<string, unknown>) {
+  return Math.max(1, Number(body.page || 1) || 1);
+}
+
+function readPageSize(body: Record<string, unknown>) {
+  return Math.min(100, Math.max(5, Number(body.pageSize || 10) || 10));
+}
+
+function readFilters(body: Record<string, unknown>) {
+  return (body.filters && typeof body.filters === 'object' ? body.filters : {}) as Record<string, unknown>;
+}
+
+function normalizeFilter(value: unknown) {
+  return String(value || '').trim();
+}
+
+function likePattern(value: unknown) {
+  return `%${normalizeFilter(value).replace(/[%_,]/g, ' ')}%`;
+}
+
+function getShanghaiDayStart(offsetDays = 0) {
+  const now = new Date();
+  const shanghaiNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  shanghaiNow.setUTCDate(shanghaiNow.getUTCDate() + offsetDays);
+  const day = shanghaiNow.toISOString().slice(0, 10);
+  return new Date(`${day}T00:00:00+08:00`);
+}
+
+function formatShanghaiDay(offsetDays: number) {
+  const date = getShanghaiDayStart(offsetDays);
+  const shanghai = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+  return shanghai.toISOString().slice(5, 10);
+}
+
+function createTrendSkeleton() {
+  return Array.from({ length: 7 }, (_, index) => {
+    const offset = index - 6;
+    return {
+      date: formatShanghaiDay(offset),
+      start: getShanghaiDayStart(offset).toISOString(),
+      end: getShanghaiDayStart(offset + 1).toISOString(),
+      users: 0,
+      notices: 0,
+      offers: 0,
+      applications: 0
+    };
+  });
+}
+
+function incrementTrend(trends: ReturnType<typeof createTrendSkeleton>, createdAt: string | null | undefined, key: 'users' | 'notices' | 'offers' | 'applications') {
+  if (!createdAt) return;
+  const timestamp = new Date(createdAt).getTime();
+  const bucket = trends.find((item) => timestamp >= new Date(item.start).getTime() && timestamp < new Date(item.end).getTime());
+  if (bucket) {
+    bucket[key] += 1;
+  }
+}
+
+async function countRows(query: PromiseLike<{ count: number | null; error: unknown }>) {
+  const result = await query;
+  if (result.error) throw result.error;
+  return result.count || 0;
+}
+
 async function logOperation(
-  service: ReturnType<typeof createClient>,
+  service: SupabaseService,
   admin: AdminUser,
   request: Request,
   action: string,
@@ -133,124 +195,424 @@ async function requireAdmin(request: Request) {
   return { service, admin, user: userData.user };
 }
 
-async function getOverview(service: ReturnType<typeof createClient>) {
+async function getOverview(service: SupabaseService) {
+  const todayStart = getShanghaiDayStart(0).toISOString();
+  const trendStart = getShanghaiDayStart(-6).toISOString();
+  const trends = createTrendSkeleton();
+
   const [
-    noticesCount,
-    pendingNoticesCount,
-    applicationsCount,
-    profilesCount,
-    offersCount,
-    pendingOffersCount,
-    feedbackCount,
-    pendingFeedbackCount
+    totalUsers,
+    todayUsers,
+    restrictedUsers,
+    bannedUsers,
+    deletedUsers,
+    totalNotices,
+    pendingNotices,
+    publishedNotices,
+    rejectedNotices,
+    hiddenNotices,
+    deletedNotices,
+    todayNotices,
+    totalOffers,
+    pendingOffers,
+    approvedOffers,
+    hiddenOffers,
+    deletedOffers,
+    todayOffers,
+    totalApplications,
+    todayApplications,
+    totalFeedback,
+    pendingFeedback,
+    processingFeedback,
+    resolvedFeedback,
+    closedFeedback
   ] = await Promise.all([
-    service.from('notices').select('id', { count: 'exact', head: true }),
-    service.from('notices').select('id', { count: 'exact', head: true }).eq('admin_status', 'pending'),
-    service.from('applications').select('id', { count: 'exact', head: true }),
-    service.from('profiles').select('id', { count: 'exact', head: true }),
-    service.from('offer_posts').select('id', { count: 'exact', head: true }),
-    service.from('offer_posts').select('id', { count: 'exact', head: true }).eq('review_status', 'pending'),
-    service.from('feedback_reports').select('id', { count: 'exact', head: true }),
-    service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+    countRows(service.from('profiles').select('id', { count: 'exact', head: true })),
+    countRows(service.from('profiles').select('id', { count: 'exact', head: true }).gte('created_at', todayStart)),
+    countRows(service.from('user_moderation').select('user_id', { count: 'exact', head: true }).eq('status', 'restricted')),
+    countRows(service.from('user_moderation').select('user_id', { count: 'exact', head: true }).eq('status', 'banned')),
+    countRows(service.from('user_moderation').select('user_id', { count: 'exact', head: true }).eq('status', 'deleted')),
+    countRows(service.from('notices').select('id', { count: 'exact', head: true }).is('admin_deleted_at', null)),
+    countRows(service.from('notices').select('id', { count: 'exact', head: true }).is('admin_deleted_at', null).eq('admin_status', 'pending')),
+    countRows(service.from('notices').select('id', { count: 'exact', head: true }).is('admin_deleted_at', null).eq('admin_status', 'published')),
+    countRows(service.from('notices').select('id', { count: 'exact', head: true }).is('admin_deleted_at', null).eq('admin_status', 'rejected')),
+    countRows(service.from('notices').select('id', { count: 'exact', head: true }).is('admin_deleted_at', null).eq('admin_status', 'hidden')),
+    countRows(service.from('notices').select('id', { count: 'exact', head: true }).not('admin_deleted_at', 'is', null)),
+    countRows(service.from('notices').select('id', { count: 'exact', head: true }).gte('created_at', todayStart)),
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null)),
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('review_status', 'pending')),
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('review_status', 'approved')),
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('review_status', 'hidden')),
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).not('deleted_at', 'is', null)),
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).gte('created_at', todayStart)),
+    countRows(service.from('applications').select('id', { count: 'exact', head: true })),
+    countRows(service.from('applications').select('id', { count: 'exact', head: true }).gte('created_at', todayStart)),
+    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true })),
+    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
+    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'processing')),
+    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'resolved')),
+    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'closed'))
   ]);
+
+  const [profileTrend, noticeTrend, offerTrend, applicationTrend] = await Promise.all([
+    service.from('profiles').select('created_at').gte('created_at', trendStart),
+    service.from('notices').select('created_at').gte('created_at', trendStart),
+    service.from('offer_posts').select('created_at').gte('created_at', trendStart),
+    service.from('applications').select('created_at').gte('created_at', trendStart)
+  ]);
+
+  if (profileTrend.error) throw profileTrend.error;
+  if (noticeTrend.error) throw noticeTrend.error;
+  if (offerTrend.error) throw offerTrend.error;
+  if (applicationTrend.error) throw applicationTrend.error;
+
+  for (const row of profileTrend.data || []) incrementTrend(trends, row.created_at, 'users');
+  for (const row of noticeTrend.data || []) incrementTrend(trends, row.created_at, 'notices');
+  for (const row of offerTrend.data || []) incrementTrend(trends, row.created_at, 'offers');
+  for (const row of applicationTrend.data || []) incrementTrend(trends, row.created_at, 'applications');
 
   return {
     metrics: {
-      totalUsers: profilesCount.count || 0,
-      totalNotices: noticesCount.count || 0,
-      pendingNotices: pendingNoticesCount.count || 0,
-      totalOffers: offersCount.count || 0,
-      pendingOffers: pendingOffersCount.count || 0,
-      totalApplications: applicationsCount.count || 0,
-      totalFeedback: feedbackCount.count || 0,
-      pendingFeedback: pendingFeedbackCount.count || 0
-    }
+      totalUsers,
+      todayUsers,
+      normalUsers: Math.max(totalUsers - restrictedUsers - bannedUsers - deletedUsers, 0),
+      restrictedUsers,
+      bannedUsers,
+      deletedUsers,
+      totalNotices,
+      pendingNotices,
+      publishedNotices,
+      rejectedNotices,
+      hiddenNotices,
+      deletedNotices,
+      todayNotices,
+      totalOffers,
+      pendingOffers,
+      approvedOffers,
+      hiddenOffers,
+      deletedOffers,
+      todayOffers,
+      totalApplications,
+      todayApplications,
+      totalFeedback,
+      pendingFeedback,
+      processingFeedback,
+      resolvedFeedback,
+      closedFeedback
+    },
+    trends: trends.map(({ date, users, notices, offers, applications }) => ({ date, users, notices, offers, applications }))
   };
 }
 
-async function listNotices(service: ReturnType<typeof createClient>) {
-  const { data, error } = await service
+async function getNoticeMetrics(service: SupabaseService) {
+  const [pending, published, rejected, hidden, deleted] = await Promise.all([
+    countRows(service.from('notices').select('id', { count: 'exact', head: true }).is('admin_deleted_at', null).eq('admin_status', 'pending')),
+    countRows(service.from('notices').select('id', { count: 'exact', head: true }).is('admin_deleted_at', null).eq('admin_status', 'published')),
+    countRows(service.from('notices').select('id', { count: 'exact', head: true }).is('admin_deleted_at', null).eq('admin_status', 'rejected')),
+    countRows(service.from('notices').select('id', { count: 'exact', head: true }).is('admin_deleted_at', null).eq('admin_status', 'hidden')),
+    countRows(service.from('notices').select('id', { count: 'exact', head: true }).not('admin_deleted_at', 'is', null))
+  ]);
+
+  return { pending, published, rejected, hidden, deleted };
+}
+
+async function listNotices(service: SupabaseService, body: Record<string, unknown>) {
+  const page = readPage(body);
+  const pageSize = readPageSize(body);
+  const filters = readFilters(body);
+  const sort = String(body.sort || 'publish_desc');
+  const status = normalizeFilter(filters.status);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = service
     .from('notices')
-    .select('id,school_name,department_name,project_name,project_type,source_link,publish_date,deadline_date,admin_status,is_private,created_at,updated_at_ts')
-    .is('admin_deleted_at', null)
-    .order('publish_date', { ascending: false })
-    .limit(100);
+    .select(
+      'id,school_name,department_name,project_name,project_type,source_link,publish_date,deadline_date,admin_status,is_private,created_at,updated_at_ts,admin_reviewed_by,admin_reviewed_at,admin_review_note,admin_deleted_at',
+      { count: 'exact' }
+    );
 
+  if (status === 'deleted') {
+    query = query.not('admin_deleted_at', 'is', null);
+  } else {
+    query = query.is('admin_deleted_at', null);
+    if (status && status !== 'all') {
+      query = query.eq('admin_status', mapNoticeStatus(status));
+    }
+  }
+
+  if (normalizeFilter(filters.query)) {
+    const pattern = likePattern(filters.query);
+    query = query.or(`project_name.ilike.${pattern},school_name.ilike.${pattern},department_name.ilike.${pattern}`);
+  }
+
+  if (normalizeFilter(filters.school)) {
+    query = query.ilike('school_name', likePattern(filters.school));
+  }
+
+  if (normalizeFilter(filters.type) && normalizeFilter(filters.type) !== 'all') {
+    query = query.eq('project_type', normalizeFilter(filters.type));
+  }
+
+  if (normalizeFilter(filters.dateFrom)) {
+    query = query.gte('publish_date', normalizeFilter(filters.dateFrom));
+  }
+
+  if (normalizeFilter(filters.dateTo)) {
+    query = query.lte('publish_date', normalizeFilter(filters.dateTo));
+  }
+
+  if (sort === 'deadline_asc') {
+    query = query.order('deadline_date', { ascending: true, nullsFirst: false });
+  } else if (sort === 'updated_desc') {
+    query = query.order('updated_at_ts', { ascending: false, nullsFirst: false });
+  } else {
+    query = query.order('publish_date', { ascending: false, nullsFirst: false });
+  }
+
+  const { data, error, count } = await query.range(from, to);
   if (error) throw error;
-  return { notices: data || [] };
+
+  return {
+    notices: data || [],
+    total: count || 0,
+    page,
+    pageSize,
+    metrics: await getNoticeMetrics(service)
+  };
 }
 
-async function listOffers(service: ReturnType<typeof createClient>) {
-  const { data, error } = await service
+async function updateNoticeStatus(service: SupabaseService, admin: AdminUser, request: Request, ids: string[], status: string, note: string) {
+  const validIds = ids.map((item) => String(item || '').trim()).filter(Boolean);
+  if (!validIds.length) {
+    throw new Error('no_notice_ids');
+  }
+
+  const nextStatus = mapNoticeStatus(status);
+  const before = await service.from('notices').select('*').in('id', validIds);
+  if (before.error) throw before.error;
+
+  const patch = {
+    admin_status: nextStatus,
+    is_private: nextStatus !== 'published',
+    admin_deleted_at: nextStatus === 'deleted' ? new Date().toISOString() : null,
+    admin_reviewed_by: admin.email,
+    admin_reviewed_at: new Date().toISOString(),
+    admin_review_note: note
+  };
+
+  const { data, error } = await service.from('notices').update(patch).in('id', validIds).select();
+  if (error) throw error;
+
+  await logOperation(service, admin, request, validIds.length > 1 ? 'bulk_update_notice_status' : 'update_notice_status', 'notices', validIds.join(','), before.data, data, note);
+  return { notices: data || [], count: data?.length || 0 };
+}
+
+async function getOfferMetrics(service: SupabaseService) {
+  const [pending, approved, hidden, rejected, deleted] = await Promise.all([
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('review_status', 'pending')),
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('review_status', 'approved')),
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('review_status', 'hidden')),
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('review_status', 'rejected')),
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).not('deleted_at', 'is', null))
+  ]);
+
+  return { pending, approved, hidden, rejected, deleted };
+}
+
+async function listOffers(service: SupabaseService, body: Record<string, unknown>) {
+  const page = readPage(body);
+  const pageSize = readPageSize(body);
+  const filters = readFilters(body);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = service
     .from('offer_posts')
-    .select('id,author_name,school_name,major,project_type,result,undergraduate_background,is_anonymous,review_status,reports_count,created_at')
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .limit(100);
+    .select('id,author_name,school_name,major,project_type,result,undergraduate_background,is_anonymous,review_status,reports_count,created_at', { count: 'exact' });
+
+  const status = normalizeFilter(filters.status);
+  if (status === 'deleted') {
+    query = query.not('deleted_at', 'is', null);
+  } else {
+    query = query.is('deleted_at', null);
+    if (status && status !== 'all') {
+      query = query.eq('review_status', mapOfferStatus(status));
+    }
+  }
+
+  if (normalizeFilter(filters.query)) {
+    const pattern = likePattern(filters.query);
+    query = query.or(`author_name.ilike.${pattern},school_name.ilike.${pattern},major.ilike.${pattern},result.ilike.${pattern}`);
+  }
+
+  if (normalizeFilter(filters.school)) {
+    query = query.ilike('school_name', likePattern(filters.school));
+  }
+
+  if (normalizeFilter(filters.major)) {
+    query = query.ilike('major', likePattern(filters.major));
+  }
+
+  const { data, error, count } = await query.order('created_at', { ascending: false }).range(from, to);
 
   if (error) throw error;
-  return { offers: data || [] };
+  return { offers: data || [], total: count || 0, page, pageSize, metrics: await getOfferMetrics(service) };
 }
 
-async function listUsers(service: ReturnType<typeof createClient>) {
-  const { data, error } = await service
-    .from('profiles')
-    .select('id,nickname,undergraduate_school,major,target_major,created_at,updated_at')
-    .order('updated_at', { ascending: false })
-    .limit(100);
+async function fetchAuthEmails(service: SupabaseService, userIds: string[]) {
+  const emailById = new Map<string, string>();
+  try {
+    const { data } = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    for (const user of data.users || []) {
+      if (userIds.includes(user.id)) {
+        emailById.set(user.id, user.email || '');
+      }
+    }
+  } catch {
+    // Auth Admin API is not required for the admin list to work.
+  }
+  return emailById;
+}
 
+async function getUserMetrics(service: SupabaseService) {
+  const todayStart = getShanghaiDayStart(0).toISOString();
+  const [totalUsers, todayUsers, restrictedUsers, bannedUsers, deletedUsers] = await Promise.all([
+    countRows(service.from('profiles').select('id', { count: 'exact', head: true })),
+    countRows(service.from('profiles').select('id', { count: 'exact', head: true }).gte('created_at', todayStart)),
+    countRows(service.from('user_moderation').select('user_id', { count: 'exact', head: true }).eq('status', 'restricted')),
+    countRows(service.from('user_moderation').select('user_id', { count: 'exact', head: true }).eq('status', 'banned')),
+    countRows(service.from('user_moderation').select('user_id', { count: 'exact', head: true }).eq('status', 'deleted'))
+  ]);
+
+  return {
+    totalUsers,
+    todayUsers,
+    normalUsers: Math.max(totalUsers - restrictedUsers - bannedUsers - deletedUsers, 0),
+    restrictedUsers,
+    bannedUsers,
+    deletedUsers
+  };
+}
+
+async function listUsers(service: SupabaseService, body: Record<string, unknown>) {
+  const page = readPage(body);
+  const pageSize = readPageSize(body);
+  const filters = readFilters(body);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const keyword = normalizeFilter(filters.query);
+  const userId = normalizeFilter(filters.userId);
+
+  let query = service
+    .from('profiles')
+    .select('id,nickname,undergraduate_school,major,target_major,created_at,updated_at', { count: 'exact' });
+
+  if (userId) {
+    query = query.ilike('id', likePattern(userId));
+  }
+
+  if (keyword) {
+    const pattern = likePattern(keyword);
+    query = query.or(`nickname.ilike.${pattern},undergraduate_school.ilike.${pattern},major.ilike.${pattern},target_major.ilike.${pattern}`);
+  }
+
+  const { data, error, count } = await query.order('updated_at', { ascending: false }).range(from, to);
   if (error) throw error;
 
   const userIds = (data || []).map((item) => item.id);
-  const { data: applicationRows } = userIds.length
-    ? await service.from('applications').select('user_id,id').in('user_id', userIds)
-    : { data: [] };
-  const { data: moderationRows } = userIds.length
-    ? await service.from('user_moderation').select('user_id,status,note,updated_by,updated_at').in('user_id', userIds)
-    : { data: [] };
+  const [applicationRows, moderationRows, noticeRows, offerRows, emailById] = await Promise.all([
+    userIds.length ? service.from('applications').select('user_id,id').in('user_id', userIds) : Promise.resolve({ data: [] }),
+    userIds.length ? service.from('user_moderation').select('user_id,status,note,updated_by,updated_at').in('user_id', userIds) : Promise.resolve({ data: [] }),
+    userIds.length ? service.from('notices').select('created_by,id').in('created_by', userIds) : Promise.resolve({ data: [] }),
+    userIds.length ? service.from('offer_posts').select('user_id,id').in('user_id', userIds) : Promise.resolve({ data: [] }),
+    fetchAuthEmails(service, userIds)
+  ]);
 
-  const applicationCountByUser = new Map<string, number>();
-  for (const row of applicationRows || []) {
-    applicationCountByUser.set(row.user_id, (applicationCountByUser.get(row.user_id) || 0) + 1);
-  }
+  const countByUser = (rows: Array<{ user_id?: string | null; created_by?: string | null }>, key: 'user_id' | 'created_by') => {
+    const map = new Map<string, number>();
+    for (const row of rows || []) {
+      const id = row[key];
+      if (id) map.set(id, (map.get(id) || 0) + 1);
+    }
+    return map;
+  };
+
+  const applicationCountByUser = countByUser((applicationRows.data || []) as Array<{ user_id?: string }>, 'user_id');
+  const noticeCountByUser = countByUser((noticeRows.data || []) as Array<{ created_by?: string }>, 'created_by');
+  const offerCountByUser = countByUser((offerRows.data || []) as Array<{ user_id?: string }>, 'user_id');
   const moderationByUser = new Map<string, { status: string; note: string }>();
-  for (const row of moderationRows || []) {
+  for (const row of moderationRows.data || []) {
     moderationByUser.set(row.user_id, { status: row.status, note: row.note });
   }
 
   return {
     users: (data || []).map((item) => ({
       ...item,
+      email: emailById.get(item.id) || '',
       application_count: applicationCountByUser.get(item.id) || 0,
+      notice_count: noticeCountByUser.get(item.id) || 0,
+      offer_count: offerCountByUser.get(item.id) || 0,
       moderation_status: moderationByUser.get(item.id)?.status || 'active',
       moderation_note: moderationByUser.get(item.id)?.note || ''
-    }))
+    })),
+    total: count || 0,
+    page,
+    pageSize,
+    metrics: await getUserMetrics(service)
   };
 }
 
-async function listFeedback(service: ReturnType<typeof createClient>) {
-  const { data, error } = await service
+async function listFeedback(service: SupabaseService, body: Record<string, unknown>) {
+  const page = readPage(body);
+  const pageSize = readPageSize(body);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, error, count } = await service
     .from('feedback_reports')
-    .select('id,type,module,target_id,content,status,handler,created_at,handled_at')
+    .select('id,type,module,target_id,content,status,handler,created_at,handled_at', { count: 'exact' })
     .order('created_at', { ascending: false })
-    .limit(100);
+    .range(from, to);
 
   if (error) throw error;
-  return { feedback: data || [] };
+
+  const [pending, processing, resolved, closed] = await Promise.all([
+    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
+    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'processing')),
+    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'resolved')),
+    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'closed'))
+  ]);
+
+  return { feedback: data || [], total: count || 0, page, pageSize, metrics: { pending, processing, resolved, closed } };
 }
 
-async function listLogs(service: ReturnType<typeof createClient>) {
-  const { data, error } = await service
+async function listLogs(service: SupabaseService, body: Record<string, unknown>) {
+  const page = readPage(body);
+  const pageSize = readPageSize(body);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const todayStart = getShanghaiDayStart(0).toISOString();
+
+  const { data, error, count } = await service
     .from('admin_operation_logs')
-    .select('id,admin_email,action,module,target_id,ip_address,result,remark,created_at')
+    .select('id,admin_email,action,module,target_id,ip_address,result,remark,created_at', { count: 'exact' })
     .order('created_at', { ascending: false })
-    .limit(100);
+    .range(from, to);
 
   if (error) throw error;
-  return { logs: data || [] };
+
+  const [todayOperations, deleteOperations, banOperations, failedOperations] = await Promise.all([
+    countRows(service.from('admin_operation_logs').select('id', { count: 'exact', head: true }).gte('created_at', todayStart)),
+    countRows(service.from('admin_operation_logs').select('id', { count: 'exact', head: true }).ilike('action', '%delete%')),
+    countRows(service.from('admin_operation_logs').select('id', { count: 'exact', head: true }).ilike('action', '%user_status%')),
+    countRows(service.from('admin_operation_logs').select('id', { count: 'exact', head: true }).eq('result', 'failed'))
+  ]);
+
+  return { logs: data || [], total: count || 0, page, pageSize, metrics: { todayOperations, deleteOperations, banOperations, failedOperations } };
 }
 
-async function listSettings(service: ReturnType<typeof createClient>) {
+async function listSettings(service: SupabaseService) {
   const { data, error } = await service
     .from('admin_system_settings')
     .select('key,value,description,updated_by,updated_at')
@@ -296,7 +658,7 @@ Deno.serve(async (request) => {
     }
 
     if (resource === 'notices' && action === 'list') {
-      return json(200, await listNotices(service));
+      return json(200, await listNotices(service, body));
     }
 
     if (resource === 'notices' && action === 'create') {
@@ -321,6 +683,7 @@ Deno.serve(async (request) => {
         source_site: 'admin-manual',
         is_verified: true,
         admin_status: 'pending',
+        is_private: true,
         updated_at: nowText,
         last_checked_at: nowText
       };
@@ -330,25 +693,13 @@ Deno.serve(async (request) => {
       return json(200, { notice: data });
     }
 
-    if (resource === 'notices' && action === 'update_status') {
-      const nextStatus = mapNoticeStatus(String(body.status || 'published'));
-      const before = await service.from('notices').select('*').eq('id', id).maybeSingle();
-      const patch = {
-        admin_status: nextStatus,
-        is_private: nextStatus === 'hidden' || nextStatus === 'deleted',
-        admin_deleted_at: nextStatus === 'deleted' ? new Date().toISOString() : null,
-        admin_reviewed_by: admin.email,
-        admin_reviewed_at: new Date().toISOString(),
-        admin_review_note: String(body.note || '')
-      };
-      const { data, error } = await service.from('notices').update(patch).eq('id', id).select().single();
-      if (error) throw error;
-      await logOperation(service, admin, request, 'update_notice_status', 'notices', id, before.data, data, String(body.note || ''));
-      return json(200, { notice: data });
+    if (resource === 'notices' && (action === 'update_status' || action === 'bulk_update_status')) {
+      const ids = action === 'bulk_update_status' ? ((body.ids || []) as string[]) : [id];
+      return json(200, await updateNoticeStatus(service, admin, request, ids, String(body.status || 'published'), String(body.note || '')));
     }
 
     if (resource === 'offers' && action === 'list') {
-      return json(200, await listOffers(service));
+      return json(200, await listOffers(service, body));
     }
 
     if (resource === 'offers' && action === 'update_status') {
@@ -388,11 +739,11 @@ Deno.serve(async (request) => {
         return json(200, { userModeration: data });
       }
 
-      return json(200, await listUsers(service));
+      return json(200, await listUsers(service, body));
     }
 
     if (resource === 'feedback' && action === 'list') {
-      return json(200, await listFeedback(service));
+      return json(200, await listFeedback(service, body));
     }
 
     if (resource === 'feedback' && action === 'update_status') {
@@ -411,7 +762,7 @@ Deno.serve(async (request) => {
     }
 
     if (resource === 'logs') {
-      return json(200, await listLogs(service));
+      return json(200, await listLogs(service, body));
     }
 
     if (resource === 'settings' && action === 'list') {

@@ -82,10 +82,25 @@ export function AdminStatusBadge({ status }: { status: string }) {
   );
 }
 
-export function AdminInput({ placeholder, className = '' }: { placeholder: string; className?: string }) {
+export function AdminInput({
+  placeholder,
+  className = '',
+  value,
+  onChange,
+  type = 'text'
+}: {
+  placeholder: string;
+  className?: string;
+  value?: string;
+  onChange?: (value: string) => void;
+  type?: string;
+}) {
   return (
     <input
+      type={type}
       placeholder={placeholder}
+      value={value}
+      onChange={(event) => onChange?.(event.target.value)}
       className={adminClassNames(
         'h-11 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50',
         className
@@ -94,13 +109,31 @@ export function AdminInput({ placeholder, className = '' }: { placeholder: strin
   );
 }
 
-export function AdminSelect({ label, options }: { label?: string; options: string[] }) {
+export function AdminSelect({
+  label,
+  options,
+  value,
+  onChange
+}: {
+  label?: string;
+  options: Array<string | { label: string; value: string }>;
+  value?: string;
+  onChange?: (value: string) => void;
+}) {
+  const normalizedOptions = options.map((option) => (typeof option === 'string' ? { label: option, value: option } : option));
+
   return (
     <label className="grid gap-2">
       {label ? <span className="text-sm font-medium text-slate-700">{label}</span> : null}
-      <select className="h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50">
-        {options.map((option) => (
-          <option key={option}>{option}</option>
+      <select
+        value={value}
+        onChange={(event) => onChange?.(event.target.value)}
+        className="h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+      >
+        {normalizedOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
         ))}
       </select>
     </label>
@@ -145,31 +178,101 @@ export function AdminButton({
   );
 }
 
-export function AdminPagination({ total, pages = 5 }: { total: string; pages?: number }) {
+export function AdminPagination({
+  total,
+  pages,
+  page = 1,
+  pageSize = 10,
+  onPageChange,
+  onPageSizeChange
+}: {
+  total: string | number;
+  pages?: number;
+  page?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
+}) {
+  const totalNumber = typeof total === 'number' ? total : Number.parseInt(total, 10) || 0;
+  const computedPages = Math.max(1, Math.ceil(totalNumber / pageSize));
+  const pageCount = pages || computedPages;
+  const safePage = Math.min(Math.max(page, 1), pageCount);
+  const visiblePages = buildVisiblePages(safePage, pageCount);
+  const canGoPrevious = safePage > 1;
+  const canGoNext = safePage < pageCount;
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 text-sm text-slate-500">
       <span>共 {total} 条</span>
       <div className="flex items-center gap-2">
-        <button className="h-8 rounded-lg border border-slate-200 px-3 text-slate-500">‹</button>
-        {Array.from({ length: pages }, (_, index) => (
-          <button
-            key={`page-${index + 1}`}
-            className={adminClassNames(
-              'h-8 min-w-8 rounded-lg px-3 font-medium',
-              index === 0 ? 'bg-blue-600 text-white' : 'border border-slate-200 text-slate-600'
-            )}
-          >
-            {index + 1}
-          </button>
-        ))}
-        <button className="h-8 rounded-lg border border-slate-200 px-3 text-slate-500">›</button>
-        <select className="ml-3 h-8 rounded-lg border border-slate-200 px-2 text-slate-600">
-          <option>10 条/页</option>
-          <option>20 条/页</option>
+        <button
+          className="h-8 rounded-lg border border-slate-200 px-3 text-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!canGoPrevious}
+          onClick={() => canGoPrevious && onPageChange?.(safePage - 1)}
+        >
+          ‹
+        </button>
+        {visiblePages.map((item, index) =>
+          item === 'ellipsis' ? (
+            <span key={`ellipsis-${index}`} className="px-1 text-slate-400">
+              ...
+            </span>
+          ) : (
+            <button
+              key={`page-${item}`}
+              className={adminClassNames(
+                'h-8 min-w-8 rounded-lg px-3 font-medium',
+                item === safePage ? 'bg-blue-600 text-white' : 'border border-slate-200 text-slate-600'
+              )}
+              onClick={() => onPageChange?.(item)}
+            >
+              {item}
+            </button>
+          )
+        )}
+        <button
+          className="h-8 rounded-lg border border-slate-200 px-3 text-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!canGoNext}
+          onClick={() => canGoNext && onPageChange?.(safePage + 1)}
+        >
+          ›
+        </button>
+        <select
+          value={pageSize}
+          onChange={(event) => onPageSizeChange?.(Number(event.target.value))}
+          className="ml-3 h-8 rounded-lg border border-slate-200 px-2 text-slate-600"
+        >
+          {[10, 20, 50].map((size) => (
+            <option key={size} value={size}>
+              {size} 条/页
+            </option>
+          ))}
         </select>
       </div>
     </div>
   );
+}
+
+function buildVisiblePages(current: number, total: number): Array<number | 'ellipsis'> {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, index) => index + 1);
+  }
+
+  const pages = new Set([1, total, current, current - 1, current + 1]);
+  const ordered = Array.from(pages)
+    .filter((item) => item >= 1 && item <= total)
+    .sort((left, right) => left - right);
+
+  const result: Array<number | 'ellipsis'> = [];
+  for (const item of ordered) {
+    const previous = result[result.length - 1];
+    if (typeof previous === 'number' && item - previous > 1) {
+      result.push('ellipsis');
+    }
+    result.push(item);
+  }
+
+  return result;
 }
 
 export function AdminMiniBars({

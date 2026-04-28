@@ -16,18 +16,23 @@ import {
 import {
   adminFeedbackRows,
   adminOperationLogs,
-  adminUsers,
-  feedbackMetrics,
-  logMetrics,
-  userMetrics
+  adminUsers
 } from '@/lib/admin-data';
-import type { AdminFeedbackRow, AdminOperationLog, AdminUserRow } from '@/lib/admin-data';
+import type { AdminFeedbackRow, AdminMetric, AdminOperationLog, AdminUserRow } from '@/lib/admin-data';
 import { invokeAdminApi } from '@/lib/admin-api';
 
 export default function AdminOperationsPage() {
   const [users, setUsers] = useState<AdminUserRow[]>(adminUsers);
   const [feedback, setFeedback] = useState<AdminFeedbackRow[]>(adminFeedbackRows);
   const [logs, setLogs] = useState<AdminOperationLog[]>(adminOperationLogs);
+  const [userMetrics, setUserMetrics] = useState<AdminMetric[]>(buildUserMetrics());
+  const [feedbackMetrics, setFeedbackMetrics] = useState<AdminMetric[]>(buildFeedbackMetrics());
+  const [logMetrics, setLogMetrics] = useState<AdminMetric[]>(buildLogMetrics());
+  const [userTotal, setUserTotal] = useState(0);
+  const [feedbackTotal, setFeedbackTotal] = useState(0);
+  const [logTotal, setLogTotal] = useState(0);
+  const [userPage, setUserPage] = useState(1);
+  const [userPageSize, setUserPageSize] = useState(10);
   const [message, setMessage] = useState('正在连接后台真实运营数据...');
 
   useEffect(() => {
@@ -36,18 +41,36 @@ export default function AdminOperationsPage() {
     }, 0);
 
     return () => window.clearTimeout(timer);
+    // The operations console loads once on mount; child actions refresh data explicitly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadOperationsData() {
+  async function loadOperationsData(overrides: Partial<{ userPage: number; userPageSize: number }> = {}) {
+    const nextUserPage = overrides.userPage ?? userPage;
+    const nextUserPageSize = overrides.userPageSize ?? userPageSize;
+
     try {
       const [userData, feedbackData, logData] = await Promise.all([
-        invokeAdminApi<{ users: UserApiRow[] }>({ resource: 'users', action: 'list' }),
-        invokeAdminApi<{ feedback: FeedbackApiRow[] }>({ resource: 'feedback', action: 'list' }),
-        invokeAdminApi<{ logs: LogApiRow[] }>({ resource: 'logs', action: 'list' })
+        invokeAdminApi<{ users: UserApiRow[]; total: number; page: number; pageSize: number; metrics: UserMetricsPayload }>({
+          resource: 'users',
+          action: 'list',
+          page: nextUserPage,
+          pageSize: nextUserPageSize
+        }),
+        invokeAdminApi<{ feedback: FeedbackApiRow[]; total: number; metrics: FeedbackMetricsPayload }>({ resource: 'feedback', action: 'list' }),
+        invokeAdminApi<{ logs: LogApiRow[]; total: number; metrics: LogMetricsPayload }>({ resource: 'logs', action: 'list' })
       ]);
       setUsers(userData.users.map(mapUserApiRow));
       setFeedback(feedbackData.feedback.map(mapFeedbackApiRow));
       setLogs(logData.logs.map(mapLogApiRow));
+      setUserMetrics(buildUserMetrics(userData.metrics));
+      setFeedbackMetrics(buildFeedbackMetrics(feedbackData.metrics));
+      setLogMetrics(buildLogMetrics(logData.metrics));
+      setUserTotal(userData.total);
+      setFeedbackTotal(feedbackData.total);
+      setLogTotal(logData.total);
+      setUserPage(userData.page);
+      setUserPageSize(userData.pageSize);
       setMessage('已连接 Supabase，运营数据和操作按钮已切换到真实后台 API。');
     } catch (error) {
       setMessage(error instanceof Error ? `真实 API 暂不可用，当前显示降级数据：${error.message}` : '真实 API 暂不可用，当前显示降级数据。');
@@ -92,13 +115,24 @@ export default function AdminOperationsPage() {
       <div className="space-y-8">
         <div className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div>
         <section id="users" className="scroll-mt-24">
-          <UsersView users={users} onRefresh={loadOperationsData} onUpdateUserStatus={updateUserStatus} onNotify={setMessage} />
+          <UsersView
+            users={users}
+            metrics={userMetrics}
+            total={userTotal || users.length}
+            page={userPage}
+            pageSize={userPageSize}
+            onPageChange={(nextPage) => loadOperationsData({ userPage: nextPage })}
+            onPageSizeChange={(nextPageSize) => loadOperationsData({ userPage: 1, userPageSize: nextPageSize })}
+            onRefresh={() => loadOperationsData()}
+            onUpdateUserStatus={updateUserStatus}
+            onNotify={setMessage}
+          />
         </section>
         <section id="feedback" className="scroll-mt-24">
-          <FeedbackView feedback={feedback} onUpdateFeedbackStatus={updateFeedbackStatus} onNotify={setMessage} />
+          <FeedbackView feedback={feedback} metrics={feedbackMetrics} total={feedbackTotal || feedback.length} onUpdateFeedbackStatus={updateFeedbackStatus} onNotify={setMessage} />
         </section>
         <section id="logs" className="scroll-mt-24">
-          <LogsView logs={logs} onNotify={setMessage} />
+          <LogsView logs={logs} metrics={logMetrics} total={logTotal || logs.length} onNotify={setMessage} />
         </section>
         <section id="settings" className="scroll-mt-24">
           <SettingsView onUpdateSetting={updateSetting} onNotify={setMessage} />
@@ -110,11 +144,23 @@ export default function AdminOperationsPage() {
 
 function UsersView({
   users,
+  metrics,
+  total,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
   onRefresh,
   onUpdateUserStatus,
   onNotify
 }: {
   users: AdminUserRow[];
+  metrics: AdminMetric[];
+  total: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   onRefresh: () => void;
   onUpdateUserStatus: (id: string, status: string, note: string) => void;
   onNotify: (message: string) => void;
@@ -158,7 +204,7 @@ function UsersView({
         </AdminPanel>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {userMetrics.map((metric, index) => (
+          {metrics.map((metric, index) => (
             <AdminMetricCard key={metric.label} metric={metric} icon={icons[index]} />
           ))}
         </section>
@@ -207,7 +253,7 @@ function UsersView({
               </tbody>
             </table>
           </div>
-          <AdminPagination total={String(users.length)} />
+          <AdminPagination total={total} page={page} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
         </AdminPanel>
       </div>
 
@@ -248,10 +294,14 @@ function UsersView({
 
 function FeedbackView({
   feedback,
+  metrics,
+  total,
   onUpdateFeedbackStatus,
   onNotify
 }: {
   feedback: AdminFeedbackRow[];
+  metrics: AdminMetric[];
+  total: number;
   onUpdateFeedbackStatus: (id: string, status: string, note: string) => void;
   onNotify: (message: string) => void;
 }) {
@@ -280,7 +330,7 @@ function FeedbackView({
         </AdminPanel>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {feedbackMetrics.map((metric, index) => (
+          {metrics.map((metric, index) => (
             <AdminMetricCard key={metric.label} metric={metric} icon={icons[index]} />
           ))}
         </section>
@@ -303,7 +353,7 @@ function FeedbackView({
               </div>
             ])}
           />
-          <AdminPagination total="173" />
+          <AdminPagination total={total} />
         </AdminPanel>
       </div>
 
@@ -341,7 +391,17 @@ function FeedbackView({
   );
 }
 
-function LogsView({ logs, onNotify }: { logs: AdminOperationLog[]; onNotify: (message: string) => void }) {
+function LogsView({
+  logs,
+  metrics,
+  total,
+  onNotify
+}: {
+  logs: AdminOperationLog[];
+  metrics: AdminMetric[];
+  total: number;
+  onNotify: (message: string) => void;
+}) {
   const icons = [FileText, Trash2, ShieldAlert, Ban];
 
   function exportLogs() {
@@ -376,7 +436,7 @@ function LogsView({ logs, onNotify }: { logs: AdminOperationLog[]; onNotify: (me
         </AdminPanel>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {logMetrics.map((metric, index) => (
+          {metrics.map((metric, index) => (
             <AdminMetricCard key={metric.label} metric={metric} icon={icons[index]} />
           ))}
         </section>
@@ -395,7 +455,7 @@ function LogsView({ logs, onNotify }: { logs: AdminOperationLog[]; onNotify: (me
               item.remark
             ])}
           />
-          <AdminPagination total="238" pages={6} />
+          <AdminPagination total={total} />
         </AdminPanel>
       </div>
 
@@ -473,24 +533,50 @@ function userStatusToApi(status: string) {
 type UserApiRow = {
   id: string;
   nickname: string;
+  email?: string;
   undergraduate_school: string;
   major: string;
   target_major: string;
   created_at: string;
   updated_at: string;
   application_count: number;
+  notice_count: number;
+  offer_count: number;
   moderation_status: string;
+};
+
+type UserMetricsPayload = {
+  totalUsers: number;
+  todayUsers: number;
+  normalUsers: number;
+  restrictedUsers: number;
+  bannedUsers: number;
+  deletedUsers: number;
+};
+
+type FeedbackMetricsPayload = {
+  pending: number;
+  processing: number;
+  resolved: number;
+  closed: number;
+};
+
+type LogMetricsPayload = {
+  todayOperations: number;
+  deleteOperations: number;
+  banOperations: number;
+  failedOperations: number;
 };
 
 function mapUserApiRow(row: UserApiRow): AdminUserRow {
   return {
     id: row.id,
     nickname: row.nickname || '未设置昵称',
-    contact: `${row.undergraduate_school || '未填写学校'} / ${row.major || '未填写专业'}`,
+    contact: row.email || `${row.undergraduate_school || '未填写学校'} / ${row.major || '未填写专业'}`,
     registeredAt: row.created_at?.slice(0, 16).replace('T', ' ') || '-',
     lastActiveAt: row.updated_at?.slice(0, 16).replace('T', ' ') || '-',
-    noticeCount: 0,
-    offerCount: 0,
+    noticeCount: row.notice_count || 0,
+    offerCount: row.offer_count || 0,
     applicationCount: row.application_count || 0,
     status: mapUserStatus(row.moderation_status)
   };
@@ -565,6 +651,50 @@ function mapLogApiRow(row: LogApiRow): AdminOperationLog {
     remark: row.remark || '-',
     createdAt: row.created_at?.slice(0, 19).replace('T', ' ') || '-'
   };
+}
+
+function buildUserMetrics(metrics?: UserMetricsPayload): AdminMetric[] {
+  const data = metrics || {
+    totalUsers: 0,
+    todayUsers: 0,
+    normalUsers: 0,
+    restrictedUsers: 0,
+    bannedUsers: 0,
+    deletedUsers: 0
+  };
+
+  return [
+    { label: '总用户数', value: formatNumber(data.totalUsers), hint: '累计注册用户', tone: 'blue' },
+    { label: '今日新增', value: formatNumber(data.todayUsers), hint: '今日新增账号', tone: 'green' },
+    { label: '正常用户', value: formatNumber(data.normalUsers), hint: `限制 ${formatNumber(data.restrictedUsers)} 个`, tone: 'blue' },
+    { label: '封禁用户', value: formatNumber(data.bannedUsers), hint: `已注销 ${formatNumber(data.deletedUsers)} 个`, tone: 'rose' }
+  ];
+}
+
+function buildFeedbackMetrics(metrics?: FeedbackMetricsPayload): AdminMetric[] {
+  const data = metrics || { pending: 0, processing: 0, resolved: 0, closed: 0 };
+
+  return [
+    { label: '待处理', value: formatNumber(data.pending), hint: '需要运营处理', tone: 'rose' },
+    { label: '处理中', value: formatNumber(data.processing), hint: '已有处理人', tone: 'amber' },
+    { label: '已解决', value: formatNumber(data.resolved), hint: '用户问题已闭环', tone: 'green' },
+    { label: '已关闭', value: formatNumber(data.closed), hint: '无需继续处理', tone: 'slate' }
+  ];
+}
+
+function buildLogMetrics(metrics?: LogMetricsPayload): AdminMetric[] {
+  const data = metrics || { todayOperations: 0, deleteOperations: 0, banOperations: 0, failedOperations: 0 };
+
+  return [
+    { label: '今日操作', value: formatNumber(data.todayOperations), hint: '后台关键动作', tone: 'blue' },
+    { label: '删除操作', value: formatNumber(data.deleteOperations), hint: '需重点留痕', tone: 'rose' },
+    { label: '封禁操作', value: formatNumber(data.banOperations), hint: '账号风险处置', tone: 'amber' },
+    { label: '异常登录', value: formatNumber(data.failedOperations), hint: '安全提醒', tone: 'purple' }
+  ];
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat('zh-CN').format(value || 0);
 }
 
 function SimpleTable({ columns, rows }: { columns: string[]; rows: Array<Array<React.ReactNode>> }) {
