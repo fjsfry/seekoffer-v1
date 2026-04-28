@@ -27,6 +27,11 @@ export default function AdminNewNoticePage() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  function saveDraft() {
+    window.localStorage.setItem('seekoffer-admin-notice-draft', JSON.stringify({ ...form, savedAt: new Date().toISOString() }));
+    setMessage('草稿已保存到当前浏览器。正式发布仍需提交审核并通过后台审核。');
+  }
+
   async function submitNotice() {
     if (!form.school_name.trim() || !form.project_name.trim()) {
       setMessage('请至少填写学校名称和通知标题。');
@@ -108,7 +113,7 @@ export default function AdminNewNoticePage() {
             />
             {message ? <div className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div> : null}
             <div className="flex justify-end gap-3">
-              <AdminButton tone="secondary">保存草稿</AdminButton>
+              <AdminButton tone="secondary" onClick={saveDraft}>保存草稿</AdminButton>
               <AdminButton onClick={submitNotice} disabled={pending}>
                 <Save className="mr-2 h-4 w-4" />
                 {pending ? '提交中...' : '提交审核'}

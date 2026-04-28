@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell, CheckCircle2, Plus, RotateCcw, Trash2, XCircle } from 'lucide-react';
+import { Bell, CheckCircle2, ExternalLink, Plus, RotateCcw, Trash2, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AdminShell } from '@/components/admin-shell';
 import {
@@ -48,6 +48,8 @@ export default function AdminNoticesPage() {
   const [total, setTotal] = useState(0);
   const [pending, setPending] = useState('');
   const [message, setMessage] = useState('正在连接后台真实数据...');
+  const [selectedNotice, setSelectedNotice] = useState<AdminNoticeRow | null>(null);
+  const [reviewNote, setReviewNote] = useState('');
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -90,6 +92,10 @@ export default function AdminNoticesPage() {
       setSort(nextSort);
       setFilters(nextFilters);
       setSelectedIds([]);
+      setSelectedNotice((current) => {
+        if (!current) return null;
+        return data.notices.map(mapNoticeApiRow).find((item) => item.id === current.id) || null;
+      });
       setMessage(`已连接 Supabase，共匹配 ${data.total} 条通知，当前第 ${data.page} 页。`);
     } catch (error) {
       setMessage(error instanceof Error ? `真实 API 暂不可用：${error.message}` : '真实 API 暂不可用，请稍后重试。');
@@ -130,7 +136,8 @@ export default function AdminNoticesPage() {
       });
 
       const nextPage = rows.length === ids.length && page > 1 ? page - 1 : page;
-      setMessage('操作成功，状态已写入 Supabase，并记录到后台操作日志。');
+      window.localStorage.setItem('seekoffer-admin-notice-version', String(Date.now()));
+      setMessage('操作成功：状态已写入 Supabase，前台首页和通知库会按最新公开状态展示。');
       await loadNotices({ page: nextPage });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '通知操作失败，请稍后重试。');
@@ -149,6 +156,17 @@ export default function AdminNoticesPage() {
 
   const metricCards = buildNoticeMetricCards(metrics);
   const allVisibleSelected = rows.length > 0 && rows.every((item) => selectedIds.includes(item.id));
+
+  function openNoticeDetail(notice: AdminNoticeRow) {
+    setSelectedNotice(notice);
+    setReviewNote(notice.reviewNote || '');
+    setMessage(`已打开《${notice.title}》的审核工作台。`);
+  }
+
+  function reviewSelected(status: string, defaultNote: string) {
+    if (!selectedNotice) return;
+    void updateNoticeStatus([selectedNotice.id], status, reviewNote.trim() || defaultNote);
+  }
 
   return (
     <AdminShell title="通知管理">
@@ -292,10 +310,10 @@ export default function AdminNoticesPage() {
                     <td className="px-5 py-4"><AdminStatusBadge status={notice.status} /></td>
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap gap-3 text-sm font-medium">
-                        <button className="text-blue-600" onClick={() => window.open(`/notices/${notice.id}`, '_blank', 'noopener,noreferrer')}>详情</button>
-                        <button className="text-blue-600" onClick={() => updateNoticeStatus([notice.id], 'published', '审核通过通知')}>通过</button>
-                        <button className="text-blue-600" onClick={() => updateNoticeStatus([notice.id], 'hidden', '后台下架通知')}>下架</button>
-                        <button className="text-rose-600" onClick={() => updateNoticeStatus([notice.id], 'deleted', '后台删除通知')}>删除</button>
+                        <button className="text-blue-600 hover:underline" onClick={() => openNoticeDetail(notice)}>查看</button>
+                        <button className="text-blue-600 hover:underline" onClick={() => openNoticeDetail(notice)}>审核</button>
+                        <button className="text-slate-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'hidden', '后台下架通知')}>下架</button>
+                        <button className="text-rose-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'deleted', '后台删除通知')}>删除</button>
                       </div>
                     </td>
                   </tr>
@@ -318,6 +336,88 @@ export default function AdminNoticesPage() {
             onPageSizeChange={(nextPageSize) => void loadNotices({ page: 1, pageSize: nextPageSize })}
           />
         </AdminPanel>
+
+        {selectedNotice ? (
+          <AdminPanel
+            title="通知审核工作台"
+            action={
+              <button className="text-sm font-semibold text-slate-500 hover:text-slate-900" onClick={() => setSelectedNotice(null)}>
+                关闭
+              </button>
+            }
+          >
+            <div className="grid gap-6 p-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+              <div className="space-y-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AdminStatusBadge status={selectedNotice.status} />
+                    <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{selectedNotice.type}</span>
+                    {selectedNotice.verified ? <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">已核验</span> : null}
+                  </div>
+                  <h3 className="mt-3 text-xl font-semibold leading-8 text-slate-950">{selectedNotice.title}</h3>
+                  <p className="mt-2 text-sm text-slate-500">{selectedNotice.school} · {selectedNotice.department}</p>
+                </div>
+                <div className="grid gap-3 rounded-xl bg-slate-50 p-4 text-sm text-slate-600 sm:grid-cols-2">
+                  <span>发布时间：{selectedNotice.publishedAt}</span>
+                  <span>截止时间：{selectedNotice.deadline}</span>
+                  <span>最后核验：{selectedNotice.checkedAt}</span>
+                  <span>提交来源：{selectedNotice.submitter}</span>
+                </div>
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <div className="text-sm font-semibold text-slate-900">通知正文 / 材料要求</div>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-600">{selectedNotice.requirements || '暂无正文，建议打开官方原文核验后补充。'}</p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <a
+                    href={selectedNotice.sourceUrl || `/notices/${selectedNotice.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    官方原文
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                  <a
+                    href={`/notices/${selectedNotice.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    前台详情页
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="text-sm font-semibold text-slate-950">审核备注</div>
+                <textarea
+                  value={reviewNote}
+                  onChange={(event) => setReviewNote(event.target.value)}
+                  className="mt-3 min-h-[150px] w-full rounded-lg border border-slate-200 p-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                  placeholder="记录核验结果、下架原因、驳回原因等，操作会写入日志。"
+                />
+                <div className="mt-4 grid gap-3">
+                  <AdminButton disabled={Boolean(pending)} onClick={() => reviewSelected('published', '审核通过并发布')}>
+                    通过并同步前台
+                  </AdminButton>
+                  <AdminButton tone="danger" disabled={Boolean(pending)} onClick={() => reviewSelected('rejected', '内容不符合规范，驳回')}>
+                    驳回
+                  </AdminButton>
+                  <AdminButton tone="secondary" disabled={Boolean(pending)} onClick={() => reviewSelected('hidden', '暂时下架，前台不展示')}>
+                    下架
+                  </AdminButton>
+                  <AdminButton tone="danger" disabled={Boolean(pending)} onClick={() => reviewSelected('deleted', '逻辑删除，前台不展示')}>
+                    删除
+                  </AdminButton>
+                </div>
+                <div className="mt-4 rounded-lg bg-blue-50 p-3 text-xs leading-6 text-blue-700">
+                  发布会设置为公开可见；驳回、下架、删除会从前台首页和通知库隐藏。所有动作会记录管理员、时间和备注。
+                </div>
+              </div>
+            </div>
+          </AdminPanel>
+        ) : null}
       </div>
     </AdminShell>
   );
@@ -344,6 +444,14 @@ type NoticeApiRow = {
   is_private?: boolean;
   created_at?: string;
   updated_at_ts?: string;
+  apply_link?: string;
+  requirements?: string;
+  remarks?: string;
+  last_checked_at?: string;
+  is_verified?: boolean;
+  admin_review_note?: string;
+  admin_reviewed_by?: string;
+  admin_reviewed_at?: string;
 };
 
 function serializeFilters(filters: NoticeFilters) {
@@ -388,7 +496,16 @@ function mapNoticeApiRow(row: NoticeApiRow): AdminNoticeRow {
     deadline: row.deadline_date || '待确认',
     status: mapNoticeStatus(row.admin_status),
     views: 0,
-    saves: 0
+    saves: 0,
+    publishedAt: row.publish_date || '-',
+    applyUrl: row.apply_link || '',
+    requirements: row.requirements || '',
+    remarks: row.remarks || '',
+    checkedAt: row.last_checked_at || '-',
+    verified: Boolean(row.is_verified),
+    reviewNote: row.admin_review_note || '',
+    reviewedBy: row.admin_reviewed_by || '',
+    reviewedAt: row.admin_reviewed_at?.slice(0, 16).replace('T', ' ') || ''
   };
 }
 

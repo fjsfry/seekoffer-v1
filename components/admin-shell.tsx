@@ -53,6 +53,7 @@ export function AdminShell({
   const pathname = usePathname();
   const [session, setSession] = useState<AdminSession | null>(() => getAdminSession());
   const [activeAdminHash, setActiveAdminHash] = useState('users');
+  const normalizedPathname = pathname.replace(/\/$/, '') || '/';
 
   useEffect(() => {
     const dispose = watchAdminSession(() => {
@@ -60,6 +61,20 @@ export function AdminShell({
     });
 
     return () => dispose();
+  }, []);
+
+  useEffect(() => {
+    const syncHash = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (hash) {
+        setActiveAdminHash(hash);
+      }
+    };
+
+    syncHash();
+    window.addEventListener('hashchange', syncHash);
+
+    return () => window.removeEventListener('hashchange', syncHash);
   }, []);
 
   return (
@@ -76,10 +91,12 @@ export function AdminShell({
         <nav className="space-y-2 px-3 py-5">
           {adminNavItems.map((item) => {
             const Icon = item.icon;
+            const itemPath = item.href.split('#')[0].replace(/\/$/, '');
+            const itemHash = item.href.split('#')[1] || '';
             const active =
               item.href.includes('#')
-                ? pathname === '/admin/crawlers' && item.href.endsWith(`#${activeAdminHash}`)
-                : pathname === item.href || (item.href !== '/admin/dashboard' && pathname.startsWith(`${item.href}/`));
+                ? normalizedPathname === itemPath && itemHash === activeAdminHash
+                : normalizedPathname === itemPath || (itemPath !== '/admin/dashboard' && normalizedPathname.startsWith(`${itemPath}/`));
 
             return (
               <Link

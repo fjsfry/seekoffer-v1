@@ -328,7 +328,7 @@ async function listNotices(service: SupabaseService, body: Record<string, unknow
   let query = service
     .from('notices')
     .select(
-      'id,school_name,department_name,project_name,project_type,source_link,publish_date,deadline_date,admin_status,is_private,created_at,updated_at_ts,admin_reviewed_by,admin_reviewed_at,admin_review_note,admin_deleted_at',
+      'id,school_name,department_name,project_name,project_type,source_link,apply_link,publish_date,deadline_date,requirements,remarks,status,is_verified,last_checked_at,admin_status,is_private,created_at,updated_at_ts,admin_reviewed_by,admin_reviewed_at,admin_review_note,admin_deleted_at',
       { count: 'exact' }
     );
 
@@ -391,14 +391,21 @@ async function updateNoticeStatus(service: SupabaseService, admin: AdminUser, re
   const nextStatus = mapNoticeStatus(status);
   const before = await service.from('notices').select('*').in('id', validIds);
   if (before.error) throw before.error;
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const nowText = nowIso.slice(0, 10);
 
   const patch = {
     admin_status: nextStatus,
     is_private: nextStatus !== 'published',
-    admin_deleted_at: nextStatus === 'deleted' ? new Date().toISOString() : null,
+    admin_deleted_at: nextStatus === 'deleted' ? nowIso : null,
     admin_reviewed_by: admin.email,
-    admin_reviewed_at: new Date().toISOString(),
-    admin_review_note: note
+    admin_reviewed_at: nowIso,
+    admin_review_note: note,
+    updated_at_ts: nowIso,
+    updated_at: nowText,
+    last_checked_at: nowText,
+    is_verified: nextStatus === 'published'
   };
 
   const { data, error } = await service.from('notices').update(patch).in('id', validIds).select();

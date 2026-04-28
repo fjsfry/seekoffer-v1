@@ -709,6 +709,9 @@ async function readRemotePublicNotices() {
     .select('*')
     .eq('year', NOTICE_TARGET_YEAR)
     .eq('is_private', false)
+    .eq('admin_status', 'published')
+    .is('admin_deleted_at', null)
+    .order('publish_date', { ascending: false })
     .range(0, PUBLIC_NOTICE_QUERY_LIMIT - 1);
 
   if (error) {
@@ -742,15 +745,10 @@ export async function fetchPublicNotices() {
           return filterMainNoticeProjects(baseNoticeProjects);
         }
 
-        const merged = new Map<string, PublicNoticeProject>();
-        baseNoticeProjects.forEach((project) => {
-          merged.set(project.id, project);
-        });
-        remoteProjects.forEach((project) => {
-          merged.set(project.id, project);
-        });
-
-        return sortProjectsByFreshness(filterMainNoticeProjects(Array.from(merged.values())));
+        // Once Supabase has data, it becomes the moderation source of truth.
+        // Local JSON is only a disaster-recovery fallback; otherwise admin hide/delete
+        // actions would be reintroduced by the bundled static seed data.
+        return sortProjectsByFreshness(filterMainNoticeProjects(remoteProjects));
       } catch {
         return filterMainNoticeProjects(baseNoticeProjects);
       }

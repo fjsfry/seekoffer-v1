@@ -38,6 +38,15 @@ export type AdminNoticeRow = {
   status: '待审核' | '已发布' | '已驳回' | '已下架' | '已删除';
   views: number;
   saves: number;
+  publishedAt?: string;
+  applyUrl?: string;
+  requirements?: string;
+  remarks?: string;
+  checkedAt?: string;
+  verified?: boolean;
+  reviewNote?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
 };
 
 export type AdminOfferRow = {

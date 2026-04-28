@@ -13,18 +13,23 @@ import {
   AdminSelect,
   AdminStatusBadge
 } from '@/components/admin-ui';
-import {
-  adminFeedbackRows,
-  adminOperationLogs,
-  adminUsers
-} from '@/lib/admin-data';
 import type { AdminFeedbackRow, AdminMetric, AdminOperationLog, AdminUserRow } from '@/lib/admin-data';
 import { invokeAdminApi } from '@/lib/admin-api';
 
+type OperationsSection = 'users' | 'feedback' | 'logs' | 'settings';
+
+const operationsSectionTitles: Record<OperationsSection, string> = {
+  users: '用户管理',
+  feedback: '反馈举报',
+  logs: '操作日志',
+  settings: '系统设置'
+};
+
 export default function AdminOperationsPage() {
-  const [users, setUsers] = useState<AdminUserRow[]>(adminUsers);
-  const [feedback, setFeedback] = useState<AdminFeedbackRow[]>(adminFeedbackRows);
-  const [logs, setLogs] = useState<AdminOperationLog[]>(adminOperationLogs);
+  const [activeSection, setActiveSection] = useState<OperationsSection>('users');
+  const [users, setUsers] = useState<AdminUserRow[]>([]);
+  const [feedback, setFeedback] = useState<AdminFeedbackRow[]>([]);
+  const [logs, setLogs] = useState<AdminOperationLog[]>([]);
   const [userMetrics, setUserMetrics] = useState<AdminMetric[]>(buildUserMetrics());
   const [feedbackMetrics, setFeedbackMetrics] = useState<AdminMetric[]>(buildFeedbackMetrics());
   const [logMetrics, setLogMetrics] = useState<AdminMetric[]>(buildLogMetrics());
@@ -36,11 +41,22 @@ export default function AdminOperationsPage() {
   const [message, setMessage] = useState('正在连接后台真实运营数据...');
 
   useEffect(() => {
+    const syncHash = () => {
+      const hash = window.location.hash.replace('#', '') as OperationsSection;
+      setActiveSection(['users', 'feedback', 'logs', 'settings'].includes(hash) ? hash : 'users');
+    };
+
+    syncHash();
+    window.addEventListener('hashchange', syncHash);
+
     const timer = window.setTimeout(() => {
       void loadOperationsData();
     }, 0);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('hashchange', syncHash);
+    };
     // The operations console loads once on mount; child actions refresh data explicitly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -73,7 +89,10 @@ export default function AdminOperationsPage() {
       setUserPageSize(userData.pageSize);
       setMessage('已连接 Supabase，运营数据和操作按钮已切换到真实后台 API。');
     } catch (error) {
-      setMessage(error instanceof Error ? `真实 API 暂不可用，当前显示降级数据：${error.message}` : '真实 API 暂不可用，当前显示降级数据。');
+      setUsers([]);
+      setFeedback([]);
+      setLogs([]);
+      setMessage(error instanceof Error ? `真实 API 暂不可用：${error.message}` : '真实 API 暂不可用，请稍后重试。');
     }
   }
 
@@ -111,10 +130,10 @@ export default function AdminOperationsPage() {
   }
 
   return (
-    <AdminShell title="运营管理">
+    <AdminShell title={operationsSectionTitles[activeSection]}>
       <div className="space-y-8">
         <div className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div>
-        <section id="users" className="scroll-mt-24">
+        {activeSection === 'users' ? (
           <UsersView
             users={users}
             metrics={userMetrics}
@@ -127,16 +146,12 @@ export default function AdminOperationsPage() {
             onUpdateUserStatus={updateUserStatus}
             onNotify={setMessage}
           />
-        </section>
-        <section id="feedback" className="scroll-mt-24">
+        ) : null}
+        {activeSection === 'feedback' ? (
           <FeedbackView feedback={feedback} metrics={feedbackMetrics} total={feedbackTotal || feedback.length} onUpdateFeedbackStatus={updateFeedbackStatus} onNotify={setMessage} />
-        </section>
-        <section id="logs" className="scroll-mt-24">
-          <LogsView logs={logs} metrics={logMetrics} total={logTotal || logs.length} onNotify={setMessage} />
-        </section>
-        <section id="settings" className="scroll-mt-24">
-          <SettingsView onUpdateSetting={updateSetting} onNotify={setMessage} />
-        </section>
+        ) : null}
+        {activeSection === 'logs' ? <LogsView logs={logs} metrics={logMetrics} total={logTotal || logs.length} onNotify={setMessage} /> : null}
+        {activeSection === 'settings' ? <SettingsView onUpdateSetting={updateSetting} onNotify={setMessage} /> : null}
       </div>
     </AdminShell>
   );
@@ -167,7 +182,7 @@ function UsersView({
 }) {
   const icons = [UsersRound, UserPlus, CheckCircle2, Ban];
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const selectedUser = users.find((user) => user.id === selectedUserId) || users[0] || adminUsers[0];
+  const selectedUser = users.find((user) => user.id === selectedUserId) || users[0] || null;
 
   function previewUser(user: AdminUserRow) {
     setSelectedUserId(user.id);
@@ -259,33 +274,41 @@ function UsersView({
 
       <AdminPanel title="用户详情预览">
         <div className="p-5">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-2xl font-semibold text-blue-600">
-              {selectedUser.nickname.slice(0, 1)}
-            </div>
-            <div>
-              <div className="text-xl font-semibold text-slate-950">{selectedUser.id}</div>
-              <div className="mt-1 flex items-center gap-2">
-                <span>{selectedUser.nickname}</span>
-                <AdminStatusBadge status={selectedUser.status} />
+          {selectedUser ? (
+            <>
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-2xl font-semibold text-blue-600">
+                  {selectedUser.nickname.slice(0, 1)}
+                </div>
+                <div>
+                  <div className="text-xl font-semibold text-slate-950">{selectedUser.id}</div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span>{selectedUser.nickname}</span>
+                    <AdminStatusBadge status={selectedUser.status} />
+                  </div>
+                </div>
               </div>
+              <DetailList
+                items={[
+                  ['用户ID', selectedUser.id],
+                  ['昵称', selectedUser.nickname],
+                  ['手机/邮箱', selectedUser.contact],
+                  ['注册时间', selectedUser.registeredAt],
+                  ['最近登录', selectedUser.lastActiveAt],
+                  ['账号状态', selectedUser.status],
+                  ['提交通知数', String(selectedUser.noticeCount)],
+                  ['提交Offer数', String(selectedUser.offerCount)],
+                  ['申请记录数', String(selectedUser.applicationCount)]
+                ]}
+              />
+              <textarea className="mt-5 h-24 w-full rounded-lg border border-slate-200 p-3 text-sm outline-none" placeholder="后台备注" />
+              <button className="mt-3 text-sm font-semibold text-blue-600" onClick={() => saveUserNote(selectedUser)}>编辑备注</button>
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+              暂无用户数据。请确认 Supabase API 可用后刷新。
             </div>
-          </div>
-          <DetailList
-            items={[
-              ['用户ID', selectedUser.id],
-              ['昵称', selectedUser.nickname],
-              ['手机/邮箱', selectedUser.contact],
-              ['注册时间', selectedUser.registeredAt],
-              ['最近登录', selectedUser.lastActiveAt],
-              ['账号状态', selectedUser.status],
-              ['提交通知数', String(selectedUser.noticeCount)],
-              ['提交Offer数', String(selectedUser.offerCount)],
-              ['申请记录数', String(selectedUser.applicationCount)]
-            ]}
-          />
-          <textarea className="mt-5 h-24 w-full rounded-lg border border-slate-200 p-3 text-sm outline-none" placeholder="后台备注" />
-          <button className="mt-3 text-sm font-semibold text-blue-600" onClick={() => saveUserNote(selectedUser)}>编辑备注</button>
+          )}
         </div>
       </AdminPanel>
     </div>
