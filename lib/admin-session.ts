@@ -1,6 +1,8 @@
 'use client';
 
 import { adminAccounts, type AdminRole } from './admin-data';
+import { invokeAdminApi, isAdminApiConfigured } from './admin-api';
+import { getSupabaseBrowserClient } from './supabase-browser';
 
 export type AdminSession = {
   email: string;
@@ -59,6 +61,36 @@ function writeAdminSession(session: AdminSession | null) {
 
 export async function signInAdmin(email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
+
+  if (isAdminApiConfigured()) {
+    const supabase = getSupabaseBrowserClient();
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password
+    });
+
+    if (signInError) {
+      throw new Error(signInError.message || '管理员账号或密码不正确。');
+    }
+
+    const { admin } = await invokeAdminApi<{
+      admin: {
+        email: string;
+        name: string;
+        role: AdminRole;
+      };
+    }>({ resource: 'me' });
+
+    const session: AdminSession = {
+      email: admin.email,
+      name: admin.name || admin.email,
+      role: admin.role
+    };
+
+    writeAdminSession(session);
+    return session;
+  }
+
   const account = adminAccounts.find(
     (item) => item.email.toLowerCase() === normalizedEmail && item.password === password
   );
@@ -78,6 +110,10 @@ export async function signInAdmin(email: string, password: string) {
 }
 
 export function signOutAdmin() {
+  if (isAdminApiConfigured()) {
+    getSupabaseBrowserClient().auth.signOut().catch(() => undefined);
+  }
+
   writeAdminSession(null);
 }
 

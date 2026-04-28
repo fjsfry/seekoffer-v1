@@ -109,10 +109,18 @@ export function AdminSelect({ label, options }: { label?: string; options: strin
 
 export function AdminButton({
   children,
-  tone = 'primary'
+  tone = 'primary',
+  onClick,
+  disabled = false,
+  type = 'button',
+  className = ''
 }: {
   children: React.ReactNode;
   tone?: 'primary' | 'secondary' | 'danger';
+  onClick?: () => void;
+  disabled?: boolean;
+  type?: 'button' | 'submit';
+  className?: string;
 }) {
   const toneClass =
     tone === 'primary'
@@ -121,7 +129,20 @@ export function AdminButton({
         ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
         : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50';
 
-  return <button className={adminClassNames('inline-flex h-11 items-center justify-center rounded-lg px-5 text-sm font-semibold transition', toneClass)}>{children}</button>;
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={adminClassNames(
+        'inline-flex h-11 items-center justify-center rounded-lg px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
+        toneClass,
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
 }
 
 export function AdminPagination({ total, pages = 5 }: { total: string; pages?: number }) {

@@ -1,4 +1,7 @@
+'use client';
+
 import { CheckCircle2, EyeOff, ShieldCheck, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { AdminShell } from '@/components/admin-shell';
 import {
   AdminButton,
@@ -10,10 +13,77 @@ import {
   AdminStatusBadge
 } from '@/components/admin-ui';
 import { adminOfferRows, offerMetrics } from '@/lib/admin-data';
+import type { AdminOfferRow } from '@/lib/admin-data';
+import { invokeAdminApi } from '@/lib/admin-api';
 
 const offerIcons = [ShieldCheck, CheckCircle2, EyeOff, Trash2];
 
 export default function AdminOffersPage() {
+  const [rows, setRows] = useState<AdminOfferRow[]>(adminOfferRows);
+  const [message, setMessage] = useState('正在连接后台真实 Offer 数据...');
+  const [pending, setPending] = useState('');
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadOffers();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  async function loadOffers() {
+    setPending('load');
+    try {
+      const data = await invokeAdminApi<{ offers: OfferApiRow[] }>({ resource: 'offers', action: 'list' });
+      setRows(data.offers.map(mapOfferApiRow));
+      setMessage(`已连接 Supabase，加载 ${data.offers.length} 条 Offer。`);
+    } catch (error) {
+      setMessage(error instanceof Error ? `真实 API 暂不可用，当前显示降级数据：${error.message}` : '真实 API 暂不可用，当前显示降级数据。');
+    } finally {
+      setPending('');
+    }
+  }
+
+  async function updateOfferStatus(id: string, status: string, note: string) {
+    if ((status === 'deleted' || status === 'hidden') && !window.confirm('确认执行该操作吗？该操作会写入后台日志。')) {
+      return;
+    }
+
+    setPending(`${status}:${id}`);
+    try {
+      await invokeAdminApi({
+        resource: 'offers',
+        action: 'update_status',
+        id,
+        status,
+        note
+      });
+      setMessage('操作成功，已写入 Supabase 并记录日志。');
+      await loadOffers();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Offer 操作失败，请稍后重试。');
+    } finally {
+      setPending('');
+    }
+  }
+
+  function previewOffer(offer: AdminOfferRow) {
+    setMessage(`已打开 ${offer.school} · ${offer.major} 的 Offer 审核预览。`);
+    window.alert(
+      [
+        `提交用户：${offer.user}`,
+        `申请学校：${offer.school}`,
+        `申请专业：${offer.major}`,
+        `项目类型：${offer.projectType}`,
+        `录取结果：${offer.result}`,
+        `本科背景：${offer.background}`,
+        `是否匿名：${offer.anonymous ? '是' : '否'}`,
+        `提交时间：${offer.submittedAt}`,
+        `审核状态：${offer.status}`
+      ].join('\n')
+    );
+  }
+
   return (
     <AdminShell title="Offer池管理">
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
@@ -29,9 +99,18 @@ export default function AdminOffersPage() {
               </div>
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_120px_120px]">
                 <AdminInput placeholder="搜索学校、专业、用户昵称等" />
-                <AdminButton>查询</AdminButton>
-                <AdminButton tone="secondary">重置</AdminButton>
+                <AdminButton onClick={loadOffers} disabled={pending === 'load'}>查询</AdminButton>
+                <AdminButton
+                  tone="secondary"
+                  onClick={() => {
+                    void loadOffers();
+                    setMessage('Offer 筛选条件已重置，并重新加载真实 Offer 列表。');
+                  }}
+                >
+                  重置
+                </AdminButton>
               </div>
+              <div className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div>
             </div>
           </AdminPanel>
 
@@ -60,7 +139,7 @@ export default function AdminOffersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {adminOfferRows.concat(adminOfferRows).slice(0, 10).map((offer, index) => (
+                  {rows.slice(0, 10).map((offer, index) => (
                     <tr key={`${offer.id}-${index}`} className="border-t border-slate-100">
                       <td className="px-5 py-4"><input type="checkbox" aria-label={`选择 ${offer.user}`} /></td>
                       <td className="px-5 py-4">
@@ -85,10 +164,10 @@ export default function AdminOffersPage() {
                       <td className="px-5 py-4"><AdminStatusBadge status={offer.status} /></td>
                       <td className="px-5 py-4">
                         <div className="flex gap-3 font-medium">
-                          <button className="text-blue-600">查看</button>
-                          <button className="text-blue-600">审核</button>
-                          <button className="text-blue-600">隐藏</button>
-                          <button className="text-rose-600">删除</button>
+                          <button className="text-blue-600" onClick={() => previewOffer(offer)}>查看</button>
+                          <button className="text-blue-600" onClick={() => updateOfferStatus(offer.id, 'approved', '审核通过 Offer')}>审核</button>
+                          <button className="text-blue-600" onClick={() => updateOfferStatus(offer.id, 'hidden', '后台隐藏 Offer')}>隐藏</button>
+                          <button className="text-rose-600" onClick={() => updateOfferStatus(offer.id, 'deleted', '后台删除 Offer')}>删除</button>
                         </div>
                       </td>
                     </tr>
@@ -96,7 +175,7 @@ export default function AdminOffersPage() {
                 </tbody>
               </table>
             </div>
-            <AdminPagination total="1,732" />
+            <AdminPagination total={String(rows.length)} />
           </AdminPanel>
         </div>
 
@@ -110,6 +189,45 @@ export default function AdminOffersPage() {
       </div>
     </AdminShell>
   );
+}
+
+type OfferApiRow = {
+  id: string;
+  author_name: string;
+  school_name: string;
+  major: string;
+  project_type: string;
+  result: string;
+  undergraduate_background: string;
+  is_anonymous: boolean;
+  review_status: string;
+  reports_count: number;
+  created_at: string;
+};
+
+function mapOfferApiRow(row: OfferApiRow): AdminOfferRow {
+  return {
+    id: row.id,
+    user: row.author_name || '匿名用户',
+    avatar: (row.author_name || '匿').slice(0, 1),
+    school: row.school_name || '待补充学校',
+    major: row.major || '待补充专业',
+    projectType: row.project_type || '其他',
+    result: row.result || '待确认',
+    background: row.undergraduate_background || '未填写',
+    anonymous: row.is_anonymous,
+    submittedAt: row.created_at?.slice(0, 16).replace('T', ' ') || '-',
+    status: mapOfferStatus(row.review_status),
+    reports: row.reports_count || 0
+  };
+}
+
+function mapOfferStatus(status: string): AdminOfferRow['status'] {
+  if (status === 'approved') return '已通过';
+  if (status === 'rejected') return '已驳回';
+  if (status === 'hidden') return '已隐藏';
+  if (status === 'deleted') return '已删除';
+  return '待审核';
 }
 
 function ReviewTip({ title, body }: { title: string; body: string }) {

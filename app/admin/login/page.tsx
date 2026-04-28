@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BarChart3, Bell, ClipboardCheck, LoaderCircle, LockKeyhole, ShieldCheck, UsersRound } from 'lucide-react';
 import { adminAccounts } from '@/lib/admin-data';
+import { isAdminApiConfigured } from '@/lib/admin-api';
 import { getAdminSession, signInAdmin } from '@/lib/admin-session';
 
 export default function AdminLoginPage() {
@@ -12,6 +13,7 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState(adminAccounts[0]?.password || '');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const liveMode = isAdminApiConfigured();
 
   useEffect(() => {
     if (getAdminSession()) {
@@ -73,7 +75,11 @@ export default function AdminLoginPage() {
             后台登录
           </div>
           <h2 className="mt-4 text-2xl font-semibold text-slate-950">进入运营工作台</h2>
-          <p className="mt-3 text-sm leading-7 text-slate-500">当前为独立后台 MVP，后续可以接入 Supabase 管理员表和服务端权限校验。</p>
+          <p className="mt-3 text-sm leading-7 text-slate-500">
+            {liveMode
+              ? '使用 Supabase 管理员账号登录，权限会由 Edge Function 在服务端校验。'
+              : '当前本地缺少 Supabase 环境变量，会使用演示账号；生产环境必须启用 Supabase 管理员校验。'}
+          </p>
 
           <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
             <label className="grid gap-2">
@@ -106,8 +112,9 @@ export default function AdminLoginPage() {
 
           {error ? <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
 
-          <div className="mt-6 rounded-2xl bg-slate-50 p-4">
-            <div className="text-sm font-semibold text-slate-950">当前内置管理员账号</div>
+          {!liveMode ? (
+            <div className="mt-6 rounded-2xl bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-950">本地演示管理员账号</div>
             <div className="mt-3 grid gap-3 text-sm text-slate-600">
               {adminAccounts.map((item) => (
                 <div key={item.email} className="rounded-xl bg-white px-4 py-3 shadow-sm">
@@ -118,7 +125,8 @@ export default function AdminLoginPage() {
                 </div>
               ))}
             </div>
-          </div>
+            </div>
+          ) : null}
         </section>
       </div>
     </main>
