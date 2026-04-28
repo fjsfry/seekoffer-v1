@@ -1,89 +1,111 @@
-import { Plus, Search } from 'lucide-react';
 import Link from 'next/link';
+import { Bell, CheckCircle2, Plus, RotateCcw, Trash2, XCircle } from 'lucide-react';
 import { AdminShell } from '@/components/admin-shell';
-import { adminNoticeRows } from '@/lib/admin-data';
+import {
+  AdminButton,
+  AdminInput,
+  AdminMetricCard,
+  AdminPagination,
+  AdminPanel,
+  AdminSelect,
+  AdminStatusBadge
+} from '@/components/admin-ui';
+import { adminNoticeRows, noticeMetrics } from '@/lib/admin-data';
+
+const noticeIcons = [Bell, CheckCircle2, XCircle, Trash2];
 
 export default function AdminNoticesPage() {
   return (
-    <AdminShell
-      title="通知库管理"
-      description="这里集中处理通知的补录、修正、上下架、归档和人工复核。"
-    >
-      <section className="surface-card rounded-[30px] p-6">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px_220px_220px]">
-          <label className="relative">
-            <Search className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
-            <input
-              placeholder="搜索标题、学校、学院或来源"
-              className="w-full rounded-2xl border border-black/5 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none"
-            />
-          </label>
-          <select className="rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none">
-            <option>全部类型</option>
-            <option>夏令营</option>
-            <option>预推免</option>
-            <option>正式推免</option>
-          </select>
-          <select className="rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none">
-            <option>全部状态</option>
-            <option>报名中</option>
-            <option>即将截止</option>
-            <option>已截止</option>
-          </select>
-          <Link
-            href="/admin/notices/new"
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white"
-          >
-            <Plus className="h-4 w-4" />
-            新建通知
-          </Link>
-        </div>
-      </section>
-
-      <section className="surface-card overflow-hidden rounded-[30px]">
-        <div className="grid grid-cols-[minmax(0,1.6fr)_120px_140px_160px_120px_120px] gap-3 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-          <span>标题 / 学校</span>
-          <span>类型</span>
-          <span>发布时间</span>
-          <span>截止时间</span>
-          <span>状态</span>
-          <span>来源</span>
-        </div>
-
-        {adminNoticeRows.map((notice) => (
-          <div
-            key={notice.id}
-            className="grid grid-cols-[minmax(0,1.6fr)_120px_140px_160px_120px_120px] gap-3 border-t border-black/5 px-5 py-4 text-sm"
-          >
-            <div className="min-w-0">
-              <div className="truncate font-semibold text-ink">{notice.school} · {notice.title}</div>
-              <div className="mt-1 truncate text-slate-500">{notice.department}</div>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400">
-                <span>{notice.operator}</span>
-                <span>·</span>
-                <span>{notice.manualEdited ? '人工修正' : '系统同步'}</span>
-              </div>
-            </div>
-            <div className="text-slate-600">{notice.noticeType}</div>
-            <div className="text-slate-600">{notice.publishDate}</div>
-            <div className="text-slate-600">{notice.deadlineDate}</div>
-            <div>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                  notice.status === '即将截止'
-                    ? 'bg-amber-50 text-amber-700'
-                    : notice.status === '已截止'
-                      ? 'bg-slate-100 text-slate-600'
-                      : 'bg-emerald-50 text-emerald-700'
-                }`}
+    <AdminShell title="通知管理">
+      <div className="space-y-6">
+        <AdminPanel>
+          <div className="grid gap-5 p-5">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px_220px_220px_220px_120px]">
+              <AdminInput placeholder="请输入通知标题" />
+              <AdminSelect label="" options={['请选择学校', '清华大学', '北京大学', '复旦大学', '上海交通大学']} />
+              <AdminSelect label="" options={['请选择类型', '夏令营', '预推免', '九推', '招生通知']} />
+              <AdminSelect label="" options={['请选择状态', '待审核', '已发布', '已驳回', '已下架']} />
+              <AdminInput placeholder="开始日期  至  结束日期" />
+              <Link
+                href="/admin/notices/new"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
               >
-                {notice.status}
-              </span>
+                <Plus className="h-4 w-4" />
+                新建通知
+              </Link>
             </div>
-            <div className="text-slate-600">{notice.source}</div>
+            <div className="flex justify-end gap-3">
+              <AdminButton>查询</AdminButton>
+              <AdminButton tone="secondary">
+                <RotateCcw className="mr-2 h-4 w-4" />
+                重置
+              </AdminButton>
+            </div>
           </div>
-        ))}
-      </section>
+        </AdminPanel>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {noticeMetrics.map((metric, index) => (
+            <AdminMetricCard key={metric.label} metric={metric} icon={noticeIcons[index]} />
+          ))}
+        </section>
+
+        <AdminPanel title="通知列表">
+          <div className="flex flex-wrap gap-3 px-5 py-4">
+            <AdminButton tone="secondary">批量通过</AdminButton>
+            <AdminButton tone="danger">批量驳回</AdminButton>
+            <AdminButton tone="secondary">批量删除</AdminButton>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1180px] text-left text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold text-slate-500">
+                <tr>
+                  <th className="px-5 py-3"><input type="checkbox" aria-label="选择全部通知" /></th>
+                  <th className="px-5 py-3">通知标题</th>
+                  <th className="px-5 py-3">学校</th>
+                  <th className="px-5 py-3">类型</th>
+                  <th className="px-5 py-3">来源链接</th>
+                  <th className="px-5 py-3">提交人</th>
+                  <th className="px-5 py-3">提交时间</th>
+                  <th className="px-5 py-3">状态</th>
+                  <th className="px-5 py-3">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adminNoticeRows.slice(0, 10).map((notice) => (
+                  <tr key={notice.id} className="border-t border-slate-100">
+                    <td className="px-5 py-4"><input type="checkbox" aria-label={`选择 ${notice.title}`} /></td>
+                    <td className="max-w-[320px] truncate px-5 py-4 font-medium text-slate-900">{notice.title}</td>
+                    <td className="px-5 py-4 text-slate-700">{notice.school}</td>
+                    <td className="px-5 py-4">
+                      <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600">{notice.type}</span>
+                    </td>
+                    <td className="max-w-[220px] truncate px-5 py-4">
+                      <a href={notice.sourceUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                        {notice.sourceUrl}
+                      </a>
+                    </td>
+                    <td className="px-5 py-4 text-slate-700">{notice.submitter}</td>
+                    <td className="px-5 py-4 text-slate-600">{notice.submittedAt}</td>
+                    <td className="px-5 py-4"><AdminStatusBadge status={notice.status} /></td>
+                    <td className="px-5 py-4">
+                      <div className="flex gap-3 text-sm font-medium">
+                        <button className="text-blue-600">查看</button>
+                        <button className="text-blue-600">审核</button>
+                        <button className="text-blue-600">编辑</button>
+                        <button className="text-rose-600">删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <AdminPagination total="152" pages={5} />
+        </AdminPanel>
+      </div>
     </AdminShell>
   );
 }

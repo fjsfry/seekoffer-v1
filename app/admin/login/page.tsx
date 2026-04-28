@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LoaderCircle, LockKeyhole, ShieldCheck } from 'lucide-react';
+import { BarChart3, Bell, ClipboardCheck, LoaderCircle, LockKeyhole, ShieldCheck, UsersRound } from 'lucide-react';
 import { adminAccounts } from '@/lib/admin-data';
 import { getAdminSession, signInAdmin } from '@/lib/admin-session';
 
@@ -21,9 +21,7 @@ export default function AdminLoginPage() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) {
-      return;
-    }
+    if (pending) return;
 
     setPending(true);
     setError('');
@@ -39,92 +37,90 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8">
-      <div className="mx-auto max-w-[1080px]">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
-          <section className="surface-card rounded-[34px] p-8 lg:p-10">
-            <div className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-sm font-semibold text-brand">
-              <ShieldCheck className="h-4 w-4" />
-              Seekoffer Admin
-            </div>
-            <h1 className="mt-6 text-4xl font-semibold tracking-tight text-ink">先用一个轻后台，把运营最重要的动作收进来。</h1>
-            <p className="mt-5 max-w-2xl text-sm leading-8 text-slate-600">
-              这版后台 MVP 只先解决四件事：看数据、改通知、管 Offer 池、看爬虫状态。后面再把高风险写操作逐步迁到
-              Supabase Edge Functions。
-            </p>
+    <main className="min-h-screen bg-[#f6f8fb] px-4 py-8">
+      <div className="mx-auto grid min-h-[calc(100vh-64px)] max-w-[1180px] items-center gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm lg:p-10">
+          <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-600">
+            <ShieldCheck className="h-4 w-4" />
+            SeekOffer Admin
+          </div>
+          <h1 className="mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-slate-950">
+            运营管理后台，先把内容质量和用户秩序管起来。
+          </h1>
+          <p className="mt-5 max-w-2xl text-sm leading-8 text-slate-600">
+            后台只服务网站运营：审核通知、管理 Offer 池、处理用户反馈、查看操作日志与基础增长数据。用户个人申请表只做统计，不进入具体内容。
+          </p>
 
-            <div className="mt-8 grid gap-4 md:grid-cols-2">
-              {[
-                ['仪表盘', '先看今日新增、待审核内容和最近一次爬虫状态。'],
-                ['通知库管理', '补录、修正、归档通知，避免前台暴露脏数据。'],
-                ['Offer 池审核', '处理待审核、隐藏、软删除和举报内容。'],
-                ['爬虫状态', '知道哪一路源挂了、哪次同步失败、需不需要重跑。']
-              ].map(([title, description]) => (
-                <div key={title} className="rounded-[24px] bg-slate-50 p-5">
-                  <div className="text-base font-semibold text-ink">{title}</div>
-                  <p className="mt-2 text-sm leading-7 text-slate-500">{description}</p>
+          <div className="mt-8 grid gap-4 md:grid-cols-2">
+            {[
+              [BarChart3, '数据概览', '一眼看清用户增长、待审核内容和申请功能使用趋势。'],
+              [Bell, '通知审核', '审核、发布、驳回、下架和删除通知，保障前台可信。'],
+              [ClipboardCheck, 'Offer 管理', '控制演示/用户贡献内容的真实性、隐私和举报风险。'],
+              [UsersRound, '用户与反馈', '查看用户状态，处理反馈举报，所有关键操作留痕。']
+            ].map(([Icon, title, description]) => (
+              <div key={String(title)} className="rounded-2xl bg-slate-50 p-5">
+                <Icon className="h-6 w-6 text-blue-600" />
+                <div className="mt-4 font-semibold text-slate-950">{title as string}</div>
+                <p className="mt-2 text-sm leading-7 text-slate-500">{description as string}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600">
+            <LockKeyhole className="h-4 w-4" />
+            后台登录
+          </div>
+          <h2 className="mt-4 text-2xl font-semibold text-slate-950">进入运营工作台</h2>
+          <p className="mt-3 text-sm leading-7 text-slate-500">当前为独立后台 MVP，后续可以接入 Supabase 管理员表和服务端权限校验。</p>
+
+          <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold text-slate-800">管理员邮箱</span>
+              <input
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold text-slate-800">密码</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+              />
+            </label>
+
+            <button
+              type="submit"
+              className="mt-2 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white transition hover:bg-blue-700"
+            >
+              {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+              {pending ? '登录中...' : '进入后台'}
+            </button>
+          </form>
+
+          {error ? <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
+
+          <div className="mt-6 rounded-2xl bg-slate-50 p-4">
+            <div className="text-sm font-semibold text-slate-950">当前内置管理员账号</div>
+            <div className="mt-3 grid gap-3 text-sm text-slate-600">
+              {adminAccounts.map((item) => (
+                <div key={item.email} className="rounded-xl bg-white px-4 py-3 shadow-sm">
+                  <div className="font-semibold text-slate-950">{item.name}</div>
+                  <div className="mt-1 text-xs leading-6 text-slate-500">
+                    {item.email} / {item.password}
+                  </div>
                 </div>
               ))}
             </div>
-          </section>
-
-          <section className="surface-card rounded-[34px] p-8">
-            <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
-              <LockKeyhole className="h-4 w-4" />
-              后台登录
-            </div>
-            <h2 className="mt-4 text-2xl font-semibold text-ink">进入运营工作区</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-500">
-              当前先用管理员账号进入后台，下一步再接入 Supabase 管理员表与角色校验。
-            </p>
-
-            <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold text-ink">管理员邮箱</span>
-                <input
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
-                />
-              </label>
-
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold text-ink">密码</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
-                />
-              </label>
-
-              <button
-                type="submit"
-                className="mt-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white"
-              >
-                {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-                {pending ? '登录中...' : '进入后台'}
-              </button>
-            </form>
-
-            {error ? <div className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
-
-            <div className="mt-6 rounded-[24px] bg-slate-50 p-4">
-              <div className="text-sm font-semibold text-ink">当前内置管理员账号</div>
-              <div className="mt-3 grid gap-3 text-sm text-slate-600">
-                {adminAccounts.map((item) => (
-                  <div key={item.email} className="rounded-2xl bg-white px-4 py-3 shadow-sm">
-                    <div className="font-semibold text-ink">{item.name}</div>
-                    <div className="mt-1 text-xs leading-6 text-slate-500">
-                      {item.email} · {item.role}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        </div>
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
