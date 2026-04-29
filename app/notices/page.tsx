@@ -69,9 +69,15 @@ function getVisiblePages(currentPage: number, totalPages: number) {
 
 function getNoticeCardTags(project: PublicNoticeProject) {
   const seen = new Set<string>();
-  const tags = [getDisplayProjectType(project.projectType), getDisplayDiscipline(project.discipline), ...getDisplayTags(project.tags)]
+  const tags = [getDisplayProjectType(project.projectType), inferSchoolRange(project), ...getDisplayTags(project.tags)]
     .map((item) => item.trim())
-    .filter(Boolean)
+    .filter((item) => {
+      if (!item || item === '其他' || item === '待分类' || item === '方向待分类') {
+        return false;
+      }
+
+      return item.length <= 8 && !/[，,、；;]/.test(item);
+    })
     .filter((item) => {
       if (seen.has(item)) {
         return false;
@@ -477,7 +483,7 @@ export default function NoticesPage() {
                 }`}
               >
                 {highlighted ? (
-                    <div className="absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-br-2xl bg-emerald-500 text-sm font-bold text-white shadow-sm">
+                  <div className="absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-br-2xl bg-emerald-500 text-sm font-bold text-white shadow-sm">
                     急
                   </div>
                 ) : null}
@@ -490,11 +496,13 @@ export default function NoticesPage() {
                     rounded="full"
                   />
 
-                  <div className="flex min-w-0 flex-col overflow-hidden">
+                  <div className="flex h-full min-w-0 flex-col overflow-hidden">
                     <div className="flex min-w-0 items-center gap-2">
                       <h2 className="shrink-0 text-lg font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</h2>
                       <span className="min-w-0 truncate text-sm text-slate-500">{getDisplayDepartmentName(project.departmentName)}</span>
-                      <DeadlineBadge level={project.deadlineLevel} />
+                      <span className="shrink-0">
+                        <DeadlineBadge level={project.deadlineLevel} />
+                      </span>
                     </div>
                     <Link
                       href={buildNoticeDetailHref(project.id)}
@@ -503,22 +511,24 @@ export default function NoticesPage() {
                     >
                       {normalizeNoticeTitle(project.projectName, 160)}
                     </Link>
-                    <div className="mt-3 flex items-center gap-3 overflow-hidden text-xs text-slate-500">
-                      <span className="inline-flex items-center gap-1">
+                    <div className="mt-3 flex h-5 items-center gap-3 overflow-hidden text-xs text-slate-500">
+                      <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
                         <CalendarDays className="h-3.5 w-3.5" />
                         发布于 {formatNoticeDateOnly(project.publishDate)}
                       </span>
                       {city ? (
-                        <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
                           <MapPin className="h-3.5 w-3.5" />
                           {city}
                         </span>
                       ) : null}
-                      <span className="min-w-0 truncate">{getDisplayDiscipline(project.discipline)}</span>
                     </div>
-                    <div className="mt-3 flex h-7 gap-2 overflow-hidden">
+                    <div className="mt-3 flex h-7 flex-nowrap gap-2 overflow-hidden">
                       {getNoticeCardTags(project).map((item) => (
-                        <span key={item} className="max-w-[150px] truncate rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                        <span
+                          key={item}
+                          className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500"
+                        >
                           {item}
                         </span>
                       ))}
