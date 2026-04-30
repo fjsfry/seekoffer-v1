@@ -14,6 +14,7 @@ import {
 } from './mock-data';
 import { filterMainNoticeProjects } from './notice-quality';
 import { baseNoticeProjects } from './notice-source';
+import { canCreateMoreApplications } from './billing-api';
 
 const APPLICATION_STORAGE_KEY = 'seekoffer-my-application-table';
 const MANUAL_PROJECT_STORAGE_KEY = 'seekoffer-manual-projects';
@@ -500,6 +501,15 @@ async function upsertRemoteApplications(records: UserProjectRecord[]) {
   }
 }
 
+async function assertApplicationQuota(currentCount: number) {
+  const quota = await canCreateMoreApplications(currentCount);
+  if (!quota.allowed) {
+    throw new Error(
+      `免费版最多可跟进 ${quota.freeLimit} 个申请项目。升级 Pro 后可以无限加入申请表、使用高级提醒和后续导出能力。`
+    );
+  }
+}
+
 async function deleteRemoteApplication(projectId: string) {
   const context = getSupabaseMemberContext();
   if (!context || !projectId) {
@@ -786,6 +796,8 @@ export async function addProjectToApplicationTable(projectId: string) {
     return existing;
   }
 
+  await assertApplicationQuota(current.length);
+
   const created = buildDefaultRecord(projectId);
   persistStoredRecords([...current, created]);
   await upsertRemoteApplications([...current, created]);
@@ -795,6 +807,9 @@ export async function addProjectToApplicationTable(projectId: string) {
 export async function createManualApplicationEntry(input: ManualProjectInput) {
   await hydrateWorkspaceFromSupabase();
   const manualProjects = readStoredManualProjects();
+  const existingRecords = readStoredRecords();
+  await assertApplicationQuota(existingRecords.length);
+
   const projectId = `custom-${Date.now()}`;
   const timestamp = nowText();
   const project = normalizeManualProject({
@@ -824,7 +839,7 @@ export async function createManualApplicationEntry(input: ManualProjectInput) {
   });
 
   const nextManualProjects = [...manualProjects, project];
-  const nextRecords = [...readStoredRecords(), record];
+  const nextRecords = [...existingRecords, record];
   persistStoredManualProjects(nextManualProjects);
   persistStoredRecords(nextRecords);
 

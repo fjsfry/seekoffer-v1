@@ -62,6 +62,8 @@ export function ManualProjectEntryCard({
       setShowMore(false);
       setMessage('项目已加入我的申请表，后续可以继续补充材料和备注。');
       onCreated?.();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '项目保存失败，请稍后重试。');
     } finally {
       setSubmitting(false);
     }

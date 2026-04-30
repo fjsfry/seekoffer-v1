@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Columns3,
+  Crown,
   FileText,
   FolderPlus,
   LayoutList,
@@ -24,6 +25,7 @@ import { ManualProjectEntryCard } from '@/components/manual-project-entry-card';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge } from '@/components/status-badge';
 import { useUserSessionState } from '@/hooks/use-user-session';
+import { useProEntitlement } from '@/hooks/use-pro-entitlement';
 import {
   WORKSPACE_SYNC_NOTICE,
   deleteUserProject,
@@ -39,6 +41,7 @@ import {
   type MaterialChecklistKey,
   type UserProjectRecord
 } from '@/lib/mock-data';
+import { FREE_APPLICATION_LIMIT } from '@/lib/billing-api';
 import {
   formatNoticeDateOnly,
   getDisplayDepartmentName,
@@ -121,6 +124,7 @@ export default function ApplicationsPage() {
   const [openChecklistId, setOpenChecklistId] = useState('');
   const [deletingProjectId, setDeletingProjectId] = useState('');
   const { ready, loggedIn } = useUserSessionState();
+  const proEntitlement = useProEntitlement();
 
   useEffect(() => {
     if (!loggedIn) {
@@ -274,6 +278,31 @@ export default function ApplicationsPage() {
         <ApplicationStatCard label="7天内截止" value={stats.upcoming7} hint="即将截止的项目" icon={CalendarDays} tone="orange" />
         <ApplicationStatCard label="待补材料" value={stats.materialPending} hint="需要补齐的材料项" icon={BellRing} tone="violet" />
       </section>
+
+      {!proEntitlement.data?.isPro && rows.length >= FREE_APPLICATION_LIMIT - 1 ? (
+        <section className="rounded-[30px] border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-emerald-50 px-5 py-5 shadow-soft">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <Crown className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="font-semibold text-ink">你已经接近免费版申请项目上限</div>
+                <div className="mt-1 text-sm leading-7 text-slate-600">
+                  免费版最多跟进 {FREE_APPLICATION_LIMIT} 个申请项目。升级 Pro 后可无限加入申请表，并逐步解锁多节点提醒、日历和导出能力。
+                </div>
+              </div>
+            </div>
+            <Link
+              href="/pro"
+              className="inline-flex w-fit items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white"
+            >
+              查看 Pro
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <ManualProjectEntryCard onCreated={refreshRows} />
 
