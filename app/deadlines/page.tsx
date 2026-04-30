@@ -8,6 +8,7 @@ import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge, StatusBadge } from '@/components/status-badge';
 import { fetchDeadlineNotices } from '@/lib/cloudbase-data';
+import { getDeadlineLevelFromDate } from '@/lib/deadline-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
 import { allSchoolOptions, projectTypeOptions, type PublicNoticeProject } from '@/lib/mock-data';
 
@@ -18,9 +19,9 @@ const groupMeta: Record<
   { title: string; subtitle: string; empty: string; tone: string; border: string }
 > = {
   today: {
-    title: '今日截止',
-    subtitle: '最危险的一组，建议今天直接处理提交动作。',
-    empty: '当前没有今日截止项目。',
+    title: '24 小时内截止',
+    subtitle: '最危险的一组，建议现在就核对原文并处理提交动作。',
+    empty: '当前没有 24 小时内截止项目。',
     tone: 'text-rose-700',
     border: 'border-rose-100 bg-rose-50'
   },
@@ -61,7 +62,7 @@ export default function DeadlinesPage() {
 
   const filteredProjects = useMemo(() => {
     return projects
-      .filter((item) => item.deadlineLevel !== 'expired')
+      .filter((item) => getDeadlineLevelFromDate(item.deadlineDate) !== 'expired')
       .filter((item) => (school === '全部学校' ? true : item.schoolName === school))
       .filter((item) => (projectType === '全部类型' ? true : item.projectType === projectType))
       .sort((left, right) => left.deadlineDate.localeCompare(right.deadlineDate));
@@ -69,9 +70,9 @@ export default function DeadlinesPage() {
 
   const grouped = useMemo(
     () => ({
-      today: filteredProjects.filter((item) => item.deadlineLevel === 'today'),
-      within3days: filteredProjects.filter((item) => item.deadlineLevel === 'within3days'),
-      within7days: filteredProjects.filter((item) => item.deadlineLevel === 'within7days')
+      today: filteredProjects.filter((item) => getDeadlineLevelFromDate(item.deadlineDate) === 'today'),
+      within3days: filteredProjects.filter((item) => getDeadlineLevelFromDate(item.deadlineDate) === 'within3days'),
+      within7days: filteredProjects.filter((item) => getDeadlineLevelFromDate(item.deadlineDate) === 'within7days')
     }),
     [filteredProjects]
   );
@@ -110,7 +111,7 @@ export default function DeadlinesPage() {
         </select>
 
         <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
-          共筛到 {filteredProjects.length} 个高风险项目，建议优先处理今日截止与 3 天内截止通知。
+          共筛到 {filteredProjects.length} 个高风险项目，建议优先处理 24 小时内与 3 天内截止通知。
         </div>
       </section>
 
@@ -134,7 +135,7 @@ export default function DeadlinesPage() {
                   rows.map((project) => (
                     <div key={project.id} className="rounded-[28px] border border-white/70 bg-white p-5 shadow-sm">
                       <div className="flex flex-wrap items-center gap-2">
-                        <DeadlineBadge level={project.deadlineLevel} />
+                        <DeadlineBadge level={getDeadlineLevelFromDate(project.deadlineDate)} />
                         <StatusBadge status={project.status} />
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
                           {project.projectType}

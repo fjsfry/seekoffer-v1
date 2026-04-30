@@ -10,6 +10,7 @@ import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge, StatusBadge } from '@/components/status-badge';
 import { fetchPublicNotices } from '@/lib/cloudbase-data';
+import { getCountdownLabel, getDeadlineLevelFromDate } from '@/lib/deadline-display';
 import {
   buildNoticeFeedbackHref,
   formatNoticeDate,
@@ -26,29 +27,6 @@ import {
 import { baseNoticeProjects } from '@/lib/notice-source';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
-
-function getCountdown(deadlineDate: string) {
-  const value = new Date(`${deadlineDate.replace(' ', 'T')}:00+08:00`);
-  const now = new Date();
-  const diff = value.getTime() - now.getTime();
-
-  if (Number.isNaN(value.getTime())) {
-    return '截止时间待补充';
-  }
-
-  if (diff <= 0) {
-    return '项目已截止';
-  }
-
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const days = Math.floor(hours / 24);
-
-  if (days >= 1) {
-    return `距截止约 ${days} 天`;
-  }
-
-  return `距截止约 ${Math.max(hours, 1)} 小时`;
-}
 
 function NoticeDetailContent() {
   const searchParams = useSearchParams();
@@ -206,7 +184,7 @@ function NoticeDetail({ project }: { project: PublicNoticeProject }) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <DeadlineBadge level={project.deadlineLevel} />
+              <DeadlineBadge level={getDeadlineLevelFromDate(project.deadlineDate)} />
               <StatusBadge status={project.status} />
               <span className="rounded-full bg-brand-cream px-3 py-1 text-xs font-semibold text-slate-700">
                 {getDisplayProjectType(project.projectType)}
@@ -232,7 +210,7 @@ function NoticeDetail({ project }: { project: PublicNoticeProject }) {
                 <Clock3 className="h-4 w-4" />
                 截止倒计时
               </div>
-              <div className="mt-2 text-lg font-semibold text-ink">{getCountdown(project.deadlineDate)}</div>
+              <div className="mt-2 text-lg font-semibold text-ink">{getCountdownLabel(project.deadlineDate)}</div>
             </div>
           </section>
 

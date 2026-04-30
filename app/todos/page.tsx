@@ -8,6 +8,7 @@ import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { useUserSessionState } from '@/hooks/use-user-session';
 import { fetchApplicationRows, watchApplicationTable, type ApplicationRow } from '@/lib/cloudbase-data';
+import { getDeadlineLevelFromDate } from '@/lib/deadline-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
 
 type TodoBlock = {
@@ -53,25 +54,29 @@ export default function TodosPage() {
     const today = rows
       .filter(
         ({ item, project }) =>
-          project.deadlineLevel === 'today' ||
+          getDeadlineLevelFromDate(project.deadlineDate) === 'today' ||
           (Boolean(item.interviewTime) && item.interviewTime.startsWith(new Date().toISOString().slice(0, 10)))
       )
       .slice(0, 5)
-      .map(({ item, project }) => ({
-        id: `${item.userProjectId}-today`,
-        title: `${project.schoolName} · ${project.projectName}`,
-        description:
-          project.deadlineLevel === 'today'
-            ? `今天截止，当前状态是“${item.myStatus}”，请优先完成提交或确认动作。`
-            : `今天有面试或确认安排：${item.interviewTime}。`,
-        href: project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id)
-      }));
+      .map(({ item, project }) => {
+        const deadlineLevel = getDeadlineLevelFromDate(project.deadlineDate);
+
+        return {
+          id: `${item.userProjectId}-today`,
+          title: `${project.schoolName} · ${project.projectName}`,
+          description:
+            deadlineLevel === 'today'
+              ? `24 小时内截止，当前状态是“${item.myStatus}”，请优先完成提交或确认动作。`
+              : `今天有面试或确认安排：${item.interviewTime}。`,
+          href: project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id)
+        };
+      });
 
     const thisWeek = rows
       .filter(
         ({ item, project }) =>
-          project.deadlineLevel === 'within3days' ||
-          project.deadlineLevel === 'within7days' ||
+          getDeadlineLevelFromDate(project.deadlineDate) === 'within3days' ||
+          getDeadlineLevelFromDate(project.deadlineDate) === 'within7days' ||
           item.resultStatus === '待确认'
       )
       .slice(0, 6)
@@ -87,10 +92,10 @@ export default function TodosPage() {
 
     const later = rows
       .filter(
-        ({ item, project }) =>
-          item.materialsProgress < 100 &&
-          project.deadlineLevel !== 'today' &&
-          project.deadlineLevel !== 'within3days'
+        ({ item, project }) => {
+          const deadlineLevel = getDeadlineLevelFromDate(project.deadlineDate);
+          return item.materialsProgress < 100 && deadlineLevel !== 'today' && deadlineLevel !== 'within3days';
+        }
       )
       .slice(0, 6)
       .map(({ item, project }) => ({
@@ -102,8 +107,8 @@ export default function TodosPage() {
 
     return [
       {
-        title: '今天必须处理',
-        subtitle: '先看今天就会出风险的项目，比如今日截止、当天面试或当天确认。',
+        title: '24 小时内必须处理',
+        subtitle: '先看马上会出风险的项目，比如 24 小时内截止、当天面试或当天确认。',
         tone: 'bg-rose-50 text-rose-700',
         items: today
       },
@@ -199,7 +204,7 @@ export default function TodosPage() {
             {
               icon: BellRing,
               title: '提醒逻辑',
-              text: '根据今日截止、3 天内截止和 7 天内截止自动抬高优先级。'
+              text: '根据 24 小时内截止、3 天内截止和 7 天内截止自动抬高优先级。'
             },
             {
               icon: CalendarClock,

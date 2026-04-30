@@ -13,6 +13,11 @@ const collegeDirectoryPath = path.join(repoRoot, 'lib', 'college-directory.ts');
 
 const INTERNAL_TAG_PATTERN = /^calendar_|^project_notices|^cloudbase/i;
 const NOISY_TAG_PATTERN = /https?:|www\.|\.(com|cn|edu|org)|(^|\s)com($|\s)/i;
+const DIRTY_NOTICE_PATTERN =
+  /seekoffer\s*test|\bdemo\b|\btest\b|测试|測試|测试数据|占位数据|示例数据|\?{3,}|�{2,}|锟斤拷|锟�|undefined|null/i;
+const COMPETITION_NOTICE_PATTERN =
+  /榜单赛事|蓝桥杯|挑战杯|互联网\+|数学建模|程序设计竞赛|软件和信息技术大赛|高校计算机大赛|跨文化能力竞赛|竞赛章程|大学生.*竞赛|创新创业大赛|大赛|\bACM\b|\bICPC\b/i;
+const BODY_LIKE_TITLE_PATTERN = /^通\s*知我院|复试工作还在进行中|请各位同学及时|详见附件|具体安排如下/i;
 
 function loadLocalEnv() {
   for (const fileName of ['.env.local', '.env']) {
@@ -48,6 +53,44 @@ function compact(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
 
+function cleanProjectTitle(value) {
+  let title = compact(value)
+    .replace(/^招生通知\s*[|｜]\s*/i, '')
+    .replace(/\.pdf\b/gi, '')
+    .replace(/\s*(报名中|已截止|未开始)\s*(夏令营报名|春令营报名|其他)?\s*/g, ' ')
+    .trim();
+
+  const cutPatterns = [
+    /(?:申请|报名|推免|营员)?截止时间(?:[:：]|在|为)?/i,
+    /(?:申请|报名|由请)?开始时间(?:[:：]|在|为)?/i,
+    /发布时间[:：]/i,
+    /发布日期[:：]/i,
+    /发表日期[:：]/i,
+    /一、/,
+    /1[.、]\s*/
+  ];
+
+  for (const pattern of cutPatterns) {
+    const match = title.match(pattern);
+    if (match?.index && match.index >= 8) {
+      title = title.slice(0, match.index).trim();
+      break;
+    }
+  }
+
+  const introIndex = title.search(/简介(?=.{18,})/);
+  if (introIndex >= 12) {
+    title = title.slice(0, introIndex + 2).trim();
+  }
+
+  const sentenceCut = title.search(/[。；;！!](?=.{12,})/);
+  if (sentenceCut >= 12) {
+    title = title.slice(0, sentenceCut + 1).trim();
+  }
+
+  return compact(title).slice(0, 110);
+}
+
 function toArray(value) {
   if (Array.isArray(value)) {
     return value;
@@ -78,7 +121,15 @@ function unique(items) {
 
 function isWeakSchool(value) {
   const text = compact(value);
-  return !text || text === '???' || text === '其他' || text === '待补充' || /^20\d{2}年大学$/.test(text);
+  return (
+    !text ||
+    text === '???' ||
+    text === '其他' ||
+    text === '待补充' ||
+    text === '待识别院校' ||
+    text === '中国大学' ||
+    /^20\d{2}年大学$/.test(text)
+  );
 }
 
 function loadColleges() {
@@ -219,8 +270,58 @@ function normalizeTags(tags, college, discipline) {
   return unique([...(college?.levels || []), college?.city || '', discipline, ...base]).slice(0, 8);
 }
 
+function hasValidDeadlineDate(value) {
+  const deadlineTime = parseDateToTime(value);
+  if (Number.isNaN(deadlineTime)) {
+    return false;
+  }
+
+  const year = new Date(deadlineTime).getFullYear();
+  return year >= 2025 && year <= 2028;
+}
+
+function shouldKeepPublicNotice(project) {
+  const text = [
+    project.id,
+    project.schoolName,
+    project.departmentName,
+    project.projectName,
+    project.projectType,
+    project.discipline,
+    project.status,
+    project.sourceSite,
+    project.tags.join(' '),
+    project.requirements,
+    project.remarks
+  ]
+    .map(compact)
+    .join(' ');
+
+  if (DIRTY_NOTICE_PATTERN.test(text)) {
+    return false;
+  }
+
+  if (BODY_LIKE_TITLE_PATTERN.test(compact(project.projectName))) {
+    return false;
+  }
+
+  if (COMPETITION_NOTICE_PATTERN.test(text)) {
+    return false;
+  }
+
+  if (!project.id || isWeakSchool(project.schoolName) || /^【.*】/.test(compact(project.schoolName))) {
+    return false;
+  }
+
+  if (!compact(project.projectName) || compact(project.projectName).length < 6 || !hasValidDeadlineDate(project.deadlineDate)) {
+    return false;
+  }
+
+  return true;
+}
+
 function normalizeProject(row) {
-  const rawTitle = compact(row.projectName || row.project_name || row.project || row.title || '');
+  const rawTitle = cleanProjectTitle(row.projectName || row.project_name || row.project || row.title || '');
   const college = findCollegeFromText(`${row.schoolName || row.school_name || row.school || ''} ${rawTitle}`);
   const schoolName = isWeakSchool(row.schoolName || row.school_name || row.school)
     ? college?.name || '待识别院校'
@@ -333,6 +434,8 @@ async function fetchSupabaseNoticeRows() {
     endpoint.searchParams.set('select', '*');
     endpoint.searchParams.set('year', 'eq.2026');
     endpoint.searchParams.set('is_private', 'eq.false');
+    endpoint.searchParams.set('admin_status', 'eq.published');
+    endpoint.searchParams.set('admin_deleted_at', 'is.null');
     endpoint.searchParams.set('limit', String(pageSize));
     endpoint.searchParams.set('offset', String(offset));
 
@@ -359,14 +462,16 @@ async function fetchSupabaseNoticeRows() {
     }
   }
 
-  return rows.map(mapSupabaseNoticeRow).filter((item) => item.id && item.year === 2026);
+  return rows.map(mapSupabaseNoticeRow).filter((item) => item.year === 2026 && shouldKeepPublicNotice(item));
 }
 
-const exportRows = loadExportRows().map(normalizeProject).filter((item) => item.id && item.year === 2026);
+const exportRows = loadExportRows()
+  .map(normalizeProject)
+  .filter((item) => item.year === 2026 && shouldKeepPublicNotice(item));
 const supplementRows = readJson(dataPath)
   .filter((item) => String(item.id || '').startsWith('baoyantongzhi-'))
   .map(normalizeProject)
-  .filter((item) => item.id && item.year === 2026);
+  .filter((item) => item.year === 2026 && shouldKeepPublicNotice(item));
 const supabaseRows = await fetchSupabaseNoticeRows();
 
 const merged = new Map();
@@ -374,7 +479,10 @@ exportRows.forEach((item) => merged.set(item.id, item));
 supplementRows.forEach((item) => merged.set(item.id, item));
 supabaseRows.forEach((item) => merged.set(item.id, item));
 
-const result = Array.from(merged.values()).sort((left, right) => {
+const result = Array.from(merged.values()).map((item) => ({
+  ...item,
+  projectName: cleanProjectTitle(item.projectName) || '通知标题待补充'
+})).filter(shouldKeepPublicNotice).sort((left, right) => {
   const publishCompare = right.publishDate.localeCompare(left.publishDate);
   if (publishCompare !== 0) {
     return publishCompare;

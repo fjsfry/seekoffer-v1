@@ -53,7 +53,12 @@ export default function AdminNoticesPage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void loadNotices({ page: 1 });
+      const query = new URLSearchParams(window.location.search).get('query') || '';
+      const initialFilters = query.trim() ? { ...defaultFilters, query: query.trim() } : defaultFilters;
+      if (query.trim()) {
+        setFilters(initialFilters);
+      }
+      void loadNotices({ page: 1, filters: initialFilters });
     }, 0);
 
     return () => window.clearTimeout(timer);
@@ -137,7 +142,7 @@ export default function AdminNoticesPage() {
 
       const nextPage = rows.length === ids.length && page > 1 ? page - 1 : page;
       window.localStorage.setItem('seekoffer-admin-notice-version', String(Date.now()));
-      setMessage('操作成功：状态已写入 Supabase，前台首页和通知库会按最新公开状态展示。');
+      setMessage('操作成功：状态已写入 Supabase。线上前台会通过实时公开接口隐藏/展示，下一次构建也会同步静态兜底数据。');
       await loadNotices({ page: nextPage });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '通知操作失败，请稍后重试。');
@@ -169,7 +174,7 @@ export default function AdminNoticesPage() {
   }
 
   return (
-    <AdminShell title="通知管理">
+    <AdminShell title="通知管理" description="审核、发布、下架和删除通知内容；已发布内容才会进入前台首页与通知库。">
       <div className="space-y-6">
         <AdminPanel>
           <div className="grid gap-5 p-5">
@@ -245,7 +250,15 @@ export default function AdminNoticesPage() {
           ))}
         </section>
 
-        <AdminPanel title="通知列表">
+        <AdminPanel
+          title="通知列表"
+          action={
+            <AdminButton tone="secondary" onClick={() => void loadNotices()} disabled={pending === 'load'}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              刷新列表
+            </AdminButton>
+          }
+        >
           <div className="flex flex-wrap gap-3 px-5 py-4">
             <AdminButton tone="secondary" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'published', '批量通过通知')}>
               批量通过
@@ -311,7 +324,7 @@ export default function AdminNoticesPage() {
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap gap-3 text-sm font-medium">
                         <button className="text-blue-600 hover:underline" onClick={() => openNoticeDetail(notice)}>查看</button>
-                        <button className="text-blue-600 hover:underline" onClick={() => openNoticeDetail(notice)}>审核</button>
+                        <button className="text-emerald-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'published', '后台审核通过并发布')}>发布</button>
                         <button className="text-slate-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'hidden', '后台下架通知')}>下架</button>
                         <button className="text-rose-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'deleted', '后台删除通知')}>删除</button>
                       </div>

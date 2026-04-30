@@ -1,6 +1,7 @@
 'use client';
 
 import { getSupabaseBrowserClient } from './supabase-browser';
+import { getDeadlineLevelFromDate, getPublicStatusForDeadlineLevel } from './deadline-display';
 import { getUserSession, type UserProfile, updateUserProfile } from './user-session';
 import {
   materialChecklistDefinitions,
@@ -115,32 +116,6 @@ function readStoragePayload<T>(storageKey: string): StoredPayload<T> | null {
   return null;
 }
 
-function parseDeadline(deadlineDate: string) {
-  const normalized = deadlineDate.includes('T') ? deadlineDate : deadlineDate.replace(' ', 'T');
-  const value = new Date(`${normalized}:00+08:00`);
-  return Number.isNaN(value.getTime()) ? null : value;
-}
-
-function resolveDeadlineLevel(deadlineDate: string): DeadlineLevel {
-  const value = parseDeadline(deadlineDate);
-  if (!value) return 'future';
-
-  const diff = value.getTime() - Date.now();
-  const day = 1000 * 60 * 60 * 24;
-
-  if (diff <= 0) return 'expired';
-  if (diff <= day) return 'today';
-  if (diff <= day * 3) return 'within3days';
-  if (diff <= day * 7) return 'within7days';
-  return 'future';
-}
-
-function resolvePublicStatus(level: DeadlineLevel): PublicNoticeProject['status'] {
-  if (level === 'expired') return '已截止';
-  if (level === 'today' || level === 'within3days' || level === 'within7days') return '即将截止';
-  return '报名中';
-}
-
 function normalizeProjectStatus(
   status: PublicNoticeProject['status'] | undefined,
   deadlineLevel: DeadlineLevel
@@ -151,10 +126,10 @@ function normalizeProjectStatus(
     deadlineLevel === 'within3days' ||
     deadlineLevel === 'within7days'
   ) {
-    return resolvePublicStatus(deadlineLevel);
+    return getPublicStatusForDeadlineLevel(deadlineLevel);
   }
 
-  return status || resolvePublicStatus(deadlineLevel);
+  return status || getPublicStatusForDeadlineLevel(deadlineLevel);
 }
 
 export function calculateMaterialsProgress(record: Pick<UserProjectRecord, MaterialChecklistKey>) {
@@ -169,7 +144,7 @@ function hasMaterialChecklistPatch(patch: Partial<UserProjectRecord>) {
 
 function normalizeManualProject(project: Partial<PublicNoticeProject>) {
   const deadlineDate = String(project.deadlineDate || '').trim();
-  const deadlineLevel = resolveDeadlineLevel(deadlineDate);
+  const deadlineLevel = getDeadlineLevelFromDate(deadlineDate);
   const publishDate = String(project.publishDate || '').trim() || nowText().slice(0, 10);
 
   return {
@@ -777,7 +752,7 @@ export async function fetchNoticeById(id: string) {
 
 export async function fetchDeadlineNotices() {
   const projects = await fetchPublicNotices();
-  return projects.filter((item) => item.deadlineLevel !== 'future');
+  return projects.filter((item) => getDeadlineLevelFromDate(item.deadlineDate) !== 'future');
 }
 
 export async function fetchUserProjects() {

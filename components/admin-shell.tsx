@@ -53,6 +53,7 @@ export function AdminShell({
   const pathname = usePathname();
   const [session, setSession] = useState<AdminSession | null>(() => getAdminSession());
   const [activeAdminHash, setActiveAdminHash] = useState('users');
+  const [globalSearch, setGlobalSearch] = useState('');
   const normalizedPathname = pathname.replace(/\/$/, '') || '/';
 
   useEffect(() => {
@@ -108,10 +109,12 @@ export function AdminShell({
                   }
                 }}
                 className={adminClassNames(
-                  'flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-medium transition',
-                  active ? 'bg-blue-50 text-blue-600' : 'text-slate-700 hover:bg-slate-50 hover:text-blue-600'
+                  'relative flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-medium transition',
+                  active ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-slate-700 hover:bg-slate-50 hover:text-blue-600'
                 )}
+                aria-current={active ? 'page' : undefined}
               >
+                {active ? <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-blue-600" /> : null}
                 <Icon className="h-5 w-5" />
                 {item.label}
               </Link>
@@ -135,8 +138,15 @@ export function AdminShell({
             <label className="relative hidden md:block">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
+                value={globalSearch}
+                onChange={(event) => setGlobalSearch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && globalSearch.trim()) {
+                    window.location.href = `/admin/notices?query=${encodeURIComponent(globalSearch.trim())}`;
+                  }
+                }}
                 className="h-11 w-[360px] rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
-                placeholder="搜索用户、通知、Offer等"
+                placeholder="搜索通知、学校、用户；回车进入通知管理"
               />
             </label>
 

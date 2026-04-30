@@ -7,10 +7,12 @@ const TITLE_TRAILING_PATTERN =
   /\s*(报名中|即将截止|已截止|未开始|活动中|已结束|剩余\s*\d+\s*天|距离(报名)?截止\s*\d+\s*天).*$/i;
 
 const TITLE_BODY_BOUNDARY_PATTERN =
-  /\s+(?:发布于|浏览|阅读|来源|原文链接|报名链接|申请链接|申请材料|材料要求|联系方式|联系人|咨询电话|电子邮箱|附件|一、|一\.|1\.|1、)\s*.*$/i;
+  /\s+(?:发布于|浏览|阅读|来源|原文链接|报名链接|申请链接|申请材料|材料要求|联系方式|联系人|咨询电话|电子邮箱|附件|招生对象|申请条件|报名方式|一、|一\.|1\.|1、)\s*.*$/i;
 
 const TITLE_PREFIX_PATTERN =
-  /^(?:招生通知|通知公告|通知|项目通知|院校通知|保研通知|推免通知)\s*[|｜:：-]\s*/i;
+  /^(?:招生通知|通知公告|通知|项目通知|院校通知|保研通知|推免通知|官方通知)\s*[|｜:：-]\s*/i;
+
+const TITLE_SOURCE_PREFIX_PATTERN = /^【[^】]{2,16}】\s*/;
 
 const INTERNAL_SOURCE_LABELS = new Map([
   ['calendar_notices', '院校公开通知自动同步'],
@@ -31,7 +33,7 @@ function isNoisyTag(value: string) {
 
 export function isWeakNoticeValue(value: string | undefined | null) {
   const text = compactText(String(value || ''));
-  return !text || text === '???' || text === '-' || text === '待补充' || text.toLowerCase() === 'unknown';
+  return !text || text === '???' || text === '-' || text === '待补充' || text === '待识别院校' || text.toLowerCase() === 'unknown';
 }
 
 export function getDisplaySchoolName(value: string | undefined | null) {
@@ -68,15 +70,18 @@ export function normalizeNoticeTitle(projectName: string, limit = 72) {
   const compact = compactText(
     String(projectName || '')
       .split(/\r?\n/)[0]
+      .replace(TITLE_SOURCE_PREFIX_PATTERN, '')
       .replace(TITLE_PREFIX_PATTERN, '')
       .replace(DATE_FIELD_PATTERN, '')
       .replace(TITLE_BODY_BOUNDARY_PATTERN, '')
       .replace(TITLE_TRAILING_PATTERN, '')
-      .replace(/\s*(报名中|即将截止|已截止|未开始|活动中|已结束)\s*(其他|夏令营|预推免|正式推免|春令营报名|夏令营报名)?\s*(由请|申请|报名)?开始时间[:：]?.*$/i, '')
-      .replace(/\s*[^，。；;|｜]{0,16}报名截止时间[:：]?.*$/i, '')
+      .replace(/\s*(报名中|即将截止|已截止|未开始|活动中|已结束)\s*(其他|夏令营|预推免|正式推免|春令营报名|夏令营报名)?\s*(由请|申请|报名)?开始时间(?:[:：]|在|为)?.*$/i, '')
+      .replace(/\s*[^，。；;|｜]{0,16}报名截止时间(?:[:：]|在|为)?.*$/i, '')
       .replace(/\s*距离(报名)?截止\s*\d+\s*天.*$/i, '')
-      .replace(/\s*(春令营|夏令营)?报名\s*(由请|申请)?开始时间[:：]?.*$/i, '')
+      .replace(/\s*(春令营|夏令营)?报名\s*(由请|申请)?开始时间(?:[:：]|在|为)?.*$/i, '')
       .replace(/\s*[|｜]\s*(春令营|夏令营|预推免|九推|正式推免)?\s*(报名|申请)?\s*(由请|申请|报名)?开始时间.*$/i, '')
+      .replace(/简介(?=.{18,}).*$/i, '简介')
+      .replace(/[。；;！!](?=.{12,}).*$/i, (matched) => matched.slice(0, 1))
       .replace(/\s{2,}/g, ' ')
   );
 
@@ -112,7 +117,7 @@ export function getVerificationLabel(project: Pick<PublicNoticeProject, 'isVerif
     return '已人工复核';
   }
 
-  return project.lastCheckedAt ? '已自动同步，待人工抽检' : '待同步核验';
+  return project.lastCheckedAt ? '自动同步，官网来源' : '待同步核验';
 }
 
 export function buildNoticeFeedbackHref(project: Pick<PublicNoticeProject, 'id' | 'schoolName' | 'projectName'>) {

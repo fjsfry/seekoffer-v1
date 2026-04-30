@@ -36,6 +36,7 @@ export default function AdminOffersPage() {
   const [total, setTotal] = useState(0);
   const [message, setMessage] = useState('正在连接后台真实 Offer 数据...');
   const [pending, setPending] = useState('');
+  const [selectedOffer, setSelectedOffer] = useState<AdminOfferRow | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -74,6 +75,10 @@ export default function AdminOffersPage() {
       setMetrics(data.metrics);
       setFilters(nextFilters);
       setMessage(`已连接 Supabase，共匹配 ${data.total} 条 Offer。`);
+      setSelectedOffer((current) => {
+        if (!current) return null;
+        return data.offers.map(mapOfferApiRow).find((item) => item.id === current.id) || null;
+      });
     } catch (error) {
       setRows([]);
       setMessage(error instanceof Error ? `真实 API 暂不可用：${error.message}` : '真实 API 暂不可用，请稍后重试。');
@@ -106,25 +111,13 @@ export default function AdminOffersPage() {
   }
 
   function previewOffer(offer: AdminOfferRow) {
+    setSelectedOffer(offer);
     setMessage(`已打开 ${offer.school} · ${offer.major} 的 Offer 审核预览。`);
-    window.alert(
-      [
-        `提交用户：${offer.user}`,
-        `申请学校：${offer.school}`,
-        `申请专业：${offer.major}`,
-        `项目类型：${offer.projectType}`,
-        `录取结果：${offer.result}`,
-        `本科背景：${offer.background}`,
-        `是否匿名：${offer.anonymous ? '是' : '否'}`,
-        `提交时间：${offer.submittedAt}`,
-        `审核状态：${offer.status}`
-      ].join('\n')
-    );
   }
 
   return (
-    <AdminShell title="Offer池管理">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+    <AdminShell title="Offer池管理" description="审核用户贡献的 Offer 动态，优先排查隐私、引流和明显虚假内容。">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
           <AdminPanel>
             <div className="grid gap-5 p-5">
@@ -212,9 +205,9 @@ export default function AdminOffersPage() {
                       <td className="px-5 py-4">
                         <div className="flex gap-3 font-medium">
                           <button className="text-blue-600" onClick={() => previewOffer(offer)}>查看</button>
-                          <button className="text-blue-600" onClick={() => updateOfferStatus(offer.id, 'approved', '审核通过 Offer')}>通过</button>
-                          <button className="text-blue-600" onClick={() => updateOfferStatus(offer.id, 'hidden', '后台隐藏 Offer')}>隐藏</button>
-                          <button className="text-rose-600" onClick={() => updateOfferStatus(offer.id, 'deleted', '后台删除 Offer')}>删除</button>
+                          <button className="text-emerald-600" disabled={Boolean(pending)} onClick={() => updateOfferStatus(offer.id, 'approved', '审核通过 Offer')}>通过</button>
+                          <button className="text-slate-600" disabled={Boolean(pending)} onClick={() => updateOfferStatus(offer.id, 'hidden', '后台隐藏 Offer')}>隐藏</button>
+                          <button className="text-rose-600" disabled={Boolean(pending)} onClick={() => updateOfferStatus(offer.id, 'deleted', '后台删除 Offer')}>删除</button>
                         </div>
                       </td>
                     </tr>
@@ -235,11 +228,47 @@ export default function AdminOffersPage() {
           </AdminPanel>
         </div>
 
-        <AdminPanel title="审核提示">
-          <div className="space-y-7 p-5 text-sm leading-7 text-slate-600">
-            <ReviewTip title="检查隐私信息" body="确认 Offer 内容中是否包含姓名、邮箱、电话、地址、身份证号、学号等个人隐私信息。" />
+        <AdminPanel title="Offer审核工作台">
+          <div className="space-y-5 p-5 text-sm leading-7 text-slate-600">
+            {selectedOffer ? (
+              <>
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-lg font-semibold text-slate-950">{selectedOffer.school}</div>
+                      <div className="mt-1 text-slate-500">{selectedOffer.major} · {selectedOffer.projectType}</div>
+                    </div>
+                    <AdminStatusBadge status={selectedOffer.status} />
+                  </div>
+                  <div className="mt-4 grid gap-2">
+                    <DetailItem label="提交用户" value={selectedOffer.user} />
+                    <DetailItem label="录取结果" value={selectedOffer.result} />
+                    <DetailItem label="本科背景" value={selectedOffer.background} />
+                    <DetailItem label="匿名展示" value={selectedOffer.anonymous ? '是' : '否'} />
+                    <DetailItem label="举报数" value={`${selectedOffer.reports}`} />
+                    <DetailItem label="提交时间" value={selectedOffer.submittedAt} />
+                  </div>
+                </div>
+                <div className="grid gap-3">
+                  <AdminButton disabled={Boolean(pending)} onClick={() => updateOfferStatus(selectedOffer.id, 'approved', '审核通过 Offer')}>
+                    通过并展示
+                  </AdminButton>
+                  <AdminButton tone="secondary" disabled={Boolean(pending)} onClick={() => updateOfferStatus(selectedOffer.id, 'hidden', '后台隐藏 Offer')}>
+                    隐藏
+                  </AdminButton>
+                  <AdminButton tone="danger" disabled={Boolean(pending)} onClick={() => updateOfferStatus(selectedOffer.id, 'deleted', '后台删除 Offer')}>
+                    删除
+                  </AdminButton>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-slate-500">
+                请选择一条 Offer 查看完整审核信息。
+              </div>
+            )}
+            <ReviewTip title="检查隐私信息" body="确认内容中是否包含姓名、邮箱、电话、地址、身份证号、学号等个人隐私信息。" />
             <ReviewTip title="检查广告引流" body="确认内容中是否存在引导添加微信、QQ群、外链、二维码等广告引流信息。" />
-            <ReviewTip title="检查内容真实性" body="确认 Offer 内容真实有效，无显著夸大或误导性信息，维护社区可信度。" />
+            <ReviewTip title="检查内容真实性" body="确认内容真实克制，无明显夸大或误导，维护社区可信度。" />
           </div>
         </AdminPanel>
       </div>
@@ -327,6 +356,15 @@ function ReviewTip({ title, body }: { title: string; body: string }) {
       <span className="absolute left-0 top-2 h-2 w-2 rounded-full bg-blue-600" />
       <div className="font-semibold text-slate-950">{title}</div>
       <p className="mt-2">{body}</p>
+    </div>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0">
+      <span className="text-slate-500">{label}</span>
+      <span className="text-right font-semibold text-slate-800">{value || '-'}</span>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import * as React from 'react';
 import type { DeadlineLevel } from '@/lib/mock-data';
+import { getDeadlineBadgeMeta } from '@/lib/deadline-display';
 
 type BadgeTone =
   | 'default'
@@ -63,37 +64,6 @@ function normalizeTone(input?: string | null): BadgeTone {
   return 'default';
 }
 
-function resolveDeadlineMeta(level?: DeadlineLevel | null) {
-  switch (level) {
-    case 'today':
-      return {
-        label: '24 小时内截止',
-        tone: 'danger' as const,
-      };
-    case 'within3days':
-      return {
-        label: '3天内截止',
-        tone: 'warning' as const,
-      };
-    case 'within7days':
-      return {
-        label: '7天内截止',
-        tone: 'info' as const,
-      };
-    case 'expired':
-      return {
-        label: '已截止',
-        tone: 'muted' as const,
-      };
-    case 'future':
-    default:
-      return {
-        label: '可跟进',
-        tone: 'success' as const,
-      };
-  }
-}
-
 const toneClassMap: Record<BadgeTone, string> = {
   default: 'bg-slate-100 text-slate-700 border border-slate-200',
   success: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
@@ -143,7 +113,7 @@ export function DeadlineBadge({
   className?: string;
   size?: BadgeSize;
 }) {
-  const meta = resolveDeadlineMeta(level);
+  const meta = getDeadlineBadgeMeta(level);
 
   return (
     <StatusBadge

@@ -7,6 +7,7 @@ import { ExternalSiteMark } from '@/components/external-site-mark';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge, StatusBadge } from '@/components/status-badge';
+import { getCountdownLabel, getDeadlineLevelFromDate } from '@/lib/deadline-display';
 import {
   buildNoticeFeedbackHref,
   formatNoticeDate,
@@ -25,29 +26,6 @@ import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 
 const visibleNoticeProjects = filterMainNoticeProjects(baseNoticeProjects);
-
-function getCountdown(deadlineDate: string) {
-  const value = new Date(`${deadlineDate.replace(' ', 'T')}:00+08:00`);
-  const now = new Date();
-  const diff = value.getTime() - now.getTime();
-
-  if (Number.isNaN(value.getTime())) {
-    return '截止时间待补充';
-  }
-
-  if (diff <= 0) {
-    return '项目已截止';
-  }
-
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const days = Math.floor(hours / 24);
-
-  if (days >= 1) {
-    return `距截止约 ${days} 天`;
-  }
-
-  return `距截止约 ${hours} 小时`;
-}
 
 export function generateStaticParams() {
   return visibleNoticeProjects.map((item) => ({
@@ -135,7 +113,7 @@ export default async function NoticeDetailPage({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <DeadlineBadge level={project.deadlineLevel} />
+              <DeadlineBadge level={getDeadlineLevelFromDate(project.deadlineDate)} />
               <StatusBadge status={project.status} />
               <span className="rounded-full bg-brand-cream px-3 py-1 text-xs font-semibold text-slate-700">
                 {getDisplayProjectType(project.projectType)}
@@ -161,7 +139,7 @@ export default async function NoticeDetailPage({
                 <Clock3 className="h-4 w-4" />
                 截止倒计时
               </div>
-              <div className="mt-2 text-lg font-semibold text-ink">{getCountdown(project.deadlineDate)}</div>
+              <div className="mt-2 text-lg font-semibold text-ink">{getCountdownLabel(project.deadlineDate)}</div>
             </div>
           </section>
 
@@ -228,7 +206,7 @@ export default async function NoticeDetailPage({
                 rel="noreferrer"
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-brand shadow-sm"
               >
-                查看平台详情页
+                查看官网原文
                 <ArrowUpRight className="h-4 w-4" />
               </a>
               <a

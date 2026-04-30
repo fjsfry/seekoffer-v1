@@ -4,36 +4,34 @@ export type NoticeQualityTier = 'clean' | 'p0' | 'p1' | 'p2';
 
 const dirtyTextPatterns = [
   /seekoffer\s*test/i,
+  /\bdemo\b/i,
   /\btest\b/i,
-  /测试|測試/,
+  /测试|測試|测试数据|占位数据|示例数据/,
   /\?{3,}/,
   /�{2,}/,
-  /锟斤拷|锟�/
+  /锟斤拷|锟�/,
+  /undefined|null/i
 ];
 
 const competitionPatterns = [
+  /榜单赛事/,
   /蓝桥杯/,
   /挑战杯/,
   /互联网\+/,
   /数学建模/,
   /程序设计竞赛/,
   /软件和信息技术大赛/,
+  /高校计算机大赛/,
+  /跨文化能力竞赛/,
+  /竞赛章程/,
   /大学生.*竞赛/,
   /创新创业大赛/,
+  /大赛/,
   /\bACM\b/i,
   /\bICPC\b/i
 ];
 
-const baoyanIntentPatterns = [
-  /推免/,
-  /保研/,
-  /夏令营/,
-  /预推免/,
-  /免试研究生/,
-  /优秀大学生/,
-  /研究生招生/,
-  /接收.*推荐免试/
-];
+const bodyLikeTitlePatterns = [/^通\s*知我院/, /复试工作还在进行中/, /请各位同学及时/, /详见附件/, /具体安排如下/];
 
 function compactText(value: unknown) {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -88,17 +86,32 @@ function isCompetitionOrContest(project: PublicNoticeProject) {
   return competitionPatterns.some((pattern) => pattern.test(text));
 }
 
-function hasBaoyanIntent(project: PublicNoticeProject) {
-  const text = buildNoticeText(project);
-  return baoyanIntentPatterns.some((pattern) => pattern.test(text));
+function hasBodyLikeTitle(project: PublicNoticeProject) {
+  const title = compactText(project.projectName);
+  return bodyLikeTitlePatterns.some((pattern) => pattern.test(title));
+}
+
+function hasBrokenPublicIdentity(project: PublicNoticeProject) {
+  const schoolName = compactText(project.schoolName);
+  const title = compactText(project.projectName);
+
+  return (
+    !schoolName ||
+    !title ||
+    schoolName === '其他' ||
+    schoolName === '待识别院校' ||
+    schoolName === '中国大学' ||
+    /^【.*】/.test(schoolName) ||
+    title.length < 6
+  );
 }
 
 export function getNoticeQualityTier(project: PublicNoticeProject): NoticeQualityTier {
-  if (hasDirtyText(project) || !hasValidDeadline(project)) {
+  if (hasDirtyText(project) || hasBodyLikeTitle(project) || hasBrokenPublicIdentity(project) || !hasValidDeadline(project)) {
     return 'p0';
   }
 
-  if (isCompetitionOrContest(project) && !hasBaoyanIntent(project)) {
+  if (isCompetitionOrContest(project)) {
     return 'p1';
   }
 

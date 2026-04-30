@@ -782,8 +782,7 @@ Deno.serve(async (request) => {
       const before = await service.from('admin_system_settings').select('*').eq('key', key).maybeSingle();
       const { data, error } = await service
         .from('admin_system_settings')
-        .update({ value, updated_by: admin.email, updated_at: new Date().toISOString() })
-        .eq('key', key)
+        .upsert({ key, value, updated_by: admin.email, updated_at: new Date().toISOString() }, { onConflict: 'key' })
         .select()
         .single();
       if (error) throw error;

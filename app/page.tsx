@@ -23,6 +23,7 @@ import { ExternalSiteMark } from '@/components/external-site-mark';
 import { ProductHeroVisual } from '@/components/product-hero-visual';
 import { SiteShell } from '@/components/site-shell';
 import { fetchPublicNotices } from '@/lib/cloudbase-data';
+import { getDeadlineDistanceLabel, getDeadlineLevelFromDate, getDeadlineTimestamp } from '@/lib/deadline-display';
 import {
   formatNoticeDateOnly,
   getDisplayDepartmentName,
@@ -38,26 +39,6 @@ import { offerFeedItems, officialResourceSections } from '@/lib/portal-data';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
 
-function getDeadlineTimestamp(project: PublicNoticeProject) {
-  const date = project.deadlineDate || '9999-12-31 23:59';
-  const timestamp = new Date(`${date.replace(' ', 'T')}:00+08:00`).getTime();
-  return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp;
-}
-
-function getDeadlineHint(project: PublicNoticeProject) {
-  const timestamp = getDeadlineTimestamp(project);
-  if (timestamp === Number.MAX_SAFE_INTEGER) {
-    return '时间待补充';
-  }
-
-  const diffDays = Math.max(0, Math.ceil((timestamp - Date.now()) / (1000 * 60 * 60 * 24)));
-  if (project.deadlineLevel === 'today') {
-    return '24 小时内截止';
-  }
-
-  return diffDays <= 0 ? '已截止' : `${diffDays} 天后`;
-}
-
 export default function HomePage() {
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
     filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
@@ -68,7 +49,7 @@ export default function HomePage() {
 
     fetchPublicNotices().then((rows) => {
       if (active) {
-        setProjects(rows);
+        setProjects(rows.filter((item) => String(item.year) === '2026'));
       }
     });
 
@@ -80,21 +61,21 @@ export default function HomePage() {
   const latestProjects = useMemo(
     () =>
       [...projects]
-        .filter((item) => item.deadlineLevel !== 'expired')
+        .filter((item) => getDeadlineLevelFromDate(item.deadlineDate) !== 'expired')
         .sort((left, right) => right.publishDate.localeCompare(left.publishDate))
         .slice(0, 5),
     [projects]
   );
 
   const riskBuckets = useMemo(() => {
-    const sortedProjects = [...projects].sort((left, right) => getDeadlineTimestamp(left) - getDeadlineTimestamp(right));
+    const sortedProjects = [...projects].sort((left, right) => getDeadlineTimestamp(left.deadlineDate) - getDeadlineTimestamp(right.deadlineDate));
     const pickByLevel = (level: PublicNoticeProject['deadlineLevel']) =>
-      sortedProjects.filter((item) => item.deadlineLevel === level);
+      sortedProjects.filter((item) => getDeadlineLevelFromDate(item.deadlineDate) === level);
 
     return [
       {
         key: 'today',
-        title: '今日截止',
+        title: '24小时内截止',
         count: pickByLevel('today').length,
         items: pickByLevel('today').slice(0, 2)
       },
@@ -161,10 +142,14 @@ export default function HomePage() {
   const priorityActions = useMemo(
     () =>
       [...projects]
-        .filter((item) => item.deadlineLevel !== 'expired')
+        .filter((item) => getDeadlineLevelFromDate(item.deadlineDate) !== 'expired')
         .sort((left, right) => {
           const urgentRank = { today: 0, within3days: 1, within7days: 2, future: 3, expired: 4 } as const;
-          return urgentRank[left.deadlineLevel] - urgentRank[right.deadlineLevel] || right.publishDate.localeCompare(left.publishDate);
+          return (
+            urgentRank[getDeadlineLevelFromDate(left.deadlineDate)] -
+              urgentRank[getDeadlineLevelFromDate(right.deadlineDate)] ||
+            right.publishDate.localeCompare(left.publishDate)
+          );
         })
         .slice(0, 3),
     [projects]
@@ -316,7 +301,7 @@ export default function HomePage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</span>
-                      <DeadlineBadge level={project.deadlineLevel} />
+                      <DeadlineBadge level={getDeadlineLevelFromDate(project.deadlineDate)} />
                     </div>
                     <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500 group-hover:text-brand">
                       {normalizeNoticeTitle(project.projectName, 60)}
@@ -433,7 +418,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end sm:justify-center">
                   <span className="text-xs text-slate-500">截止：{formatNoticeDateOnly(project.deadlineDate)}</span>
-                  <DeadlineBadge level={project.deadlineLevel} />
+                  <DeadlineBadge level={getDeadlineLevelFromDate(project.deadlineDate)} />
                   <span className="rounded-xl border border-brand/20 px-3 py-2 text-xs font-semibold text-brand">查看详情</span>
                 </div>
               </Link>
@@ -489,7 +474,9 @@ export default function HomePage() {
                           >
                             {formatNoticeDateOnly(project.deadlineDate)}
                           </span>
-                          <span className="mt-1 block text-[11px] text-slate-400">{getDeadlineHint(project)}</span>
+                          <span className="mt-1 block text-[11px] text-slate-400">
+                            {getDeadlineDistanceLabel(project.deadlineDate)}
+                          </span>
                         </span>
                       </Link>
                     ))

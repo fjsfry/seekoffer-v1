@@ -495,7 +495,7 @@ function SettingsView({
   onNotify: (message: string) => void;
 }) {
   function roleMessage(role: string) {
-    onNotify(`${role} 的权限编辑入口已接通：第一版先保留为运营提示，后续接入细粒度权限表。`);
+    onNotify(`${role} 的细粒度权限编辑暂未开放。当前版本只允许超级管理员在 Supabase 后台维护管理员名单。`);
   }
 
   return (
@@ -504,10 +504,10 @@ function SettingsView({
         <SimpleTable
           columns={['角色', '权限范围', '高危权限', '成员数', '操作']}
           rows={[
-            ['超级管理员', '全部权限', '删除 / 封禁 / 导出 / 配置', '1', <button key="edit-super" className="text-blue-600" onClick={() => roleMessage('超级管理员')}>编辑</button>],
-            ['内容审核员', '通知与Offer审核', '下架内容', '3', <button key="edit-review" className="text-blue-600" onClick={() => roleMessage('内容审核员')}>编辑</button>],
-            ['运营管理员', '用户、反馈、内容处理', '限制用户', '2', <button key="edit-ops" className="text-blue-600" onClick={() => roleMessage('运营管理员')}>编辑</button>],
-            ['只读管理员', '只读数据', '无', '1', <button key="edit-read" className="text-blue-600" onClick={() => roleMessage('只读管理员')}>编辑</button>]
+            ['超级管理员', '全部权限', '删除 / 封禁 / 导出 / 配置', '1', <button key="edit-super" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('超级管理员')}>查看说明</button>],
+            ['内容审核员', '通知与Offer审核', '下架内容', '3', <button key="edit-review" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('内容审核员')}>查看说明</button>],
+            ['运营管理员', '用户、反馈、内容处理', '限制用户', '2', <button key="edit-ops" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('运营管理员')}>查看说明</button>],
+            ['只读管理员', '只读数据', '无', '1', <button key="edit-read" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('只读管理员')}>查看说明</button>]
           ]}
         />
       </AdminPanel>

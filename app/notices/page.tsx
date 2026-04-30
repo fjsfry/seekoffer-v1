@@ -25,6 +25,12 @@ import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge, StatusBadge } from '@/components/status-badge';
 import { fetchPublicNotices } from '@/lib/cloudbase-data';
 import {
+  getDaysUntilDeadline,
+  getDeadlineDistanceLabel,
+  getDeadlineLevelFromDate,
+  getDeadlineTimestamp
+} from '@/lib/deadline-display';
+import {
   formatNoticeDateOnly,
   getDisplayDepartmentName,
   getDisplayDiscipline,
@@ -44,12 +50,34 @@ type ProgressFilter = '全部' | '报名中' | '未开始' | '已结束';
 type RangeFilter = '全部' | '985' | '211' | '双一流' | '其他';
 
 const PAGE_SIZE = 8;
+const CITY_TAGS = new Set([
+  '北京',
+  '上海',
+  '广州',
+  '深圳',
+  '南京',
+  '杭州',
+  '天津',
+  '武汉',
+  '成都',
+  '西安',
+  '合肥',
+  '苏州',
+  '重庆',
+  '长沙',
+  '厦门',
+  '青岛',
+  '哈尔滨',
+  '香港',
+  '澳门'
+]);
 
 function matchesProgress(filter: ProgressFilter, project: PublicNoticeProject) {
+  const deadlineLevel = getDeadlineLevelFromDate(project.deadlineDate);
   if (filter === '全部') return true;
-  if (filter === '报名中') return project.status === '报名中' || project.status === '即将截止';
+  if (filter === '报名中') return deadlineLevel !== 'expired' && (project.status === '报名中' || project.status === '即将截止');
   if (filter === '未开始') return project.status === '未开始';
-  return project.status === '已截止' || project.status === '已结束' || project.status === '活动中';
+  return deadlineLevel === 'expired' || project.status === '已截止' || project.status === '已结束' || project.status === '活动中';
 }
 
 function getVisiblePages(currentPage: number, totalPages: number) {
@@ -91,16 +119,11 @@ function getNoticeCardTags(project: PublicNoticeProject) {
 }
 
 function parseDeadline(project: PublicNoticeProject) {
-  const date = project.deadlineDate || '9999-12-31 23:59';
-  const timestamp = new Date(`${date.replace(' ', 'T')}:00+08:00`).getTime();
-  return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp;
+  return getDeadlineTimestamp(project.deadlineDate);
 }
 
 function getDaysLeft(project: PublicNoticeProject) {
-  const timestamp = parseDeadline(project);
-  if (timestamp === Number.MAX_SAFE_INTEGER) return null;
-
-  return Math.max(0, Math.ceil((timestamp - Date.now()) / (1000 * 60 * 60 * 24)));
+  return getDaysUntilDeadline(project.deadlineDate);
 }
 
 function getBeijingDateString(date = new Date()) {
@@ -118,8 +141,8 @@ function getBeijingDateString(date = new Date()) {
 function sortProjects(rows: PublicNoticeProject[], sortBy: SortOption) {
   return rows.sort((left, right) => {
     if (sortBy === 'deadline') {
-      const leftExpired = left.deadlineLevel === 'expired' ? 1 : 0;
-      const rightExpired = right.deadlineLevel === 'expired' ? 1 : 0;
+      const leftExpired = getDeadlineLevelFromDate(left.deadlineDate) === 'expired' ? 1 : 0;
+      const rightExpired = getDeadlineLevelFromDate(right.deadlineDate) === 'expired' ? 1 : 0;
 
       if (leftExpired !== rightExpired) {
         return leftExpired - rightExpired;
@@ -137,7 +160,7 @@ function sortProjects(rows: PublicNoticeProject[], sortBy: SortOption) {
 }
 
 function getCityTag(project: PublicNoticeProject) {
-  return (project.tags || []).find((tag) => /北京|上海|广州|南京|杭州|天津|武汉|成都|西安|合肥|苏州|香港/.test(tag));
+  return (project.tags || []).map((tag) => tag.trim()).find((tag) => CITY_TAGS.has(tag));
 }
 
 export default function NoticesPage() {
@@ -258,7 +281,12 @@ export default function NoticesPage() {
     { label: '今日更新', value: `${todayUpdateCount}`, icon: BookOpenText },
     {
       label: '3天内截止',
-      value: `${projects.filter((item) => item.deadlineLevel === 'today' || item.deadlineLevel === 'within3days').length}`,
+      value: `${
+        projects.filter((item) => {
+          const level = getDeadlineLevelFromDate(item.deadlineDate);
+          return level === 'today' || level === 'within3days';
+        }).length
+      }`,
       icon: Clock3
     }
   ];
@@ -266,25 +294,31 @@ export default function NoticesPage() {
   const urgentProjects = useMemo(
     () =>
       sortProjects(
-        projects.filter((item) => ['today', 'within3days', 'within7days'].includes(item.deadlineLevel)),
+        projects.filter((item) => ['today', 'within3days', 'within7days'].includes(getDeadlineLevelFromDate(item.deadlineDate))),
         'deadline'
       ).slice(0, 5),
     [projects]
   );
 
-  const weeklyUpdates = useMemo(() => {
+  const todayUpdates = useMemo(() => {
     const counts = new Map<string, number>();
-    projects
-      .filter((item) => item.publishDate >= latestPublishDate.slice(0, 7))
-      .forEach((item) => {
-        const school = getDisplaySchoolName(item.schoolName);
-        counts.set(school, (counts.get(school) || 0) + 1);
-      });
+    const todayRows = projects.filter((item) => item.publishDate === todayInBeijing);
+    const fallbackRows = latestPublishDate ? projects.filter((item) => item.publishDate === latestPublishDate) : [];
+    const rows = todayRows.length ? todayRows : fallbackRows;
 
-    return Array.from(counts.entries())
-      .sort((left, right) => right[1] - left[1])
-      .slice(0, 5);
-  }, [projects, latestPublishDate]);
+    rows.forEach((item) => {
+      const school = getDisplaySchoolName(item.schoolName);
+      counts.set(school, (counts.get(school) || 0) + 1);
+    });
+
+    return {
+      date: todayRows.length ? todayInBeijing : latestPublishDate,
+      hasTodayRows: todayRows.length > 0,
+      rows: Array.from(counts.entries())
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 5)
+    };
+  }, [projects, todayInBeijing, latestPublishDate]);
 
   function updatePage(nextPage: number | ((currentPage: number) => number)) {
     setPageState((current) => {
@@ -473,7 +507,8 @@ export default function NoticesPage() {
           {pagedProjects.map((project, index) => {
             const daysLeft = getDaysLeft(project);
             const city = getCityTag(project);
-            const highlighted = currentPage === 1 && index === 0 && project.deadlineLevel !== 'expired';
+            const deadlineLevel = getDeadlineLevelFromDate(project.deadlineDate);
+            const highlighted = currentPage === 1 && index === 0 && deadlineLevel !== 'expired';
 
             return (
               <article
@@ -501,7 +536,7 @@ export default function NoticesPage() {
                       <h2 className="shrink-0 text-lg font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</h2>
                       <span className="min-w-0 truncate text-sm text-slate-500">{getDisplayDepartmentName(project.departmentName)}</span>
                       <span className="shrink-0">
-                        <DeadlineBadge level={project.deadlineLevel} />
+                        <DeadlineBadge level={deadlineLevel} />
                       </span>
                     </div>
                     <Link
@@ -509,7 +544,7 @@ export default function NoticesPage() {
                       className="mt-2 line-clamp-2 min-h-[3.5rem] text-lg font-semibold leading-7 text-slate-800 hover:text-brand"
                       title={normalizeNoticeTitle(project.projectName, 160)}
                     >
-                      {normalizeNoticeTitle(project.projectName, 160)}
+                      {normalizeNoticeTitle(project.projectName, 86)}
                     </Link>
                     <div className="mt-3 flex h-5 items-center gap-3 overflow-hidden text-xs text-slate-500">
                       <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
@@ -546,7 +581,7 @@ export default function NoticesPage() {
                     <div className="text-right text-sm">
                       <div className="font-semibold text-brand">截止 {formatNoticeDateOnly(project.deadlineDate)}</div>
                       <div className="mt-1 text-slate-500">
-                        {daysLeft === null ? '时间待补充' : project.deadlineLevel === 'expired' ? '已截止' : `剩余 ${daysLeft} 天`}
+                        {daysLeft === null ? '时间待补充' : getDeadlineDistanceLabel(project.deadlineDate)}
                       </div>
                     </div>
                     <div className="grid w-full gap-2 sm:w-[150px]">
@@ -615,7 +650,9 @@ export default function NoticesPage() {
                     <Link key={project.id} href={buildNoticeDetailHref(project.id)} className="grid gap-1 rounded-xl p-2 hover:bg-slate-50">
                       <div className="flex items-center justify-between gap-3 text-sm">
                         <span className="font-semibold text-slate-700">{getDisplaySchoolName(project.schoolName)}</span>
-                        <span className="font-semibold text-rose-500">{daysLeft ?? '-'} 天后</span>
+                        <span className="font-semibold text-rose-500">
+                          {daysLeft === null ? '-' : getDeadlineDistanceLabel(project.deadlineDate)}
+                        </span>
                       </div>
                       <div className="line-clamp-1 text-xs text-slate-500">{normalizeNoticeTitle(project.projectName, 34)}</div>
                       <div className="text-xs text-slate-400">{formatNoticeDateOnly(project.deadlineDate)} 截止</div>
@@ -628,14 +665,23 @@ export default function NoticesPage() {
             </div>
           </SideCard>
 
-          <SideCard title="本周更新" icon={RefreshCw}>
+          <SideCard title="今日更新" icon={RefreshCw}>
             <div className="grid gap-3">
-              {weeklyUpdates.map(([school, count]) => (
-                <div key={school} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-slate-700">{school}</span>
-                  <span className="font-semibold text-slate-500">{count} 条</span>
+              {!todayUpdates.hasTodayRows && todayUpdates.date ? (
+                <div className="rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500">
+                  暂无今日新增，以下显示最近同步日 {todayUpdates.date} 的更新。
                 </div>
-              ))}
+              ) : null}
+              {todayUpdates.rows.length ? (
+                todayUpdates.rows.map(([school, count]) => (
+                  <div key={school} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-slate-700">{school}</span>
+                    <span className="font-semibold text-slate-500">{count} 条</span>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-400">暂无更新记录。</div>
+              )}
             </div>
           </SideCard>
 
