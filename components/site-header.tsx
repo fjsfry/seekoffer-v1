@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, Brain, BriefcaseBusiness, Building2, Heart, House, Newspaper, Search, Sparkles } from 'lucide-react';
+import { BookOpen, Brain, BriefcaseBusiness, Building2, Heart, House, Newspaper, Search } from 'lucide-react';
 import { SeekofferLogo } from './seekoffer-logo';
 import { UserSessionEntry } from './user-session-entry';
 
@@ -13,7 +13,6 @@ const navItems = [
   { href: '/resources', label: '资源库', icon: BookOpen },
   { href: '/offers', label: 'Offer 池', icon: Heart },
   { href: '/ai', label: 'AI 定位', icon: Brain },
-  { href: '/pro', label: 'Pro', icon: Sparkles },
   { href: '/me', label: '工作台', icon: BriefcaseBusiness }
 ];
 

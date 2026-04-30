@@ -4,6 +4,7 @@ import { getSupabaseBrowserClient } from './supabase-browser';
 import { SUPABASE_URL } from './supabase-env';
 
 export const FREE_APPLICATION_LIMIT = 5;
+export const PRO_FEATURE_ENABLED = false;
 
 export type BillingProvider = 'wechat' | 'alipay';
 
@@ -156,6 +157,14 @@ export function clearBillingEntitlementCache() {
 }
 
 export async function canCreateMoreApplications(currentCount: number) {
+  if (!PRO_FEATURE_ENABLED) {
+    return {
+      allowed: true,
+      isPro: false,
+      freeLimit: FREE_APPLICATION_LIMIT
+    };
+  }
+
   if (currentCount < FREE_APPLICATION_LIMIT) {
     return {
       allowed: true,

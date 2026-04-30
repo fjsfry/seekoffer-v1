@@ -6,7 +6,7 @@ const siteUrl = 'https://www.seekoffer.com.cn';
 
 export const dynamic = 'force-static';
 
-const staticRoutes = ['/', '/notices', '/colleges', '/resources', '/offers', '/ai', '/pro', '/me', '/data-quality', '/about', '/terms', '/privacy', '/disclaimer'];
+const staticRoutes = ['/', '/notices', '/colleges', '/resources', '/offers', '/ai', '/me', '/data-quality', '/about', '/terms', '/privacy', '/disclaimer'];
 
 function toAbsoluteUrl(path: string) {
   return new URL(path, siteUrl).toString();

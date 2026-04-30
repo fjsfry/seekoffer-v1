@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Check, LoaderCircle, Plus } from 'lucide-react';
 import { addProjectToApplicationTable, fetchUserProjects, watchApplicationTable } from '@/lib/cloudbase-data';
@@ -97,16 +96,7 @@ export function ApplicationActionButton({
           {added ? '已加入我的申请表' : pending ? '加入中...' : '加入我的申请表'}
         </span>
       </button>
-      {message ? (
-        <div className="text-xs leading-5 text-rose-600">
-          {message}
-          {message.includes('免费版最多') ? (
-            <Link href="/pro" className="ml-1 font-semibold text-brand underline underline-offset-2">
-              查看 Pro
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
+      {message ? <div className="text-xs leading-5 text-rose-600">{message}</div> : null}
     </div>
   );
 }
