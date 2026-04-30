@@ -10,8 +10,11 @@ import {
   ClipboardList,
   Crown,
   Download,
+  ExternalLink,
   LoaderCircle,
   Lock,
+  Mail,
+  MessageCircle,
   QrCode,
   ShieldCheck,
   Sparkles,
@@ -29,6 +32,9 @@ import {
 } from '@/lib/billing-api';
 import { openAuthModal, writeAuthIntent } from '@/lib/auth-intent';
 import { useProEntitlement } from '@/hooks/use-pro-entitlement';
+
+const CONTACT_EMAIL = 'seekoffer@qq.com';
+const QQ_GROUP = '1092490793';
 
 const fallbackPlans: BillingPlan[] = [
   {
@@ -79,7 +85,7 @@ const valueCards = [
   },
   {
     title: '材料清单与日历',
-    description: '把每个项目拆成材料进度、截止时间和行动清单，未来支持日历和导出。',
+    description: '把每个项目拆成材料进度、截止时间和行动清单，后续支持日历和导出。',
     icon: CalendarDays
   },
   {
@@ -91,9 +97,27 @@ const valueCards = [
 
 const roadmap = [
   '材料清单自动拆解：从通知正文提取成绩单、推荐信、个人陈述、科研证明等材料项。',
-  '日历视图：按周/月查看截止、面试、材料节点，支持未来导出到系统日历。',
+  '日历视图：按周/月查看截止、面试、材料节点，并支持导出到系统日历。',
   '申请优先级：结合截止时间、材料复杂度和个人背景，提示今天最值得处理的项目。',
   '通知变更提醒：当官网原文发生变化时，提示字段差异和需要重新确认的内容。'
+] as const;
+
+const compliancePaths = [
+  {
+    title: '推荐路径：办理个体工商户后直连',
+    body: '用于正式商业化最稳。拿到主体资质后，申请微信支付商户号和支付宝商家能力，回调自动开通 Pro。',
+    tone: 'green'
+  },
+  {
+    title: '过渡路径：小范围内测人工开通',
+    body: `当前可以先生成 Pro 意向单，通过 ${CONTACT_EMAIL} 或 QQ 群 ${QQ_GROUP} 人工核对后开通，适合灰度验证价格和需求。`,
+    tone: 'blue'
+  },
+  {
+    title: '不建议：免签支付/跑分码/个人收款码聚合',
+    body: '这类方案容易触发资金、风控和售后风险，也不利于未来备案、退款、发票和用户信任。',
+    tone: 'amber'
+  }
 ] as const;
 
 function getPlanUnit(plan: BillingPlan) {
@@ -105,6 +129,24 @@ function getPlanUnit(plan: BillingPlan) {
 function formatDateTime(value: string | null | undefined) {
   if (!value) return '暂未开通';
   return value.slice(0, 16).replace('T', ' ');
+}
+
+function buildManualMailHref(checkout: CreateBillingOrderResponse | null, plan: BillingPlan) {
+  const subject = encodeURIComponent('Seekoffer Pro 内测开通');
+  const body = encodeURIComponent(
+    [
+      '你好，我想开通 Seekoffer Pro。',
+      '',
+      `套餐：${plan.name}`,
+      `金额：${formatPlanPrice(plan.price_cents)}`,
+      checkout ? `订单号：${checkout.order.out_trade_no}` : '订单号：尚未生成',
+      '',
+      '我的登录邮箱：',
+      '付款/开通备注：'
+    ].join('\n')
+  );
+
+  return `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
 }
 
 export default function ProPage() {
@@ -169,7 +211,11 @@ export default function ProPage() {
     try {
       const response = await createBillingOrder(selectedPlan.id, provider);
       setCheckout(response);
-      setMessage(response.payment.message);
+      setMessage(
+        response.payment.configured
+          ? response.payment.message
+          : '当前自动支付通道还在资质接入中，已为你生成内测开通意向单。请通过邮箱或 QQ 群联系运营核对后开通。'
+      );
       await entitlement.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '订单创建失败，请稍后重试。');
@@ -316,7 +362,11 @@ export default function ProPage() {
         </div>
 
         <aside className="rounded-[34px] border border-slate-200/80 bg-white p-6 shadow-soft lg:p-7">
-          <div className="text-sm font-semibold text-brand">支付方式</div>
+          <div className="text-sm font-semibold text-brand">支付与开通</div>
+          <div className="mt-3 rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
+            正式微信/支付宝支付需要商户资质。当前可以先生成内测意向单，由运营人工核对并开通；正式商户号配置完成后，会自动切换为扫码支付。
+          </div>
+
           <div className="mt-4 grid grid-cols-2 gap-3">
             {[
               { value: 'wechat' as const, label: '微信支付' },
@@ -353,7 +403,7 @@ export default function ProPage() {
             className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-4 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(20,91,87,0.18)] disabled:opacity-60"
           >
             {creating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-            {creating ? '正在创建订单...' : loggedIn && isMember ? '创建扫码支付订单' : '登录后升级 Pro'}
+            {creating ? '正在创建订单...' : loggedIn && isMember ? '创建 Pro 开通单' : '登录后升级 Pro'}
           </button>
 
           {message ? (
@@ -379,17 +429,69 @@ export default function ProPage() {
                     className="mt-2 h-24 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs outline-none"
                   />
                   <div className="mt-2 text-xs leading-5 text-slate-500">
-                    正式上线前建议接入本地二维码渲染组件；当前先保留支付码内容用于联调。
+                    商户号配置完成后，这里会渲染正式扫码二维码，并通过异步回调自动开通权益。
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="mt-4 rounded-2xl bg-slate-50 p-3 text-xs leading-5 text-slate-500">
+                  当前没有正式支付二维码。请通过下方联系方式提交订单号，运营核对后人工开通。
+                </div>
+              )}
             </div>
           ) : null}
 
-          <div className="mt-5 rounded-3xl border border-brand/10 bg-brand/[0.04] p-4 text-xs leading-6 text-brand/85">
-            支付成功后由微信/支付宝异步回调自动开通权益。当前如果还没有商户号、应用私钥和回调地址，系统会创建订单但不会向用户展示扣款入口。
+          <div className="mt-5 grid gap-3">
+            <a
+              href={buildManualMailHref(checkout, selectedPlan)}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-brand hover:border-brand/40"
+            >
+              <Mail className="h-4 w-4" />
+              邮件联系开通
+            </a>
+            <div className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+              <MessageCircle className="h-4 w-4 text-brand" />
+              QQ 交流群：{QQ_GROUP}
+            </div>
           </div>
         </aside>
+      </section>
+
+      <section className="rounded-[34px] border border-slate-200/80 bg-white p-6 shadow-soft lg:p-8">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-brand">
+              <ShieldCheck className="h-4 w-4" />
+              Payment Readiness
+            </div>
+            <h2 className="mt-4 text-3xl font-semibold text-ink">没有营业执照时，先这样稳妥推进</h2>
+          </div>
+          <a
+            href="https://pay.weixin.qq.com/"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:text-brand"
+          >
+            查看商户平台
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        </div>
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          {compliancePaths.map((item) => (
+            <article
+              key={item.title}
+              className={`rounded-[26px] border p-5 ${
+                item.tone === 'green'
+                  ? 'border-emerald-200 bg-emerald-50'
+                  : item.tone === 'blue'
+                    ? 'border-blue-200 bg-blue-50'
+                    : 'border-amber-200 bg-amber-50'
+              }`}
+            >
+              <h3 className="text-lg font-semibold text-ink">{item.title}</h3>
+              <p className="mt-3 text-sm leading-7 text-slate-600">{item.body}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="rounded-[34px] border border-slate-200/80 bg-white p-6 shadow-soft lg:p-8">
