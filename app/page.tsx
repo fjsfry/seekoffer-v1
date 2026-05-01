@@ -63,7 +63,7 @@ export default function HomePage() {
       [...projects]
         .filter((item) => getDeadlineLevelFromDate(item.deadlineDate) !== 'expired')
         .sort((left, right) => right.publishDate.localeCompare(left.publishDate))
-        .slice(0, 5),
+        .slice(0, 3),
     [projects]
   );
 
@@ -196,14 +196,14 @@ export default function HomePage() {
               className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3.5 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
             >
               <FileText className="h-4 w-4" />
-              查看通知
+              找到可申请项目
             </Link>
             <Link
               href="/me"
               className="inline-flex items-center gap-2 rounded-xl border border-brand/30 bg-white px-6 py-3.5 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5 hover:border-brand"
             >
               <Grid3X3 className="h-4 w-4" />
-              进入工作台
+              免费创建申请表
             </Link>
           </div>
         </div>
@@ -383,7 +383,7 @@ export default function HomePage() {
               <p className="mt-2 text-sm text-slate-500">按发布时间同步，优先展示 2026 年公开院校通知。</p>
             </div>
             <Link href="/notices" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
-              查看更多
+              进入通知库
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -427,7 +427,7 @@ export default function HomePage() {
 
           <div className="mt-5 text-center">
             <Link href="/notices" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
-              查看更多通知
+              查看全部通知并加入申请表
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

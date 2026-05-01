@@ -22,7 +22,7 @@ import {
 import { ApplicationActionButton } from '@/components/application-action-button';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
-import { DeadlineBadge, StatusBadge } from '@/components/status-badge';
+import { DeadlineBadge } from '@/components/status-badge';
 import { fetchPublicNotices } from '@/lib/cloudbase-data';
 import {
   getDaysUntilDeadline,
@@ -48,6 +48,7 @@ import type { PublicNoticeProject } from '@/lib/mock-data';
 type SortOption = 'deadline' | 'publish' | 'school';
 type ProgressFilter = '全部' | '报名中' | '未开始' | '已结束';
 type RangeFilter = '全部' | '985' | '211' | '双一流' | '其他';
+type DeadlineQuickFilter = '全部' | 'within7days';
 
 const PAGE_SIZE = 8;
 const CITY_TAGS = new Set([
@@ -163,6 +164,15 @@ function getCityTag(project: PublicNoticeProject) {
   return (project.tags || []).map((tag) => tag.trim()).find((tag) => CITY_TAGS.has(tag));
 }
 
+const quickFilters = [
+  { label: '报名中', kind: 'progress', value: '报名中' },
+  { label: '7天内截止', kind: 'deadline', value: 'within7days' },
+  { label: '985', kind: 'range', value: '985' },
+  { label: '211', kind: 'range', value: '211' },
+  { label: '夏令营', kind: 'type', value: '夏令营' },
+  { label: '预推免', kind: 'type', value: '预推免' }
+] as const;
+
 export default function NoticesPage() {
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
     filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
@@ -174,6 +184,7 @@ export default function NoticesPage() {
   const [discipline, setDiscipline] = useState('全部');
   const [schoolRange, setSchoolRange] = useState<RangeFilter>('全部');
   const [progress, setProgress] = useState<ProgressFilter>('全部');
+  const [deadlineQuick, setDeadlineQuick] = useState<DeadlineQuickFilter>('全部');
   const [projectType, setProjectType] = useState('全部');
   const [year, setYear] = useState('2026');
   const [sortBy, setSortBy] = useState<SortOption>('publish');
@@ -187,6 +198,7 @@ export default function NoticesPage() {
     discipline,
     schoolRange,
     progress,
+    deadlineQuick,
     projectType,
     year,
     sortBy
@@ -237,6 +249,10 @@ export default function NoticesPage() {
         !majorText ||
         [item.discipline, item.departmentName, item.projectName, item.tags.join(' ')].join(' ').toLowerCase().includes(majorText);
       const matchesProgressState = matchesProgress(progress, item);
+      const matchesDeadlineQuick =
+        deadlineQuick === '全部'
+          ? true
+          : ['today', 'within3days', 'within7days'].includes(getDeadlineLevelFromDate(item.deadlineDate));
       const matchesYear = year === '全部' ? true : String(item.year) === year;
       const matchesKeyword =
         !noticeKeyword ||
@@ -259,13 +275,14 @@ export default function NoticesPage() {
         matchesDiscipline &&
         matchesMajor &&
         matchesProgressState &&
+        matchesDeadlineQuick &&
         matchesYear &&
         matchesKeyword
       );
     });
 
     return sortProjects(rows, sortBy);
-  }, [projects, keyword, schoolName, majorKeyword, category, discipline, schoolRange, progress, projectType, year, sortBy]);
+  }, [projects, keyword, schoolName, majorKeyword, category, discipline, schoolRange, progress, deadlineQuick, projectType, year, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
   const requestedPage = pageState.filterKey === filterKey ? pageState.page : 1;
@@ -340,9 +357,37 @@ export default function NoticesPage() {
     setDiscipline('全部');
     setSchoolRange('全部');
     setProgress('全部');
+    setDeadlineQuick('全部');
     setProjectType('全部');
     setYear('2026');
     setSortBy('publish');
+  }
+
+  function applyQuickFilter(filter: (typeof quickFilters)[number]) {
+    if (filter.kind === 'progress') {
+      setProgress(filter.value as ProgressFilter);
+    }
+
+    if (filter.kind === 'deadline') {
+      setProgress('报名中');
+      setDeadlineQuick('within7days');
+      setSortBy('deadline');
+    }
+
+    if (filter.kind === 'range') {
+      setSchoolRange(filter.value as RangeFilter);
+    }
+
+    if (filter.kind === 'type') {
+      setProjectType(filter.value);
+    }
+  }
+
+  function isQuickFilterActive(filter: (typeof quickFilters)[number]) {
+    if (filter.kind === 'progress') return progress === filter.value;
+    if (filter.kind === 'deadline') return deadlineQuick === 'within7days';
+    if (filter.kind === 'range') return schoolRange === filter.value;
+    return projectType === filter.value;
   }
 
   return (
@@ -417,51 +462,64 @@ export default function NoticesPage() {
           </button>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-4 xl:grid-cols-[repeat(5,minmax(0,1fr))_132px]">
-          <FilterSelect label="年份" value={year} onChange={setYear}>
-            <option value="2026">2026</option>
-            <option value="全部">全部</option>
-          </FilterSelect>
-          <FilterSelect label="学校层次" value={schoolRange} onChange={(value) => setSchoolRange(value as RangeFilter)}>
-            {(['全部', '985', '211', '双一流', '其他'] as RangeFilter[]).map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </FilterSelect>
-          <FilterInput label="城市 / 学校" value={schoolName} onChange={setSchoolName} placeholder="全部" />
-          <FilterSelect
-            label="学科"
-            value={category}
-            onChange={(value) => {
-              setCategory(value);
-              setDiscipline('全部');
-            }}
-          >
-            {categoryOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </FilterSelect>
-          <FilterSelect label="状态" value={progress} onChange={(value) => setProgress(value as ProgressFilter)}>
-            {(['全部', '报名中', '未开始', '已结束'] as ProgressFilter[]).map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </FilterSelect>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs font-semibold text-slate-400">快捷筛选</span>
+          {quickFilters.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => applyQuickFilter(item)}
+              className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${
+                isQuickFilterActive(item) ? 'bg-brand text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-brand/8 hover:text-brand'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
           <button
             type="button"
             onClick={resetFilters}
-            className="h-12 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-500 transition hover:border-brand hover:text-brand"
+            className="ml-auto rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-brand hover:text-brand"
           >
             重置
           </button>
         </div>
 
         {advancedOpen ? (
-          <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-3">
+          <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-3 xl:grid-cols-4">
+            <FilterSelect label="年份" value={year} onChange={setYear}>
+              <option value="2026">2026</option>
+              <option value="全部">全部</option>
+            </FilterSelect>
+            <FilterSelect label="学校层次" value={schoolRange} onChange={(value) => setSchoolRange(value as RangeFilter)}>
+              {(['全部', '985', '211', '双一流', '其他'] as RangeFilter[]).map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </FilterSelect>
+            <FilterInput label="城市 / 学校" value={schoolName} onChange={setSchoolName} placeholder="全部" />
+            <FilterSelect
+              label="学科"
+              value={category}
+              onChange={(value) => {
+                setCategory(value);
+                setDiscipline('全部');
+              }}
+            >
+              {categoryOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </FilterSelect>
+            <FilterSelect label="状态" value={progress} onChange={(value) => setProgress(value as ProgressFilter)}>
+              {(['全部', '报名中', '未开始', '已结束'] as ProgressFilter[]).map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </FilterSelect>
             <FilterInput label="专业关键词" value={majorKeyword} onChange={setMajorKeyword} placeholder="例如 人工智能" />
             <FilterSelect label="细分专业" value={discipline} onChange={setDiscipline}>
               {disciplineOptions.map((item) => (
@@ -513,7 +571,7 @@ export default function NoticesPage() {
             return (
               <article
                 key={project.id}
-                className={`relative min-h-[236px] overflow-hidden rounded-[26px] border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft sm:h-[236px] ${
+                className={`relative min-h-[210px] overflow-hidden rounded-[26px] border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft sm:min-h-[210px] ${
                   highlighted ? 'border-emerald-300 bg-emerald-50/35' : 'border-slate-200'
                 }`}
               >
@@ -523,7 +581,7 @@ export default function NoticesPage() {
                   </div>
                 ) : null}
 
-                <div className="grid h-full gap-5 sm:grid-cols-[76px_minmax(0,1fr)_190px]">
+                <div className="grid h-full gap-5 sm:grid-cols-[70px_minmax(0,1fr)_176px]">
                   <ExternalSiteMark
                     source={resolveNoticeLogoSource(project)}
                     label={getDisplaySchoolName(project.schoolName)}
@@ -532,21 +590,21 @@ export default function NoticesPage() {
                   />
 
                   <div className="flex h-full min-w-0 flex-col overflow-hidden">
-                    <div className="flex min-w-0 items-center gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <h2 className="shrink-0 text-lg font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</h2>
-                      <span className="min-w-0 truncate text-sm text-slate-500">{getDisplayDepartmentName(project.departmentName)}</span>
                       <span className="shrink-0">
                         <DeadlineBadge level={deadlineLevel} />
                       </span>
                     </div>
                     <Link
                       href={buildNoticeDetailHref(project.id)}
-                      className="mt-2 line-clamp-2 min-h-[3.5rem] text-lg font-semibold leading-7 text-slate-800 hover:text-brand"
+                      className="mt-2 line-clamp-2 min-h-[3.35rem] text-lg font-semibold leading-7 text-slate-800 hover:text-brand"
                       title={normalizeNoticeTitle(project.projectName, 160)}
                     >
                       {normalizeNoticeTitle(project.projectName, 86)}
                     </Link>
                     <div className="mt-3 flex h-5 items-center gap-3 overflow-hidden text-xs text-slate-500">
+                      <span className="min-w-0 truncate">{getDisplayDepartmentName(project.departmentName)}</span>
                       <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
                         <CalendarDays className="h-3.5 w-3.5" />
                         发布于 {formatNoticeDateOnly(project.publishDate)}
@@ -568,16 +626,10 @@ export default function NoticesPage() {
                         </span>
                       ))}
                     </div>
-                    <div className="mt-auto flex gap-2 pt-3 text-xs font-semibold">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-brand">
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        官网来源
-                      </span>
-                    </div>
+                    <div className="mt-auto pt-3 text-xs font-semibold text-brand">官网来源 · 以原文为准</div>
                   </div>
 
                   <div className="grid gap-3 sm:h-full sm:justify-items-end">
-                    <StatusBadge status={project.status} />
                     <div className="text-right text-sm">
                       <div className="font-semibold text-brand">截止 {formatNoticeDateOnly(project.deadlineDate)}</div>
                       <div className="mt-1 text-slate-500">
@@ -587,7 +639,7 @@ export default function NoticesPage() {
                     <div className="grid w-full gap-2 sm:w-[150px]">
                       <Link
                         href={buildNoticeDetailHref(project.id)}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-deep"
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-brand/20 bg-white px-4 text-sm font-semibold text-brand transition hover:border-brand"
                       >
                         查看详情
                         <ArrowRight className="h-4 w-4" />

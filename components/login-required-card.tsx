@@ -2,16 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowRight, BellRing, CheckSquare2, ClipboardList, LockKeyhole } from 'lucide-react';
+import { ArrowRight, BellRing, CheckSquare2, ClipboardList, LockKeyhole, Sparkles } from 'lucide-react';
 import { openAuthModal, type AuthIntent, writeAuthIntent } from '@/lib/auth-intent';
 import type { AuthRequirement } from '@/lib/user-session';
 
 export function LoginRequiredCard({
-  title = '登录后开启你的工作台',
-  description = '通知库、资源库和院校库可以先浏览；申请表、待办、收藏和发布这类个人动作需要先完成登录。',
+  title = '别再用 Excel 追保研截止了',
+  description = '免费创建申请表，把目标项目、材料进度、今日待办和截止提醒放到一个工作台里。通知库仍可直接浏览，登录后才能保存你的申请计划。',
   intent,
   requiredAuth = 'session',
-  actionLabel = '登录 / 注册',
+  actionLabel = '免费创建我的申请表',
   showPreview = true
 }: {
   title?: string;
@@ -42,12 +42,20 @@ export function LoginRequiredCard({
       <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 bg-[radial-gradient(circle_at_70%_24%,rgba(113,202,193,0.2),transparent_28rem)] lg:block" />
       <div className={`grid gap-7 ${showPreview ? 'lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center' : ''}`}>
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
+          <div className="inline-flex items-center gap-2 rounded-full bg-brand/8 px-3 py-1 text-sm font-semibold text-brand">
             <LockKeyhole className="h-4 w-4" />
-            登录后使用
+            登录后保存你的申请计划
           </div>
           <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink">{title}</h2>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">{description}</p>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            {['保存目标项目', '材料进度同步', '截止前提醒'].map((item) => (
+              <div key={item} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
+                {item}
+              </div>
+            ))}
+          </div>
 
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -75,6 +83,12 @@ export function LoginRequiredCard({
 function WorkbenchPreview() {
   return (
     <div className="relative z-10 rounded-[30px] border border-slate-100 bg-white/90 p-5 shadow-soft backdrop-blur">
+      <div className="absolute inset-x-6 top-1/2 z-20 -translate-y-1/2 rounded-2xl border border-white/70 bg-white/80 px-5 py-4 text-center shadow-soft backdrop-blur">
+        <Sparkles className="mx-auto h-5 w-5 text-brand" />
+        <div className="mt-2 text-sm font-semibold text-ink">登录后解锁完整申请表</div>
+        <div className="mt-1 text-xs text-slate-500">保存、提醒、同步都会自动开启</div>
+      </div>
+      <div className="pointer-events-none absolute inset-0 z-10 rounded-[30px] bg-white/20 backdrop-blur-[1.5px]" />
       <div className="grid grid-cols-3 gap-3">
         {[
           { label: '申请中', value: '2', icon: ClipboardList },

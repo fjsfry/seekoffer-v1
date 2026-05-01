@@ -459,8 +459,8 @@ export default function MePage() {
     return (
       <SiteShell>
         <LoginRequiredCard
-          title="登录后开启你的申请工作台"
-          description="登录后可以保存目标院校、管理申请状态、记录材料进度和维护行动清单。通知库、资源库和院校库仍可直接浏览。"
+          title="别再用 Excel 追保研截止了"
+          description="免费创建申请表，保存目标院校、材料进度、今日待办和截止提醒。通知库、资源库和院校库仍可直接浏览。"
         />
       </SiteShell>
     );
@@ -487,8 +487,8 @@ export default function MePage() {
     return (
       <SiteShell>
         <LoginRequiredCard
-          title="登录后开启你的工作台"
-          description="通知库、资源库和院校库可以直接浏览；申请表、行动清单和收藏功能需要先完成正式账号登录。"
+          title="别再用 Excel 追保研截止了"
+          description="登录后可以保存目标项目、管理申请状态、记录材料进度，并把临近截止自动变成行动清单。"
         />
       </SiteShell>
     );

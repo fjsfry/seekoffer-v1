@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, MapPin, Search } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, MapPin, Search } from 'lucide-react';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { ProductHeroVisual } from '@/components/product-hero-visual';
@@ -13,6 +13,7 @@ const allCityLabel = '全部城市';
 const allGroupLabel = '全部标签';
 const cityOptions = [allCityLabel, ...Array.from(new Set(collegeDirectory.map((item) => item.city)))];
 const groupOptions = [allGroupLabel, '985', '211', '双一流', 'C9', '华五', '国防七子'];
+const hotCities = ['北京', '上海', '南京', '武汉', '广州', '西安', '成都'];
 
 function getVisiblePages(currentPage: number, totalPages: number) {
   const start = Math.max(1, currentPage - 1);
@@ -40,6 +41,7 @@ export default function CollegesPage() {
   const [group, setGroup] = useState(allGroupLabel);
   const [pageState, setPageState] = useState({ page: 1, filterKey: '' });
   const [jumpPage, setJumpPage] = useState('');
+  const [showAllCities, setShowAllCities] = useState(false);
   const filterKey = `${keyword.trim().toLowerCase()}|${city}|${group}`;
 
   const filteredColleges = useMemo(() => {
@@ -95,8 +97,8 @@ export default function CollegesPage() {
         <ProductHeroVisual variant="college" compact />
       </section>
 
-      <section className="surface-card rounded-[34px] p-7 lg:p-8">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px_240px]">
+      <section className="surface-card rounded-[34px] p-6 lg:p-8">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_220px]">
           <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3">
             <Search className="h-4 w-4 text-slate-400" />
             <input
@@ -106,18 +108,6 @@ export default function CollegesPage() {
               className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
             />
           </div>
-
-          <select
-            value={city}
-            onChange={(event) => setCity(event.target.value)}
-            className="rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
-          >
-            {cityOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
 
           <select
             value={group}
@@ -132,26 +122,71 @@ export default function CollegesPage() {
           </select>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-2">
-          {groupOptions.slice(1).map((item) => (
+        <div className="mt-6">
+          <div className="mb-3 text-xs font-semibold text-slate-400">热门城市</div>
+          <div className="flex flex-wrap gap-2">
+            {[allCityLabel, ...hotCities].map((item) => (
+              <button
+                key={item}
+                onClick={() => setCity(item)}
+                className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${
+                  city === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-brand/8 hover:text-brand'
+                }`}
+              >
+                {item === allCityLabel ? '全部城市' : item}
+              </button>
+            ))}
             <button
-              key={item}
-              onClick={() => setGroup(item)}
+              type="button"
+              onClick={() => setShowAllCities((current) => !current)}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-500 hover:border-brand hover:text-brand"
+            >
+              更多城市
+              <ChevronDown className={`h-4 w-4 transition ${showAllCities ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+          {showAllCities ? (
+            <div className="mt-3 flex max-h-40 flex-wrap gap-2 overflow-auto rounded-2xl bg-slate-50 p-3">
+              {cityOptions
+                .filter((item) => item !== allCityLabel && !hotCities.includes(item))
+                .map((item) => (
+                  <button
+                    key={item}
+                    onClick={() => setCity(item)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      city === item ? 'bg-brand text-white' : 'bg-white text-slate-500 hover:text-brand'
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-6">
+          <div className="mb-3 text-xs font-semibold text-slate-400">院校标签</div>
+          <div className="flex flex-wrap gap-2">
+            {groupOptions.slice(1).map((item) => (
+              <button
+                key={item}
+                onClick={() => setGroup(item)}
+                className={`rounded-full px-3 py-2 text-sm font-semibold transition ${
+                  group === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+            <button
+              onClick={() => setGroup(allGroupLabel)}
               className={`rounded-full px-3 py-2 text-sm font-semibold transition ${
-                group === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600'
+                group === allGroupLabel ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600'
               }`}
             >
-              {item}
+              全部标签
             </button>
-          ))}
-          <button
-            onClick={() => setGroup(allGroupLabel)}
-            className={`rounded-full px-3 py-2 text-sm font-semibold transition ${
-              group === allGroupLabel ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600'
-            }`}
-          >
-            全部标签
-          </button>
+          </div>
         </div>
       </section>
 

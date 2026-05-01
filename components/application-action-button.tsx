@@ -79,7 +79,7 @@ export function ApplicationActionButton({
 
   const className =
     variant === 'secondary'
-      ? 'rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm'
+      ? 'w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep disabled:opacity-70'
       : 'rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white';
 
   return (
