@@ -7,9 +7,9 @@ import { ExternalSiteMark } from '@/components/external-site-mark';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge, StatusBadge } from '@/components/status-badge';
+import { QQ_GROUP_URL } from '@/lib/contact';
 import { getCountdownLabel, getDeadlineLevelFromDate } from '@/lib/deadline-display';
 import {
-  buildNoticeFeedbackHref,
   formatNoticeDate,
   formatNoticeDateOnly,
   getDisplayDepartmentName,
@@ -18,7 +18,6 @@ import {
   getDisplaySchoolName,
   getDisplaySourceLabel,
   getDisplayTags,
-  getVerificationLabel,
   normalizeNoticeTitle
 } from '@/lib/notice-display';
 import { baseNoticeProjects } from '@/lib/notice-source';
@@ -210,10 +209,12 @@ export default async function NoticeDetailPage({
                 <ArrowUpRight className="h-4 w-4" />
               </a>
               <a
-                href={buildNoticeFeedbackHref(project)}
+                href={QQ_GROUP_URL}
+                target="_blank"
+                rel="noreferrer"
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800"
               >
-                反馈通知错误
+                加 QQ 群反馈
               </a>
               <Link
                 href="/deadlines"
@@ -233,8 +234,6 @@ export default async function NoticeDetailPage({
               <InfoItem label="来源说明" value={getDisplaySourceLabel(project.sourceSite)} />
               <InfoItem label="平台录入时间" value={project.collectedAt} />
               <InfoItem label="最近更新时间" value={project.updatedAt} />
-              <InfoItem label="最近核验时间" value={project.lastCheckedAt} />
-              <InfoItem label="核验状态" value={getVerificationLabel(project)} />
             </div>
             <p className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500">
               Seekoffer 会尽力清洗和核对公开信息，但正式报名、材料要求和截止时间请以院校官网原文为准。

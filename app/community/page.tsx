@@ -1,5 +1,6 @@
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
+import { QQ_GROUP_NUMBER } from '@/lib/contact';
 
 export default function CommunityPage() {
   return (
@@ -14,8 +15,8 @@ export default function CommunityPage() {
         <div className="grid gap-5">
           <p>正式 Offer 发布通道开放后，我们会要求发布者登录账号，并对高风险内容进行审核或抽检。</p>
           <p>禁止编造他人去向、冒充老师或同学、泄露手机号/微信号/身份证号等隐私信息，也不要发布未经确认的录取承诺。</p>
-          <p>用户可以选择匿名展示，但平台会保留必要账号记录用于反垃圾、纠错、举报处理和社区安全。</p>
-          <p>任何人发现疑似虚假、侵权或误导信息，都可以通过举报入口或 seekoffer@qq.com 申请处理。</p>
+          <p>用户可以选择匿名展示，但仍需对自己发布的信息负责，避免给其他同学造成误导。</p>
+          <p>任何人发现疑似虚假、侵权或误导信息，都可以通过 seekoffer@qq.com 或 QQ 交流群 {QQ_GROUP_NUMBER} 联系我们。</p>
         </div>
       </section>
     </SiteShell>

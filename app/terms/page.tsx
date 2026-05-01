@@ -1,5 +1,6 @@
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
+import { QQ_GROUP_NUMBER } from '@/lib/contact';
 
 export default function TermsPage() {
   return (
@@ -22,7 +23,7 @@ export default function TermsPage() {
             通知、截止时间和材料要求会尽力清洗与核对，但最终解释和正式要求以院校官网原文为准。因用户未核对原文或自行决策造成的后果，需要由用户自行判断承担。
           </p>
           <p>
-            如发现数据错误、账号异常、侵权内容或需要删除个人数据，请通过 seekoffer@qq.com 联系我们。
+            如发现数据错误、账号异常、侵权内容或需要删除个人数据，请通过 seekoffer@qq.com 或 QQ 交流群 {QQ_GROUP_NUMBER} 联系我们。
           </p>
         </div>
       </section>

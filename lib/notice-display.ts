@@ -1,5 +1,3 @@
-import type { PublicNoticeProject } from './mock-data';
-
 const DATE_FIELD_PATTERN =
   /\s*(报名通知发布时间|通知发布时间|发布时间|报名开始时间|申请开始时间|报名截止时间|申请截止时间|活动开始时间|活动结束时间|开始时间|截止时间)[:：]\s*\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(\s+\d{1,2}:\d{2}(:\d{2})?)?/gi;
 
@@ -110,27 +108,4 @@ export function getDisplaySourceLabel(value: string | undefined | null) {
   }
 
   return INTERNAL_SOURCE_LABELS.get(text) || text;
-}
-
-export function getVerificationLabel(project: Pick<PublicNoticeProject, 'isVerified' | 'lastCheckedAt'>) {
-  if (project.isVerified) {
-    return '已人工复核';
-  }
-
-  return project.lastCheckedAt ? '自动同步，官网来源' : '待同步核验';
-}
-
-export function buildNoticeFeedbackHref(project: Pick<PublicNoticeProject, 'id' | 'schoolName' | 'projectName'>) {
-  const subject = encodeURIComponent(`Seekoffer 通知纠错：${getDisplaySchoolName(project.schoolName)}`);
-  const body = encodeURIComponent(
-    [
-      `通知编号：${project.id}`,
-      `通知标题：${normalizeNoticeTitle(project.projectName, 120)}`,
-      '',
-      '我发现的问题：',
-      ''
-    ].join('\n')
-  );
-
-  return `mailto:seekoffer@qq.com?subject=${subject}&body=${body}`;
 }

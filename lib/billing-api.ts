@@ -72,7 +72,7 @@ let entitlementCache: {
 
 function getBillingFunctionUrl() {
   if (!SUPABASE_URL) {
-    throw new Error('Supabase 环境变量未配置，暂时无法读取 Pro 权益。');
+    throw new Error('暂时无法读取 Pro 权益，请稍后再试。');
   }
 
   return `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/billing-api`;

@@ -695,19 +695,19 @@ export default function NoticesPage() {
             </Link>
           </SideCard>
 
-          <SideCard title="可信度说明" icon={ShieldCheck}>
+          <SideCard title="使用提醒" icon={ShieldCheck}>
             <div className="grid gap-3 text-sm leading-7 text-slate-600">
               <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                <span className="font-semibold text-ink">字段分层：</span>
-                截止时间、报名入口和材料要求会单独清洗，前台不展示爬虫内部字段。
+                <span className="font-semibold text-ink">先看重点：</span>
+                优先关注院校、学院、通知标题、发布时间和截止时间。
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                <span className="font-semibold text-ink">状态一致：</span>
-                列表和详情页都按当前时间重新判断“报名中 / 即将截止 / 已截止”。
+                <span className="font-semibold text-ink">官网确认：</span>
+                报名入口、材料要求和考核安排请以院校官网原文为准。
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                <span className="font-semibold text-ink">纠错闭环：</span>
-                每条详情页都可以反馈错误，后续进入核验队列。
+                <span className="font-semibold text-ink">发现问题：</span>
+                可以加入 QQ 群 1092490793 告诉我们。
               </div>
             </div>
           </SideCard>

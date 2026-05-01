@@ -9,10 +9,10 @@ import { ExternalSiteMark } from '@/components/external-site-mark';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge, StatusBadge } from '@/components/status-badge';
+import { QQ_GROUP_NUMBER, QQ_GROUP_URL } from '@/lib/contact';
 import { fetchPublicNotices } from '@/lib/cloudbase-data';
 import { getCountdownLabel, getDeadlineLevelFromDate } from '@/lib/deadline-display';
 import {
-  buildNoticeFeedbackHref,
   formatNoticeDate,
   formatNoticeDateOnly,
   getDisplayDepartmentName,
@@ -21,7 +21,6 @@ import {
   getDisplaySchoolName,
   getDisplaySourceLabel,
   getDisplayTags,
-  getVerificationLabel,
   normalizeNoticeTitle
 } from '@/lib/notice-display';
 import { baseNoticeProjects } from '@/lib/notice-source';
@@ -71,7 +70,7 @@ function NoticeDetailContent() {
           setRemoteState({
             id,
             project: null,
-            message: '通知详情加载失败，请返回通知库重新打开，或通过反馈入口告诉我们。'
+            message: '通知详情加载失败，请返回通知库重新打开，或加入 QQ 群告诉我们。'
           });
         }
       });
@@ -96,7 +95,7 @@ function NoticeDetailContent() {
           <div className="flex flex-col items-center justify-center gap-5 text-center">
             <LoaderCircle className="h-8 w-8 animate-spin text-brand" />
             <p className="max-w-xl text-sm leading-7 text-slate-600">
-              如果这条通知刚刚由爬虫同步，详情页会优先从 Supabase 实时兜底读取。
+              如果这条通知刚刚更新，详情页可能需要几秒钟同步，请稍等一下。
             </p>
           </div>
         </section>
@@ -137,7 +136,7 @@ function EmptyDetailState({ href, label }: { href: string; label: string }) {
     <section className="surface-card rounded-[34px] p-8">
       <div className="flex flex-col items-center justify-center gap-5 text-center">
         <p className="max-w-xl text-sm leading-7 text-slate-600">
-          我们没有让页面一直转圈，而是把异常状态直接告诉你。你可以先回到通知库重新选择，也可以反馈给我们核查。
+          我们没有让页面一直转圈，而是把异常状态直接告诉你。你可以先回到通知库重新选择，也可以加入 QQ 群告诉我们。
         </p>
         <Link
           href={href}
@@ -282,10 +281,12 @@ function NoticeDetail({ project }: { project: PublicNoticeProject }) {
                 <ArrowUpRight className="h-4 w-4" />
               </a>
               <a
-                href={buildNoticeFeedbackHref(project)}
+                href={QQ_GROUP_URL}
+                target="_blank"
+                rel="noreferrer"
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800"
               >
-                反馈通知错误
+                加 QQ 群反馈
               </a>
               <Link
                 href="/deadlines"
@@ -299,19 +300,19 @@ function NoticeDetail({ project }: { project: PublicNoticeProject }) {
           <section className="rounded-[30px] border border-black/5 bg-white p-6 shadow-soft">
             <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
               <ShieldCheck className="h-4 w-4" />
-              数据可信度
+              来源与提醒
             </div>
             <div className="mt-4 grid gap-3 text-sm text-slate-600">
               <InfoItem label="来源说明" value={sourceLabel} />
               <InfoItem label="平台录入时间" value={project.collectedAt} />
               <InfoItem label="最近更新时间" value={project.updatedAt} />
-              <InfoItem label="最近核验时间" value={project.lastCheckedAt} />
-              <InfoItem label="核验状态" value={getVerificationLabel(project)} />
             </div>
             <div className="mt-4 grid gap-2 text-xs leading-6 text-slate-500">
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">截止时间：系统提取后持续校验，异常可反馈。</div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">截止时间：以院校官网原文为最终依据。</div>
               <div className="rounded-2xl bg-slate-50 px-4 py-3">材料要求：以院校官网原文为最终依据。</div>
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">纠错闭环：收到反馈后会进入核验队列。</div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                发现信息有误：可加入 QQ 群 {QQ_GROUP_NUMBER} 告诉我们。
+              </div>
             </div>
           </section>
 
@@ -329,7 +330,7 @@ function NoticeDetail({ project }: { project: PublicNoticeProject }) {
                 ))
               ) : (
                 <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-600">
-                  暂无公开变更记录。若你发现截止时间、入口或材料要求变化，可以直接反馈。
+                  暂无公开变更记录。若你发现截止时间、入口或材料要求变化，可以加入 QQ 群告诉我们。
                 </div>
               )}
             </div>

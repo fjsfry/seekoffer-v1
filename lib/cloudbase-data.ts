@@ -55,7 +55,7 @@ export type ManualProjectInput = {
 };
 
 export const WORKSPACE_SYNC_NOTICE =
-  '当前已切换到 Supabase 账号体系。试用态只保存在当前浏览器；完成正式登录后，申请表、个人资料和手动录入项目会自动同步到你的个人工作区。';
+  '试用态只保存在当前浏览器；完成正式登录后，申请表、个人资料和手动录入项目会自动同步到你的个人工作区。';
 
 let hydrateWorkspacePromise: Promise<void> | null = null;
 let hydratedWorkspaceUserId = '';

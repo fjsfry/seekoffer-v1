@@ -228,7 +228,7 @@ function formatAuthError(error: unknown, fallback: string) {
   }
 
   if (/supabase|environment variables|missing/.test(message)) {
-    return '网页登录配置未完成：缺少 Supabase 环境变量。';
+    return '网页登录配置暂未完成，请稍后再试或联系 Seekoffer。';
   }
 
   if (/invalid login credentials|invalid_credentials/.test(message)) {
@@ -240,7 +240,7 @@ function formatAuthError(error: unknown, fallback: string) {
   }
 
   if (/error sending confirmation email|error sending magic link|error sending otp|smtp|send.*email|email.*send/.test(message)) {
-    return '邮件发送失败：请检查 Supabase Auth 的 Resend/SMTP 发信配置，或稍后再试。';
+    return '邮件发送失败，请稍后再试或联系 Seekoffer。';
   }
 
   if (/email rate limit exceeded|rate limit/.test(message)) {
@@ -427,7 +427,7 @@ function persistMemberSessionFromUser(user: SupabaseUserLike, provider: AuthProv
 
 export async function signInWithPasswordAccount(payload: CredentialsPayload) {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const identifier = normalizeIdentifier(payload.identifier);
@@ -457,7 +457,7 @@ export async function signInWithPasswordAccount(payload: CredentialsPayload) {
 
 export async function signUpWithPasswordAccount(payload: CredentialsPayload): Promise<PasswordSignUpResult> {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const identifier = normalizeIdentifier(payload.identifier);
@@ -519,7 +519,7 @@ export async function signUpWithPasswordAccount(payload: CredentialsPayload): Pr
 
 export async function resendSignupConfirmationCode(email: string) {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const normalizedEmail = normalizeEmailIdentifier(email);
@@ -549,7 +549,7 @@ export async function resendSignupConfirmationCode(email: string) {
 
 export async function sendPasswordResetEmail(email: string) {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const normalizedEmail = normalizeEmailIdentifier(email);
@@ -575,7 +575,7 @@ export async function sendPasswordResetEmail(email: string) {
 
 export async function verifySignupConfirmationCode(email: string, token: string) {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const normalizedEmail = normalizeEmailIdentifier(email);
@@ -610,7 +610,7 @@ export async function verifySignupConfirmationCode(email: string, token: string)
 
 export async function sendEmailLoginCode(email: string, options: EmailLoginCodeOptions = {}) {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const normalizedEmail = normalizeEmailIdentifier(email);
@@ -642,7 +642,7 @@ export async function sendEmailLoginCode(email: string, options: EmailLoginCodeO
 
 export async function verifyEmailLoginCode(email: string, token: string) {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置未完成：缺少 Supabase 环境变量。');
+    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const normalizedEmail = normalizeEmailIdentifier(email);

@@ -96,7 +96,7 @@ export type UserProjectRecord = {
   customReminderEnabled: boolean;
 };
 
-export type FieldGuideCategory = '公共项目字段' | '个人申请字段' | '系统字段';
+export type FieldGuideCategory = '项目基础信息' | '个人申请记录' | '来源与变更信息';
 
 export type FieldGuideItem = {
   key: string;
@@ -263,9 +263,9 @@ export const statusDefinitions: StatusDefinition[] = [
 ];
 
 export const guideTips = [
-  '公共字段由平台统一维护，解决不同学生自己建表时字段命名不一致的问题。',
-  '个人字段由学生自己填写，目标是把原本零散的 Excel 在线化，后续提醒和待办才能自动生成。',
-  '系统字段展示来源、核验和变更记录，这一层是普通表格做不到、但网站可以持续提供的价值。'
+  '项目基础信息帮你快速看清学校、学院、项目阶段、截止时间和官网原文。',
+  '个人申请记录由你自己维护，用来把 Excel、备忘录和聊天记录里的进度集中到一起。',
+  '来源与变更信息用于提醒你关注官网原文和重要调整，提交前仍建议再次确认官方页面。'
 ];
 
 export const noticeProjects: PublicNoticeProject[] = [
@@ -597,112 +597,112 @@ export const fieldGuideItems: FieldGuideItem[] = [
   {
     key: 'school_name',
     label: '学校名称',
-    category: '公共项目字段',
+    category: '项目基础信息',
     description: '项目所属学校，是所有筛选与统计的第一层维度。',
     example: '北京大学'
   },
   {
     key: 'department_name',
     label: '学院 / 系 / 实验室',
-    category: '公共项目字段',
+    category: '项目基础信息',
     description: '尽量定位到学院、中心或实验室层级，避免同校不同项目混淆。',
     example: '生命科学联合中心（北大方面）'
   },
   {
     key: 'project_type',
     label: '项目类型',
-    category: '公共项目字段',
+    category: '项目基础信息',
     description: '统一使用夏令营、预推免、正式推免三类口径。',
     example: '预推免'
   },
   {
     key: 'discipline',
     label: '学科方向',
-    category: '公共项目字段',
+    category: '项目基础信息',
     description: '用于快速筛掉不相关项目，也方便后续做方向聚合。',
     example: '人工智能'
   },
   {
     key: 'deadline_date',
     label: '截止时间',
-    category: '公共项目字段',
+    category: '项目基础信息',
     description: '建议精确到日和时分，这样网站才能做 7 天、3 天、当天提醒。',
     example: '2026-04-13 18:00'
   },
   {
     key: 'materials_required',
     label: '材料要求',
-    category: '公共项目字段',
+    category: '项目基础信息',
     description: '把原通知里的材料要求拆成列表，便于学生逐项勾选完成。',
     example: '简历、成绩单、推荐信、个人陈述'
   },
   {
     key: 'apply_link',
     label: '原文链接',
-    category: '公共项目字段',
+    category: '项目基础信息',
     description: '无论网站怎么结构化，最终都要保留原始官方入口，避免信息失真。',
     example: 'https://mp.weixin.qq.com/...'
   },
   {
     key: 'my_status',
     label: '我的状态',
-    category: '个人申请字段',
+    category: '个人申请记录',
     description: '记录你当前对这个项目的推进阶段，替代原来 Excel 里的手填状态列。',
     example: '准备材料中'
   },
   {
     key: 'priority_level',
     label: '优先级',
-    category: '个人申请字段',
+    category: '个人申请记录',
     description: '用高、中、低表达当周处理顺序，避免所有项目一起堆着看。',
     example: '高'
   },
   {
     key: 'materials_progress',
     label: '材料完成度',
-    category: '个人申请字段',
+    category: '个人申请记录',
     description: '系统根据材料勾选自动汇总为百分比，方便生成待办。',
     example: '67%'
   },
   {
     key: 'recommendation_ready',
     label: '推荐信是否完成',
-    category: '个人申请字段',
+    category: '个人申请记录',
     description: '推荐信往往最容易拖延，拆成单独字段后提醒会更准确。',
     example: 'false'
   },
   {
     key: 'contact_supervisor_done',
     label: '是否联系导师',
-    category: '个人申请字段',
+    category: '个人申请记录',
     description: '对于强调导师联系的项目，单独做成字段比塞进备注更有用。',
     example: 'true'
   },
   {
     key: 'my_notes',
     label: '个人备注',
-    category: '个人申请字段',
+    category: '个人申请记录',
     description: '记录导师反馈、提交感受、面试安排和个人判断。',
     example: '周二前催老师出推荐信'
   },
   {
-    key: 'is_verified',
-    label: '是否人工校验',
-    category: '系统字段',
-    description: '告诉学生这条通知是否已经经过人工复核。',
-    example: 'true'
+    key: 'source_status',
+    label: '来源状态',
+    category: '来源与变更信息',
+    description: '提示这条通知是否有清晰的官网来源，方便你回到原文确认。',
+    example: '官网来源'
   },
   {
     key: 'last_checked_at',
-    label: '最近核验时间',
-    category: '系统字段',
-    description: '显示平台最近一次复查这条通知的时间。',
+    label: '最近更新时间',
+    category: '来源与变更信息',
+    description: '显示这条通知最近一次整理或更新的时间。',
     example: '2026-04-11 10:30'
   },
   {
     key: 'change_log',
     label: '变更记录',
-    category: '系统字段',
+    category: '来源与变更信息',
     description: '记录截止时间、材料要求、活动时间等变化，方便学生判断是否需要补操作。',
     example: '补充科研经历说明字段'
   }
