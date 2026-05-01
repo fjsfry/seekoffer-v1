@@ -12,6 +12,7 @@ export function UserSessionEntry() {
   const pathname = usePathname();
   const { ready, session } = useUserSessionState();
   const [pendingAction, setPendingAction] = useState<'logout' | ''>('');
+  const workbenchActive = pathname === '/me' || pathname.startsWith('/me/') || pathname === '/applications';
 
   function handleOpenLogin() {
     const intent = {
@@ -79,7 +80,11 @@ export function UserSessionEntry() {
     <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
       <Link
         href="/me"
-        className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-100 px-3 pr-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white md:h-11 md:px-3 md:pr-4"
+        className={`inline-flex h-10 items-center gap-2 rounded-xl px-3 pr-4 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 md:h-11 md:px-3 md:pr-4 ${
+          workbenchActive
+            ? 'bg-brand/[0.08] text-brand ring-1 ring-brand/15'
+            : 'bg-slate-100 text-slate-800 hover:bg-white'
+        }`}
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand/10 text-brand md:h-8 md:w-8">
           <LayoutGrid className="h-4 w-4" />
