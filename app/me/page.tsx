@@ -466,6 +466,11 @@ export default function MePage() {
     );
   }
 
+  async function refreshApplicationRows() {
+    const merged = await fetchApplicationRows();
+    setRows(merged);
+  }
+
   async function handleDeleteApplication(row: ApplicationRow) {
     const schoolName = getDisplaySchoolName(row.project.schoolName);
     const confirmed = window.confirm(`确定要从申请表删除「${schoolName}」吗？相关待办和材料进度也会一并移除。`);
@@ -476,8 +481,7 @@ export default function MePage() {
     setDeletingProjectId(row.item.userProjectId);
     try {
       await deleteUserProject(row.item.userProjectId);
-      const merged = await fetchApplicationRows();
-      setRows(merged);
+      await refreshApplicationRows();
     } finally {
       setDeletingProjectId('');
     }
@@ -594,6 +598,10 @@ export default function MePage() {
             </div>
           </div>
 
+          <div className="mt-5">
+            <ManualProjectEntryCard compact onCreated={refreshApplicationRows} />
+          </div>
+
           <div className="mt-5 grid gap-3">
             {applicationPreview.length ? (
               applicationPreview.map((row) => (
@@ -614,9 +622,9 @@ export default function MePage() {
                   <Link href="/notices" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white">
                     去通知库添加
                   </Link>
-                  <Link href="/applications#manual-entry" className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+                  <a href="#manual-entry" className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm">
                     手动新增项目
-                  </Link>
+                  </a>
                 </div>
               </div>
             )}
@@ -856,7 +864,6 @@ export default function MePage() {
         </section>
       </section>
 
-      <ManualProjectEntryCard compact />
     </SiteShell>
   );
 }
