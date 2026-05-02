@@ -421,17 +421,17 @@ export default function NoticesPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-3 lg:justify-end">
+        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
           {pageStats.map((item) => {
             const Icon = item.icon;
 
             return (
-              <div key={item.label} className="soft-stat-pill min-w-[150px] rounded-[28px] px-4 py-4">
-                <div className="flex items-center gap-3">
+              <div key={item.label} className="soft-stat-pill rounded-[28px] px-4 py-4">
+                <div className="flex items-center justify-center gap-3 text-center">
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
                     <Icon className="h-5 w-5" />
                   </span>
-                  <div>
+                  <div className="min-w-0">
                     <div className="whitespace-nowrap text-xs text-slate-500">{item.label}</div>
                     <div className="whitespace-nowrap text-xl font-semibold text-ink">{item.value}</div>
                   </div>
