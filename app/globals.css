@@ -20,6 +20,10 @@ body {
   margin: 0;
 }
 
+html {
+  font-size: 16px;
+}
+
 body {
   background:
     radial-gradient(circle at 78% 4%, rgba(111, 193, 185, 0.18), transparent 36rem),
@@ -28,6 +32,12 @@ body {
     var(--page-bg);
   color: var(--page-ink);
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+}
+
+@media (min-width: 1024px) {
+  html {
+    font-size: 17px;
+  }
 }
 
 a {

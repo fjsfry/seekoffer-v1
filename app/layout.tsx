@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { AuthActionBridge } from '@/components/auth-action-bridge';
 import { AuthModal } from '@/components/auth-modal';
 import { UserSessionProvider } from '@/components/user-session-provider';
@@ -45,6 +45,11 @@ export const metadata: Metadata = {
     description: '持续同步公开院校通知，帮助你整理截止时间、申请进度和常用资源入口。',
     images: ['/logo.png']
   }
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

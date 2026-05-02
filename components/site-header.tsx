@@ -19,8 +19,8 @@ export function SiteHeader() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-40 -mx-4 border-b border-slate-200/70 bg-white/90 px-4 py-2.5 shadow-[0_10px_30px_rgba(18,32,38,0.04)] backdrop-blur-2xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <div className="mx-auto max-w-[1280px]">
+    <header className="sticky top-0 z-40 -mx-4 border-b border-slate-200/70 bg-white/90 px-4 py-2.5 shadow-[0_10px_30px_rgba(18,32,38,0.04)] backdrop-blur-2xl sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
+      <div className="mx-auto max-w-[1440px]">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-4">
           <div className="min-w-0 md:col-start-1 md:row-start-1">
             <SeekofferLogo />
