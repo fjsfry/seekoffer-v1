@@ -9,10 +9,14 @@ import { useUserSessionState } from '@/hooks/use-user-session';
 
 export function ApplicationActionButton({
   projectId,
-  variant = 'primary'
+  variant = 'primary',
+  label = '加入我的申请表',
+  addedLabel
 }: {
   projectId: string;
   variant?: 'primary' | 'secondary';
+  label?: string;
+  addedLabel?: string;
 }) {
   const pathname = usePathname();
   const { loggedIn } = useUserSessionState();
@@ -93,7 +97,7 @@ export function ApplicationActionButton({
           ) : (
             <Plus className="h-4 w-4" />
           )}
-          {added ? '已加入我的申请表' : pending ? '加入中...' : '加入我的申请表'}
+          {added ? addedLabel || (variant === 'secondary' ? '已加入' : '已加入我的申请表') : pending ? '加入中...' : label}
         </span>
       </button>
       {message ? <div className="text-xs leading-5 text-rose-600">{message}</div> : null}

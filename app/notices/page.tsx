@@ -174,9 +174,9 @@ const quickFilters = [
 ] as const;
 
 export default function NoticesPage() {
-  const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
-    filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
-  );
+  const [projects, setProjects] = useState<PublicNoticeProject[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [keyword, setKeyword] = useState('');
   const [schoolName, setSchoolName] = useState('');
   const [majorKeyword, setMajorKeyword] = useState('');
@@ -207,11 +207,28 @@ export default function NoticesPage() {
   useEffect(() => {
     let active = true;
 
-    fetchPublicNotices().then((rows: PublicNoticeProject[]) => {
-      if (active) {
-        setProjects(rows.filter((item) => String(item.year) === '2026'));
+    async function loadPublicNotices() {
+      setIsLoading(true);
+      setLoadError('');
+
+      try {
+        const rows = await fetchPublicNotices();
+        if (active) {
+          setProjects(rows.filter((item) => String(item.year) === '2026'));
+        }
+      } catch {
+        if (active) {
+          setProjects(filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026'));
+          setLoadError('通知同步暂时不可用，已展示本地兜底数据。');
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
       }
-    });
+    }
+
+    void loadPublicNotices();
 
     return () => {
       active = false;
@@ -290,20 +307,23 @@ export default function NoticesPage() {
   const pagedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const visiblePages = getVisiblePages(currentPage, totalPages);
   const todayInBeijing = getBeijingDateString();
+  const isNoticeLoading = isLoading && projects.length === 0;
   const todayUpdateCount = projects.filter((item) => item.publishDate === todayInBeijing).length;
   const latestPublishDate = projects.reduce((latest, item) => (item.publishDate > latest ? item.publishDate : latest), '');
 
   const pageStats = [
-    { label: '2026通知', value: `${projects.length}+`, icon: BellRing },
-    { label: '今日更新', value: `${todayUpdateCount}`, icon: BookOpenText },
+    { label: '2026通知', value: isNoticeLoading ? '加载中' : `${projects.length}+`, icon: BellRing },
+    { label: '今日更新', value: isNoticeLoading ? '加载中' : `${todayUpdateCount}`, icon: BookOpenText },
     {
       label: '3天内截止',
-      value: `${
-        projects.filter((item) => {
-          const level = getDeadlineLevelFromDate(item.deadlineDate);
-          return level === 'today' || level === 'within3days';
-        }).length
-      }`,
+      value: isNoticeLoading
+        ? '加载中'
+        : `${
+            projects.filter((item) => {
+              const level = getDeadlineLevelFromDate(item.deadlineDate);
+              return level === 'today' || level === 'within3days';
+            }).length
+          }`,
       icon: Clock3
     }
   ];
@@ -401,19 +421,19 @@ export default function NoticesPage() {
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="flex flex-wrap gap-3 lg:justify-end">
           {pageStats.map((item) => {
             const Icon = item.icon;
 
             return (
-              <div key={item.label} className="soft-stat-pill rounded-full px-5 py-4">
+              <div key={item.label} className="soft-stat-pill min-w-[150px] rounded-[28px] px-4 py-4">
                 <div className="flex items-center gap-3">
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
                     <Icon className="h-5 w-5" />
                   </span>
                   <div>
-                    <div className="text-xs text-slate-500">{item.label}</div>
-                    <div className="text-xl font-semibold text-ink">{item.value}</div>
+                    <div className="whitespace-nowrap text-xs text-slate-500">{item.label}</div>
+                    <div className="whitespace-nowrap text-xl font-semibold text-ink">{item.value}</div>
                   </div>
                 </div>
               </div>
@@ -442,7 +462,7 @@ export default function NoticesPage() {
           ))}
         </div>
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_132px]">
+        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_160px]">
           <label className="flex h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 shadow-sm">
             <Search className="h-5 w-5 text-slate-400" />
             <input
@@ -455,7 +475,7 @@ export default function NoticesPage() {
           <button
             type="button"
             onClick={() => setAdvancedOpen((current) => !current)}
-            className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-brand px-5 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
+            className="inline-flex h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-brand px-5 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
           >
             <SlidersHorizontal className="h-4 w-4" />
             {advancedOpen ? '收起筛选' : '高级筛选'}
@@ -535,13 +555,20 @@ export default function NoticesPage() {
             </FilterSelect>
           </div>
         ) : null}
+        {loadError ? (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            {loadError}
+          </div>
+        ) : null}
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_330px]">
         <div className="grid gap-4">
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-[22px] border border-slate-200 bg-white px-5 py-4 shadow-sm">
             <div className="flex flex-wrap items-center gap-4 text-sm">
-              <span className="font-semibold text-ink">共 {filteredProjects.length.toLocaleString('zh-CN')} 条结果</span>
+              <span className="font-semibold text-ink">
+                {isNoticeLoading ? '正在加载通知...' : `共 ${filteredProjects.length.toLocaleString('zh-CN')} 条结果`}
+              </span>
               <span className="text-slate-400">|</span>
               <button
                 onClick={() => setSortBy('publish')}
@@ -558,107 +585,111 @@ export default function NoticesPage() {
             </div>
             <button onClick={resetFilters} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-brand">
               <RefreshCw className="h-4 w-4" />
-              刷新筛选
+              重置筛选
             </button>
           </div>
 
-          {pagedProjects.map((project, index) => {
-            const daysLeft = getDaysLeft(project);
-            const city = getCityTag(project);
-            const deadlineLevel = getDeadlineLevelFromDate(project.deadlineDate);
-            const highlighted = currentPage === 1 && index === 0 && deadlineLevel !== 'expired';
+          {isNoticeLoading ? (
+            <NoticeListSkeleton />
+          ) : (
+            pagedProjects.map((project, index) => {
+              const daysLeft = getDaysLeft(project);
+              const city = getCityTag(project);
+              const deadlineLevel = getDeadlineLevelFromDate(project.deadlineDate);
+              const highlighted = currentPage === 1 && index === 0 && deadlineLevel !== 'expired';
 
-            return (
-              <article
-                key={project.id}
-                className={`relative min-h-[210px] overflow-hidden rounded-[26px] border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft sm:min-h-[210px] ${
-                  highlighted ? 'border-emerald-300 bg-emerald-50/35' : 'border-slate-200'
-                }`}
-              >
-                {highlighted ? (
-                  <div className="absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-br-2xl bg-emerald-500 text-sm font-bold text-white shadow-sm">
-                    急
-                  </div>
-                ) : null}
-
-                <div className="grid h-full gap-5 sm:grid-cols-[70px_minmax(0,1fr)_176px]">
-                  <ExternalSiteMark
-                    source={resolveNoticeLogoSource(project)}
-                    label={getDisplaySchoolName(project.schoolName)}
-                    size="lg"
-                    rounded="full"
-                  />
-
-                  <div className="flex h-full min-w-0 flex-col overflow-hidden">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <h2 className="shrink-0 text-lg font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</h2>
-                      <span className="shrink-0">
-                        <DeadlineBadge level={deadlineLevel} />
-                      </span>
+              return (
+                <article
+                  key={project.id}
+                  className={`relative min-h-[210px] overflow-hidden rounded-[26px] border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft sm:min-h-[210px] ${
+                    highlighted ? 'border-emerald-300 bg-emerald-50/35' : 'border-slate-200'
+                  }`}
+                >
+                  {highlighted ? (
+                    <div className="absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-br-2xl bg-emerald-500 text-sm font-bold text-white shadow-sm">
+                      急
                     </div>
-                    <Link
-                      href={buildNoticeDetailHref(project.id)}
-                      className="mt-2 line-clamp-2 min-h-[3.35rem] text-lg font-semibold leading-7 text-slate-800 hover:text-brand"
-                      title={normalizeNoticeTitle(project.projectName, 160)}
-                    >
-                      {normalizeNoticeTitle(project.projectName, 86)}
-                    </Link>
-                    <div className="mt-3 flex h-5 items-center gap-3 overflow-hidden text-xs text-slate-500">
-                      <span className="min-w-0 truncate">{getDisplayDepartmentName(project.departmentName)}</span>
-                      <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
-                        <CalendarDays className="h-3.5 w-3.5" />
-                        发布于 {formatNoticeDateOnly(project.publishDate)}
-                      </span>
-                      {city ? (
-                        <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
-                          <MapPin className="h-3.5 w-3.5" />
-                          {city}
+                  ) : null}
+
+                  <div className="grid h-full gap-5 sm:grid-cols-[70px_minmax(0,1fr)_176px]">
+                    <ExternalSiteMark
+                      source={resolveNoticeLogoSource(project)}
+                      label={getDisplaySchoolName(project.schoolName)}
+                      size="lg"
+                      rounded="full"
+                    />
+
+                    <div className="flex h-full min-w-0 flex-col overflow-hidden">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <h2 className="shrink-0 text-lg font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</h2>
+                        <span className="shrink-0">
+                          <DeadlineBadge level={deadlineLevel} />
                         </span>
-                      ) : null}
-                    </div>
-                    <div className="mt-3 flex h-7 flex-nowrap gap-2 overflow-hidden">
-                      {getNoticeCardTags(project).map((item) => (
-                        <span
-                          key={item}
-                          className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500"
-                        >
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="mt-auto pt-3 text-xs font-semibold text-brand">官网来源 · 以原文为准</div>
-                  </div>
-
-                  <div className="grid gap-3 sm:h-full sm:justify-items-end">
-                    <div className="text-right text-sm">
-                      <div className="font-semibold text-brand">截止 {formatNoticeDateOnly(project.deadlineDate)}</div>
-                      <div className="mt-1 text-slate-500">
-                        {daysLeft === null ? '时间待补充' : getDeadlineDistanceLabel(project.deadlineDate)}
                       </div>
-                    </div>
-                    <div className="grid w-full gap-2 sm:w-[150px]">
                       <Link
                         href={buildNoticeDetailHref(project.id)}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-brand/20 bg-white px-4 text-sm font-semibold text-brand transition hover:border-brand"
+                        className="mt-2 line-clamp-2 min-h-[3.35rem] text-lg font-semibold leading-7 text-slate-800 hover:text-brand"
+                        title={normalizeNoticeTitle(project.projectName, 160)}
                       >
-                        查看详情
-                        <ArrowRight className="h-4 w-4" />
+                        {normalizeNoticeTitle(project.projectName, 86)}
                       </Link>
-                      <ApplicationActionButton projectId={project.id} variant="secondary" />
+                      <div className="mt-3 flex h-5 items-center gap-3 overflow-hidden text-xs text-slate-500">
+                        <span className="min-w-0 truncate">{getDisplayDepartmentName(project.departmentName)}</span>
+                        <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          发布于 {formatNoticeDateOnly(project.publishDate)}
+                        </span>
+                        {city ? (
+                          <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
+                            <MapPin className="h-3.5 w-3.5" />
+                            {city}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-3 flex h-7 flex-nowrap gap-2 overflow-hidden">
+                        {getNoticeCardTags(project).map((item) => (
+                          <span
+                            key={item}
+                            className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500"
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="mt-auto pt-3 text-xs font-semibold text-brand">官网来源 · 以原文为准</div>
+                    </div>
+
+                    <div className="grid gap-3 sm:h-full sm:justify-items-end">
+                      <div className="text-right text-sm">
+                        <div className="font-semibold text-brand">截止 {formatNoticeDateOnly(project.deadlineDate)}</div>
+                        <div className="mt-1 text-slate-500">
+                          {daysLeft === null ? '时间待补充' : getDeadlineDistanceLabel(project.deadlineDate)}
+                        </div>
+                      </div>
+                      <div className="grid w-full gap-2 sm:w-[150px]">
+                        <Link
+                          href={buildNoticeDetailHref(project.id)}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-brand/20 bg-white px-4 text-sm font-semibold text-brand transition hover:border-brand"
+                        >
+                          查看详情
+                          <ArrowRight className="h-4 w-4" />
+                        </Link>
+                        <ApplicationActionButton projectId={project.id} variant="secondary" label="加入申请表" />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </article>
-            );
-          })}
+                </article>
+              );
+            })
+          )}
 
-          {!pagedProjects.length ? (
+          {!isNoticeLoading && !pagedProjects.length ? (
             <div className="rounded-[24px] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm text-slate-500">
               当前筛选条件下没有匹配通知，建议减少筛选条件或换一个关键词。
             </div>
           ) : null}
 
-          {filteredProjects.length ? (
+          {!isNoticeLoading && filteredProjects.length ? (
             <div className="flex flex-wrap items-center justify-center gap-3 rounded-[22px] bg-white px-5 py-5 shadow-sm">
               <button
                 onClick={() => updatePage((current) => Math.max(1, current - 1))}
@@ -694,7 +725,9 @@ export default function NoticesPage() {
         <aside className="grid content-start gap-5">
           <SideCard title="截止提醒" icon={BellRing}>
             <div className="grid gap-4">
-              {urgentProjects.length ? (
+              {isNoticeLoading ? (
+                <SideLoadingRows />
+              ) : urgentProjects.length ? (
                 urgentProjects.map((project) => {
                   const daysLeft = getDaysLeft(project);
 
@@ -724,7 +757,9 @@ export default function NoticesPage() {
                   暂无今日新增，以下显示最近同步日 {todayUpdates.date} 的更新。
                 </div>
               ) : null}
-              {todayUpdates.rows.length ? (
+              {isNoticeLoading ? (
+                <SideLoadingRows />
+              ) : todayUpdates.rows.length ? (
                 todayUpdates.rows.map(([school, count]) => (
                   <div key={school} className="flex items-center justify-between gap-3 text-sm">
                     <span className="text-slate-700">{school}</span>
@@ -847,6 +882,50 @@ function SideCard({
         </Link>
       </div>
       {children}
+    </div>
+  );
+}
+
+function NoticeListSkeleton() {
+  return (
+    <div className="grid gap-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="min-h-[210px] overflow-hidden rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="grid h-full gap-5 sm:grid-cols-[70px_minmax(0,1fr)_176px]">
+            <div className="h-14 w-14 animate-pulse rounded-full bg-slate-100" />
+            <div className="min-w-0">
+              <div className="h-5 w-44 animate-pulse rounded-full bg-slate-100" />
+              <div className="mt-4 h-6 w-full animate-pulse rounded-full bg-slate-100" />
+              <div className="mt-3 h-6 w-3/4 animate-pulse rounded-full bg-slate-100" />
+              <div className="mt-5 flex gap-2">
+                <span className="h-7 w-16 animate-pulse rounded-full bg-slate-100" />
+                <span className="h-7 w-20 animate-pulse rounded-full bg-slate-100" />
+                <span className="h-7 w-14 animate-pulse rounded-full bg-slate-100" />
+              </div>
+            </div>
+            <div className="grid content-between gap-3 sm:justify-items-end">
+              <div className="h-5 w-28 animate-pulse rounded-full bg-slate-100" />
+              <div className="grid w-full gap-2 sm:w-[150px]">
+                <span className="h-11 animate-pulse rounded-xl bg-slate-100" />
+                <span className="h-11 animate-pulse rounded-xl bg-slate-100" />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SideLoadingRows() {
+  return (
+    <div className="grid gap-3">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="rounded-xl p-2">
+          <div className="h-4 w-4/5 animate-pulse rounded-full bg-slate-100" />
+          <div className="mt-2 h-3 w-2/3 animate-pulse rounded-full bg-slate-100" />
+        </div>
+      ))}
     </div>
   );
 }

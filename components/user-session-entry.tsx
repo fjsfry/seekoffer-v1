@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { ArrowUpRight, LayoutGrid, LoaderCircle, LogIn, LogOut } from 'lucide-react';
 import { openAuthModal, writeAuthIntent } from '@/lib/auth-intent';
 import { useUserSessionState } from '@/hooks/use-user-session';
-import { getAuthProviderLabel, signOutUser } from '@/lib/user-session';
+import { signOutUser } from '@/lib/user-session';
 
 export function UserSessionEntry() {
   const pathname = usePathname();
@@ -89,12 +89,7 @@ export function UserSessionEntry() {
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand/10 text-brand md:h-8 md:w-8">
           <LayoutGrid className="h-4 w-4" />
         </span>
-        <span className="flex items-center gap-2">
-          <span>{session.profile.nickname ? `${session.profile.nickname}的工作台` : '工作台'}</span>
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-            {getAuthProviderLabel(session.authProvider)}
-          </span>
-        </span>
+        <span className="max-w-[7.5rem] truncate">{session.profile.nickname ? `${session.profile.nickname}的工作台` : '工作台'}</span>
       </Link>
 
       {session.authProvider === 'anonymous' ? (
