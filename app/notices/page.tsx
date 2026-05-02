@@ -50,7 +50,7 @@ type ProgressFilter = '全部' | '报名中' | '未开始' | '已结束';
 type RangeFilter = '全部' | '985' | '211' | '双一流' | '其他';
 type DeadlineQuickFilter = '全部' | 'within7days';
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 16;
 const CITY_TAGS = new Set([
   '北京',
   '上海',
