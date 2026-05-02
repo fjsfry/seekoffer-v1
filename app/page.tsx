@@ -43,15 +43,27 @@ export default function HomePage() {
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
     filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
   );
+  const [noticesLoading, setNoticesLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
 
-    fetchPublicNotices().then((rows) => {
-      if (active) {
-        setProjects(rows.filter((item) => String(item.year) === '2026'));
-      }
-    });
+    fetchPublicNotices()
+      .then((rows) => {
+        if (active) {
+          setProjects(rows.filter((item) => String(item.year) === '2026'));
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setProjects(filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026'));
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setNoticesLoading(false);
+        }
+      });
 
     return () => {
       active = false;
@@ -97,8 +109,8 @@ export default function HomePage() {
   const heroMetrics = [
     {
       label: '2026 通知',
-      value: `${projects.length}+`,
-      hint: '持续同步中',
+      value: noticesLoading ? '加载中' : `${projects.length}+`,
+      hint: noticesLoading ? '正在同步最新通知' : '持续同步中',
       icon: BellRing
     },
     {
