@@ -15,7 +15,7 @@ Optional:
 
 ## Schedule
 
-The workflow runs every 2 hours from 08:20 to 22:20 Beijing time, plus one early catch-up run at 06:20 Beijing time.
+The workflow runs once every hour, at minute 20. GitHub cron uses UTC, so this is still hourly in Beijing time.
 
 It can also be started manually from GitHub Actions:
 

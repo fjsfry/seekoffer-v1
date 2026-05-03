@@ -2,10 +2,8 @@ name: Sync notices to Supabase
 
 on:
   schedule:
-    # 08:20-22:20 Beijing time, every 2 hours.
-    - cron: '20 0-14/2 * * *'
-    # 06:20 Beijing time, one early catch-up run.
-    - cron: '20 22 * * *'
+    # Every hour at minute 20. GitHub cron uses UTC; this is hourly in Beijing time too.
+    - cron: '20 * * * *'
   workflow_dispatch:
     inputs:
       target_year:
