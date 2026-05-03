@@ -11,6 +11,7 @@
     "cache:logos": "node ./scripts/cache-site-marks.mjs",
     "sync:school-logos": "node ./scripts/sync-urongda-logo-map.mjs",
     "sync:notices": "node ./scripts/sync-public-notice-data.mjs",
+    "sync:notices:github": "node ./scripts/sync-baoyan-notices-to-supabase.mjs",
     "import:cloudbase-export": "node ./scripts/import-cloudbase-export-to-supabase.mjs",
     "build:hosting": "npm run build && node ./scripts/prepare-hosting.mjs",
     "deploy:cloudbase": "npm run build:hosting && tcb hosting deploy ./hosting-dist --env-id cloudbase-4gonuep215f23af4"

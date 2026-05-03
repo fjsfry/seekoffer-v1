@@ -1,0 +1,65 @@
+name: Sync notices to Supabase
+
+on:
+  schedule:
+    # 08:20-22:20 Beijing time, every 2 hours.
+    - cron: '20 0-14/2 * * *'
+    # 06:20 Beijing time, one early catch-up run.
+    - cron: '20 22 * * *'
+  workflow_dispatch:
+    inputs:
+      target_year:
+        description: 'Notice target year'
+        required: false
+        default: '2026'
+      primary_max_pages:
+        description: 'Optional max pages for a quick/manual test. Leave empty for full sync.'
+        required: false
+        default: ''
+      primary_max_details:
+        description: 'Optional max detail requests for smoke tests. Leave empty for full sync.'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Parse notices without writing to Supabase'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: sync-notices-to-supabase
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync public notices
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    env:
+      TARGET_YEAR: ${{ github.event.inputs.target_year || '2026' }}
+      PRIMARY_ORDER_BY: publishTime
+      PRIMARY_MAX_PAGES: ${{ github.event.inputs.primary_max_pages }}
+      PRIMARY_MAX_DETAILS: ${{ github.event.inputs.primary_max_details }}
+      PRIMARY_DETAIL_CONCURRENCY: '3'
+      PRIMARY_DETAIL_DELAY_MS: '150'
+      SECONDARY_MAX_PAGES: '30'
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_INGEST_URL: ${{ secrets.SUPABASE_INGEST_URL }}
+      SUPABASE_INGEST_SECRET: ${{ secrets.SUPABASE_INGEST_SECRET }}
+      SUPABASE_INGEST_SOURCE: github-actions-sync
+      DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Sync notices
+        run: npm run sync:notices:github
