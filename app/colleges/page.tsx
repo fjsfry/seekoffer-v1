@@ -367,7 +367,7 @@ export default function CollegesPage() {
             重置
           </button>
         </div>
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_180px]">
+        <div>
           <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3">
             <Search className="h-4 w-4 text-slate-400" />
             <input
@@ -378,17 +378,6 @@ export default function CollegesPage() {
             />
           </div>
 
-          <select
-            value={sortBy}
-            onChange={(event) => setSortBy(event.target.value as SortOption)}
-            className="rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
-          >
-            {sortOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
         </div>
 
         <div className="mt-6">
