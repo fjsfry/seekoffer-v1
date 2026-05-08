@@ -1,6 +1,8 @@
 'use client';
 
 import type React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Ban, CheckCircle2, Clock3, FileText, ShieldAlert, Trash2, UserPlus, UsersRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AdminShell } from '@/components/admin-shell';
@@ -25,7 +27,32 @@ const operationsSectionTitles: Record<OperationsSection, string> = {
   settings: '系统设置'
 };
 
+const operationsSectionDescriptions: Record<OperationsSection, string> = {
+  users: '管理注册用户、风险状态和用户侧申请行为，所有限制和封禁都会留痕。',
+  feedback: '集中处理用户反馈、内容举报和纠错工单，形成可追踪的处理闭环。',
+  logs: '审计后台关键操作、导出日志并排查异常登录与高危动作。',
+  settings: '管理角色权限、审核开关、举报提醒和后台基础安全策略。'
+};
+
+const operationsSectionRoutes: Array<{ section: OperationsSection; href: string; label: string; hint: string }> = [
+  { section: 'users', href: '/admin/users', label: '用户', hint: '账号状态' },
+  { section: 'feedback', href: '/admin/feedback', label: '反馈', hint: '工单闭环' },
+  { section: 'logs', href: '/admin/logs', label: '日志', hint: '审计追踪' },
+  { section: 'settings', href: '/admin/settings', label: '设置', hint: '权限开关' }
+];
+
+function resolveSectionFromLocation(pathname: string, hash: string): OperationsSection {
+  if (pathname.includes('/admin/feedback')) return 'feedback';
+  if (pathname.includes('/admin/logs')) return 'logs';
+  if (pathname.includes('/admin/settings')) return 'settings';
+  if (pathname.includes('/admin/users')) return 'users';
+
+  const hashSection = hash.replace('#', '') as OperationsSection;
+  return ['users', 'feedback', 'logs', 'settings'].includes(hashSection) ? hashSection : 'users';
+}
+
 export default function AdminOperationsPage() {
+  const pathname = usePathname();
   const [activeSection, setActiveSection] = useState<OperationsSection>('users');
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [feedback, setFeedback] = useState<AdminFeedbackRow[]>([]);
@@ -41,13 +68,12 @@ export default function AdminOperationsPage() {
   const [message, setMessage] = useState('正在连接后台真实运营数据...');
 
   useEffect(() => {
-    const syncHash = () => {
-      const hash = window.location.hash.replace('#', '') as OperationsSection;
-      setActiveSection(['users', 'feedback', 'logs', 'settings'].includes(hash) ? hash : 'users');
+    const syncSection = () => {
+      setActiveSection(resolveSectionFromLocation(pathname, window.location.hash));
     };
 
-    syncHash();
-    window.addEventListener('hashchange', syncHash);
+    syncSection();
+    window.addEventListener('hashchange', syncSection);
 
     const timer = window.setTimeout(() => {
       void loadOperationsData();
@@ -55,11 +81,11 @@ export default function AdminOperationsPage() {
 
     return () => {
       window.clearTimeout(timer);
-      window.removeEventListener('hashchange', syncHash);
+      window.removeEventListener('hashchange', syncSection);
     };
     // The operations console loads once on mount; child actions refresh data explicitly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pathname]);
 
   async function loadOperationsData(overrides: Partial<{ userPage: number; userPageSize: number }> = {}) {
     const nextUserPage = overrides.userPage ?? userPage;
@@ -130,9 +156,10 @@ export default function AdminOperationsPage() {
   }
 
   return (
-    <AdminShell title={operationsSectionTitles[activeSection]}>
+    <AdminShell title={operationsSectionTitles[activeSection]} description={operationsSectionDescriptions[activeSection]}>
       <div className="space-y-8">
-        <div className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div>
+        <OperationsSwitch activeSection={activeSection} />
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div>
         {activeSection === 'users' ? (
           <UsersView
             users={users}
@@ -154,6 +181,31 @@ export default function AdminOperationsPage() {
         {activeSection === 'settings' ? <SettingsView onUpdateSetting={updateSetting} onNotify={setMessage} /> : null}
       </div>
     </AdminShell>
+  );
+}
+
+function OperationsSwitch({ activeSection }: { activeSection: OperationsSection }) {
+  return (
+    <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-4">
+      {operationsSectionRoutes.map((item) => {
+        const active = item.section === activeSection;
+
+        return (
+          <Link
+            key={item.section}
+            href={item.href}
+            className={`rounded-xl border px-4 py-3 transition ${
+              active
+                ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm'
+                : 'border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <div className="text-sm font-semibold">{item.label}</div>
+            <div className="mt-1 text-xs opacity-75">{item.hint}</div>
+          </Link>
+        );
+      })}
+    </section>
   );
 }
 
@@ -243,28 +295,38 @@ function UsersView({
                 </tr>
               </thead>
               <tbody>
-                {users.map((user) => (
-                  <tr key={user.id} className="border-t border-slate-100">
-                    <td className="px-5 py-4"><input type="checkbox" aria-label={`选择 ${user.nickname}`} /></td>
-                    <td className="px-5 py-4 font-mono text-slate-700">{user.id}</td>
-                    <td className="px-5 py-4 font-medium text-slate-900">{user.nickname}</td>
-                    <td className="px-5 py-4 text-slate-600">{user.contact}</td>
-                    <td className="px-5 py-4 text-slate-600">{user.registeredAt}</td>
-                    <td className="px-5 py-4 text-slate-600">{user.lastActiveAt}</td>
-                    <td className="px-5 py-4 text-slate-700">{user.noticeCount}</td>
-                    <td className="px-5 py-4 text-slate-700">{user.offerCount}</td>
-                    <td className="px-5 py-4 text-slate-700">{user.applicationCount}</td>
-                    <td className="px-5 py-4"><AdminStatusBadge status={user.status} /></td>
-                    <td className="px-5 py-4">
-                      <div className="flex gap-3 font-medium">
-                        <button className="text-blue-600" onClick={() => previewUser(user)}>详情</button>
-                        <button className="text-blue-600" onClick={() => onUpdateUserStatus(user.id, 'restricted', '后台限制用户提交')}>限制</button>
-                        <button className="text-blue-600" onClick={() => onUpdateUserStatus(user.id, 'banned', '后台封禁用户')}>封禁</button>
-                        <button className="text-blue-600" onClick={() => saveUserNote(user)}>备注</button>
+                {users.length ? (
+                  users.map((user) => (
+                    <tr key={user.id} className="border-t border-slate-100">
+                      <td className="px-5 py-4"><input type="checkbox" aria-label={`选择 ${user.nickname}`} /></td>
+                      <td className="px-5 py-4 font-mono text-slate-700">{user.id}</td>
+                      <td className="px-5 py-4 font-medium text-slate-900">{user.nickname}</td>
+                      <td className="px-5 py-4 text-slate-600">{user.contact}</td>
+                      <td className="px-5 py-4 text-slate-600">{user.registeredAt}</td>
+                      <td className="px-5 py-4 text-slate-600">{user.lastActiveAt}</td>
+                      <td className="px-5 py-4 text-slate-700">{user.noticeCount}</td>
+                      <td className="px-5 py-4 text-slate-700">{user.offerCount}</td>
+                      <td className="px-5 py-4 text-slate-700">{user.applicationCount}</td>
+                      <td className="px-5 py-4"><AdminStatusBadge status={user.status} /></td>
+                      <td className="px-5 py-4">
+                        <div className="flex gap-3 font-medium">
+                          <button className="text-blue-600" onClick={() => previewUser(user)}>详情</button>
+                          <button className="text-blue-600" onClick={() => onUpdateUserStatus(user.id, 'restricted', '后台限制用户提交')}>限制</button>
+                          <button className="text-blue-600" onClick={() => onUpdateUserStatus(user.id, 'banned', '后台封禁用户')}>封禁</button>
+                          <button className="text-blue-600" onClick={() => saveUserNote(user)}>备注</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr className="border-t border-slate-100">
+                    <td colSpan={11} className="px-5 py-14 text-center">
+                      <div className="mx-auto max-w-sm rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
+                        暂无用户数据。请确认 Supabase 管理员会话有效，或稍后刷新重试。
                       </div>
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -500,19 +562,49 @@ function SettingsView({
 
   return (
     <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
-      <AdminPanel title="角色权限">
-        <SimpleTable
-          columns={['角色', '权限范围', '高危权限', '成员数', '操作']}
-          rows={[
-            ['超级管理员', '全部权限', '删除 / 封禁 / 导出 / 配置', '1', <button key="edit-super" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('超级管理员')}>查看说明</button>],
-            ['内容审核员', '通知与Offer审核', '下架内容', '3', <button key="edit-review" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('内容审核员')}>查看说明</button>],
-            ['运营管理员', '用户、反馈、内容处理', '限制用户', '2', <button key="edit-ops" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('运营管理员')}>查看说明</button>],
-            ['只读管理员', '只读数据', '无', '1', <button key="edit-read" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('只读管理员')}>查看说明</button>]
-          ]}
-        />
-      </AdminPanel>
+      <div className="space-y-6">
+        <OperationsMaturityChecklist />
+        <AdminPanel title="角色权限">
+          <SimpleTable
+            columns={['角色', '权限范围', '高危权限', '成员数', '操作']}
+            rows={[
+              ['超级管理员', '全部权限', '删除 / 封禁 / 导出 / 配置', '1', <button key="edit-super" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('超级管理员')}>查看说明</button>],
+              ['内容审核员', '通知与 Offer 审核', '下架内容', '3', <button key="edit-review" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('内容审核员')}>查看说明</button>],
+              ['运营管理员', '用户、反馈、内容处理', '限制用户', '2', <button key="edit-ops" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('运营管理员')}>查看说明</button>],
+              ['只读管理员', '只读数据', '无', '1', <button key="edit-read" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('只读管理员')}>查看说明</button>]
+            ]}
+          />
+        </AdminPanel>
+      </div>
       <SettingsCard onUpdateSetting={onUpdateSetting} />
     </div>
+  );
+}
+
+function OperationsMaturityChecklist() {
+  const checks = [
+    ['真实 API', '用户、反馈、日志均通过 Supabase Edge Function 读取，不再依赖静态 mock。', '已接入'],
+    ['权限留痕', '封禁、限制、处理反馈、修改设置等关键操作会写入操作日志。', '已启用'],
+    ['审核闭环', '反馈举报拥有待处理、处理中、已解决、已关闭的完整状态链路。', '已完善'],
+    ['发布保护', '内容审核、Offer 提交、举报提醒与日志保留都集中在系统设置中管理。', '可配置']
+  ];
+
+  return (
+    <section className="grid gap-4 md:grid-cols-2">
+      {checks.map(([title, description, status]) => (
+        <div key={title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-slate-950">{title}</div>
+              <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+              {status}
+            </span>
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -733,16 +825,26 @@ function SimpleTable({ columns, rows }: { columns: string[]; rows: Array<Array<R
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={`row-${rowIndex}`} className="border-t border-slate-100">
-              <td className="px-5 py-4"><input type="checkbox" aria-label={`选择第 ${rowIndex + 1} 行`} /></td>
-              {row.map((cell, cellIndex) => (
-                <td key={`row-${rowIndex}-${cellIndex}`} className="max-w-[260px] truncate px-5 py-4 text-slate-700">
-                  {cell}
-                </td>
-              ))}
+          {rows.length ? (
+            rows.map((row, rowIndex) => (
+              <tr key={`row-${rowIndex}`} className="border-t border-slate-100">
+                <td className="px-5 py-4"><input type="checkbox" aria-label={`选择第 ${rowIndex + 1} 行`} /></td>
+                {row.map((cell, cellIndex) => (
+                  <td key={`row-${rowIndex}-${cellIndex}`} className="max-w-[260px] truncate px-5 py-4 text-slate-700">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : (
+            <tr className="border-t border-slate-100">
+              <td colSpan={columns.length + 1} className="px-5 py-14 text-center">
+                <div className="mx-auto max-w-sm rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
+                  暂无数据。请确认筛选条件或刷新后台 API。
+                </div>
+              </td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
     </div>

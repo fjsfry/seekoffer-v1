@@ -24,10 +24,10 @@ const adminNavItems = [
   { href: '/admin/dashboard', label: '数据概览', icon: LayoutDashboard },
   { href: '/admin/notices', label: '通知管理', icon: Bell },
   { href: '/admin/offers', label: 'Offer池管理', icon: ClipboardList },
-  { href: '/admin/crawlers#users', label: '用户管理', icon: UsersRound },
-  { href: '/admin/crawlers#feedback', label: '反馈举报', icon: Flag },
-  { href: '/admin/crawlers#logs', label: '操作日志', icon: ShieldCheck },
-  { href: '/admin/crawlers#settings', label: '系统设置', icon: Settings }
+  { href: '/admin/users', label: '用户管理', icon: UsersRound },
+  { href: '/admin/feedback', label: '反馈举报', icon: Flag },
+  { href: '/admin/logs', label: '操作日志', icon: ShieldCheck },
+  { href: '/admin/settings', label: '系统设置', icon: Settings }
 ];
 
 function getRoleName(role: string) {
@@ -52,7 +52,6 @@ export function AdminShell({
 }) {
   const pathname = usePathname();
   const [session, setSession] = useState<AdminSession | null>(() => getAdminSession());
-  const [activeAdminHash, setActiveAdminHash] = useState('users');
   const [globalSearch, setGlobalSearch] = useState('');
   const normalizedPathname = pathname.replace(/\/$/, '') || '/';
 
@@ -62,20 +61,6 @@ export function AdminShell({
     });
 
     return () => dispose();
-  }, []);
-
-  useEffect(() => {
-    const syncHash = () => {
-      const hash = window.location.hash.replace('#', '');
-      if (hash) {
-        setActiveAdminHash(hash);
-      }
-    };
-
-    syncHash();
-    window.addEventListener('hashchange', syncHash);
-
-    return () => window.removeEventListener('hashchange', syncHash);
   }, []);
 
   return (
@@ -92,22 +77,15 @@ export function AdminShell({
         <nav className="space-y-2 px-3 py-5">
           {adminNavItems.map((item) => {
             const Icon = item.icon;
-            const itemPath = item.href.split('#')[0].replace(/\/$/, '');
-            const itemHash = item.href.split('#')[1] || '';
+            const itemPath = item.href.replace(/\/$/, '');
             const active =
-              item.href.includes('#')
-                ? normalizedPathname === itemPath && itemHash === activeAdminHash
-                : normalizedPathname === itemPath || (itemPath !== '/admin/dashboard' && normalizedPathname.startsWith(`${itemPath}/`));
+              normalizedPathname === itemPath ||
+              (itemPath !== '/admin/dashboard' && normalizedPathname.startsWith(`${itemPath}/`));
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => {
-                  if (item.href.includes('#')) {
-                    setActiveAdminHash(item.href.split('#')[1] || 'users');
-                  }
-                }}
                 className={adminClassNames(
                   'relative flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-medium transition',
                   active ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-slate-700 hover:bg-slate-50 hover:text-blue-600'
@@ -123,7 +101,16 @@ export function AdminShell({
         </nav>
 
         <div className="absolute bottom-5 left-5 right-5">
-          <button className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500">‹‹</button>
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-blue-700">
+              <ShieldCheck className="h-4 w-4" />
+              后台运行状态
+            </div>
+            <p className="mt-2 text-xs leading-5 text-blue-700/80">已接入 Supabase API，关键审核和用户操作会写入操作日志。</p>
+            <Link href="/admin/logs" className="mt-3 inline-flex text-xs font-semibold text-blue-700">
+              查看日志 →
+            </Link>
+          </div>
         </div>
       </aside>
 
@@ -142,7 +129,9 @@ export function AdminShell({
                 onChange={(event) => setGlobalSearch(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && globalSearch.trim()) {
-                    window.location.href = `/admin/notices?query=${encodeURIComponent(globalSearch.trim())}`;
+                    const keyword = globalSearch.trim();
+                    const targetPath = /@|用户|user|^[0-9a-f-]{16,}$/i.test(keyword) ? '/admin/users' : '/admin/notices';
+                    window.location.href = `${targetPath}?query=${encodeURIComponent(keyword)}`;
                   }
                 }}
                 className="h-11 w-[360px] rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"

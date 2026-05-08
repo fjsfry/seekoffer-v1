@@ -186,7 +186,7 @@ export default function AdminDashboardPage() {
 
           <DashboardTable
             title="最新反馈 / 举报"
-            href="/admin/crawlers#feedback"
+            href="/admin/feedback"
             columns={['类型', '内容', '提交时间', '状态']}
             rows={latestFeedback.map((item) => [
               item.type,
