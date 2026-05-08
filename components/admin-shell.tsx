@@ -17,7 +17,7 @@ import {
   UserRound,
   UsersRound
 } from 'lucide-react';
-import { getAdminSession, signOutAdmin, watchAdminSession, type AdminSession } from '@/lib/admin-session';
+import { refreshAdminSession, signOutAdmin, watchAdminSession, type AdminSession } from '@/lib/admin-session';
 import { adminClassNames } from './admin-ui';
 
 const adminNavItems = [
@@ -84,15 +84,25 @@ export function AdminShell({
   const normalizedPathname = pathname.replace(/\/$/, '') || '/';
 
   useEffect(() => {
-    const syncSession = () => {
-      setSession(getAdminSession());
-      setSessionReady(true);
+    let disposed = false;
+
+    const syncSession = async () => {
+      const verifiedSession = await refreshAdminSession();
+      if (!disposed) {
+        setSession(verifiedSession);
+        setSessionReady(true);
+      }
     };
 
-    syncSession();
-    const dispose = watchAdminSession(syncSession);
+    void syncSession();
+    const dispose = watchAdminSession(() => {
+      void syncSession();
+    });
 
-    return () => dispose();
+    return () => {
+      disposed = true;
+      dispose();
+    };
   }, []);
 
   useEffect(() => {

@@ -8,18 +8,27 @@ type AdminUser = {
 };
 
 type SupabaseService = ReturnType<typeof createClient>;
+const allowedSettingKeys = new Set([
+  'content_review_enabled',
+  'offer_submit_enabled',
+  'report_alert_enabled',
+  'operation_log_retention_days'
+]);
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS'
-};
+function getCorsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': Deno.env.get('SEEKOFFER_ADMIN_ALLOWED_ORIGIN') || 'https://www.seekoffer.com.cn',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    Vary: 'Origin'
+  };
+}
 
 function json(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
+      ...getCorsHeaders(),
       'Content-Type': 'application/json'
     }
   });
@@ -46,6 +55,51 @@ function mapFeedbackStatus(status: string) {
   if (status === 'resolved') return 'resolved';
   if (status === 'closed') return 'closed';
   return 'pending';
+}
+
+function requireOneOf(value: unknown, allowedValues: string[], field: string) {
+  const normalized = String(value || '').trim();
+  if (!allowedValues.includes(normalized)) {
+    throw new Error(`invalid_${field}`);
+  }
+  return normalized;
+}
+
+type AdminPermission = 'overview:read' | 'content:write' | 'users:write' | 'settings:write' | 'logs:read';
+
+function requireAdminPermission(admin: AdminUser, permission: AdminPermission) {
+  const permissionsByRole: Record<string, Set<string>> = {
+    super_admin: new Set(['overview:read', 'content:write', 'users:write', 'settings:write', 'logs:read']),
+    ops_manager: new Set(['overview:read', 'content:write', 'users:write', 'logs:read']),
+    content_reviewer: new Set(['overview:read', 'content:write']),
+    readonly_admin: new Set(['overview:read', 'logs:read'])
+  };
+  const rolePermissions = permissionsByRole[admin.role] || new Set<string>();
+
+  if (!rolePermissions.has(permission)) {
+    throw new Error('admin_permission_denied');
+  }
+}
+
+function normalizeSettingValue(key: string, value: unknown) {
+  if (key === 'operation_log_retention_days') {
+    const normalized = Number(value);
+    if (!Number.isInteger(normalized) || normalized < 7 || normalized > 3650) {
+      throw new Error('invalid_setting_value');
+    }
+
+    return normalized;
+  }
+
+  if (['content_review_enabled', 'offer_submit_enabled', 'report_alert_enabled'].includes(key)) {
+    if (typeof value !== 'boolean') {
+      throw new Error('invalid_setting_value');
+    }
+
+    return value;
+  }
+
+  throw new Error('invalid_setting_key');
 }
 
 function readPage(body: Record<string, unknown>) {
@@ -166,28 +220,13 @@ async function requireAdmin(request: Request) {
   }
 
   const email = userData.user.email.toLowerCase();
-  const allowedEmails = (Deno.env.get('SEEKOFFER_ADMIN_EMAILS') || '')
-    .split(',')
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-
   const { data: adminRow } = await service
     .from('admin_users')
     .select('email,name,role,status')
     .eq('email', email)
     .maybeSingle();
 
-  const fallbackAdmin =
-    !adminRow && allowedEmails.includes(email)
-      ? {
-          email,
-          name: email.split('@')[0],
-          role: 'super_admin',
-          status: 'active'
-        }
-      : null;
-
-  const admin = (adminRow || fallbackAdmin) as AdminUser | null;
+  const admin = adminRow as AdminUser | null;
   if (!admin || admin.status !== 'active') {
     return { error: json(403, { error: 'admin_forbidden' }) };
   }
@@ -388,7 +427,7 @@ async function updateNoticeStatus(service: SupabaseService, admin: AdminUser, re
     throw new Error('no_notice_ids');
   }
 
-  const nextStatus = mapNoticeStatus(status);
+  const nextStatus = requireOneOf(status, ['published', 'pending', 'rejected', 'hidden', 'deleted'], 'notice_status');
   const before = await service.from('notices').select('*').in('id', validIds);
   if (before.error) throw before.error;
   const now = new Date();
@@ -631,7 +670,7 @@ async function listSettings(service: SupabaseService) {
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: getCorsHeaders() });
   }
 
   if (request.method !== 'POST') {
@@ -661,14 +700,17 @@ Deno.serve(async (request) => {
     }
 
     if (resource === 'overview') {
+      requireAdminPermission(admin, 'overview:read');
       return json(200, await getOverview(service));
     }
 
     if (resource === 'notices' && action === 'list') {
+      requireAdminPermission(admin, 'content:write');
       return json(200, await listNotices(service, body));
     }
 
     if (resource === 'notices' && action === 'create') {
+      requireAdminPermission(admin, 'content:write');
       const notice = body.notice as Record<string, unknown>;
       const nowText = new Date().toISOString().slice(0, 10);
       const payload = {
@@ -701,16 +743,19 @@ Deno.serve(async (request) => {
     }
 
     if (resource === 'notices' && (action === 'update_status' || action === 'bulk_update_status')) {
+      requireAdminPermission(admin, 'content:write');
       const ids = action === 'bulk_update_status' ? ((body.ids || []) as string[]) : [id];
       return json(200, await updateNoticeStatus(service, admin, request, ids, String(body.status || 'published'), String(body.note || '')));
     }
 
     if (resource === 'offers' && action === 'list') {
+      requireAdminPermission(admin, 'content:write');
       return json(200, await listOffers(service, body));
     }
 
     if (resource === 'offers' && action === 'update_status') {
-      const nextStatus = mapOfferStatus(String(body.status || 'approved'));
+      requireAdminPermission(admin, 'content:write');
+      const nextStatus = requireOneOf(body.status, ['approved', 'rejected', 'hidden', 'deleted'], 'offer_status');
       const before = await service.from('offer_posts').select('*').eq('id', id).maybeSingle();
       const patch = {
         review_status: nextStatus,
@@ -727,8 +772,9 @@ Deno.serve(async (request) => {
     }
 
     if (resource === 'users') {
+      requireAdminPermission(admin, 'users:write');
       if (action === 'update_status') {
-        const status = String(body.status || 'active');
+        const status = requireOneOf(body.status, ['active', 'restricted', 'banned', 'deleted'], 'user_status');
         const before = await service.from('user_moderation').select('*').eq('user_id', id).maybeSingle();
         const { data, error } = await service
           .from('user_moderation')
@@ -750,11 +796,13 @@ Deno.serve(async (request) => {
     }
 
     if (resource === 'feedback' && action === 'list') {
+      requireAdminPermission(admin, 'users:write');
       return json(200, await listFeedback(service, body));
     }
 
     if (resource === 'feedback' && action === 'update_status') {
-      const nextStatus = mapFeedbackStatus(String(body.status || 'resolved'));
+      requireAdminPermission(admin, 'users:write');
+      const nextStatus = requireOneOf(body.status, ['pending', 'processing', 'resolved', 'closed'], 'feedback_status');
       const before = await service.from('feedback_reports').select('*').eq('id', id).maybeSingle();
       const patch = {
         status: nextStatus,
@@ -769,16 +817,22 @@ Deno.serve(async (request) => {
     }
 
     if (resource === 'logs') {
+      requireAdminPermission(admin, 'logs:read');
       return json(200, await listLogs(service, body));
     }
 
     if (resource === 'settings' && action === 'list') {
+      requireAdminPermission(admin, 'settings:write');
       return json(200, await listSettings(service));
     }
 
     if (resource === 'settings' && action === 'update') {
+      requireAdminPermission(admin, 'settings:write');
       const key = String(body.key || '');
-      const value = body.value;
+      if (!allowedSettingKeys.has(key)) {
+        throw new Error('invalid_setting_key');
+      }
+      const value = normalizeSettingValue(key, body.value);
       const before = await service.from('admin_system_settings').select('*').eq('key', key).maybeSingle();
       const { data, error } = await service
         .from('admin_system_settings')
@@ -792,9 +846,12 @@ Deno.serve(async (request) => {
 
     return json(400, { error: 'unknown_resource_or_action' });
   } catch (error) {
-    return json(500, {
+    const message = error instanceof Error ? error.message : String(error);
+    const status = message === 'admin_permission_denied' ? 403 : message.startsWith('invalid_') || message === 'no_notice_ids' ? 400 : 500;
+
+    return json(status, {
       error: 'admin_api_failed',
-      message: error instanceof Error ? error.message : String(error)
+      message
     });
   }
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { adminAccounts, type AdminRole } from './admin-data';
+import type { AdminRole } from './admin-data';
 import { invokeAdminApi, isAdminApiConfigured } from './admin-api';
 import { getSupabaseBrowserClient } from './supabase-browser';
 
@@ -62,17 +62,36 @@ function writeAdminSession(session: AdminSession | null) {
 export async function signInAdmin(email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
 
-  if (isAdminApiConfigured()) {
-    const supabase = getSupabaseBrowserClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password
-    });
+  if (!isAdminApiConfigured()) {
+    throw new Error('后台真实 API 未配置，已禁止使用前端演示账号登录。');
+  }
 
-    if (signInError) {
-      throw new Error(signInError.message || '管理员账号或密码不正确。');
-    }
+  const supabase = getSupabaseBrowserClient();
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: normalizedEmail,
+    password
+  });
 
+  if (signInError) {
+    throw new Error(signInError.message || '管理员账号或密码不正确。');
+  }
+
+  const session = await refreshAdminSession();
+  if (!session) {
+    await supabase.auth.signOut().catch(() => undefined);
+    throw new Error('管理员权限校验未通过。');
+  }
+
+  return session;
+}
+
+export async function refreshAdminSession() {
+  if (!isAdminApiConfigured()) {
+    writeAdminSession(null);
+    return null;
+  }
+
+  try {
     const { admin } = await invokeAdminApi<{
       admin: {
         email: string;
@@ -89,24 +108,10 @@ export async function signInAdmin(email: string, password: string) {
 
     writeAdminSession(session);
     return session;
+  } catch {
+    writeAdminSession(null);
+    return null;
   }
-
-  const account = adminAccounts.find(
-    (item) => item.email.toLowerCase() === normalizedEmail && item.password === password
-  );
-
-  if (!account) {
-    throw new Error('管理员账号或密码不正确。');
-  }
-
-  const session: AdminSession = {
-    email: account.email,
-    name: account.name,
-    role: account.role
-  };
-
-  writeAdminSession(session);
-  return session;
 }
 
 export function signOutAdmin() {

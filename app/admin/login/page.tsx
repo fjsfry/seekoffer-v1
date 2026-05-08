@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BarChart3, Bell, ClipboardCheck, LoaderCircle, LockKeyhole, ShieldCheck, UsersRound } from 'lucide-react';
-import { adminAccounts } from '@/lib/admin-data';
 import { isAdminApiConfigured } from '@/lib/admin-api';
-import { getAdminSession, signInAdmin } from '@/lib/admin-session';
+import { refreshAdminSession, signInAdmin } from '@/lib/admin-session';
 
 function getSafeAdminNextPath() {
   if (typeof window === 'undefined') {
@@ -24,15 +23,23 @@ function getSafeAdminNextPath() {
 export default function AdminLoginPage() {
   const router = useRouter();
   const liveMode = isAdminApiConfigured();
-  const [email, setEmail] = useState(() => (liveMode ? '' : adminAccounts[0]?.email || ''));
-  const [password, setPassword] = useState(() => (liveMode ? '' : adminAccounts[0]?.password || ''));
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (getAdminSession()) {
-      router.replace(getSafeAdminNextPath());
-    }
+    let disposed = false;
+
+    refreshAdminSession().then((session) => {
+      if (!disposed && session) {
+        router.replace(getSafeAdminNextPath());
+      }
+    });
+
+    return () => {
+      disposed = true;
+    };
   }, [router]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -92,7 +99,7 @@ export default function AdminLoginPage() {
           <p className="mt-3 text-sm leading-7 text-slate-500">
             {liveMode
               ? '使用 Supabase 管理员账号登录，权限会由 Edge Function 在服务端校验。'
-              : '当前本地缺少 Supabase 环境变量，会使用演示账号；生产环境必须启用 Supabase 管理员校验。'}
+              : '当前缺少 Supabase 环境变量。为避免误放后台入口，演示账号登录已禁用。'}
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
@@ -125,20 +132,9 @@ export default function AdminLoginPage() {
           </form>
 
           {error ? <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
-
           {!liveMode ? (
-            <div className="mt-6 rounded-2xl bg-slate-50 p-4">
-              <div className="text-sm font-semibold text-slate-950">本地演示管理员账号</div>
-            <div className="mt-3 grid gap-3 text-sm text-slate-600">
-              {adminAccounts.map((item) => (
-                <div key={item.email} className="rounded-xl bg-white px-4 py-3 shadow-sm">
-                  <div className="font-semibold text-slate-950">{item.name}</div>
-                  <div className="mt-1 text-xs leading-6 text-slate-500">
-                    {item.email} / {item.password}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <div className="mt-6 rounded-2xl bg-amber-50 p-4 text-sm leading-7 text-amber-700">
+              后台 API 未配置时不会开放任何演示登录。请先配置 Supabase URL、Anon Key 和 admin-api Edge Function。
             </div>
           ) : null}
         </section>

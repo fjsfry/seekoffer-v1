@@ -3,13 +3,6 @@ import { offerFeedItems } from './portal-data';
 
 export type AdminRole = 'super_admin' | 'content_reviewer' | 'ops_manager' | 'readonly_admin';
 
-export type AdminAccount = {
-  email: string;
-  password: string;
-  name: string;
-  role: AdminRole;
-};
-
 export type AdminMetric = {
   label: string;
   value: string;
@@ -98,21 +91,6 @@ export type AdminOperationLog = {
   remark: string;
   createdAt: string;
 };
-
-export const adminAccounts: AdminAccount[] = [
-  {
-    email: 'admin@seekoffer.cn',
-    password: 'seekoffer-admin',
-    name: 'admin',
-    role: 'super_admin'
-  },
-  {
-    email: 'ops@seekoffer.cn',
-    password: 'seekoffer-ops',
-    name: '运营小鹿',
-    role: 'ops_manager'
-  }
-];
 
 const sortedNotices = [...baseNoticeProjects].sort((left, right) =>
   (right.publishDate || '').localeCompare(left.publishDate || '')
