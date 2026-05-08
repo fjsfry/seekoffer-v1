@@ -171,7 +171,7 @@ export default function CollegesPage() {
         <ProductHeroVisual variant="college" compact />
       </section>
 
-      <section className="surface-card rounded-[34px] p-5 shadow-[0_28px_80px_rgba(15,75,72,0.08)] lg:p-7">
+      <section className="hidden">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-5">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-brand">
@@ -354,8 +354,20 @@ export default function CollegesPage() {
         ) : null}
       </section>
 
-      <section className="hidden">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_220px]">
+      <section className="product-card rounded-[30px] p-5 lg:p-6">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div className="text-sm font-semibold text-slate-600">
+            共 <span className="text-brand">{filteredColleges.length}</span> 所院校
+          </div>
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-brand hover:text-brand"
+          >
+            重置
+          </button>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_180px]">
           <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3">
             <Search className="h-4 w-4 text-slate-400" />
             <input
@@ -367,13 +379,13 @@ export default function CollegesPage() {
           </div>
 
           <select
-            value={group}
-            onChange={(event) => setGroup(event.target.value)}
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value as SortOption)}
             className="rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
           >
-            {groupOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
+            {sortOptions.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
               </option>
             ))}
           </select>
