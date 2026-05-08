@@ -24,6 +24,23 @@ const checks = [
     assert: (source) => /refreshAdminSession/.test(source) && !/getAdminSession/.test(source)
   },
   {
+    name: 'Admin shell exposes all primary admin channels',
+    file: 'components/admin-shell.tsx',
+    assert: (source) =>
+      ['/admin/dashboard', '/admin/notices', '/admin/offers', '/admin/users', '/admin/feedback', '/admin/logs', '/admin/settings'].every((path) =>
+        source.includes(path)
+      )
+  },
+  {
+    name: 'Admin settings page is standalone and reads real settings',
+    file: 'app/admin/settings/page.tsx',
+    assert: (source) =>
+      !/from ['"]\.\.\/crawlers\/page['"]/.test(source) &&
+      /resource:\s*['"]settings['"]/.test(source) &&
+      /adminChannels/.test(source) &&
+      /operation_log_retention_days/.test(source)
+  },
+  {
     name: 'Admin session refresh is cached and de-duplicated',
     file: 'lib/admin-session.ts',
     assert: (source) => /ADMIN_SESSION_TTL_MS/.test(source) && /refreshInFlight/.test(source) && /getFreshAdminSession/.test(source)
