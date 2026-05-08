@@ -99,6 +99,7 @@ export function ExternalSiteMark({
   layout?: 'square' | 'landscape';
 }) {
   const [failedImageSrcs, setFailedImageSrcs] = useState<Record<string, true>>({});
+  const [loadedImageSrcs, setLoadedImageSrcs] = useState<Record<string, true>>({});
   const domain = useMemo(() => resolveDomain(source), [source]);
   const manifestDomain = useMemo(() => resolveManifestDomain(domain), [domain]);
   const localSrc = manifestDomain ? siteMarkManifest[manifestDomain] : '';
@@ -128,6 +129,7 @@ export function ExternalSiteMark({
   const initial = buildFallbackInitial(label, domain);
   const palette = pickBadgePalette(domain || label);
   const imageFailed = Boolean(imageSrc && failedImageSrcs[imageSrc]);
+  const imageLoaded = Boolean(imageSrc && loadedImageSrcs[imageSrc]);
   const shouldUseImage =
     variant === 'image'
       ? Boolean(imageSrc) && !imageFailed
@@ -169,8 +171,27 @@ export function ExternalSiteMark({
           alt={`${label} logo`}
           fill
           unoptimized
+          loading={size === 'sm' ? 'lazy' : 'eager'}
           sizes={layout === 'landscape' ? '120px' : '72px'}
-          className={`bg-white object-contain ${layout === 'landscape' ? 'p-2.5' : 'p-1.5'}`}
+          className={`object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'} ${
+            layout === 'landscape' ? 'p-2.5' : 'p-1.5'
+          }`}
+          onLoad={() => {
+            if (!imageSrc) {
+              return;
+            }
+
+            setLoadedImageSrcs((current) => {
+              if (current[imageSrc]) {
+                return current;
+              }
+
+              return {
+                ...current,
+                [imageSrc]: true
+              };
+            });
+          }}
           onError={() => {
             if (!imageSrc) {
               return;
@@ -190,9 +211,11 @@ export function ExternalSiteMark({
         />
       ) : null}
       <span
-        className={`relative h-full w-full items-center justify-center font-black tracking-tight ${textSize} ${shouldUseImage ? 'hidden' : 'flex'}`}
+        className={`relative h-full w-full items-center justify-center font-black tracking-tight ${textSize} ${
+          shouldUseImage && imageLoaded ? 'hidden' : 'flex'
+        }`}
         style={{
-          display: shouldUseImage ? 'none' : 'flex',
+          display: shouldUseImage && imageLoaded ? 'none' : 'flex',
           color: palette.fg
         }}
       >

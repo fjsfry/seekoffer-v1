@@ -174,7 +174,9 @@ const quickFilters = [
 ] as const;
 
 export default function NoticesPage() {
-  const [projects, setProjects] = useState<PublicNoticeProject[]>([]);
+  const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
+    filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [keyword, setKeyword] = useState('');

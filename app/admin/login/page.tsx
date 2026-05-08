@@ -7,17 +7,31 @@ import { adminAccounts } from '@/lib/admin-data';
 import { isAdminApiConfigured } from '@/lib/admin-api';
 import { getAdminSession, signInAdmin } from '@/lib/admin-session';
 
+function getSafeAdminNextPath() {
+  if (typeof window === 'undefined') {
+    return '/admin/dashboard';
+  }
+
+  const next = new URLSearchParams(window.location.search).get('next') || '';
+
+  if (next.startsWith('/admin') && !next.startsWith('/admin/login')) {
+    return next;
+  }
+
+  return '/admin/dashboard';
+}
+
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState(adminAccounts[0]?.email || '');
-  const [password, setPassword] = useState(adminAccounts[0]?.password || '');
+  const liveMode = isAdminApiConfigured();
+  const [email, setEmail] = useState(() => (liveMode ? '' : adminAccounts[0]?.email || ''));
+  const [password, setPassword] = useState(() => (liveMode ? '' : adminAccounts[0]?.password || ''));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
-  const liveMode = isAdminApiConfigured();
 
   useEffect(() => {
     if (getAdminSession()) {
-      router.replace('/admin/dashboard');
+      router.replace(getSafeAdminNextPath());
     }
   }, [router]);
 
@@ -30,7 +44,7 @@ export default function AdminLoginPage() {
 
     try {
       await signInAdmin(email, password);
-      router.push('/admin/dashboard');
+      router.push(getSafeAdminNextPath());
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : '后台登录失败，请稍后重试。');
     } finally {

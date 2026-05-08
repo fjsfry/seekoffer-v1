@@ -109,7 +109,7 @@ export default function HomePage() {
   const heroMetrics = [
     {
       label: '2026 通知',
-      value: noticesLoading ? '加载中' : `${projects.length}+`,
+      value: `${projects.length}+`,
       hint: noticesLoading ? '正在同步最新通知' : '持续同步中',
       icon: BellRing
     },

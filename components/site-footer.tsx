@@ -56,6 +56,7 @@ export function SiteFooter() {
               alt="寻鹿 Seekoffer 公众号二维码"
               width={116}
               height={116}
+              loading="eager"
               className="h-28 w-28 rounded-xl object-cover"
             />
           </div>

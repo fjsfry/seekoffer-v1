@@ -120,15 +120,6 @@ function nowDateText() {
   return nowText().slice(0, 10);
 }
 
-function formatDateInChina(date) {
-  if (!date || Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  const parts = toChinaParts(date);
-  return `${parts.year}-${parts.month}-${parts.day}`;
-}
-
 function formatDateTimeInChina(date) {
   if (!date || Number.isNaN(date.getTime())) {
     return '';

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import type React from 'react';
 import { useEffect, useState } from 'react';
 import {
@@ -41,6 +41,32 @@ function getRoleName(role: string) {
   return map[role] || role;
 }
 
+function AdminAuthGate({
+  title,
+  description
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <main className="min-h-screen bg-[#f6f8fb] px-5 py-8 text-slate-900">
+      <section className="mx-auto mt-24 max-w-xl rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+          <ShieldCheck className="h-8 w-8" />
+        </div>
+        <h1 className="mt-6 text-2xl font-semibold text-slate-950">{title}</h1>
+        <p className="mt-3 text-sm leading-7 text-slate-500">{description}</p>
+        <Link
+          href="/admin/login"
+          className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white"
+        >
+          进入后台登录
+        </Link>
+      </section>
+    </main>
+  );
+}
+
 export function AdminShell({
   title,
   description,
@@ -51,17 +77,50 @@ export function AdminShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [session, setSession] = useState<AdminSession | null>(() => getAdminSession());
+  const router = useRouter();
+  const [session, setSession] = useState<AdminSession | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
   const normalizedPathname = pathname.replace(/\/$/, '') || '/';
 
   useEffect(() => {
-    const dispose = watchAdminSession(() => {
+    const syncSession = () => {
       setSession(getAdminSession());
-    });
+      setSessionReady(true);
+    };
+
+    syncSession();
+    const dispose = watchAdminSession(syncSession);
 
     return () => dispose();
   }, []);
+
+  useEffect(() => {
+    if (!sessionReady || session) {
+      return;
+    }
+
+    const next = pathname && pathname !== '/admin/login' ? `?next=${encodeURIComponent(pathname)}` : '';
+    router.replace(`/admin/login${next}`);
+  }, [pathname, router, session, sessionReady]);
+
+  if (!sessionReady) {
+    return (
+      <AdminAuthGate
+        title="正在校验后台会话"
+        description="我们正在确认你的管理员登录状态。通过校验后才会加载后台导航、用户数据和审核工具。"
+      />
+    );
+  }
+
+  if (!session) {
+    return (
+      <AdminAuthGate
+        title="请先登录运营后台"
+        description="后台只面向管理员开放。未登录时不会展示用户、反馈、日志和系统设置等运营入口。"
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f6f8fb] text-slate-900">
