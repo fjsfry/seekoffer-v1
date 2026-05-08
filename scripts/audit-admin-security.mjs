@@ -24,6 +24,11 @@ const checks = [
     assert: (source) => /refreshAdminSession/.test(source) && !/getAdminSession/.test(source)
   },
   {
+    name: 'Admin session refresh is cached and de-duplicated',
+    file: 'lib/admin-session.ts',
+    assert: (source) => /ADMIN_SESSION_TTL_MS/.test(source) && /refreshInFlight/.test(source) && /getFreshAdminSession/.test(source)
+  },
+  {
     name: 'Admin Edge Function does not use wildcard CORS',
     file: 'supabase/functions/admin-api/index.ts',
     assert: (source) => !/Access-Control-Allow-Origin['"]?\s*:\s*['"]\*/.test(source)

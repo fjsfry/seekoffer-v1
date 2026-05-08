@@ -8,10 +8,13 @@ export type AdminSession = {
   email: string;
   name: string;
   role: AdminRole;
+  verifiedAt?: number;
 };
 
 const ADMIN_SESSION_KEY = 'seekoffer-admin-session';
 const ADMIN_EVENT_NAME = 'seekoffer-admin-session-updated';
+const ADMIN_SESSION_TTL_MS = 5 * 60 * 1000;
+let refreshInFlight: Promise<AdminSession | null> | null = null;
 
 function canUseStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -24,6 +27,10 @@ function emitAdminSessionUpdate() {
 }
 
 export function getAdminSession(): AdminSession | null {
+  return readAdminSessionFromStorage();
+}
+
+function readAdminSessionFromStorage(): AdminSession | null {
   if (!canUseStorage()) {
     return null;
   }
@@ -45,18 +52,46 @@ export function getAdminSession(): AdminSession | null {
   }
 }
 
+function getFreshAdminSession() {
+  const session = readAdminSessionFromStorage();
+  if (!session?.verifiedAt) {
+    return null;
+  }
+
+  if (Date.now() - session.verifiedAt > ADMIN_SESSION_TTL_MS) {
+    return null;
+  }
+
+  return session;
+}
+
+function isSameAdminSession(left: AdminSession | null, right: AdminSession | null) {
+  if (!left && !right) {
+    return true;
+  }
+
+  if (!left || !right) {
+    return false;
+  }
+
+  return left.email === right.email && left.name === right.name && left.role === right.role;
+}
+
 function writeAdminSession(session: AdminSession | null) {
   if (!canUseStorage()) {
     return;
   }
 
+  const previous = readAdminSessionFromStorage();
   if (session) {
     window.localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
   } else {
     window.localStorage.removeItem(ADMIN_SESSION_KEY);
   }
 
-  emitAdminSessionUpdate();
+  if (!isSameAdminSession(previous, session)) {
+    emitAdminSessionUpdate();
+  }
 }
 
 export async function signInAdmin(email: string, password: string) {
@@ -76,7 +111,7 @@ export async function signInAdmin(email: string, password: string) {
     throw new Error(signInError.message || '管理员账号或密码不正确。');
   }
 
-  const session = await refreshAdminSession();
+  const session = await refreshAdminSession({ force: true });
   if (!session) {
     await supabase.auth.signOut().catch(() => undefined);
     throw new Error('管理员权限校验未通过。');
@@ -85,33 +120,51 @@ export async function signInAdmin(email: string, password: string) {
   return session;
 }
 
-export async function refreshAdminSession() {
+export async function refreshAdminSession(options: { force?: boolean } = {}) {
   if (!isAdminApiConfigured()) {
     writeAdminSession(null);
     return null;
   }
 
-  try {
-    const { admin } = await invokeAdminApi<{
-      admin: {
-        email: string;
-        name: string;
-        role: AdminRole;
-      };
-    }>({ resource: 'me' });
-
-    const session: AdminSession = {
-      email: admin.email,
-      name: admin.name || admin.email,
-      role: admin.role
-    };
-
-    writeAdminSession(session);
-    return session;
-  } catch {
-    writeAdminSession(null);
-    return null;
+  if (!options.force) {
+    const cachedSession = getFreshAdminSession();
+    if (cachedSession) {
+      return cachedSession;
+    }
   }
+
+  if (!options.force && refreshInFlight) {
+    return refreshInFlight;
+  }
+
+  refreshInFlight = (async () => {
+    try {
+      const { admin } = await invokeAdminApi<{
+        admin: {
+          email: string;
+          name: string;
+          role: AdminRole;
+        };
+      }>({ resource: 'me' });
+
+      const session: AdminSession = {
+        email: admin.email,
+        name: admin.name || admin.email,
+        role: admin.role,
+        verifiedAt: Date.now()
+      };
+
+      writeAdminSession(session);
+      return session;
+    } catch {
+      writeAdminSession(null);
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
 }
 
 export function signOutAdmin() {
