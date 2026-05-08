@@ -75,7 +75,7 @@ export default function HomePage() {
       [...projects]
         .filter((item) => getDeadlineLevelFromDate(item.deadlineDate) !== 'expired')
         .sort((left, right) => right.publishDate.localeCompare(left.publishDate))
-        .slice(0, 3),
+        .slice(0, 6),
     [projects]
   );
 
@@ -400,17 +400,17 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="mt-6 grid gap-4">
+          <div className="mt-6 grid gap-3">
             {latestProjects.map((project) => (
               <Link
                 key={project.id}
                 href={buildNoticeDetailHref(project.id)}
-                className="group grid gap-4 rounded-2xl border border-slate-100 bg-white p-4 transition hover:-translate-y-0.5 hover:border-brand/20 hover:shadow-soft sm:grid-cols-[64px_minmax(0,1fr)_150px]"
+                className="group grid gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 transition hover:-translate-y-0.5 hover:border-brand/20 hover:shadow-soft sm:grid-cols-[56px_minmax(0,1fr)_138px] sm:items-center"
               >
                 <ExternalSiteMark
                   source={resolveNoticeLogoSource(project)}
                   label={getDisplaySchoolName(project.schoolName)}
-                  size="lg"
+                  size="md"
                   rounded="full"
                 />
                 <div className="min-w-0">
@@ -420,10 +420,10 @@ export default function HomePage() {
                       {getDisplayProjectType(project.projectType)}
                     </span>
                   </div>
-                  <div className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-slate-700 group-hover:text-brand">
-                    {normalizeNoticeTitle(project.projectName, 54)}
+                  <div className="mt-1.5 line-clamp-2 text-sm font-semibold leading-6 text-slate-700 group-hover:text-brand">
+                    {normalizeNoticeTitle(project.projectName, 58)}
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                  <div className="mt-1.5 flex flex-wrap gap-2 text-xs text-slate-500">
                     <span>{getDisplayDepartmentName(project.departmentName)}</span>
                     <span>发布：{formatNoticeDateOnly(project.publishDate)}</span>
                   </div>
@@ -431,7 +431,7 @@ export default function HomePage() {
                 <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end sm:justify-center">
                   <span className="text-xs text-slate-500">截止：{formatNoticeDateOnly(project.deadlineDate)}</span>
                   <DeadlineBadge level={getDeadlineLevelFromDate(project.deadlineDate)} />
-                  <span className="rounded-xl border border-brand/20 px-3 py-2 text-xs font-semibold text-brand">查看详情</span>
+                  <span className="rounded-xl border border-brand/20 px-3 py-1.5 text-xs font-semibold text-brand">查看详情</span>
                 </div>
               </Link>
             ))}
