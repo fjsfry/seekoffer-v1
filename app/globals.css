@@ -25,11 +25,12 @@ html {
 }
 
 body {
-  background:
-    radial-gradient(circle at 78% 4%, rgba(111, 193, 185, 0.18), transparent 36rem),
-    radial-gradient(circle at 8% 2%, rgba(224, 170, 85, 0.08), transparent 24rem),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 250, 249, 0.5) 34rem),
-    var(--page-bg);
+  background-color: var(--page-bg);
+  background-image: url('/backgrounds/seekoffer-site-bg.png');
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: fixed;
   color: var(--page-ink);
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
 }
