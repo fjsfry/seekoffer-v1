@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   ArrowRight,
   BellRing,
@@ -157,16 +158,18 @@ export default function HomePage() {
 
   return (
     <SiteShell>
-      <section className="relative overflow-hidden rounded-[36px] px-2 pb-4 pt-6 lg:px-6 lg:pt-10">
-        <div className="pointer-events-none absolute inset-x-[-8%] bottom-0 h-56 rounded-[50%] bg-brand/8 blur-3xl" />
-        <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_620px]">
+      <section className="relative overflow-hidden rounded-[42px] px-3 pb-8 pt-8 sm:px-8 lg:px-14 lg:pb-12 lg:pt-14">
+        <div className="pointer-events-none absolute inset-x-[-10%] bottom-[-4.5rem] h-72 rounded-[50%] bg-brand/10 blur-3xl" />
+        <div className="pointer-events-none absolute left-[46%] top-[46%] h-3 w-3 rounded-full bg-brand/25" />
+        <div className="pointer-events-none absolute left-[50%] top-[58%] h-4 w-4 rounded-full bg-brand/20" />
+        <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_620px] xl:grid-cols-[minmax(0,1fr)_660px]">
           <div className="relative z-10">
-            <h1 className="title-balance max-w-4xl text-4xl font-semibold leading-tight tracking-tight text-ink md:text-5xl lg:text-[3.45rem]">
+            <h1 className="title-balance max-w-4xl text-[2.7rem] font-semibold leading-[1.12] tracking-tight text-ink md:text-5xl lg:text-[3.35rem] xl:text-[3.6rem]">
               把分散的保研信息，
               <br />
               整理成清晰的申请路径
             </h1>
-            <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600">
+            <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 lg:text-lg">
               不再担心错过通知，自动帮你收集院校、追踪截止、管理材料，减少漏申，让保研从信息焦虑变成有节奏的行动计划。
             </p>
 
@@ -180,7 +183,7 @@ export default function HomePage() {
               </Link>
               <Link
                 href="/me"
-                className="inline-flex items-center gap-2 rounded-xl border border-brand/25 bg-white px-6 py-3.5 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5 hover:border-brand"
+                className="inline-flex items-center gap-2 rounded-xl border border-brand/25 bg-white/90 px-6 py-3.5 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5 hover:border-brand"
               >
                 免费创建申请表
               </Link>
@@ -191,14 +194,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-5 px-1 sm:grid-cols-2 lg:grid-cols-4 lg:px-12">
+      <section className="grid gap-5 px-1 sm:grid-cols-2 lg:grid-cols-4 lg:px-16">
         {heroMetrics.map((item) => {
           const Icon = item.icon;
 
           return (
-            <div key={item.label} className="product-card rounded-[22px] p-6">
+            <div key={item.label} className="product-card rounded-[24px] bg-white/90 p-6 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-soft">
               <div className="flex items-start gap-4">
-                <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/8 text-brand">
+                <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/8 text-brand shadow-[inset_0_0_0_1px_rgba(23,73,77,0.04)]">
                   <Icon className="h-7 w-7" />
                 </span>
                 <div>
@@ -214,17 +217,17 @@ export default function HomePage() {
 
       <section className="px-1 lg:px-12">
         <h2 className="text-center text-2xl font-semibold tracking-tight text-ink">为什么选择寻鹿</h2>
-        <div className="product-card mt-5 grid overflow-hidden rounded-[24px] sm:grid-cols-2 lg:grid-cols-6">
+        <div className="product-card mt-5 grid overflow-hidden rounded-[26px] bg-white/[0.88] backdrop-blur sm:grid-cols-2 lg:grid-cols-6">
           {featureCards.map((item, index) => {
             const Icon = item.icon;
 
             return (
               <div
                 key={item.title}
-                className={`px-5 py-6 text-center ${index ? 'border-t border-slate-100 sm:border-l sm:border-t-0' : ''}`}
+                className={`px-5 py-7 text-center ${index ? 'border-t border-slate-100 sm:border-l sm:border-t-0' : ''}`}
               >
-                <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand/8 text-brand">
-                  <Icon className="h-6 w-6" />
+                <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand/8 text-brand">
+                  <Icon className="h-7 w-7" />
                 </span>
                 <h3 className="mt-4 text-base font-semibold text-ink">{item.title}</h3>
                 <p className="mt-2 text-xs leading-5 text-slate-500">{item.description}</p>
@@ -236,14 +239,14 @@ export default function HomePage() {
 
       <section className="px-1 lg:px-12">
         <h2 className="text-center text-2xl font-semibold tracking-tight text-ink">三步开始，轻松管理保研申请</h2>
-        <div className="product-card mt-5 grid gap-4 rounded-[24px] p-5 lg:grid-cols-[1fr_auto_1fr_auto_1fr] lg:items-center">
+        <div className="product-card mt-5 grid gap-4 rounded-[26px] bg-white/[0.88] p-5 backdrop-blur lg:grid-cols-[1fr_auto_1fr_auto_1fr] lg:items-center">
           {stepCards.map((item, index) => {
             const Icon = item.icon;
 
             return (
               <div key={item.title} className="contents">
-                <div className="flex items-center gap-4 rounded-2xl bg-white p-4">
-                  <span className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
+                <div className="flex items-center gap-4 rounded-2xl bg-white/95 p-4 shadow-[inset_0_0_0_1px_rgba(18,32,38,0.035)]">
+                  <span className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-brand/8 text-brand">
                     <Icon className="h-7 w-7" />
                   </span>
                   <div>
@@ -261,7 +264,7 @@ export default function HomePage() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <div className="product-card grid overflow-hidden rounded-[28px] lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="product-card grid min-h-[285px] overflow-hidden rounded-[30px] bg-white/90 backdrop-blur lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           <div className="p-7 lg:p-8">
             <h2 className="text-2xl font-semibold tracking-tight text-ink">今天先处理什么，工作台会直接告诉你</h2>
             <p className="mt-4 text-sm leading-8 text-slate-600">
@@ -278,7 +281,7 @@ export default function HomePage() {
           <MiniWorkbenchPanel projects={priorityActions} />
         </div>
 
-        <div className="product-card grid overflow-hidden rounded-[28px] lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="product-card grid min-h-[285px] overflow-hidden rounded-[30px] bg-white/90 backdrop-blur lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           <div className="p-7 lg:p-8">
             <h2 className="text-2xl font-semibold tracking-tight text-ink">最新通知与截止，一手掌握</h2>
             <p className="mt-4 text-sm leading-8 text-slate-600">
@@ -321,103 +324,130 @@ export default function HomePage() {
   );
 }
 
-function HomeHeroPreview() {
+function SeekofferMiniMark({ className = '' }: { className?: string }) {
   return (
-    <div className="relative z-10 mx-auto w-full max-w-[620px] rounded-[28px] border border-brand/10 bg-white/92 p-4 shadow-hero backdrop-blur">
-      <div className="grid gap-4 lg:grid-cols-[50px_minmax(0,1fr)]">
-        <div className="hidden rounded-2xl bg-brand/5 p-2 lg:block">
-          <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-sm">
-            <ExternalSiteMark source="seekoffer" label="Seekoffer" size="sm" rounded="full" />
+    <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-brand/10 bg-white shadow-sm ${className}`}>
+      <Image src="/logo.png" alt="寻鹿 Seekoffer" width={56} height={56} className="h-full w-full object-cover" />
+    </span>
+  );
+}
+
+function HomeHeroPreview() {
+  const todos = [
+    ['补充 华东师范大学 材料', '去处理'],
+    ['关注 3 所院校 截止临近', '去查看'],
+    ['更新 中国科学技术大学 申请表', '去更新']
+  ];
+  const materialProgress = [
+    ['基本信息', '100%'],
+    ['个人陈述', '70%'],
+    ['推荐信', '40%']
+  ];
+  const deadlines = [
+    ['中国科学技术大学', '2天后截止'],
+    ['复旦大学', '3天后截止'],
+    ['上海交通大学', '5天后截止']
+  ];
+
+  return (
+    <div className="relative z-10 mx-auto w-full max-w-[660px]">
+      <div className="pointer-events-none absolute -left-8 top-20 h-36 w-36 rounded-full bg-brand/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-8 bottom-8 h-40 w-40 rounded-full bg-cyan-100/70 blur-3xl" />
+
+      <div className="relative rounded-[32px] border border-white/80 bg-white/[0.88] p-4 shadow-[0_34px_92px_rgba(18,32,38,0.13)] backdrop-blur-2xl">
+        <div className="mb-4 flex items-center justify-between px-1">
+          <div className="flex items-center gap-3">
+            <SeekofferMiniMark className="h-9 w-9" />
+            <div className="text-sm font-semibold text-ink">我的申请工作台</div>
           </div>
-          {[LayoutDashboard, UserRound, ClipboardList, CalendarDays].map((Icon, index) => (
-            <div
-              key={index}
-              className={`mb-2 flex h-9 w-9 items-center justify-center rounded-xl ${
-                index === 0 ? 'bg-brand text-white' : 'bg-white text-slate-400'
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-            </div>
-          ))}
+          <div className="flex items-center gap-2 text-slate-400">
+            {[ShieldCheck, UserRound, CalendarDays].map((Icon, index) => (
+              <span key={index} className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-50">
+                <Icon className="h-3.5 w-3.5" />
+              </span>
+            ))}
+          </div>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-ink">我的申请工作台</div>
-            <div className="flex gap-2 text-slate-400">
-              <ShieldCheck className="h-4 w-4" />
-              <UserRound className="h-4 w-4" />
-              <CalendarDays className="h-4 w-4" />
-            </div>
+        <div className="grid gap-4 lg:grid-cols-[52px_minmax(0,1fr)]">
+          <div className="hidden rounded-[20px] bg-brand/[0.06] p-2 lg:block">
+            {[LayoutDashboard, UserRound, ClipboardList, CalendarDays].map((Icon, index) => (
+              <div
+                key={index}
+                className={`mb-2 flex h-9 w-9 items-center justify-center rounded-xl transition ${
+                  index === 0 ? 'bg-brand text-white shadow-sm' : 'bg-white/80 text-slate-400'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+              </div>
+            ))}
           </div>
 
-          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_170px]">
-            <div className="rounded-2xl bg-slate-50/80 p-4">
-              <div className="mb-3 text-xs font-semibold text-slate-500">今日待办</div>
-              {['补充 华东师范大学 材料', '关注 3 所院校 截止临近', '更新 中国科学技术大学 申请表'].map((item, index) => (
-                <div key={item} className="mb-2 flex items-center gap-3 rounded-xl bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">
-                  <span className="h-2.5 w-2.5 rounded-full border border-brand/50" />
-                  <span className="min-w-0 flex-1 truncate">{item}</span>
-                  <span className="rounded-lg bg-brand/8 px-2 py-1 text-[11px] font-semibold text-brand">
-                    {index === 0 ? '去处理' : index === 1 ? '去查看' : '去更新'}
+          <div className="grid gap-4">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_190px]">
+              <div className="rounded-[22px] border border-slate-100 bg-white/75 p-4 shadow-sm">
+                <div className="mb-3 text-xs font-semibold text-slate-500">今日待办</div>
+                {todos.map(([item, action]) => (
+                  <div key={item} className="mb-2 flex items-center gap-3 rounded-xl bg-white px-3 py-2.5 text-xs text-slate-600 shadow-[0_8px_24px_rgba(18,32,38,0.04)]">
+                    <span className="h-2.5 w-2.5 rounded-full border border-brand/50" />
+                    <span className="min-w-0 flex-1 truncate">{item}</span>
+                    <span className="rounded-lg bg-brand/8 px-2 py-1 text-[11px] font-semibold text-brand">{action}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-[22px] border border-slate-100 bg-white/75 p-4 text-center shadow-sm">
+                <div className="text-xs font-semibold text-slate-500">申请进度</div>
+                <div
+                  className="mx-auto mt-4 flex h-28 w-28 items-center justify-center rounded-full shadow-[inset_0_0_0_1px_rgba(23,73,77,0.06)]"
+                  style={{ background: 'conic-gradient(#17494d 0 67%, #dfecea 67% 100%)' }}
+                >
+                  <div className="flex h-20 w-20 flex-col items-center justify-center rounded-full bg-white shadow-sm">
+                    <div className="text-xl font-semibold text-ink">8 / 12</div>
+                    <div className="text-[11px] text-slate-500">已提交</div>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-1 text-[11px] text-slate-500">
+                  <span>
+                    <b className="block text-ink">3</b>草稿
+                  </span>
+                  <span>
+                    <b className="block text-ink">1</b>进行中
+                  </span>
+                  <span>
+                    <b className="block text-ink">8</b>已提交
                   </span>
                 </div>
-              ))}
-            </div>
-
-            <div className="rounded-2xl bg-slate-50/80 p-4 text-center">
-              <div className="text-xs font-semibold text-slate-500">申请进度</div>
-              <div
-                className="mx-auto mt-4 flex h-28 w-28 items-center justify-center rounded-full"
-                style={{ background: 'conic-gradient(#17494d 0 67%, #dfecea 67% 100%)' }}
-              >
-                <div className="flex h-20 w-20 flex-col items-center justify-center rounded-full bg-white shadow-sm">
-                  <div className="text-xl font-semibold text-ink">8 / 12</div>
-                  <div className="text-[11px] text-slate-500">已提交</div>
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-3 text-xs">
-                <span>草稿 3</span>
-                <span>进行中 1</span>
-                <span>已提交 8</span>
               </div>
             </div>
-          </div>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl bg-white p-4 shadow-sm">
-              <div className="mb-3 text-xs font-semibold text-slate-500">材料完成度</div>
-              {[
-                ['基本信息', '100%'],
-                ['个人陈述', '70%'],
-                ['推荐信', '40%']
-              ].map(([label, value]) => (
-                <div key={label} className="mb-3">
-                  <div className="mb-1 flex justify-between text-[11px] text-slate-500">
-                    <span>{label}</span>
-                    <span>{value}</span>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-[22px] border border-slate-100 bg-white/85 p-4 shadow-sm">
+                <div className="mb-3 text-xs font-semibold text-slate-500">材料完成度</div>
+                {materialProgress.map(([label, value]) => (
+                  <div key={label} className="mb-3">
+                    <div className="mb-1 flex justify-between text-[11px] text-slate-500">
+                      <span>{label}</span>
+                      <span>{value}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-slate-100">
+                      <div className="h-full rounded-full bg-brand" style={{ width: value }} />
+                    </div>
                   </div>
-                  <div className="h-2 rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-brand" style={{ width: value }} />
-                  </div>
-                </div>
-              ))}
-              <div className="text-xs font-semibold text-brand">去完善材料 →</div>
-            </div>
+                ))}
+                <div className="text-xs font-semibold text-brand">去完善材料 →</div>
+              </div>
 
-            <div className="rounded-2xl bg-white p-4 shadow-sm">
-              <div className="mb-3 text-xs font-semibold text-slate-500">截止提醒（近7天）</div>
-              {[
-                ['中国科学技术大学', '2天后截止'],
-                ['复旦大学', '3天后截止'],
-                ['上海交通大学', '5天后截止']
-              ].map(([school, tag]) => (
-                <div key={school} className="mb-2 flex items-center justify-between gap-3 text-xs">
-                  <span className="truncate text-slate-600">{school}</span>
-                  <span className="shrink-0 font-semibold text-rose-500">{tag}</span>
-                </div>
-              ))}
-              <div className="mt-3 text-xs font-semibold text-brand">查看全部提醒 →</div>
+              <div className="rounded-[22px] border border-slate-100 bg-white/85 p-4 shadow-sm">
+                <div className="mb-3 text-xs font-semibold text-slate-500">截止提醒（近7天）</div>
+                {deadlines.map(([school, tag]) => (
+                  <div key={school} className="mb-2 flex items-center justify-between gap-3 text-xs">
+                    <span className="truncate text-slate-600">{school}</span>
+                    <span className="shrink-0 font-semibold text-rose-500">{tag}</span>
+                  </div>
+                ))}
+                <div className="mt-3 text-xs font-semibold text-brand">查看全部提醒 →</div>
+              </div>
             </div>
           </div>
         </div>
