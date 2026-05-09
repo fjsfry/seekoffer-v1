@@ -1,7 +1,5 @@
 import { ArrowUpRight, BookOpenText, Calculator, CheckCircle2, ClipboardList, FileText, Landmark, Mail, Wrench } from 'lucide-react';
 import { ExternalSiteMark } from '@/components/external-site-mark';
-import { PageSectionTitle } from '@/components/page-section-title';
-import { ProductHeroVisual } from '@/components/product-hero-visual';
 import { SiteShell } from '@/components/site-shell';
 import { officialResourceSections } from '@/lib/portal-data';
 
@@ -61,16 +59,42 @@ const applicationKits = [
 
 export default function ResourcesPage() {
   const heroLinks = officialResourceSections.flatMap((section) => section.links).slice(0, 6);
+  const totalResourceLinks = officialResourceSections.reduce((total, section) => total + section.links.length, 0);
 
   return (
     <SiteShell>
-      <section className="grid gap-8 py-5 lg:grid-cols-[minmax(0,1fr)_410px] lg:items-center">
-        <PageSectionTitle
-          eyebrow="Resource Toolbox"
-          title="资源库"
-          subtitle="常用学术工具、官方入口和申请服务，一页直达。"
-        />
-        <ProductHeroVisual variant="resource" compact />
+      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
+        <div>
+          <div className="eyebrow">Resource Toolbox</div>
+          <h1 className="mt-5 text-4xl font-semibold tracking-tight text-ink">资源库</h1>
+          <p className="mt-4 text-base leading-8 text-slate-600">
+            常用学术工具、官方入口和申请服务，一页直达，减少重复搜索，把时间留给真正的申请准备。
+          </p>
+        </div>
+
+        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+          {[
+            { label: '资源入口', value: `${totalResourceLinks}`, icon: BookOpenText },
+            { label: '资源分类', value: `${officialResourceSections.length}`, icon: Landmark },
+            { label: '申请工具', value: `${applicationKits.length}`, icon: ClipboardList }
+          ].map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <div key={item.label} className="soft-stat-pill rounded-[28px] px-4 py-4">
+                <div className="flex items-center justify-center gap-3 text-center">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="whitespace-nowrap text-xs text-slate-500">{item.label}</div>
+                    <div className="whitespace-nowrap text-xl font-semibold text-ink">{item.value}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       <section className="surface-card rounded-[34px] p-7 lg:p-8">
