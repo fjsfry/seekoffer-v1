@@ -164,8 +164,7 @@ export default function CollegesPage() {
     <SiteShell>
       <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
-          <div className="eyebrow">College Directory</div>
-          <h1 className="mt-5 text-4xl font-semibold tracking-tight text-ink">院校库</h1>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">院校库</h1>
           <p className="mt-4 text-base leading-8 text-slate-600">
             高频目标院校一页直达，按城市、层次和关键词快速筛选，找到学校后直接回到官网核对。
           </p>

@@ -416,8 +416,7 @@ export default function NoticesPage() {
     <SiteShell>
       <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
-          <div className="eyebrow">Notice Library</div>
-          <h1 className="mt-5 text-4xl font-semibold tracking-tight text-ink">通知库</h1>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">通知库</h1>
           <p className="mt-4 text-base leading-8 text-slate-600">
             持续同步公开保研通知，优先展示可报名项目与关键截止时间。
           </p>

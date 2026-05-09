@@ -65,8 +65,7 @@ export default function ResourcesPage() {
     <SiteShell>
       <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
-          <div className="eyebrow">Resource Toolbox</div>
-          <h1 className="mt-5 text-4xl font-semibold tracking-tight text-ink">资源库</h1>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">资源库</h1>
           <p className="mt-4 text-base leading-8 text-slate-600">
             常用学术工具、官方入口和申请服务，一页直达，减少重复搜索，把时间留给真正的申请准备。
           </p>
