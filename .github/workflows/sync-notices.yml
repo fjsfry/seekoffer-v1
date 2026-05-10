@@ -46,7 +46,7 @@ jobs:
       SECONDARY_MAX_PAGES: '30'
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       SUPABASE_INGEST_URL: ${{ secrets.SUPABASE_INGEST_URL }}
-      SUPABASE_INGEST_SECRET: ${{ secrets.SUPABASE_INGEST_SECRET }}
+      SUPABASE_INGEST_SECRET: ${{ secrets.SEEKOFFER_INGEST_SECRET || secrets.SUPABASE_INGEST_SECRET }}
       SUPABASE_INGEST_SOURCE: github-actions-sync
       DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
 

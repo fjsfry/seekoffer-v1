@@ -768,7 +768,7 @@ async function pushProjectsToSupabase(projects, summary) {
   }
 
   if (!SUPABASE_INGEST_SECRET) {
-    throw new Error('SUPABASE_INGEST_SECRET is not configured.');
+    throw new Error('SUPABASE_INGEST_SECRET or SEEKOFFER_INGEST_SECRET is not configured.');
   }
 
   const controller = new AbortController();
