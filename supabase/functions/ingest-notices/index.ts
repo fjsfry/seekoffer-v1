@@ -93,6 +93,17 @@ function dedupeNoticesById(notices: ReturnType<typeof normalizeNotice>[]) {
   return Array.from(byId.values());
 }
 
+function extractFirstYear(value: string) {
+  const match = String(value || '').match(/\b(20\d{2})\b/);
+  return match ? Number(match[1]) : null;
+}
+
+function hasOutdatedDeadline(notice: ReturnType<typeof normalizeNotice>) {
+  const noticeYear = Number(notice.year || 0);
+  const deadlineYear = extractFirstYear(notice.deadline_date);
+  return Boolean(noticeYear && deadlineYear && deadlineYear < noticeYear);
+}
+
 Deno.serve(async (request) => {
   if (request.method !== 'POST') {
     return json(405, { error: 'method_not_allowed' });
@@ -123,7 +134,8 @@ Deno.serve(async (request) => {
   }
 
   const normalizedNotices = Array.isArray(body.notices) ? body.notices.map(normalizeNotice) : [];
-  const notices = dedupeNoticesById(normalizedNotices);
+  const publishableNotices = normalizedNotices.filter((notice) => !hasOutdatedDeadline(notice));
+  const notices = dedupeNoticesById(publishableNotices);
   if (!notices.length) {
     return json(400, { error: 'empty_notices' });
   }
@@ -159,12 +171,18 @@ Deno.serve(async (request) => {
     notices_received: notices.length,
     notices_upserted: notices.length,
     success: true,
-    summary: body.summary || {}
+    summary: {
+      ...(body.summary || {}),
+      originalNoticesReceived: normalizedNotices.length,
+      skippedOutdatedDeadline: normalizedNotices.length - publishableNotices.length,
+      dedupedNotices: notices.length
+    }
   });
 
   return json(200, {
     ok: true,
     noticesReceived: normalizedNotices.length,
+    noticesSkipped: normalizedNotices.length - publishableNotices.length,
     noticesUpserted: notices.length
   });
 });
