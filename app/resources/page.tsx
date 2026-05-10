@@ -58,7 +58,6 @@ const applicationKits = [
 ];
 
 export default function ResourcesPage() {
-  const heroLinks = officialResourceSections.flatMap((section) => section.links).slice(0, 6);
   const totalResourceLinks = officialResourceSections.reduce((total, section) => total + section.links.length, 0);
 
   return (
@@ -97,45 +96,9 @@ export default function ResourcesPage() {
       </section>
 
       <section className="surface-card rounded-[34px] p-7 lg:p-8">
-        <div className="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
-          <div>
-            <div className="eyebrow">Quick Access</div>
-            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-ink">高频入口</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-500">把申请期反复打开的网站放在最前面。</p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {heroLinks.map((item) => (
-              <a
-                key={item.title}
-                href={item.href}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft"
-              >
-                <div className="flex items-center gap-3">
-                  <ExternalSiteMark
-                    source={item.href}
-                    label={item.title}
-                    size="lg"
-                    layout={getResourceMarkLayout(item.href)}
-                  />
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-ink">{item.title}</div>
-                    <div className="mt-1 truncate text-xs text-slate-500">{item.badge}</div>
-                  </div>
-                </div>
-              </a>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="surface-card rounded-[34px] p-7 lg:p-8">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="eyebrow">Application Center</div>
-            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-ink">申请资料中心</h2>
+            <h2 className="text-3xl font-semibold tracking-tight text-ink">申请资料中心</h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-500">
               资源库不只做网址导航，也会逐步沉淀模板、清单和工具，让每次准备材料都少走一步弯路。
             </p>
@@ -177,12 +140,11 @@ export default function ResourcesPage() {
           return (
             <div key={section.title} className="surface-card rounded-[34px] p-6 lg:p-7">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brand/8 text-brand">
                     <Icon className="h-4 w-4" />
-                    {section.title}
-                  </div>
-                  <h3 className="mt-3 text-2xl font-semibold text-ink">{section.title}</h3>
+                  </span>
+                  <h2 className="text-3xl font-semibold tracking-tight text-ink">{section.title}</h2>
                 </div>
               </div>
 
