@@ -362,9 +362,20 @@ function shouldKeepNotice(notice) {
 
   if (!notice.id || !notice.school_name || !notice.project_name) return false;
   if (notice.project_name.length < 6) return false;
+  if (isDeadlineOlderThanTargetYear(notice.deadline_date, TARGET_YEAR)) return false;
   if (DIRTY_NOTICE_PATTERN.test(text)) return false;
   if (COMPETITION_NOTICE_PATTERN.test(text)) return false;
   return true;
+}
+
+function extractFirstYear(value) {
+  const match = normalizeSpace(value).match(/\b(20\d{2})\b/);
+  return match ? Number(match[1]) : null;
+}
+
+function isDeadlineOlderThanTargetYear(deadlineText, targetYear) {
+  const deadlineYear = extractFirstYear(deadlineText);
+  return Boolean(deadlineYear && deadlineYear < targetYear);
 }
 
 function buildPrimaryProject(record, detail = {}, targetYear = TARGET_YEAR) {
@@ -424,10 +435,9 @@ function extractYearSignals(record) {
     record.sign_up_end,
     record.start_time,
     record.end_time,
-    record.updated_time,
-    record.updated_at,
-    record.created_at,
     record.title,
+    record.description,
+    record.rule,
     record.content
   ]
     .map(normalizeSpace)
