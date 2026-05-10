@@ -1,5 +1,4 @@
 import {
-  ArrowRight,
   ArrowUpRight,
   BookOpenText,
   Calculator,
@@ -14,37 +13,10 @@ import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
 import { officialResourceSections } from '@/lib/portal-data';
 
-const squareMarkDomains = new Set([
-  'cas.cn',
-  'chsi.com.cn',
-  'daoshipingjia.net',
-  'deepl.com',
-  'grammarly.com',
-  'notion.so',
-  'obsidian.md',
-  'overleaf.com',
-  'xmind.app'
-]);
-
-function getResourceMarkLayout(source: string) {
-  try {
-    const domain = new URL(source).hostname.replace(/^www\./, '');
-    return squareMarkDomains.has(domain) ? 'square' : 'landscape';
-  } catch {
-    return 'landscape';
-  }
-}
-
 const sectionIcons = {
   高频学术工具: BookOpenText,
   官方入口: Landmark,
   常用服务: Wrench
-} as const;
-
-const sectionActionLabels = {
-  高频学术工具: '查看更多工具',
-  官方入口: '查看更多入口',
-  常用服务: '查看更多服务'
 } as const;
 
 const applicationKits = [
@@ -171,24 +143,17 @@ export default function ResourcesPage() {
       <section className="grid gap-7">
         {officialResourceSections.map((section) => {
           const Icon = sectionIcons[section.title as keyof typeof sectionIcons];
-          const actionLabel = sectionActionLabels[section.title as keyof typeof sectionActionLabels];
 
           return (
             <div key={section.title} className="surface-card rounded-[34px] p-6 lg:p-8">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex items-start gap-3">
-                  <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <h2 className="text-2xl font-semibold tracking-tight text-ink md:text-3xl">{section.title}</h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{section.description}</p>
-                  </div>
-                </div>
-                <span className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-brand">
-                  {actionLabel}
-                  <ArrowRight className="h-4 w-4" />
+              <div className="flex items-start gap-3">
+                <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
+                  <Icon className="h-5 w-5" />
                 </span>
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-tight text-ink md:text-3xl">{section.title}</h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{section.description}</p>
+                </div>
               </div>
 
               <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -198,16 +163,18 @@ export default function ResourcesPage() {
                     href={item.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="group rounded-[22px] border border-slate-100 bg-white/95 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft"
+                    className="group min-h-[116px] rounded-[22px] border border-slate-100 bg-white/95 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft"
                   >
-                    <div className="flex items-center gap-4">
-                      <ExternalSiteMark
-                        source={item.href}
-                        label={item.title}
-                        size="lg"
-                        layout={getResourceMarkLayout(item.href)}
-                      />
-                      <div className="min-w-0 flex-1">
+                    <div className="grid h-full grid-cols-[4rem_minmax(0,1fr)] items-center gap-4">
+                      <span className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-slate-50">
+                        <ExternalSiteMark
+                          source={item.href}
+                          label={item.title}
+                          size="lg"
+                          layout="square"
+                        />
+                      </span>
+                      <div className="min-w-0">
                         <div className="truncate text-base font-semibold text-ink">{item.title}</div>
                         <p className="mt-1 line-clamp-1 text-sm text-slate-500">{item.description}</p>
                         <div className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-brand">
