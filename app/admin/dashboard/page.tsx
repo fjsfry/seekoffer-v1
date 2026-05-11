@@ -21,6 +21,7 @@ import {
 } from '@/components/admin-ui';
 import type { AdminFeedbackRow, AdminMetric, AdminNoticeRow, AdminOfferRow, TrendPoint } from '@/lib/admin-data';
 import { invokeAdminApi } from '@/lib/admin-api';
+import { formatBeijingDateTime } from '@/lib/admin-time';
 
 const dashboardIcons = [Activity, Globe2, UsersRound, Bell, ClipboardList, ShieldAlert];
 
@@ -344,7 +345,7 @@ function mapNoticeApiRow(row: NoticeApiRow): AdminNoticeRow {
     type: row.project_type || '其他',
     sourceUrl: row.source_link || `/notices/${row.id}`,
     submitter: row.is_private ? '用户提交' : '系统同步',
-    submittedAt: row.updated_at_ts?.slice(0, 16).replace('T', ' ') || row.created_at?.slice(0, 16).replace('T', ' ') || row.publish_date || '-',
+    submittedAt: formatBeijingDateTime(row.updated_at_ts || row.created_at, row.publish_date || '-'),
     deadline: row.deadline_date || '待确认',
     status: mapNoticeStatus(row.admin_status),
     views: 0,
@@ -385,7 +386,7 @@ function mapOfferApiRow(row: OfferApiRow): AdminOfferRow {
     result: row.result || '待确认',
     background: row.undergraduate_background || '未填写',
     anonymous: row.is_anonymous,
-    submittedAt: row.created_at?.slice(0, 16).replace('T', ' ') || '-',
+    submittedAt: formatBeijingDateTime(row.created_at),
     status: mapOfferStatus(row.review_status),
     reports: row.reports_count || 0
   };
@@ -417,7 +418,7 @@ function mapFeedbackApiRow(row: FeedbackApiRow): AdminFeedbackRow {
     module: row.module === 'notice' ? '通知内容' : row.module === 'offer' ? 'Offer信息' : row.module === 'user' ? '用户行为' : '系统功能',
     user: row.target_id || '用户反馈',
     content: row.content || '-',
-    submittedAt: row.created_at?.slice(0, 16).replace('T', ' ') || '-',
+    submittedAt: formatBeijingDateTime(row.created_at),
     status: row.status === 'processing' ? '处理中' : row.status === 'resolved' ? '已解决' : row.status === 'closed' ? '已关闭' : '待处理',
     handler: row.handler || '-'
   };

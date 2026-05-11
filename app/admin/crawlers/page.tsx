@@ -17,6 +17,7 @@ import {
 } from '@/components/admin-ui';
 import type { AdminFeedbackRow, AdminMetric, AdminOperationLog, AdminUserRow } from '@/lib/admin-data';
 import { invokeAdminApi } from '@/lib/admin-api';
+import { formatBeijingDateTime } from '@/lib/admin-time';
 
 type OperationsSection = 'users' | 'feedback' | 'logs' | 'settings';
 
@@ -688,8 +689,8 @@ function mapUserApiRow(row: UserApiRow): AdminUserRow {
     id: row.id,
     nickname: row.nickname || '未设置昵称',
     contact: row.email || `${row.undergraduate_school || '未填写学校'} / ${row.major || '未填写专业'}`,
-    registeredAt: row.created_at?.slice(0, 16).replace('T', ' ') || '-',
-    lastActiveAt: row.updated_at?.slice(0, 16).replace('T', ' ') || '-',
+    registeredAt: formatBeijingDateTime(row.created_at),
+    lastActiveAt: formatBeijingDateTime(row.updated_at),
     noticeCount: row.notice_count || 0,
     offerCount: row.offer_count || 0,
     applicationCount: row.application_count || 0,
@@ -722,7 +723,7 @@ function mapFeedbackApiRow(row: FeedbackApiRow): AdminFeedbackRow {
     module: mapFeedbackModule(row.module),
     user: row.target_id || '用户反馈',
     content: row.content || '-',
-    submittedAt: row.created_at?.slice(0, 16).replace('T', ' ') || '-',
+    submittedAt: formatBeijingDateTime(row.created_at),
     status: mapFeedbackStatus(row.status),
     handler: row.handler || '-'
   };
@@ -764,7 +765,7 @@ function mapLogApiRow(row: LogApiRow): AdminOperationLog {
     ip: row.ip_address || '-',
     result: row.result === 'failed' ? '失败' : '成功',
     remark: row.remark || '-',
-    createdAt: row.created_at?.slice(0, 19).replace('T', ' ') || '-'
+    createdAt: formatBeijingDateTime(row.created_at)
   };
 }
 

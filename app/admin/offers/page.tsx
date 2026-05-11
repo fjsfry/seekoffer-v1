@@ -14,6 +14,7 @@ import {
 } from '@/components/admin-ui';
 import type { AdminMetric, AdminOfferRow } from '@/lib/admin-data';
 import { invokeAdminApi } from '@/lib/admin-api';
+import { formatBeijingDateTime } from '@/lib/admin-time';
 
 const offerIcons = [ShieldCheck, CheckCircle2, EyeOff, Trash2];
 
@@ -336,7 +337,7 @@ function mapOfferApiRow(row: OfferApiRow): AdminOfferRow {
     result: row.result || '待确认',
     background: row.undergraduate_background || '未填写',
     anonymous: row.is_anonymous,
-    submittedAt: row.created_at?.slice(0, 16).replace('T', ' ') || '-',
+    submittedAt: formatBeijingDateTime(row.created_at),
     status: mapOfferStatus(row.review_status),
     reports: row.reports_count || 0
   };

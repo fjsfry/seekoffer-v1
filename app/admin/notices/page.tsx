@@ -15,6 +15,7 @@ import {
 } from '@/components/admin-ui';
 import type { AdminMetric, AdminNoticeRow } from '@/lib/admin-data';
 import { invokeAdminApi } from '@/lib/admin-api';
+import { formatBeijingDateTime } from '@/lib/admin-time';
 
 const noticeIcons = [Bell, CheckCircle2, XCircle, Trash2];
 
@@ -505,7 +506,7 @@ function mapNoticeApiRow(row: NoticeApiRow): AdminNoticeRow {
     type: row.project_type || '其他',
     sourceUrl: row.source_link || `/notices/${row.id}`,
     submitter: row.is_private ? '用户提交' : '系统同步',
-    submittedAt: row.updated_at_ts?.slice(0, 16).replace('T', ' ') || row.created_at?.slice(0, 16).replace('T', ' ') || row.publish_date || '-',
+    submittedAt: formatBeijingDateTime(row.updated_at_ts || row.created_at, row.publish_date || '-'),
     deadline: row.deadline_date || '待确认',
     status: mapNoticeStatus(row.admin_status),
     views: 0,
@@ -518,7 +519,7 @@ function mapNoticeApiRow(row: NoticeApiRow): AdminNoticeRow {
     verified: Boolean(row.is_verified),
     reviewNote: row.admin_review_note || '',
     reviewedBy: row.admin_reviewed_by || '',
-    reviewedAt: row.admin_reviewed_at?.slice(0, 16).replace('T', ' ') || ''
+    reviewedAt: formatBeijingDateTime(row.admin_reviewed_at, '')
   };
 }
 
