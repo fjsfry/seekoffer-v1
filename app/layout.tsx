@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { AuthActionBridge } from '@/components/auth-action-bridge';
 import { AuthModal } from '@/components/auth-modal';
 import { UserSessionProvider } from '@/components/user-session-provider';
+import { VisitorPresenceTracker } from '@/components/visitor-presence-tracker';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <UserSessionProvider>
           <AuthActionBridge />
           <AuthModal />
+          <VisitorPresenceTracker />
           {children}
         </UserSessionProvider>
       </body>

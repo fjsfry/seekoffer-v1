@@ -166,6 +166,49 @@ async function countRows(query: PromiseLike<{ count: number | null; error: unkno
   return result.count || 0;
 }
 
+function createOnlineWindowStart(minutes = 2) {
+  return new Date(Date.now() - minutes * 60 * 1000).toISOString();
+}
+
+async function getAnalyticsOverview(service: SupabaseService) {
+  const activeWindowMinutes = 2;
+  const onlineSince = createOnlineWindowStart(activeWindowMinutes);
+  const todayStart = getShanghaiDayStart(0).toISOString();
+
+  const [onlineVisitors, totalVisitors, todayVisitors, todayPageViews, onlineRows, recentRows] = await Promise.all([
+    countRows(service.from('site_visitors').select('visitor_id', { count: 'exact', head: true }).gte('last_seen_at', onlineSince)),
+    countRows(service.from('site_visitors').select('visitor_id', { count: 'exact', head: true })),
+    countRows(service.from('site_visitors').select('visitor_id', { count: 'exact', head: true }).gte('first_seen_at', todayStart)),
+    countRows(service.from('site_visit_events').select('id', { count: 'exact', head: true }).eq('event_type', 'pageview').gte('created_at', todayStart)),
+    service
+      .from('site_visitors')
+      .select('visitor_id,first_seen_at,last_seen_at,last_path,last_title,last_referrer,last_locale,last_timezone,visit_count,page_view_count')
+      .gte('last_seen_at', onlineSince)
+      .order('last_seen_at', { ascending: false })
+      .limit(12),
+    service
+      .from('site_visitors')
+      .select('visitor_id,first_seen_at,last_seen_at,last_path,last_title,last_referrer,last_locale,last_timezone,visit_count,page_view_count')
+      .order('last_seen_at', { ascending: false })
+      .limit(12)
+  ]);
+
+  if (onlineRows.error) throw onlineRows.error;
+  if (recentRows.error) throw recentRows.error;
+
+  return {
+    metrics: {
+      onlineVisitors,
+      totalVisitors,
+      todayVisitors,
+      todayPageViews,
+      activeWindowMinutes
+    },
+    onlineVisitors: onlineRows.data || [],
+    recentVisitors: recentRows.data || []
+  };
+}
+
 async function logOperation(
   service: SupabaseService,
   admin: AdminUser,
@@ -702,6 +745,11 @@ Deno.serve(async (request) => {
     if (resource === 'overview') {
       requireAdminPermission(admin, 'overview:read');
       return json(200, await getOverview(service));
+    }
+
+    if (resource === 'analytics') {
+      requireAdminPermission(admin, 'overview:read');
+      return json(200, await getAnalyticsOverview(service));
     }
 
     if (resource === 'notices' && action === 'list') {

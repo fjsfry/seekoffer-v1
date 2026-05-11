@@ -1,11 +1,11 @@
 'use client';
 
 import {
+  Activity,
   Bell,
   ClipboardList,
-  FileText,
+  Globe2,
   ShieldAlert,
-  UserPlus,
   UsersRound
 } from 'lucide-react';
 import Link from 'next/link';
@@ -22,7 +22,7 @@ import {
 import type { AdminFeedbackRow, AdminMetric, AdminNoticeRow, AdminOfferRow, TrendPoint } from '@/lib/admin-data';
 import { invokeAdminApi } from '@/lib/admin-api';
 
-const dashboardIcons = [UsersRound, Bell, ClipboardList, ShieldAlert, UserPlus, FileText];
+const dashboardIcons = [Activity, Globe2, UsersRound, Bell, ClipboardList, ShieldAlert];
 
 const emptyOverview: AdminOverviewMetrics = {
   totalUsers: 0,
@@ -53,9 +53,22 @@ const emptyOverview: AdminOverviewMetrics = {
   closedFeedback: 0
 };
 
+const emptyAnalytics: AdminAnalyticsPayload = {
+  metrics: {
+    onlineVisitors: 0,
+    totalVisitors: 0,
+    todayVisitors: 0,
+    todayPageViews: 0,
+    activeWindowMinutes: 2
+  },
+  onlineVisitors: [],
+  recentVisitors: []
+};
+
 export default function AdminDashboardPage() {
   const [overviewMetrics, setOverviewMetrics] = useState<AdminOverviewMetrics>(emptyOverview);
-  const [metrics, setMetrics] = useState<AdminMetric[]>(buildLiveMetrics(emptyOverview));
+  const [analytics, setAnalytics] = useState<AdminAnalyticsPayload>(emptyAnalytics);
+  const [metrics, setMetrics] = useState<AdminMetric[]>(buildLiveMetrics(emptyOverview, emptyAnalytics.metrics));
   const [trends, setTrends] = useState<TrendPoint[]>(buildEmptyTrends());
   const [pendingNotices, setPendingNotices] = useState<AdminNoticeRow[]>([]);
   const [pendingOffers, setPendingOffers] = useState<AdminOfferRow[]>([]);
@@ -64,8 +77,9 @@ export default function AdminDashboardPage() {
 
   async function loadDashboard() {
     try {
-      const [overview, notices, offers, feedback] = await Promise.all([
+      const [overview, analyticsData, notices, offers, feedback] = await Promise.all([
         invokeAdminApi<{ metrics: AdminOverviewMetrics; trends: TrendPoint[] }>({ resource: 'overview', action: 'get' }),
+        invokeAdminApi<AdminAnalyticsPayload>({ resource: 'analytics', action: 'overview' }),
         invokeAdminApi<{ notices: NoticeApiRow[] }>({
           resource: 'notices',
           action: 'list',
@@ -79,7 +93,8 @@ export default function AdminDashboardPage() {
       ]);
 
       setOverviewMetrics(overview.metrics);
-      setMetrics(buildLiveMetrics(overview.metrics));
+      setAnalytics(analyticsData);
+      setMetrics(buildLiveMetrics(overview.metrics, analyticsData.metrics));
       setTrends(overview.trends?.length ? overview.trends : buildEmptyTrends());
       setPendingNotices(notices.notices.map(mapNoticeApiRow));
       setPendingOffers(offers.offers.filter((item) => item.review_status === 'pending' || item.reports_count > 0).slice(0, 5).map(mapOfferApiRow));
@@ -87,7 +102,8 @@ export default function AdminDashboardPage() {
       setMessage('已连接 Supabase，数据概览、趋势和待处理列表均来自真实业务表。');
     } catch (error) {
       setOverviewMetrics(emptyOverview);
-      setMetrics(buildLiveMetrics(emptyOverview));
+      setAnalytics(emptyAnalytics);
+      setMetrics(buildLiveMetrics(emptyOverview, emptyAnalytics.metrics));
       setTrends(buildEmptyTrends());
       setPendingNotices([]);
       setPendingOffers([]);
@@ -100,8 +116,14 @@ export default function AdminDashboardPage() {
     const timer = window.setTimeout(() => {
       void loadDashboard();
     }, 0);
+    const interval = window.setInterval(() => {
+      void loadDashboard();
+    }, 30_000);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearInterval(interval);
+    };
   }, []);
 
   const maxNotices = Math.max(...trends.map((item) => item.notices), 1);
@@ -115,6 +137,21 @@ export default function AdminDashboardPage() {
           {metrics.map((metric, index) => (
             <AdminMetricCard key={metric.label} metric={metric} icon={dashboardIcons[index]} />
           ))}
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+          <VisitorPanel
+            title="实时在线访客"
+            description={`最近 ${analytics.metrics.activeWindowMinutes} 分钟内有心跳的非后台访客`}
+            rows={analytics.onlineVisitors}
+            empty="当前暂无在线访客。"
+          />
+          <VisitorPanel
+            title="最近访问"
+            description="按最后活跃时间排序，帮助你判断站点真实使用情况"
+            rows={analytics.recentVisitors}
+            empty="暂无访客记录。"
+          />
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
@@ -231,14 +268,41 @@ type AdminOverviewMetrics = {
   closedFeedback: number;
 };
 
-function buildLiveMetrics(metrics: AdminOverviewMetrics): AdminMetric[] {
+type AdminAnalyticsMetrics = {
+  onlineVisitors: number;
+  totalVisitors: number;
+  todayVisitors: number;
+  todayPageViews: number;
+  activeWindowMinutes: number;
+};
+
+type AdminVisitorRow = {
+  visitor_id: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  last_path: string;
+  last_title: string;
+  last_referrer: string;
+  last_locale: string;
+  last_timezone: string;
+  visit_count: number;
+  page_view_count: number;
+};
+
+type AdminAnalyticsPayload = {
+  metrics: AdminAnalyticsMetrics;
+  onlineVisitors: AdminVisitorRow[];
+  recentVisitors: AdminVisitorRow[];
+};
+
+function buildLiveMetrics(metrics: AdminOverviewMetrics, analytics: AdminAnalyticsMetrics): AdminMetric[] {
   return [
-    { label: '总用户数', value: formatNumber(metrics.totalUsers), hint: `今日新增 ${formatNumber(metrics.todayUsers)}`, tone: 'blue' },
+    { label: '实时在线', value: formatNumber(analytics.onlineVisitors), hint: `最近 ${analytics.activeWindowMinutes} 分钟心跳`, tone: 'green' },
+    { label: '累计访客', value: formatNumber(analytics.totalVisitors), hint: `今日新增 ${formatNumber(analytics.todayVisitors)}，PV ${formatNumber(analytics.todayPageViews)}`, tone: 'blue' },
+    { label: '注册用户', value: formatNumber(metrics.totalUsers), hint: `今日注册 ${formatNumber(metrics.todayUsers)}`, tone: 'slate' },
     { label: '待审核通知', value: formatNumber(metrics.pendingNotices), hint: `通知总数 ${formatNumber(metrics.totalNotices)}`, tone: 'amber' },
     { label: '待审核 Offer', value: formatNumber(metrics.pendingOffers), hint: `Offer 总数 ${formatNumber(metrics.totalOffers)}`, tone: 'purple' },
-    { label: '待处理举报', value: formatNumber(metrics.pendingFeedback), hint: `反馈总数 ${formatNumber(metrics.totalFeedback)}`, tone: 'rose' },
-    { label: '今日新增用户', value: formatNumber(metrics.todayUsers), hint: `正常用户 ${formatNumber(metrics.normalUsers)}`, tone: 'green' },
-    { label: '申请记录总数', value: formatNumber(metrics.totalApplications), hint: `今日新增 ${formatNumber(metrics.todayApplications)}，只做统计`, tone: 'blue' }
+    { label: '待处理举报', value: formatNumber(metrics.pendingFeedback), hint: `反馈总数 ${formatNumber(metrics.totalFeedback)}`, tone: 'rose' }
   ];
 }
 
@@ -357,6 +421,78 @@ function mapFeedbackApiRow(row: FeedbackApiRow): AdminFeedbackRow {
     status: row.status === 'processing' ? '处理中' : row.status === 'resolved' ? '已解决' : row.status === 'closed' ? '已关闭' : '待处理',
     handler: row.handler || '-'
   };
+}
+
+function VisitorPanel({
+  title,
+  description,
+  rows,
+  empty
+}: {
+  title: string;
+  description: string;
+  rows: AdminVisitorRow[];
+  empty: string;
+}) {
+  return (
+    <AdminPanel
+      title={title}
+      action={<span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">自动刷新 30s</span>}
+    >
+      <div className="px-5 pb-2 pt-4 text-sm text-slate-500">{description}</div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px] text-left text-sm">
+          <thead className="bg-slate-50 text-xs font-semibold text-slate-500">
+            <tr>
+              <th className="px-4 py-3">访客</th>
+              <th className="px-4 py-3">当前位置</th>
+              <th className="px-4 py-3">最后活跃</th>
+              <th className="px-4 py-3">访问次数</th>
+              <th className="px-4 py-3">页面浏览</th>
+              <th className="px-4 py-3">地区线索</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={row.visitor_id} className={adminClassNames('border-t border-slate-100', index % 2 === 1 && 'bg-slate-50/40')}>
+                <td className="px-4 py-3 font-mono text-xs text-slate-600" title={row.visitor_id}>
+                  {shortVisitorId(row.visitor_id)}
+                </td>
+                <td className="max-w-[260px] truncate px-4 py-3 text-slate-700" title={row.last_title || row.last_path}>
+                  <div className="font-medium text-slate-800">{row.last_path || '/'}</div>
+                  <div className="truncate text-xs text-slate-400">{row.last_title || '未记录标题'}</div>
+                </td>
+                <td className="px-4 py-3 text-slate-600">{formatRelativeTime(row.last_seen_at)}</td>
+                <td className="px-4 py-3 text-slate-600">{formatNumber(row.visit_count)}</td>
+                <td className="px-4 py-3 text-slate-600">{formatNumber(row.page_view_count)}</td>
+                <td className="px-4 py-3 text-slate-500">{row.last_locale || '-'}{row.last_timezone ? ` · ${row.last_timezone}` : ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!rows.length ? <div className="border-t border-slate-100 px-5 py-8 text-center text-sm text-slate-500">{empty}</div> : null}
+    </AdminPanel>
+  );
+}
+
+function shortVisitorId(value: string) {
+  if (!value) return '-';
+  return `${value.slice(0, 8)}...${value.slice(-6)}`;
+}
+
+function formatRelativeTime(value: string) {
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return '-';
+
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (diffSeconds < 60) return `${diffSeconds} 秒前`;
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes} 分钟前`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} 小时前`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} 天前`;
 }
 
 function DashboardTable({
