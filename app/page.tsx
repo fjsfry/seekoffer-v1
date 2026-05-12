@@ -266,7 +266,9 @@ export default function HomePage() {
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="product-card grid min-h-[285px] overflow-hidden rounded-[30px] bg-white/90 backdrop-blur lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           <div className="p-7 lg:p-8">
-            <h2 className="text-2xl font-semibold tracking-tight text-ink">今天先处理什么，工作台会直接告诉你</h2>
+            <h2 className="text-[1.35rem] font-semibold leading-snug tracking-tight text-ink xl:text-2xl">
+              今天先处理什么，工作台会直接告诉你
+            </h2>
             <p className="mt-4 text-sm leading-8 text-slate-600">
               待办、进度、材料完成度、截止提醒，一目了然，帮你聚焦最重要的下一步。
             </p>
@@ -283,7 +285,9 @@ export default function HomePage() {
 
         <div className="product-card grid min-h-[285px] overflow-hidden rounded-[30px] bg-white/90 backdrop-blur lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           <div className="p-7 lg:p-8">
-            <h2 className="text-2xl font-semibold tracking-tight text-ink">最新通知与截止，一手掌握</h2>
+            <h2 className="text-[1.35rem] font-semibold leading-snug tracking-tight text-ink xl:text-2xl">
+              最新通知与截止，一手掌握
+            </h2>
             <p className="mt-4 text-sm leading-8 text-slate-600">
               实时更新的院校通知与截止提醒，重要信息清晰呈现，助你抢占先机。
             </p>
@@ -458,7 +462,7 @@ function HomeHeroPreview() {
 
 function MiniWorkbenchPanel({ projects }: { projects: PublicNoticeProject[] }) {
   return (
-    <div className="relative min-h-[260px] overflow-hidden bg-gradient-to-br from-emerald-50/80 to-white p-6">
+    <div className="relative min-h-[260px] overflow-hidden bg-gradient-to-br from-emerald-50/80 to-white p-5 sm:p-6">
       <div className="absolute right-[-2rem] top-[-2rem] h-32 w-32 rounded-full bg-brand/10 blur-2xl" />
       <div className="relative rounded-2xl bg-white/85 p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between text-xs font-semibold text-slate-500">
@@ -471,23 +475,23 @@ function MiniWorkbenchPanel({ projects }: { projects: PublicNoticeProject[] }) {
             <span className="min-w-0 flex-1 truncate">
               {index === 0 ? '补充' : index === 1 ? '关注' : '更新'} {getDisplaySchoolName(project.schoolName)}
             </span>
-            <span className="rounded-lg bg-brand/8 px-2 py-1 font-semibold text-brand">
+            <span className="shrink-0 rounded-lg bg-brand/8 px-2 py-1 font-semibold text-brand">
               {index === 0 ? '去处理' : index === 1 ? '去查看' : '去更新'}
             </span>
           </div>
         ))}
       </div>
 
-      <div className="relative mt-4 grid grid-cols-4 gap-2">
+      <div className="relative mt-4 grid grid-cols-4 gap-2 sm:gap-3">
         {[
           ['12', '全部申请'],
           ['8', '已提交'],
           ['3', '进行中'],
           ['1', '待确认']
         ].map(([value, label]) => (
-          <div key={label} className="rounded-2xl bg-white/85 px-3 py-4 text-center shadow-sm">
-            <div className="text-2xl font-semibold text-brand">{value}</div>
-            <div className="mt-1 text-[11px] text-slate-500">{label}</div>
+          <div key={label} className="min-w-0 rounded-2xl bg-white/90 px-2 py-4 text-center shadow-sm ring-1 ring-white/70">
+            <div className="text-2xl font-semibold leading-none text-brand">{value}</div>
+            <div className="mt-2 whitespace-nowrap text-[10px] font-medium leading-none text-slate-500 sm:text-[11px]">{label}</div>
           </div>
         ))}
       </div>
