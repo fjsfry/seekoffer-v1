@@ -897,8 +897,8 @@ function NoticesPageContent() {
         ) : null}
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_330px]">
-        <div className="grid gap-4">
+      <section className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_330px]">
+        <div className="grid content-start gap-4">
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-[22px] border border-slate-200 bg-white px-5 py-4 shadow-sm">
             <div className="flex flex-wrap items-center gap-4 text-sm">
               <span className="font-semibold text-ink">
@@ -1029,7 +1029,7 @@ function NoticesPageContent() {
             </div>
           ) : null}
 
-          {!isNoticeLoading && filteredProjects.length ? (
+          {!isNoticeLoading && filteredProjects.length && totalPages > 1 ? (
             <div className="flex flex-wrap items-center justify-center gap-3 rounded-[22px] bg-white px-5 py-5 shadow-sm">
               <button
                 onClick={() => updatePage((current) => Math.max(1, current - 1))}
