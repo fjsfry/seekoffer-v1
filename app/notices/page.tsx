@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import { Suspense, useEffect, useMemo, useState, type ComponentType, type MouseEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -53,6 +53,7 @@ type DeadlineQuickFilter = '全部' | 'within7days';
 type SearchParamReader = Pick<URLSearchParams, 'get' | 'toString'>;
 
 const PAGE_SIZE = 16;
+const NOTICE_LIST_POSITION_STORAGE_KEY = 'seekoffer.noticeListPosition.v1';
 const projectTypeOptions = ['全部', '夏令营', '预推免', '正式推免'] as const;
 const sortOptions: SortOption[] = ['deadline', 'publish', 'school'];
 const progressOptions: ProgressFilter[] = ['全部', '报名中', '未开始', '已结束'];
@@ -214,6 +215,16 @@ type NoticeListUrlState = NoticeListFilterValues & {
   page: number;
 };
 
+type NoticeListPositionSnapshot = {
+  href: string;
+  filterKey: string;
+  noticeId: string;
+  page: number;
+  savedAt: number;
+  scrollY: number;
+};
+type NoticeListPositionDraft = Omit<NoticeListPositionSnapshot, 'savedAt'>;
+
 function readFirstSearchParam(params: SearchParamReader, ...keys: string[]) {
   for (const key of keys) {
     const value = params.get(key);
@@ -308,6 +319,77 @@ function buildNoticeListHref(values: NoticeListFilterValues, page: number, advan
   const hash = anchorId ? `#notice-${encodeURIComponent(anchorId)}` : '';
 
   return `/notices${query ? `?${query}` : ''}${hash}`;
+}
+
+function getNoticeDomId(id: string) {
+  return `notice-${id}`;
+}
+
+function getUrlWithoutHash(href: string) {
+  return href.split('#')[0];
+}
+
+function writeNoticeListPosition(snapshot: NoticeListPositionDraft) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      NOTICE_LIST_POSITION_STORAGE_KEY,
+      JSON.stringify({
+        ...snapshot,
+        savedAt: Date.now()
+      } satisfies NoticeListPositionSnapshot)
+    );
+  } catch {
+    // sessionStorage can be unavailable in strict privacy contexts; URL fallback still preserves the page.
+  }
+}
+
+function readNoticeListPosition() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(NOTICE_LIST_POSITION_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<NoticeListPositionSnapshot>;
+    if (!parsed.href || !parsed.href.startsWith('/notices') || typeof parsed.scrollY !== 'number') {
+      return null;
+    }
+
+    if (!parsed.savedAt || Date.now() - parsed.savedAt > 30 * 60 * 1000) {
+      return null;
+    }
+
+    return {
+      href: parsed.href,
+      filterKey: parsed.filterKey || '',
+      noticeId: parsed.noticeId || '',
+      page: typeof parsed.page === 'number' ? parsed.page : 1,
+      savedAt: parsed.savedAt,
+      scrollY: parsed.scrollY
+    } satisfies NoticeListPositionSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function clearNoticeListPosition() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.sessionStorage.removeItem(NOTICE_LIST_POSITION_STORAGE_KEY);
+  } catch {
+    // Ignore storage cleanup failures; they should not block browsing.
+  }
 }
 
 export default function NoticesPage() {
@@ -495,6 +577,37 @@ function NoticesPageContent() {
       return;
     }
 
+    const snapshot = readNoticeListPosition();
+    const currentPathWithSearch = `${window.location.pathname}${window.location.search}`;
+    if (
+      snapshot &&
+      getUrlWithoutHash(snapshot.href) === currentPathWithSearch &&
+      snapshot.filterKey === filterKey &&
+      snapshot.page === currentPage
+    ) {
+      window.requestAnimationFrame(() => {
+        if (snapshot.noticeId) {
+          document.getElementById(getNoticeDomId(snapshot.noticeId))?.scrollIntoView({
+            block: 'center'
+          });
+        }
+
+        window.requestAnimationFrame(() => {
+          window.scrollTo({
+            top: Math.max(0, snapshot.scrollY),
+            behavior: 'auto'
+          });
+          window.history.replaceState(null, '', buildNoticeListHref(filterValues, currentPage, advancedOpen));
+          clearNoticeListPosition();
+        });
+      });
+      return;
+    }
+
+    if (snapshot && getUrlWithoutHash(snapshot.href) !== currentPathWithSearch) {
+      clearNoticeListPosition();
+    }
+
     const hash = window.location.hash;
     if (!hash.startsWith('#notice-')) {
       return;
@@ -564,6 +677,21 @@ function NoticesPageContent() {
         page: resolvedPage
       };
     });
+  }
+
+  function rememberNoticeListPosition(event: MouseEvent<HTMLAnchorElement>, noticeId: string, returnHref: string) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+
+    writeNoticeListPosition({
+      href: returnHref,
+      filterKey,
+      noticeId,
+      page: currentPage,
+      scrollY: window.scrollY
+    });
+    window.history.replaceState(null, '', returnHref);
   }
 
   function resetFilters() {
@@ -798,10 +926,12 @@ function NoticesPageContent() {
               const city = getCityTag(project);
               const deadlineLevel = getDeadlineLevelFromDate(project.deadlineDate);
               const highlighted = currentPage === 1 && index === 0 && deadlineLevel !== 'expired';
+              const returnHref = buildNoticeListHref(filterValues, currentPage, advancedOpen, project.id);
+              const detailHref = buildNoticeDetailHref(project.id, returnHref);
 
               return (
                 <article
-                  id={`notice-${project.id}`}
+                  id={getNoticeDomId(project.id)}
                   key={project.id}
                   className={`relative min-h-[210px] overflow-hidden rounded-[26px] border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft sm:min-h-[210px] ${
                     highlighted ? 'border-emerald-300 bg-emerald-50/35' : 'border-slate-200'
@@ -829,7 +959,8 @@ function NoticesPageContent() {
                         </span>
                       </div>
                       <Link
-                        href={buildNoticeDetailHref(project.id, buildNoticeListHref(filterValues, currentPage, advancedOpen, project.id))}
+                        href={detailHref}
+                        onClick={(event) => rememberNoticeListPosition(event, project.id, returnHref)}
                         className="mt-2 line-clamp-2 min-h-[3.35rem] text-lg font-semibold leading-7 text-slate-800 hover:text-brand"
                         title={normalizeNoticeTitle(project.projectName, 160)}
                       >
@@ -870,7 +1001,8 @@ function NoticesPageContent() {
                       </div>
                       <div className="grid w-full gap-2 sm:w-[150px]">
                         <Link
-                          href={buildNoticeDetailHref(project.id, buildNoticeListHref(filterValues, currentPage, advancedOpen, project.id))}
+                          href={detailHref}
+                          onClick={(event) => rememberNoticeListPosition(event, project.id, returnHref)}
                           className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-brand/20 bg-white px-4 text-sm font-semibold text-brand transition hover:border-brand"
                         >
                           查看详情
@@ -932,11 +1064,13 @@ function NoticesPageContent() {
               ) : urgentProjects.length ? (
                 urgentProjects.map((project) => {
                   const daysLeft = getDaysLeft(project);
+                  const returnHref = buildNoticeListHref(filterValues, currentPage, advancedOpen);
 
                   return (
                     <Link
                       key={project.id}
-                      href={buildNoticeDetailHref(project.id, buildNoticeListHref(filterValues, currentPage, advancedOpen))}
+                      href={buildNoticeDetailHref(project.id, returnHref)}
+                      onClick={(event) => rememberNoticeListPosition(event, project.id, returnHref)}
                       className="grid gap-1 rounded-xl p-2 hover:bg-slate-50"
                     >
                       <div className="flex items-center justify-between gap-3 text-sm">
