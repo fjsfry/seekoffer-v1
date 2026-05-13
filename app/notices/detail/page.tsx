@@ -27,9 +27,22 @@ import { baseNoticeProjects } from '@/lib/notice-source';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
 
+function getSafeNoticeReturnHref(value: string | null) {
+  if (!value) {
+    return '/notices';
+  }
+
+  if (value.startsWith('/notices') && !value.startsWith('//') && !/[\r\n]/.test(value)) {
+    return value;
+  }
+
+  return '/notices';
+}
+
 function NoticeDetailContent() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id') || '';
+  const returnHref = getSafeNoticeReturnHref(searchParams.get('returnTo'));
   const initialProject = useMemo(() => baseNoticeProjects.find((item) => item.id === id) || null, [id]);
   const [remoteState, setRemoteState] = useState<{
     id: string;
@@ -83,7 +96,7 @@ function NoticeDetailContent() {
   if (!id) {
     return (
       <DetailShell title="没有找到通知编号" subtitle="当前链接缺少通知编号，请返回通知库重新选择一条通知。">
-        <EmptyDetailState href="/notices" label="返回通知库" />
+        <EmptyDetailState href={returnHref} label="返回通知库" />
       </DetailShell>
     );
   }
@@ -106,12 +119,12 @@ function NoticeDetailContent() {
   if (!project) {
     return (
       <DetailShell title="通知详情暂不可用" subtitle={message || '这条通知暂时无法打开。'}>
-        <EmptyDetailState href="/notices" label="返回通知库" />
+        <EmptyDetailState href={returnHref} label="返回通知库" />
       </DetailShell>
     );
   }
 
-  return <NoticeDetail project={project} />;
+  return <NoticeDetail project={project} returnHref={returnHref} />;
 }
 
 function DetailShell({
@@ -150,12 +163,12 @@ function EmptyDetailState({ href, label }: { href: string; label: string }) {
   );
 }
 
-function NoticeDetail({ project }: { project: PublicNoticeProject }) {
+function NoticeDetail({ project, returnHref }: { project: PublicNoticeProject; returnHref: string }) {
   const sourceLabel = getDisplaySourceLabel(project.sourceSite);
 
   return (
     <SiteShell>
-      <Link href="/notices" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
+      <Link href={returnHref} className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
         <ArrowLeft className="h-4 w-4" />
         返回通知库
       </Link>

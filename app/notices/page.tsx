@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import { Suspense, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
   BellRing,
@@ -49,8 +50,29 @@ type SortOption = 'deadline' | 'publish' | 'school';
 type ProgressFilter = '全部' | '报名中' | '未开始' | '已结束';
 type RangeFilter = '全部' | '985' | '211' | '双一流' | '其他';
 type DeadlineQuickFilter = '全部' | 'within7days';
+type SearchParamReader = Pick<URLSearchParams, 'get' | 'toString'>;
 
 const PAGE_SIZE = 16;
+const projectTypeOptions = ['全部', '夏令营', '预推免', '正式推免'] as const;
+const sortOptions: SortOption[] = ['deadline', 'publish', 'school'];
+const progressOptions: ProgressFilter[] = ['全部', '报名中', '未开始', '已结束'];
+const rangeOptions: RangeFilter[] = ['全部', '985', '211', '双一流', '其他'];
+const deadlineQuickOptions: DeadlineQuickFilter[] = ['全部', 'within7days'];
+const defaultNoticeListState: NoticeListUrlState = {
+  keyword: '',
+  schoolName: '',
+  majorKeyword: '',
+  category: '全部',
+  discipline: '全部',
+  schoolRange: '全部',
+  progress: '全部',
+  deadlineQuick: '全部',
+  projectType: '全部',
+  year: '2026',
+  sortBy: 'publish',
+  advancedOpen: false,
+  page: 1
+};
 const CITY_TAGS = new Set([
   '北京',
   '上海',
@@ -173,38 +195,183 @@ const quickFilters = [
   { label: '预推免', kind: 'type', value: '预推免' }
 ] as const;
 
+type NoticeListFilterValues = {
+  keyword: string;
+  schoolName: string;
+  majorKeyword: string;
+  category: string;
+  discipline: string;
+  schoolRange: RangeFilter;
+  progress: ProgressFilter;
+  deadlineQuick: DeadlineQuickFilter;
+  projectType: string;
+  year: string;
+  sortBy: SortOption;
+};
+
+type NoticeListUrlState = NoticeListFilterValues & {
+  advancedOpen: boolean;
+  page: number;
+};
+
+function readFirstSearchParam(params: SearchParamReader, ...keys: string[]) {
+  for (const key of keys) {
+    const value = params.get(key);
+
+    if (value !== null) {
+      return value;
+    }
+  }
+
+  return '';
+}
+
+function pickAllowedValue<T extends string>(value: string, allowed: readonly T[], fallback: T) {
+  return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+function parseNoticePage(value: string | null) {
+  const page = Number(value);
+  return Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+}
+
+function buildNoticeFilterKey(values: NoticeListFilterValues) {
+  return [
+    values.keyword.trim().toLowerCase(),
+    values.schoolName.trim().toLowerCase(),
+    values.majorKeyword.trim().toLowerCase(),
+    values.category,
+    values.discipline,
+    values.schoolRange,
+    values.progress,
+    values.deadlineQuick,
+    values.projectType,
+    values.year,
+    values.sortBy
+  ].join('|');
+}
+
+function parseNoticeListUrlState(params: SearchParamReader) {
+  if (!params.toString()) {
+    return null;
+  }
+
+  return {
+    keyword: readFirstSearchParam(params, 'q', 'keyword'),
+    schoolName: readFirstSearchParam(params, 'school'),
+    majorKeyword: readFirstSearchParam(params, 'major'),
+    category: readFirstSearchParam(params, 'category') || '全部',
+    discipline: readFirstSearchParam(params, 'discipline') || '全部',
+    schoolRange: pickAllowedValue(readFirstSearchParam(params, 'range'), rangeOptions, '全部'),
+    progress: pickAllowedValue(readFirstSearchParam(params, 'status', 'progress'), progressOptions, '全部'),
+    deadlineQuick: pickAllowedValue(readFirstSearchParam(params, 'deadline'), deadlineQuickOptions, '全部'),
+    projectType: pickAllowedValue(readFirstSearchParam(params, 'type'), projectTypeOptions, '全部'),
+    year: readFirstSearchParam(params, 'year') || '2026',
+    sortBy: pickAllowedValue(readFirstSearchParam(params, 'sort'), sortOptions, 'publish'),
+    advancedOpen: readFirstSearchParam(params, 'advanced') === '1',
+    page: parseNoticePage(params.get('page'))
+  } satisfies NoticeListUrlState;
+}
+
+function appendSearchParam(params: URLSearchParams, key: string, value: string, fallback = '') {
+  const normalizedValue = value.trim();
+
+  if (normalizedValue && normalizedValue !== fallback) {
+    params.set(key, normalizedValue);
+  }
+}
+
+function buildNoticeListHref(values: NoticeListFilterValues, page: number, advancedOpen: boolean, anchorId?: string) {
+  const params = new URLSearchParams();
+
+  appendSearchParam(params, 'q', values.keyword);
+  appendSearchParam(params, 'school', values.schoolName);
+  appendSearchParam(params, 'major', values.majorKeyword);
+  appendSearchParam(params, 'category', values.category, '全部');
+  appendSearchParam(params, 'discipline', values.discipline, '全部');
+  appendSearchParam(params, 'range', values.schoolRange, '全部');
+  appendSearchParam(params, 'status', values.progress, '全部');
+  appendSearchParam(params, 'deadline', values.deadlineQuick, '全部');
+  appendSearchParam(params, 'type', values.projectType, '全部');
+  appendSearchParam(params, 'year', values.year, '2026');
+  appendSearchParam(params, 'sort', values.sortBy, 'publish');
+
+  if (advancedOpen) {
+    params.set('advanced', '1');
+  }
+
+  if (page > 1) {
+    params.set('page', String(page));
+  }
+
+  const query = params.toString();
+  const hash = anchorId ? `#notice-${encodeURIComponent(anchorId)}` : '';
+
+  return `/notices${query ? `?${query}` : ''}${hash}`;
+}
+
 export default function NoticesPage() {
+  return (
+    <Suspense fallback={<NoticesPageFallback />}>
+      <NoticesPageContent />
+    </Suspense>
+  );
+}
+
+function NoticesPageFallback() {
+  return (
+    <SiteShell>
+      <section className="page-hero px-6 py-7 lg:px-8">
+        <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">通知库</h1>
+        <p className="mt-4 text-base leading-8 text-slate-600">正在恢复你的浏览位置，请稍等。</p>
+      </section>
+      <NoticeListSkeleton />
+    </SiteShell>
+  );
+}
+
+function NoticesPageContent() {
+  const searchParams = useSearchParams();
+  const initialUrlState = useMemo(() => parseNoticeListUrlState(searchParams), [searchParams]);
+  const initialNoticeState = initialUrlState || defaultNoticeListState;
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
     filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
   );
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [keyword, setKeyword] = useState('');
-  const [schoolName, setSchoolName] = useState('');
-  const [majorKeyword, setMajorKeyword] = useState('');
-  const [category, setCategory] = useState('全部');
-  const [discipline, setDiscipline] = useState('全部');
-  const [schoolRange, setSchoolRange] = useState<RangeFilter>('全部');
-  const [progress, setProgress] = useState<ProgressFilter>('全部');
-  const [deadlineQuick, setDeadlineQuick] = useState<DeadlineQuickFilter>('全部');
-  const [projectType, setProjectType] = useState('全部');
-  const [year, setYear] = useState('2026');
-  const [sortBy, setSortBy] = useState<SortOption>('publish');
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [pageState, setPageState] = useState({ page: 1, filterKey: '' });
-  const filterKey = [
-    keyword.trim().toLowerCase(),
-    schoolName.trim().toLowerCase(),
-    majorKeyword.trim().toLowerCase(),
-    category,
-    discipline,
-    schoolRange,
-    progress,
-    deadlineQuick,
-    projectType,
-    year,
-    sortBy
-  ].join('|');
+  const [keyword, setKeyword] = useState(initialNoticeState.keyword);
+  const [schoolName, setSchoolName] = useState(initialNoticeState.schoolName);
+  const [majorKeyword, setMajorKeyword] = useState(initialNoticeState.majorKeyword);
+  const [category, setCategory] = useState(initialNoticeState.category);
+  const [discipline, setDiscipline] = useState(initialNoticeState.discipline);
+  const [schoolRange, setSchoolRange] = useState<RangeFilter>(initialNoticeState.schoolRange);
+  const [progress, setProgress] = useState<ProgressFilter>(initialNoticeState.progress);
+  const [deadlineQuick, setDeadlineQuick] = useState<DeadlineQuickFilter>(initialNoticeState.deadlineQuick);
+  const [projectType, setProjectType] = useState(initialNoticeState.projectType);
+  const [year, setYear] = useState(initialNoticeState.year);
+  const [sortBy, setSortBy] = useState<SortOption>(initialNoticeState.sortBy);
+  const [advancedOpen, setAdvancedOpen] = useState(initialNoticeState.advancedOpen);
+  const [pageState, setPageState] = useState(() => ({
+    page: initialNoticeState.page,
+    filterKey: buildNoticeFilterKey(initialNoticeState)
+  }));
+  const filterValues = useMemo<NoticeListFilterValues>(
+    () => ({
+      keyword,
+      schoolName,
+      majorKeyword,
+      category,
+      discipline,
+      schoolRange,
+      progress,
+      deadlineQuick,
+      projectType,
+      year,
+      sortBy
+    }),
+    [keyword, schoolName, majorKeyword, category, discipline, schoolRange, progress, deadlineQuick, projectType, year, sortBy]
+  );
+  const filterKey = buildNoticeFilterKey(filterValues);
 
   useEffect(() => {
     let active = true;
@@ -313,6 +480,34 @@ export default function NoticesPage() {
   const todayUpdateCount = projects.filter((item) => item.publishDate === todayInBeijing).length;
   const latestPublishDate = projects.reduce((latest, item) => (item.publishDate > latest ? item.publishDate : latest), '');
 
+  useEffect(() => {
+    const preservedHash = window.location.hash.startsWith('#notice-') ? window.location.hash : '';
+    const nextHref = `${buildNoticeListHref(filterValues, currentPage, advancedOpen)}${preservedHash}`;
+    const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+    if (currentHref !== nextHref) {
+      window.history.replaceState(null, '', nextHref);
+    }
+  }, [filterValues, currentPage, advancedOpen]);
+
+  useEffect(() => {
+    if (isNoticeLoading || !pagedProjects.length || typeof window === 'undefined') {
+      return;
+    }
+
+    const hash = window.location.hash;
+    if (!hash.startsWith('#notice-')) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView({
+        block: 'center'
+      });
+      window.history.replaceState(null, '', buildNoticeListHref(filterValues, currentPage, advancedOpen));
+    });
+  }, [isNoticeLoading, currentPage, filterKey, pagedProjects.length, filterValues, advancedOpen]);
+
   const pageStats = [
     { label: '2026通知', value: isNoticeLoading ? '加载中' : `${projects.length}+`, icon: BellRing },
     { label: '今日更新', value: isNoticeLoading ? '加载中' : `${todayUpdateCount}`, icon: BookOpenText },
@@ -372,17 +567,22 @@ export default function NoticesPage() {
   }
 
   function resetFilters() {
-    setKeyword('');
-    setSchoolName('');
-    setMajorKeyword('');
-    setCategory('全部');
-    setDiscipline('全部');
-    setSchoolRange('全部');
-    setProgress('全部');
-    setDeadlineQuick('全部');
-    setProjectType('全部');
-    setYear('2026');
-    setSortBy('publish');
+    setKeyword(defaultNoticeListState.keyword);
+    setSchoolName(defaultNoticeListState.schoolName);
+    setMajorKeyword(defaultNoticeListState.majorKeyword);
+    setCategory(defaultNoticeListState.category);
+    setDiscipline(defaultNoticeListState.discipline);
+    setSchoolRange(defaultNoticeListState.schoolRange);
+    setProgress(defaultNoticeListState.progress);
+    setDeadlineQuick(defaultNoticeListState.deadlineQuick);
+    setProjectType(defaultNoticeListState.projectType);
+    setYear(defaultNoticeListState.year);
+    setSortBy(defaultNoticeListState.sortBy);
+    setAdvancedOpen(defaultNoticeListState.advancedOpen);
+    setPageState({
+      page: 1,
+      filterKey: buildNoticeFilterKey(defaultNoticeListState)
+    });
   }
 
   function applyQuickFilter(filter: (typeof quickFilters)[number]) {
@@ -445,7 +645,7 @@ export default function NoticesPage() {
 
       <section className="product-card rounded-[30px] p-5 lg:p-6">
         <div className="flex flex-wrap gap-4 border-b border-slate-100 pb-5">
-          {['全部', '夏令营', '预推免', '正式推免'].map((item) => (
+          {projectTypeOptions.map((item) => (
             <button
               key={item}
               onClick={() => setProjectType(item)}
@@ -601,6 +801,7 @@ export default function NoticesPage() {
 
               return (
                 <article
+                  id={`notice-${project.id}`}
                   key={project.id}
                   className={`relative min-h-[210px] overflow-hidden rounded-[26px] border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft sm:min-h-[210px] ${
                     highlighted ? 'border-emerald-300 bg-emerald-50/35' : 'border-slate-200'
@@ -628,7 +829,7 @@ export default function NoticesPage() {
                         </span>
                       </div>
                       <Link
-                        href={buildNoticeDetailHref(project.id)}
+                        href={buildNoticeDetailHref(project.id, buildNoticeListHref(filterValues, currentPage, advancedOpen, project.id))}
                         className="mt-2 line-clamp-2 min-h-[3.35rem] text-lg font-semibold leading-7 text-slate-800 hover:text-brand"
                         title={normalizeNoticeTitle(project.projectName, 160)}
                       >
@@ -669,7 +870,7 @@ export default function NoticesPage() {
                       </div>
                       <div className="grid w-full gap-2 sm:w-[150px]">
                         <Link
-                          href={buildNoticeDetailHref(project.id)}
+                          href={buildNoticeDetailHref(project.id, buildNoticeListHref(filterValues, currentPage, advancedOpen, project.id))}
                           className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-brand/20 bg-white px-4 text-sm font-semibold text-brand transition hover:border-brand"
                         >
                           查看详情
@@ -733,7 +934,11 @@ export default function NoticesPage() {
                   const daysLeft = getDaysLeft(project);
 
                   return (
-                    <Link key={project.id} href={buildNoticeDetailHref(project.id)} className="grid gap-1 rounded-xl p-2 hover:bg-slate-50">
+                    <Link
+                      key={project.id}
+                      href={buildNoticeDetailHref(project.id, buildNoticeListHref(filterValues, currentPage, advancedOpen))}
+                      className="grid gap-1 rounded-xl p-2 hover:bg-slate-50"
+                    >
                       <div className="flex items-center justify-between gap-3 text-sm">
                         <span className="font-semibold text-slate-700">{getDisplaySchoolName(project.schoolName)}</span>
                         <span className="font-semibold text-rose-500">
