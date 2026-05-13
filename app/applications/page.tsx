@@ -41,8 +41,8 @@ import {
 } from '@/lib/mock-data';
 import {
   formatNoticeDateOnly,
-  getDisplayDepartmentName,
   getDisplayDiscipline,
+  getDisplayNoticeDepartment,
   getDisplayProjectType,
   getDisplaySchoolName,
   normalizeNoticeTitle
@@ -501,7 +501,7 @@ function ApplicationTableRow({
           <ExternalSiteMark source={resolveNoticeLogoSource(project)} label={getDisplaySchoolName(project.schoolName)} size="lg" rounded="full" />
           <div className="min-w-0">
             <div className="text-lg font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</div>
-            <div className="mt-1 truncate text-slate-500">{getDisplayDepartmentName(project.departmentName)}</div>
+            <div className="mt-1 truncate text-slate-500">{getDisplayNoticeDepartment(project)}</div>
             <div className="mt-1 line-clamp-1 font-semibold text-slate-700">{normalizeNoticeTitle(project.projectName, 54)}</div>
             <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
               <span className="rounded-full bg-slate-100 px-2.5 py-1">{getDisplayDiscipline(project.discipline)}</span>

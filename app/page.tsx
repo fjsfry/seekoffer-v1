@@ -28,7 +28,7 @@ import { fetchPublicNotices } from '@/lib/cloudbase-data';
 import { getDeadlineDistanceLabel, getDeadlineLevelFromDate, getDeadlineTimestamp } from '@/lib/deadline-display';
 import {
   formatNoticeDateOnly,
-  getDisplayDepartmentName,
+  getDisplayNoticeDepartment,
   getDisplayProjectType,
   getDisplaySchoolName,
   normalizeNoticeTitle
@@ -556,7 +556,7 @@ function LatestNoticeList({ projects }: { projects: PublicNoticeProject[] }) {
               </div>
             </div>
             <div className="text-xs leading-5 text-slate-500 sm:text-right">
-              <div>来源：{getDisplayDepartmentName(project.departmentName)}</div>
+              <div>来源：{getDisplayNoticeDepartment(project)}</div>
               <div>{formatNoticeDateOnly(project.publishDate)}</div>
             </div>
             <div className="sm:text-right">
@@ -598,7 +598,7 @@ function DeadlineReminderList({ projects }: { projects: PublicNoticeProject[] })
                 <span className="truncate font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</span>
                 <span className="text-xs text-slate-400">({getDisplayProjectType(project.projectType)})</span>
               </div>
-              <div className="mt-1 truncate text-sm text-slate-500">{getDisplayDepartmentName(project.departmentName)}</div>
+              <div className="mt-1 truncate text-sm text-slate-500">{getDisplayNoticeDepartment(project)}</div>
             </div>
             <div className="text-right">
               <div className={index < 2 ? 'font-semibold text-rose-500' : 'font-semibold text-orange-500'}>

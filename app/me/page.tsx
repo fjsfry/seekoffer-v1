@@ -39,8 +39,8 @@ import {
 } from '@/lib/cloudbase-data';
 import {
   formatNoticeDateOnly,
-  getDisplayDepartmentName,
   getDisplayDiscipline,
+  getDisplayNoticeDepartment,
   getDisplaySchoolName,
   normalizeNoticeTitle
 } from '@/lib/notice-display';
@@ -934,7 +934,7 @@ function ApplicationProgressCard({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="truncate text-lg font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</h3>
-              <span className="text-sm font-semibold text-slate-500">· {getDisplayDepartmentName(project.departmentName)}</span>
+              <span className="text-sm font-semibold text-slate-500">· {getDisplayNoticeDepartment(project)}</span>
             </div>
             <p className="mt-2 line-clamp-1 text-sm text-slate-600">{normalizeNoticeTitle(project.projectName, 62)}</p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">

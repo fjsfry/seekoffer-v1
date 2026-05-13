@@ -26,7 +26,7 @@ function compactText(value: string) {
 
 function isNoisyTag(value: string) {
   const lower = value.toLowerCase();
-  return /https?:|www\.|\.(com|cn|edu|org)|(^|\s)com($|\s)/i.test(lower) || value.length > 16;
+  return /https?:|www\.|\.(com|cn|edu|org)|(^|\s)com($|\s)|[a-z]{3,}/i.test(lower) || value.length > 16;
 }
 
 export function isWeakNoticeValue(value: string | undefined | null) {
@@ -42,6 +42,79 @@ export function getDisplaySchoolName(value: string | undefined | null) {
 export function getDisplayDepartmentName(value: string | undefined | null) {
   const text = compactText(String(value || ''));
   return isWeakNoticeValue(text) ? '学院信息待补充' : text;
+}
+
+type NoticeDepartmentFields = {
+  schoolName?: string | null;
+  departmentName?: string | null;
+  projectName?: string | null;
+  requirements?: string | null;
+};
+
+const REQUIREMENT_DEPARTMENT_PATTERN =
+  /^\s*[\u3010\[]([^\u3011\]]{2,48})[\u3011\]]\s*[\u2014\u2013\u2212\-\uFF0D]{1,2}\s*([^\s,\.;\|\uFF0C\u3002\uFF1B\uFF5C]{2,48})/;
+
+const TITLE_DEPARTMENT_PATTERN =
+  /[\u4e00-\u9fffA-Za-z0-9（）()·\-]{2,48}(?:\u5b66\u9662|\u7814\u7a76\u9662|\u7814\u7a76\u6240|\u4e2d\u5fc3|\u5b9e\u9a8c\u5ba4|\u4e66\u9662|\u7cfb)/g;
+
+function normalizeDepartmentCandidate(value: string | undefined | null, schoolName: string) {
+  const text = compactText(String(value || ''))
+    .replace(/^[\u3010\[]|[\u3011\]]$/g, '')
+    .replace(/^[\u2014\u2013\u2212\-\uFF0D]+/, '')
+    .trim();
+
+  if (isWeakNoticeValue(text) || !text || text === schoolName || text.length < 2 || text.length > 48) {
+    return '';
+  }
+
+  if (/https?:|www\.|\d{4}[-/.]/i.test(text)) {
+    return '';
+  }
+
+  return text;
+}
+
+function extractDepartmentFromRequirementPrefix(requirements: string | undefined | null, schoolName: string) {
+  const match = compactText(String(requirements || '')).match(REQUIREMENT_DEPARTMENT_PATTERN);
+  if (!match) {
+    return '';
+  }
+
+  const sourceSchool = compactText(match[1] || '');
+  if (schoolName && sourceSchool && sourceSchool !== schoolName && !sourceSchool.includes(schoolName) && !schoolName.includes(sourceSchool)) {
+    return '';
+  }
+
+  return normalizeDepartmentCandidate(match[2], schoolName);
+}
+
+function extractDepartmentFromTitle(projectName: string | undefined | null, schoolName: string) {
+  const candidates = compactText(String(projectName || '')).match(TITLE_DEPARTMENT_PATTERN) || [];
+
+  return (
+    candidates
+      .map((item) => normalizeDepartmentCandidate(item, schoolName))
+      .find((item) => item && item !== schoolName) || ''
+  );
+}
+
+export function getDisplayNoticeDepartment(project: NoticeDepartmentFields) {
+  const schoolName = getDisplaySchoolName(project.schoolName);
+  const storedDepartment = getDisplayDepartmentName(project.departmentName);
+  const storedRaw = compactText(String(project.departmentName || ''));
+  const referenceText = compactText(`${project.projectName || ''} ${project.requirements || ''}`);
+  const requirementDepartment = extractDepartmentFromRequirementPrefix(project.requirements, schoolName);
+
+  if (requirementDepartment) {
+    return requirementDepartment;
+  }
+
+  const titleDepartment = extractDepartmentFromTitle(project.projectName, schoolName);
+  if (titleDepartment && (isWeakNoticeValue(storedRaw) || !referenceText.includes(storedRaw))) {
+    return titleDepartment;
+  }
+
+  return storedDepartment;
 }
 
 export function getDisplayDiscipline(value: string | undefined | null) {

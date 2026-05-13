@@ -7,6 +7,7 @@ const eslintConfig = [
       '.next/**',
       '.next-web/**',
       'node_modules/**',
+      'node_modules_corrupt_*/**',
       'out/**',
       'build/**',
       'hosting-dist/**',

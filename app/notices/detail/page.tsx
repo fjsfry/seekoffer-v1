@@ -15,8 +15,8 @@ import { getCountdownLabel, getDeadlineLevelFromDate } from '@/lib/deadline-disp
 import {
   formatNoticeDate,
   formatNoticeDateOnly,
-  getDisplayDepartmentName,
   getDisplayDiscipline,
+  getDisplayNoticeDepartment,
   getDisplayProjectType,
   getDisplaySchoolName,
   getDisplaySourceLabel,
@@ -165,6 +165,7 @@ function EmptyDetailState({ href, label }: { href: string; label: string }) {
 
 function NoticeDetail({ project, returnHref }: { project: PublicNoticeProject; returnHref: string }) {
   const sourceLabel = getDisplaySourceLabel(project.sourceSite);
+  const departmentName = getDisplayNoticeDepartment(project);
 
   return (
     <SiteShell>
@@ -191,7 +192,7 @@ function NoticeDetail({ project, returnHref }: { project: PublicNoticeProject; r
                 rounded="full"
               />
               <div>
-                <div className="text-sm font-semibold text-slate-500">{getDisplayDepartmentName(project.departmentName)}</div>
+                <div className="text-sm font-semibold text-slate-500">{departmentName}</div>
                 <div className="mt-1 text-2xl font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</div>
               </div>
             </div>
@@ -211,7 +212,7 @@ function NoticeDetail({ project, returnHref }: { project: PublicNoticeProject; r
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <InfoItem label="学校" value={getDisplaySchoolName(project.schoolName)} />
-              <InfoItem label="学院 / 系" value={getDisplayDepartmentName(project.departmentName)} />
+              <InfoItem label="学院 / 系" value={departmentName} />
               <InfoItem label="学科方向" value={getDisplayDiscipline(project.discipline)} />
               <InfoItem label="发布时间" value={formatNoticeDateOnly(project.publishDate)} />
               <InfoItem label="截止时间" value={formatNoticeDate(project.deadlineDate)} />

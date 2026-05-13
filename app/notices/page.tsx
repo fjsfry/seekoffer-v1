@@ -33,8 +33,8 @@ import {
 } from '@/lib/deadline-display';
 import {
   formatNoticeDateOnly,
-  getDisplayDepartmentName,
   getDisplayDiscipline,
+  getDisplayNoticeDepartment,
   getDisplayProjectType,
   getDisplaySchoolName,
   getDisplayTags,
@@ -506,16 +506,30 @@ function NoticesPageContent() {
     const majorText = majorKeyword.trim().toLowerCase();
 
     const rows = projects.filter((item) => {
+      const displaySchool = getDisplaySchoolName(item.schoolName);
+      const displayDepartment = getDisplayNoticeDepartment(item);
+      const displayTitle = normalizeNoticeTitle(item.projectName, 160);
+      const primaryKeywordText = [displaySchool, displayDepartment, displayTitle].join(' ').toLowerCase();
+      const secondaryKeywordText = [
+        getDisplayDiscipline(item.discipline),
+        getNoticeCardTags(item).join(' ')
+      ]
+        .join(' ')
+        .toLowerCase();
+      const canUseBroadKeyword = noticeKeyword.length >= 4 || /[a-z0-9]/i.test(noticeKeyword);
       const matchesType = projectType === '全部' ? true : item.projectType === projectType;
       const matchesRange = schoolRange === '全部' ? true : inferSchoolRange(item) === schoolRange;
       const matchesSchool =
         !schoolKeyword ||
-        [getDisplaySchoolName(item.schoolName), getDisplayDepartmentName(item.departmentName)].join(' ').toLowerCase().includes(schoolKeyword);
+        [displaySchool, displayDepartment].join(' ').toLowerCase().includes(schoolKeyword);
       const matchesCategory = category === '全部' ? true : inferDisciplineCategory(item.discipline) === category;
       const matchesDiscipline = discipline === '全部' ? true : getDisplayDiscipline(item.discipline) === discipline;
       const matchesMajor =
         !majorText ||
-        [item.discipline, item.departmentName, item.projectName, item.tags.join(' ')].join(' ').toLowerCase().includes(majorText);
+        [getDisplayDiscipline(item.discipline), displayDepartment, displayTitle, getNoticeCardTags(item).join(' ')]
+          .join(' ')
+          .toLowerCase()
+          .includes(majorText);
       const matchesProgressState = matchesProgress(progress, item);
       const matchesDeadlineQuick =
         deadlineQuick === '全部'
@@ -524,16 +538,8 @@ function NoticesPageContent() {
       const matchesYear = year === '全部' ? true : String(item.year) === year;
       const matchesKeyword =
         !noticeKeyword ||
-        [
-          getDisplaySchoolName(item.schoolName),
-          getDisplayDepartmentName(item.departmentName),
-          item.projectName,
-          item.discipline,
-          item.tags.join(' ')
-        ]
-          .join(' ')
-          .toLowerCase()
-          .includes(noticeKeyword);
+        primaryKeywordText.includes(noticeKeyword) ||
+        (canUseBroadKeyword && secondaryKeywordText.includes(noticeKeyword));
 
       return (
         matchesType &&
@@ -967,7 +973,7 @@ function NoticesPageContent() {
                         {normalizeNoticeTitle(project.projectName, 86)}
                       </Link>
                       <div className="mt-3 flex h-5 items-center gap-3 overflow-hidden text-xs text-slate-500">
-                        <span className="min-w-0 truncate">{getDisplayDepartmentName(project.departmentName)}</span>
+                        <span className="min-w-0 truncate">{getDisplayNoticeDepartment(project)}</span>
                         <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
                           <CalendarDays className="h-3.5 w-3.5" />
                           发布于 {formatNoticeDateOnly(project.publishDate)}

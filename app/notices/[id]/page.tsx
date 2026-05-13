@@ -12,8 +12,8 @@ import { getCountdownLabel, getDeadlineLevelFromDate } from '@/lib/deadline-disp
 import {
   formatNoticeDate,
   formatNoticeDateOnly,
-  getDisplayDepartmentName,
   getDisplayDiscipline,
+  getDisplayNoticeDepartment,
   getDisplayProjectType,
   getDisplaySchoolName,
   getDisplaySourceLabel,
@@ -48,7 +48,7 @@ export async function generateMetadata({
 
   const school = getDisplaySchoolName(project.schoolName);
   const title = normalizeNoticeTitle(project.projectName, 72);
-  const description = `${school} ${getDisplayDepartmentName(project.departmentName)} ${formatNoticeDateOnly(project.deadlineDate)} 截止。查看原文、材料要求和申请进度管理入口。`;
+  const description = `${school} ${getDisplayNoticeDepartment(project)} ${formatNoticeDateOnly(project.deadlineDate)} 截止。查看原文、材料要求和申请进度管理入口。`;
   const url = `/notices/${encodeURIComponent(project.id)}`;
 
   return {
@@ -87,6 +87,8 @@ export default async function NoticeDetailPage({
     notFound();
   }
 
+  const departmentName = getDisplayNoticeDepartment(project);
+
   return (
     <SiteShell>
       <PageSectionTitle
@@ -106,7 +108,7 @@ export default async function NoticeDetailPage({
                 rounded="full"
               />
               <div>
-                <div className="text-sm font-semibold text-slate-500">{getDisplayDepartmentName(project.departmentName)}</div>
+                <div className="text-sm font-semibold text-slate-500">{departmentName}</div>
                 <div className="mt-1 text-2xl font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</div>
               </div>
             </div>
@@ -126,7 +128,7 @@ export default async function NoticeDetailPage({
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <InfoItem label="学校" value={getDisplaySchoolName(project.schoolName)} />
-              <InfoItem label="学院 / 系" value={getDisplayDepartmentName(project.departmentName)} />
+              <InfoItem label="学院 / 系" value={departmentName} />
               <InfoItem label="学科方向" value={getDisplayDiscipline(project.discipline)} />
               <InfoItem label="发布时间" value={formatNoticeDateOnly(project.publishDate)} />
               <InfoItem label="截止时间" value={formatNoticeDate(project.deadlineDate)} />
