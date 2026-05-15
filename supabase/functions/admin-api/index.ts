@@ -676,6 +676,55 @@ async function listFeedback(service: SupabaseService, body: Record<string, unkno
   return { feedback: data || [], total: count || 0, page, pageSize, metrics: { pending, processing, resolved, closed } };
 }
 
+async function listAiWaitlistLeads(service: SupabaseService, body: Record<string, unknown>) {
+  const page = readPage(body);
+  const pageSize = readPageSize(body);
+  const filters = readFilters(body);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const keyword = normalizeFilter(filters.query);
+  const primaryNeed = normalizeFilter(filters.primaryNeed);
+  const todayStart = getShanghaiDayStart(0).toISOString();
+
+  let query = service
+    .from('ai_waitlist_leads')
+    .select('id,user_id,wechat_id,primary_need,details,submitted_at_text,source,created_at', { count: 'exact' });
+
+  if (keyword) {
+    const pattern = likePattern(keyword);
+    query = query.or(`wechat_id.ilike.${pattern},primary_need.ilike.${pattern},details.ilike.${pattern}`);
+  }
+
+  if (primaryNeed && primaryNeed !== '全部需求') {
+    query = query.eq('primary_need', primaryNeed);
+  }
+
+  const { data, error, count } = await query.order('created_at', { ascending: false }).range(from, to);
+  if (error) throw error;
+
+  const [totalLeads, todayLeads, riskLeads, materialLeads, briefLeads] = await Promise.all([
+    countRows(service.from('ai_waitlist_leads').select('id', { count: 'exact', head: true })),
+    countRows(service.from('ai_waitlist_leads').select('id', { count: 'exact', head: true }).gte('created_at', todayStart)),
+    countRows(service.from('ai_waitlist_leads').select('id', { count: 'exact', head: true }).eq('primary_need', '申请风险评估')),
+    countRows(service.from('ai_waitlist_leads').select('id', { count: 'exact', head: true }).eq('primary_need', '材料短板提示')),
+    countRows(service.from('ai_waitlist_leads').select('id', { count: 'exact', head: true }).eq('primary_need', '提炼简章要求'))
+  ]);
+
+  return {
+    aiWaitlistLeads: data || [],
+    total: count || 0,
+    page,
+    pageSize,
+    metrics: {
+      totalLeads,
+      todayLeads,
+      riskLeads,
+      materialLeads,
+      briefLeads
+    }
+  };
+}
+
 async function listLogs(service: SupabaseService, body: Record<string, unknown>) {
   const page = readPage(body);
   const pageSize = readPageSize(body);
@@ -862,6 +911,11 @@ Deno.serve(async (request) => {
       if (error) throw error;
       await logOperation(service, admin, request, 'update_feedback_status', 'feedback', id, before.data, data, String(body.note || ''));
       return json(200, { feedback: data });
+    }
+
+    if (resource === 'ai_waitlist' && action === 'list') {
+      requireAdminPermission(admin, 'users:write');
+      return json(200, await listAiWaitlistLeads(service, body));
     }
 
     if (resource === 'logs') {

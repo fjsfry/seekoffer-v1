@@ -27,9 +27,17 @@ const checks = [
     name: 'Admin shell exposes all primary admin channels',
     file: 'components/admin-shell.tsx',
     assert: (source) =>
-      ['/admin/dashboard', '/admin/notices', '/admin/offers', '/admin/users', '/admin/feedback', '/admin/logs', '/admin/settings'].every((path) =>
+      ['/admin/dashboard', '/admin/notices', '/admin/offers', '/admin/ai-leads', '/admin/users', '/admin/feedback', '/admin/logs', '/admin/settings'].every((path) =>
         source.includes(path)
       )
+  },
+  {
+    name: 'Admin AI waitlist page reads through admin API',
+    file: 'app/admin/ai-leads/page.tsx',
+    assert: (source) =>
+      /resource:\s*['"]ai_waitlist['"]/.test(source) &&
+      /AdminShell/.test(source) &&
+      /formatBeijingDateTime/.test(source)
   },
   {
     name: 'Admin settings page is standalone and reads real settings',
