@@ -329,6 +329,32 @@ function readStoredRecords() {
   return readStoredRecordsPayload().items;
 }
 
+function mergeByKey<T>(remoteItems: T[], localItems: T[], getKey: (item: T) => string) {
+  const merged = new Map<string, T>();
+
+  for (const item of remoteItems) {
+    const key = getKey(item);
+    if (key) {
+      merged.set(key, item);
+    }
+  }
+
+  // Local items intentionally win because users may have just added or edited
+  // a record before the remote sync completed.
+  for (const item of localItems) {
+    const key = getKey(item);
+    if (key) {
+      merged.set(key, item);
+    }
+  }
+
+  return Array.from(merged.values());
+}
+
+function logWorkspaceSyncWarning(action: string, error: unknown) {
+  console.warn(`[Seekoffer][workspace] ${action} failed`, error);
+}
+
 function getSupabaseMemberContext() {
   const session = getUserSession();
   if (!session || session.authProvider === 'anonymous' || !session.userId) {
@@ -663,20 +689,50 @@ async function hydrateWorkspaceFromSupabase() {
       const localApplications = readStoredRecordsPayload().items;
       const localProfile = getUserSession()?.profile;
 
-      await Promise.all([
+      const pushResults = await Promise.allSettled([
         upsertRemoteManualProjects(localManualProjects),
         upsertRemoteApplications(localApplications),
         upsertRemoteProfile(localProfile)
       ]);
 
-      const [remoteManualProjects, remoteApplications, remoteProfile] = await Promise.all([
+      pushResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          logWorkspaceSyncWarning(['manual-project-push', 'application-push', 'profile-push'][index], result.reason);
+        }
+      });
+
+      const [manualProjectsResult, applicationsResult, profileResult] = await Promise.allSettled([
         fetchRemoteManualProjects(),
         fetchRemoteApplications(),
         fetchRemoteProfile()
       ]);
 
-      persistStoredManualProjects(remoteManualProjects, nowIsoText(), false);
-      persistStoredRecords(remoteApplications, nowIsoText(), false);
+      if (manualProjectsResult.status === 'rejected') {
+        logWorkspaceSyncWarning('manual-project-fetch', manualProjectsResult.reason);
+      }
+
+      if (applicationsResult.status === 'rejected') {
+        logWorkspaceSyncWarning('application-fetch', applicationsResult.reason);
+      }
+
+      if (profileResult.status === 'rejected') {
+        logWorkspaceSyncWarning('profile-fetch', profileResult.reason);
+      }
+
+      const remoteManualProjects = manualProjectsResult.status === 'fulfilled' ? manualProjectsResult.value : [];
+      const remoteApplications = applicationsResult.status === 'fulfilled' ? applicationsResult.value : [];
+      const remoteProfile = profileResult.status === 'fulfilled' ? profileResult.value : null;
+
+      persistStoredManualProjects(
+        mergeByKey(remoteManualProjects, localManualProjects, (project) => project.id),
+        nowIsoText(),
+        false
+      );
+      persistStoredRecords(
+        mergeByKey(remoteApplications, localApplications, (record) => record.projectId),
+        nowIsoText(),
+        false
+      );
 
       if (remoteProfile && profileHasMeaningfulContent(remoteProfile)) {
         updateUserProfile(remoteProfile);
@@ -799,8 +855,17 @@ export async function addProjectToApplicationTable(projectId: string) {
   await assertApplicationQuota(current.length);
 
   const created = buildDefaultRecord(projectId);
-  persistStoredRecords([...current, created]);
-  await upsertRemoteApplications([...current, created]);
+  const nextRecords = [...current, created];
+  persistStoredRecords(nextRecords);
+
+  try {
+    await upsertRemoteApplications(nextRecords);
+  } catch (error) {
+    // Keep the user action locally even if the remote sync is temporarily
+    // blocked by stale notice mirrors, network issues, or RLS changes.
+    logWorkspaceSyncWarning('application-add-sync', error);
+  }
+
   return created;
 }
 

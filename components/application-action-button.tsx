@@ -7,6 +7,26 @@ import { addProjectToApplicationTable, fetchUserProjects, watchApplicationTable 
 import { openAuthModal, writeAuthIntent } from '@/lib/auth-intent';
 import { useUserSessionState } from '@/hooks/use-user-session';
 
+function getActionErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (error && typeof error === 'object') {
+    const record = error as Record<string, unknown>;
+    const message = record.message || record.error_description || record.error || record.details;
+    if (typeof message === 'string' && message.trim()) {
+      return message;
+    }
+  }
+
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+
+  return '加入申请表失败，请刷新后重试；如果仍然失败，请通过右下角反馈入口告诉我们。';
+}
+
 export function ApplicationActionButton({
   projectId,
   variant = 'primary',
@@ -75,7 +95,7 @@ export function ApplicationActionButton({
       await addProjectToApplicationTable(projectId);
       setAdded(true);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '请先完成正式账号登录后再加入申请表。');
+      setMessage(getActionErrorMessage(error));
     } finally {
       setPending(false);
     }
