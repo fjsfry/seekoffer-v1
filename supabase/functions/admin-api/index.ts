@@ -592,6 +592,8 @@ async function listUsers(service: SupabaseService, body: Record<string, unknown>
   const to = from + pageSize - 1;
   const keyword = normalizeFilter(filters.query);
   const userId = normalizeFilter(filters.userId);
+  const status = normalizeFilter(filters.status);
+  const activity = normalizeFilter(filters.activity);
 
   let query = service
     .from('profiles')
@@ -601,7 +603,59 @@ async function listUsers(service: SupabaseService, body: Record<string, unknown>
     query = query.ilike('id', likePattern(userId));
   }
 
-  if (keyword) {
+  if (status && status !== 'all') {
+    const moderationQuery = await service
+      .from('user_moderation')
+      .select('user_id,status')
+      .neq('status', 'active');
+    if (moderationQuery.error) throw moderationQuery.error;
+    const moderatedRows = moderationQuery.data || [];
+    const moderatedIds = moderatedRows.map((item) => item.user_id).filter(Boolean);
+    if (status === 'active') {
+      if (moderatedIds.length) {
+        query = query.not('id', 'in', `(${moderatedIds.join(',')})`);
+      }
+    } else {
+      const matchedIds = moderatedRows
+        .filter((item) => item.status === status)
+        .map((item) => item.user_id)
+        .filter(Boolean);
+      if (!matchedIds.length) {
+        return {
+          users: [],
+          total: 0,
+          page,
+          pageSize,
+          metrics: await getUserMetrics(service)
+        };
+      }
+      query = query.in('id', matchedIds);
+    }
+  }
+
+  if (activity && activity !== 'all') {
+    const now = new Date();
+    const offsetDays = activity === 'today' ? 0 : activity === '7d' ? -6 : activity === '30d' ? -29 : 0;
+    const since = activity === 'today' ? getShanghaiDayStart(0).toISOString() : new Date(now.getTime() + offsetDays * 24 * 60 * 60 * 1000).toISOString();
+    query = query.gte('updated_at', since);
+  }
+
+  if (keyword.includes('@')) {
+    const { data } = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const matchedUserIds = (data.users || [])
+      .filter((user) => (user.email || '').toLowerCase().includes(keyword.toLowerCase()))
+      .map((user) => user.id);
+    if (!matchedUserIds.length) {
+      return {
+        users: [],
+        total: 0,
+        page,
+        pageSize,
+        metrics: await getUserMetrics(service)
+      };
+    }
+    query = query.in('id', matchedUserIds);
+  } else if (keyword) {
     const pattern = likePattern(keyword);
     query = query.or(`nickname.ilike.${pattern},undergraduate_school.ilike.${pattern},major.ilike.${pattern},target_major.ilike.${pattern}`);
   }
@@ -655,12 +709,44 @@ async function listUsers(service: SupabaseService, body: Record<string, unknown>
 async function listFeedback(service: SupabaseService, body: Record<string, unknown>) {
   const page = readPage(body);
   const pageSize = readPageSize(body);
+  const filters = readFilters(body);
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
+  const type = normalizeFilter(filters.type);
+  const module = normalizeFilter(filters.module);
+  const status = normalizeFilter(filters.status);
+  const queryText = normalizeFilter(filters.query);
 
-  const { data, error, count } = await service
+  let query = service
     .from('feedback_reports')
-    .select('id,type,module,target_id,content,status,handler,created_at,handled_at', { count: 'exact' })
+    .select('id,type,module,target_id,content,status,handler,created_at,handled_at', { count: 'exact' });
+
+  if (type && type !== 'all') {
+    query = query.eq('type', type);
+  }
+
+  if (module && module !== 'all') {
+    query = query.eq('module', module);
+  }
+
+  if (status && status !== 'all') {
+    query = query.eq('status', mapFeedbackStatus(status));
+  }
+
+  if (queryText) {
+    const pattern = likePattern(queryText);
+    query = query.or(`content.ilike.${pattern},target_id.ilike.${pattern},handler.ilike.${pattern}`);
+  }
+
+  if (normalizeFilter(filters.dateFrom)) {
+    query = query.gte('created_at', `${normalizeFilter(filters.dateFrom)}T00:00:00+08:00`);
+  }
+
+  if (normalizeFilter(filters.dateTo)) {
+    query = query.lte('created_at', `${normalizeFilter(filters.dateTo)}T23:59:59+08:00`);
+  }
+
+  const { data, error, count } = await query
     .order('created_at', { ascending: false })
     .range(from, to);
 
@@ -728,13 +814,45 @@ async function listAiWaitlistLeads(service: SupabaseService, body: Record<string
 async function listLogs(service: SupabaseService, body: Record<string, unknown>) {
   const page = readPage(body);
   const pageSize = readPageSize(body);
+  const filters = readFilters(body);
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const todayStart = getShanghaiDayStart(0).toISOString();
+  const operator = normalizeFilter(filters.operator);
+  const action = normalizeFilter(filters.action);
+  const module = normalizeFilter(filters.module);
+  const queryText = normalizeFilter(filters.query);
 
-  const { data, error, count } = await service
+  let query = service
     .from('admin_operation_logs')
-    .select('id,admin_email,action,module,target_id,ip_address,result,remark,created_at', { count: 'exact' })
+    .select('id,admin_email,action,module,target_id,ip_address,result,remark,created_at', { count: 'exact' });
+
+  if (operator && operator !== 'all') {
+    query = query.ilike('admin_email', likePattern(operator));
+  }
+
+  if (action && action !== 'all') {
+    query = query.ilike('action', likePattern(action));
+  }
+
+  if (module && module !== 'all') {
+    query = query.ilike('module', likePattern(module));
+  }
+
+  if (queryText) {
+    const pattern = likePattern(queryText);
+    query = query.or(`target_id.ilike.${pattern},remark.ilike.${pattern},ip_address.ilike.${pattern}`);
+  }
+
+  if (normalizeFilter(filters.dateFrom)) {
+    query = query.gte('created_at', `${normalizeFilter(filters.dateFrom)}T00:00:00+08:00`);
+  }
+
+  if (normalizeFilter(filters.dateTo)) {
+    query = query.lte('created_at', `${normalizeFilter(filters.dateTo)}T23:59:59+08:00`);
+  }
+
+  const { data, error, count } = await query
     .order('created_at', { ascending: false })
     .range(from, to);
 

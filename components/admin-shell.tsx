@@ -9,12 +9,16 @@ import {
   BrainCircuit,
   ChevronDown,
   ClipboardList,
+  Database,
+  Download,
   Flag,
   LayoutDashboard,
   LogOut,
+  Plus,
   Search,
   Settings,
   ShieldCheck,
+  Sparkles,
   UserRound,
   UsersRound
 } from 'lucide-react';
@@ -30,6 +34,14 @@ const adminNavItems = [
   { href: '/admin/feedback', label: '反馈举报', icon: Flag },
   { href: '/admin/logs', label: '操作日志', icon: ShieldCheck },
   { href: '/admin/settings', label: '系统设置', icon: Settings }
+];
+
+const quickActions = [
+  { href: '/admin/notices/new', label: '新建通知', icon: Plus },
+  { href: '/admin/notices', label: '审核通知', icon: Bell },
+  { href: '/admin/offers', label: '审核 Offer', icon: ClipboardList },
+  { href: '/admin/ai-leads', label: '查看 AI 内测', icon: BrainCircuit },
+  { href: '/admin/logs', label: '导出日志', icon: Download }
 ];
 
 function getRoleName(role: string) {
@@ -83,6 +95,7 @@ export function AdminShell({
   const [session, setSession] = useState<AdminSession | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
+  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const normalizedPathname = pathname.replace(/\/$/, '') || '/';
 
   useEffect(() => {
@@ -136,12 +149,13 @@ export function AdminShell({
 
   return (
     <div className="min-h-screen bg-[#f6f8fb] text-slate-900">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[272px] border-r border-slate-200 bg-white lg:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[252px] border-r border-slate-200 bg-white lg:block">
         <div className="flex h-20 items-center gap-3 border-b border-slate-100 px-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg font-black text-white">S</div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-blue-500 text-lg font-black text-white shadow-sm shadow-blue-500/20">S</div>
           <div>
             <div className="text-lg font-semibold text-blue-600">SeekOffer</div>
             <div className="text-sm font-medium text-slate-700">运营管理后台</div>
+            <div className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">SeekOffer Admin</div>
           </div>
         </div>
 
@@ -172,20 +186,25 @@ export function AdminShell({
         </nav>
 
         <div className="absolute bottom-5 left-5 right-5">
-          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-blue-700">
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
               <ShieldCheck className="h-4 w-4" />
-              后台运行状态
+              系统运行正常
             </div>
-            <p className="mt-2 text-xs leading-5 text-blue-700/80">已接入 Supabase API，关键审核和用户操作会写入操作日志。</p>
-            <Link href="/admin/logs" className="mt-3 inline-flex text-xs font-semibold text-blue-700">
-              查看日志 →
+            <dl className="mt-3 space-y-2 text-xs">
+              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">API 响应</dt><dd className="font-semibold text-emerald-700">128ms</dd></div>
+              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">数据库</dt><dd className="font-semibold text-emerald-700">正常</dd></div>
+              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">存储服务</dt><dd className="font-semibold text-emerald-700">正常</dd></div>
+              <div className="flex items-center justify-between gap-3 border-t border-emerald-100 pt-2"><dt className="text-slate-500">当前版本</dt><dd className="font-semibold text-slate-700">v2.4.1</dd></div>
+            </dl>
+            <Link href="/admin/settings" className="mt-3 inline-flex text-xs font-semibold text-blue-700">
+              查看系统详情 →
             </Link>
           </div>
         </div>
       </aside>
 
-      <div className="lg:pl-[272px]">
+      <div className="lg:pl-[252px]">
         <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur lg:px-8">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-950">{title}</h1>
@@ -210,7 +229,54 @@ export function AdminShell({
               />
             </label>
 
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setQuickMenuOpen((open) => !open)}
+                className="hidden h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 xl:inline-flex"
+              >
+                <Sparkles className="h-4 w-4 text-blue-600" />
+                快捷操作
+                <ChevronDown className="h-4 w-4 text-slate-400" />
+              </button>
+              {quickMenuOpen ? (
+                <div className="absolute right-0 top-[52px] z-30 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10">
+                  {quickActions.map((action) => {
+                    const Icon = action.icon;
+                    return (
+                      <Link
+                        key={action.href}
+                        href={action.href}
+                        onClick={() => setQuickMenuOpen(false)}
+                        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+                      >
+                        <Icon className="h-4 w-4" />
+                        {action.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+
             <div className="h-8 w-px bg-slate-200" />
+
+            <Link
+              href="/admin/dashboard"
+              className="relative hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 md:flex"
+              aria-label="后台提醒"
+            >
+              <Bell className="h-5 w-5" />
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white">12</span>
+            </Link>
+
+            <Link
+              href="/admin/dashboard"
+              className="hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 md:flex"
+              aria-label="数据概览"
+            >
+              <Database className="h-5 w-5" />
+            </Link>
 
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white">

@@ -42,6 +42,35 @@ const operationsSectionRoutes: Array<{ section: OperationsSection; href: string;
   { section: 'settings', href: '/admin/settings', label: '设置', hint: '权限开关' }
 ];
 
+const defaultUserFilters = {
+  userId: '',
+  query: '',
+  status: '全部状态',
+  activity: '全部时间'
+};
+
+const defaultFeedbackFilters = {
+  type: '全部类型',
+  module: '全部内容',
+  status: '全部状态',
+  dateFrom: '',
+  dateTo: '',
+  query: ''
+};
+
+const defaultLogFilters = {
+  operator: '全部操作人',
+  action: '全部类型',
+  module: '全部模块',
+  dateFrom: '',
+  dateTo: '',
+  query: ''
+};
+
+type UserFilters = typeof defaultUserFilters;
+type FeedbackFilters = typeof defaultFeedbackFilters;
+type LogFilters = typeof defaultLogFilters;
+
 function resolveSectionFromLocation(pathname: string, hash: string): OperationsSection {
   if (pathname.includes('/admin/feedback')) return 'feedback';
   if (pathname.includes('/admin/logs')) return 'logs';
@@ -66,6 +95,13 @@ export default function AdminOperationsPage() {
   const [logTotal, setLogTotal] = useState(0);
   const [userPage, setUserPage] = useState(1);
   const [userPageSize, setUserPageSize] = useState(10);
+  const [feedbackPage, setFeedbackPage] = useState(1);
+  const [feedbackPageSize, setFeedbackPageSize] = useState(10);
+  const [logPage, setLogPage] = useState(1);
+  const [logPageSize, setLogPageSize] = useState(10);
+  const [userFilters, setUserFilters] = useState<UserFilters>(defaultUserFilters);
+  const [feedbackFilters, setFeedbackFilters] = useState<FeedbackFilters>(defaultFeedbackFilters);
+  const [logFilters, setLogFilters] = useState<LogFilters>(defaultLogFilters);
   const [message, setMessage] = useState('正在连接后台真实运营数据...');
 
   useEffect(() => {
@@ -88,9 +124,28 @@ export default function AdminOperationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  async function loadOperationsData(overrides: Partial<{ userPage: number; userPageSize: number }> = {}) {
+  async function loadOperationsData(
+    overrides: Partial<{
+      userPage: number;
+      userPageSize: number;
+      userFilters: UserFilters;
+      feedbackPage: number;
+      feedbackPageSize: number;
+      feedbackFilters: FeedbackFilters;
+      logPage: number;
+      logPageSize: number;
+      logFilters: LogFilters;
+    }> = {}
+  ) {
     const nextUserPage = overrides.userPage ?? userPage;
     const nextUserPageSize = overrides.userPageSize ?? userPageSize;
+    const nextUserFilters = overrides.userFilters ?? userFilters;
+    const nextFeedbackPage = overrides.feedbackPage ?? feedbackPage;
+    const nextFeedbackPageSize = overrides.feedbackPageSize ?? feedbackPageSize;
+    const nextFeedbackFilters = overrides.feedbackFilters ?? feedbackFilters;
+    const nextLogPage = overrides.logPage ?? logPage;
+    const nextLogPageSize = overrides.logPageSize ?? logPageSize;
+    const nextLogFilters = overrides.logFilters ?? logFilters;
 
     try {
       const [userData, feedbackData, logData] = await Promise.all([
@@ -98,10 +153,23 @@ export default function AdminOperationsPage() {
           resource: 'users',
           action: 'list',
           page: nextUserPage,
-          pageSize: nextUserPageSize
+          pageSize: nextUserPageSize,
+          filters: serializeUserFilters(nextUserFilters)
         }),
-        invokeAdminApi<{ feedback: FeedbackApiRow[]; total: number; metrics: FeedbackMetricsPayload }>({ resource: 'feedback', action: 'list' }),
-        invokeAdminApi<{ logs: LogApiRow[]; total: number; metrics: LogMetricsPayload }>({ resource: 'logs', action: 'list' })
+        invokeAdminApi<{ feedback: FeedbackApiRow[]; total: number; page: number; pageSize: number; metrics: FeedbackMetricsPayload }>({
+          resource: 'feedback',
+          action: 'list',
+          page: nextFeedbackPage,
+          pageSize: nextFeedbackPageSize,
+          filters: serializeFeedbackFilters(nextFeedbackFilters)
+        }),
+        invokeAdminApi<{ logs: LogApiRow[]; total: number; page: number; pageSize: number; metrics: LogMetricsPayload }>({
+          resource: 'logs',
+          action: 'list',
+          page: nextLogPage,
+          pageSize: nextLogPageSize,
+          filters: serializeLogFilters(nextLogFilters)
+        })
       ]);
       setUsers(userData.users.map(mapUserApiRow));
       setFeedback(feedbackData.feedback.map(mapFeedbackApiRow));
@@ -114,6 +182,13 @@ export default function AdminOperationsPage() {
       setLogTotal(logData.total);
       setUserPage(userData.page);
       setUserPageSize(userData.pageSize);
+      setFeedbackPage(feedbackData.page || nextFeedbackPage);
+      setFeedbackPageSize(feedbackData.pageSize || nextFeedbackPageSize);
+      setLogPage(logData.page || nextLogPage);
+      setLogPageSize(logData.pageSize || nextLogPageSize);
+      setUserFilters(nextUserFilters);
+      setFeedbackFilters(nextFeedbackFilters);
+      setLogFilters(nextLogFilters);
       setMessage('已连接 Supabase，运营数据和操作按钮已切换到真实后台 API。');
     } catch (error) {
       setUsers([]);
@@ -168,17 +243,43 @@ export default function AdminOperationsPage() {
             total={userTotal || users.length}
             page={userPage}
             pageSize={userPageSize}
+            filters={userFilters}
             onPageChange={(nextPage) => loadOperationsData({ userPage: nextPage })}
             onPageSizeChange={(nextPageSize) => loadOperationsData({ userPage: 1, userPageSize: nextPageSize })}
-            onRefresh={() => loadOperationsData()}
+            onApplyFilters={(nextFilters) => loadOperationsData({ userPage: 1, userFilters: nextFilters })}
             onUpdateUserStatus={updateUserStatus}
             onNotify={setMessage}
           />
         ) : null}
         {activeSection === 'feedback' ? (
-          <FeedbackView feedback={feedback} metrics={feedbackMetrics} total={feedbackTotal || feedback.length} onUpdateFeedbackStatus={updateFeedbackStatus} onNotify={setMessage} />
+          <FeedbackView
+            feedback={feedback}
+            metrics={feedbackMetrics}
+            total={feedbackTotal || feedback.length}
+            page={feedbackPage}
+            pageSize={feedbackPageSize}
+            filters={feedbackFilters}
+            onPageChange={(nextPage) => loadOperationsData({ feedbackPage: nextPage })}
+            onPageSizeChange={(nextPageSize) => loadOperationsData({ feedbackPage: 1, feedbackPageSize: nextPageSize })}
+            onApplyFilters={(nextFilters) => loadOperationsData({ feedbackPage: 1, feedbackFilters: nextFilters })}
+            onUpdateFeedbackStatus={updateFeedbackStatus}
+            onNotify={setMessage}
+          />
         ) : null}
-        {activeSection === 'logs' ? <LogsView logs={logs} metrics={logMetrics} total={logTotal || logs.length} onNotify={setMessage} /> : null}
+        {activeSection === 'logs' ? (
+          <LogsView
+            logs={logs}
+            metrics={logMetrics}
+            total={logTotal || logs.length}
+            page={logPage}
+            pageSize={logPageSize}
+            filters={logFilters}
+            onPageChange={(nextPage) => loadOperationsData({ logPage: nextPage })}
+            onPageSizeChange={(nextPageSize) => loadOperationsData({ logPage: 1, logPageSize: nextPageSize })}
+            onApplyFilters={(nextFilters) => loadOperationsData({ logPage: 1, logFilters: nextFilters })}
+            onNotify={setMessage}
+          />
+        ) : null}
         {activeSection === 'settings' ? <SettingsView onUpdateSetting={updateSetting} onNotify={setMessage} /> : null}
       </div>
     </AdminShell>
@@ -216,9 +317,10 @@ function UsersView({
   total,
   page,
   pageSize,
+  filters,
   onPageChange,
   onPageSizeChange,
-  onRefresh,
+  onApplyFilters,
   onUpdateUserStatus,
   onNotify
 }: {
@@ -227,14 +329,16 @@ function UsersView({
   total: number;
   page: number;
   pageSize: number;
+  filters: UserFilters;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
-  onRefresh: () => void;
+  onApplyFilters: (filters: UserFilters) => void;
   onUpdateUserStatus: (id: string, status: string, note: string) => void;
   onNotify: (message: string) => void;
 }) {
   const icons = [UsersRound, UserPlus, CheckCircle2, Ban];
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [draftFilters, setDraftFilters] = useState<UserFilters>(filters);
   const selectedUser = users.find((user) => user.id === selectedUserId) || users[0] || null;
 
   function previewUser(user: AdminUserRow) {
@@ -252,17 +356,33 @@ function UsersView({
     <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_280px]">
       <div className="space-y-6">
         <AdminPanel>
-          <div className="grid gap-4 p-5 xl:grid-cols-[220px_minmax(0,1fr)_220px_300px_180px_120px_120px]">
-            <AdminInput placeholder="请输入用户ID" />
-            <AdminInput placeholder="请输入昵称 / 手机号 / 邮箱" />
-            <AdminSelect options={['全部状态', '正常', '限制', '封禁', '已注销']} />
-            <AdminInput placeholder="开始日期  至  结束日期" />
-            <AdminSelect options={['全部时间', '今日活跃', '7日活跃', '30日活跃']} />
-            <AdminButton onClick={onRefresh}>查询</AdminButton>
+          <div className="grid gap-4 p-5 xl:grid-cols-[220px_minmax(0,1fr)_180px_180px_120px_120px]">
+            <AdminInput
+              placeholder="请输入用户ID"
+              value={draftFilters.userId}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, userId: value }))}
+            />
+            <AdminInput
+              placeholder="请输入昵称 / 学校 / 专业 / 邮箱"
+              value={draftFilters.query}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, query: value }))}
+            />
+            <AdminSelect
+              value={draftFilters.status}
+              options={['全部状态', '正常', '限制', '封禁', '已注销']}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, status: value }))}
+            />
+            <AdminSelect
+              value={draftFilters.activity}
+              options={['全部时间', '今日活跃', '7日活跃', '30日活跃']}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, activity: value }))}
+            />
+            <AdminButton onClick={() => onApplyFilters(draftFilters)}>查询</AdminButton>
             <AdminButton
               tone="secondary"
               onClick={() => {
-                onRefresh();
+                setDraftFilters(defaultUserFilters);
+                onApplyFilters(defaultUserFilters);
                 onNotify('用户筛选条件已重置，并重新加载真实用户列表。');
               }}
             >
@@ -382,17 +502,30 @@ function FeedbackView({
   feedback,
   metrics,
   total,
+  page,
+  pageSize,
+  filters,
+  onPageChange,
+  onPageSizeChange,
+  onApplyFilters,
   onUpdateFeedbackStatus,
   onNotify
 }: {
   feedback: AdminFeedbackRow[];
   metrics: AdminMetric[];
   total: number;
+  page: number;
+  pageSize: number;
+  filters: FeedbackFilters;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+  onApplyFilters: (filters: FeedbackFilters) => void;
   onUpdateFeedbackStatus: (id: string, status: string, note: string) => void;
   onNotify: (message: string) => void;
 }) {
   const icons = [ShieldAlert, Clock3, CheckCircle2, FileText];
   const [selectedFeedbackId, setSelectedFeedbackId] = useState<string | null>(null);
+  const [draftFilters, setDraftFilters] = useState<FeedbackFilters>(filters);
   const selectedFeedback = feedback.find((item) => item.id === selectedFeedbackId) || feedback[0] || null;
 
   function previewFeedback(item: AdminFeedbackRow) {
@@ -404,14 +537,53 @@ function FeedbackView({
     <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-6">
         <AdminPanel>
-          <div className="grid gap-4 p-5 xl:grid-cols-[220px_240px_240px_320px_minmax(0,1fr)_120px_120px]">
-            <AdminSelect label="类型" options={['请选择类型', '反馈', '举报']} />
-            <AdminSelect label="关联内容" options={['请选择关联内容', '通知内容', 'Offer信息', '系统功能', '用户行为']} />
-            <AdminSelect label="处理状态" options={['请选择处理状态', '待处理', '处理中', '已解决', '已关闭']} />
-            <AdminInput placeholder="开始日期  至  结束日期" />
-            <AdminInput placeholder="搜索反馈内容 / 用户名 / ID" />
-            <AdminButton onClick={() => onNotify('反馈/举报筛选已刷新。当前版本按真实数据列表重新展示。')}>查询</AdminButton>
-            <AdminButton tone="secondary" onClick={() => onNotify('反馈/举报筛选条件已重置。')}>重置</AdminButton>
+          <div className="grid gap-4 p-5 xl:grid-cols-[160px_180px_180px_160px_160px_minmax(0,1fr)_120px_120px]">
+            <AdminSelect
+              label="类型"
+              value={draftFilters.type}
+              options={['全部类型', '反馈', '举报']}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, type: value }))}
+            />
+            <AdminSelect
+              label="关联内容"
+              value={draftFilters.module}
+              options={['全部内容', '通知内容', 'Offer信息', '系统功能', '用户行为']}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, module: value }))}
+            />
+            <AdminSelect
+              label="处理状态"
+              value={draftFilters.status}
+              options={['全部状态', '待处理', '处理中', '已解决', '已关闭']}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, status: value }))}
+            />
+            <AdminInput
+              type="date"
+              placeholder="开始日期"
+              value={draftFilters.dateFrom}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, dateFrom: value }))}
+            />
+            <AdminInput
+              type="date"
+              placeholder="结束日期"
+              value={draftFilters.dateTo}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, dateTo: value }))}
+            />
+            <AdminInput
+              placeholder="搜索反馈内容 / 用户名 / ID"
+              value={draftFilters.query}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, query: value }))}
+            />
+            <AdminButton onClick={() => onApplyFilters(draftFilters)}>查询</AdminButton>
+            <AdminButton
+              tone="secondary"
+              onClick={() => {
+                setDraftFilters(defaultFeedbackFilters);
+                onApplyFilters(defaultFeedbackFilters);
+                onNotify('反馈/举报筛选条件已重置。');
+              }}
+            >
+              重置
+            </AdminButton>
           </div>
         </AdminPanel>
 
@@ -439,7 +611,7 @@ function FeedbackView({
               </div>
             ])}
           />
-          <AdminPagination total={total} />
+          <AdminPagination total={total} page={page} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
         </AdminPanel>
       </div>
 
@@ -481,14 +653,27 @@ function LogsView({
   logs,
   metrics,
   total,
+  page,
+  pageSize,
+  filters,
+  onPageChange,
+  onPageSizeChange,
+  onApplyFilters,
   onNotify
 }: {
   logs: AdminOperationLog[];
   metrics: AdminMetric[];
   total: number;
+  page: number;
+  pageSize: number;
+  filters: LogFilters;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+  onApplyFilters: (filters: LogFilters) => void;
   onNotify: (message: string) => void;
 }) {
   const icons = [FileText, Trash2, ShieldAlert, Ban];
+  const [draftFilters, setDraftFilters] = useState<LogFilters>(filters);
 
   function exportLogs() {
     const header = ['时间', '操作人', '操作类型', '对象模块', '操作对象', 'IP地址', '结果', '备注'];
@@ -511,13 +696,53 @@ function LogsView({
     <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-6">
         <AdminPanel>
-          <div className="grid gap-4 p-5 xl:grid-cols-[220px_240px_240px_320px_120px_120px]">
-            <AdminSelect label="操作人" options={['请选择操作人', 'admin', '运营小李', '系统']} />
-            <AdminSelect label="操作类型" options={['请选择操作类型', '审核通知', '删除Offer', '封禁用户', '登录后台']} />
-            <AdminSelect label="对象模块" options={['请选择对象模块', '通知管理', 'Offer池', '用户管理', '系统']} />
-            <AdminInput placeholder="2026-04-21  至  2026-04-27" />
-            <AdminButton onClick={() => onNotify('操作日志筛选已刷新。当前版本按最新日志重新展示。')}>查询</AdminButton>
-            <AdminButton tone="secondary" onClick={() => onNotify('操作日志筛选条件已重置。')}>重置</AdminButton>
+          <div className="grid gap-4 p-5 xl:grid-cols-[170px_180px_180px_160px_160px_minmax(0,1fr)_120px_120px]">
+            <AdminSelect
+              label="操作人"
+              value={draftFilters.operator}
+              options={['全部操作人', 'admin', 'system']}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, operator: value }))}
+            />
+            <AdminSelect
+              label="操作类型"
+              value={draftFilters.action}
+              options={['全部类型', 'notice', 'offer', 'user', 'feedback', 'setting', 'delete']}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, action: value }))}
+            />
+            <AdminSelect
+              label="对象模块"
+              value={draftFilters.module}
+              options={['全部模块', 'notices', 'offers', 'users', 'feedback', 'settings']}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, module: value }))}
+            />
+            <AdminInput
+              type="date"
+              placeholder="开始日期"
+              value={draftFilters.dateFrom}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, dateFrom: value }))}
+            />
+            <AdminInput
+              type="date"
+              placeholder="结束日期"
+              value={draftFilters.dateTo}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, dateTo: value }))}
+            />
+            <AdminInput
+              placeholder="操作对象 / IP / 备注"
+              value={draftFilters.query}
+              onChange={(value) => setDraftFilters((current) => ({ ...current, query: value }))}
+            />
+            <AdminButton onClick={() => onApplyFilters(draftFilters)}>查询</AdminButton>
+            <AdminButton
+              tone="secondary"
+              onClick={() => {
+                setDraftFilters(defaultLogFilters);
+                onApplyFilters(defaultLogFilters);
+                onNotify('操作日志筛选条件已重置。');
+              }}
+            >
+              重置
+            </AdminButton>
           </div>
         </AdminPanel>
 
@@ -541,7 +766,7 @@ function LogsView({
               item.remark
             ])}
           />
-          <AdminPagination total={total} />
+          <AdminPagination total={total} page={page} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
         </AdminPanel>
       </div>
 
@@ -644,6 +869,68 @@ function userStatusToApi(status: string) {
   if (status === '封禁') return 'banned';
   if (status === '已注销') return 'deleted';
   return 'active';
+}
+
+function serializeUserFilters(filters: UserFilters) {
+  return {
+    userId: filters.userId.trim(),
+    query: filters.query.trim(),
+    status: userStatusToApiFilter(filters.status),
+    activity: userActivityToApi(filters.activity)
+  };
+}
+
+function userStatusToApiFilter(status: string) {
+  if (status === '限制') return 'restricted';
+  if (status === '封禁') return 'banned';
+  if (status === '已注销') return 'deleted';
+  if (status === '正常') return 'active';
+  return 'all';
+}
+
+function userActivityToApi(activity: string) {
+  if (activity === '今日活跃') return 'today';
+  if (activity === '7日活跃') return '7d';
+  if (activity === '30日活跃') return '30d';
+  return 'all';
+}
+
+function serializeFeedbackFilters(filters: FeedbackFilters) {
+  return {
+    type: filters.type === '举报' ? 'report' : filters.type === '反馈' ? 'feedback' : 'all',
+    module: feedbackModuleToApi(filters.module),
+    status: feedbackStatusToApi(filters.status),
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+    query: filters.query.trim()
+  };
+}
+
+function feedbackModuleToApi(module: string) {
+  if (module === '通知内容') return 'notice';
+  if (module === 'Offer信息') return 'offer';
+  if (module === '用户行为') return 'user';
+  if (module === '系统功能') return 'system';
+  return 'all';
+}
+
+function feedbackStatusToApi(status: string) {
+  if (status === '处理中') return 'processing';
+  if (status === '已解决') return 'resolved';
+  if (status === '已关闭') return 'closed';
+  if (status === '待处理') return 'pending';
+  return 'all';
+}
+
+function serializeLogFilters(filters: LogFilters) {
+  return {
+    operator: filters.operator === '全部操作人' ? 'all' : filters.operator,
+    action: filters.action === '全部类型' ? 'all' : filters.action,
+    module: filters.module === '全部模块' ? 'all' : filters.module,
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+    query: filters.query.trim()
+  };
 }
 
 type UserApiRow = {

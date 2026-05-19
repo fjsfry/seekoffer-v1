@@ -7,12 +7,12 @@ export function adminClassNames(...classes: Array<string | false | null | undefi
 }
 
 const metricToneMap: Record<AdminMetric['tone'], string> = {
-  blue: 'bg-blue-50 text-blue-600',
-  green: 'bg-emerald-50 text-emerald-600',
-  amber: 'bg-amber-50 text-amber-600',
-  rose: 'bg-rose-50 text-rose-600',
-  purple: 'bg-violet-50 text-violet-600',
-  slate: 'bg-slate-100 text-slate-600'
+  blue: 'bg-blue-50 text-blue-600 ring-blue-100',
+  green: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
+  amber: 'bg-amber-50 text-amber-600 ring-amber-100',
+  rose: 'bg-rose-50 text-rose-600 ring-rose-100',
+  purple: 'bg-violet-50 text-violet-600 ring-violet-100',
+  slate: 'bg-slate-100 text-slate-600 ring-slate-200'
 };
 
 const statusToneMap: Record<string, string> = {
@@ -35,20 +35,32 @@ const statusToneMap: Record<string, string> = {
 
 export function AdminPanel({
   title,
+  eyebrow,
+  description,
   action,
   children,
   className = ''
 }: {
   title?: string;
+  eyebrow?: string;
+  description?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <section className={adminClassNames('rounded-2xl border border-slate-200 bg-white shadow-sm', className)}>
-      {title || action ? (
-        <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
-          {title ? <h2 className="text-base font-semibold text-slate-950">{title}</h2> : <span />}
+    <section className={adminClassNames('rounded-[22px] border border-slate-200/80 bg-white shadow-[0_16px_48px_rgba(15,23,42,0.04)]', className)}>
+      {title || action || eyebrow || description ? (
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+          {title || eyebrow || description ? (
+            <div>
+              {eyebrow ? <div className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">{eyebrow}</div> : null}
+              {title ? <h2 className="text-base font-semibold text-slate-950">{title}</h2> : null}
+              {description ? <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p> : null}
+            </div>
+          ) : (
+            <span />
+          )}
           {action}
         </div>
       ) : null}
@@ -59,15 +71,15 @@ export function AdminPanel({
 
 export function AdminMetricCard({ metric, icon: Icon }: { metric: AdminMetric; icon: LucideIcon }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-[0_14px_42px_rgba(15,23,42,0.04)]">
       <div className="flex items-center gap-4">
-        <div className={adminClassNames('flex h-14 w-14 items-center justify-center rounded-full', metricToneMap[metric.tone])}>
-          <Icon className="h-7 w-7" />
+        <div className={adminClassNames('flex h-14 w-14 items-center justify-center rounded-2xl ring-1', metricToneMap[metric.tone])}>
+          <Icon className="h-6 w-6" />
         </div>
         <div>
-          <div className="text-sm text-slate-500">{metric.label}</div>
+          <div className="text-sm font-medium text-slate-500">{metric.label}</div>
           <div className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">{metric.value}</div>
-          <div className="mt-1 text-xs text-slate-500">{metric.hint}</div>
+          <div className="mt-1 text-xs leading-5 text-slate-500">{metric.hint}</div>
         </div>
       </div>
     </div>
@@ -76,7 +88,7 @@ export function AdminMetricCard({ metric, icon: Icon }: { metric: AdminMetric; i
 
 export function AdminStatusBadge({ status }: { status: string }) {
   return (
-    <span className={adminClassNames('inline-flex rounded-md px-2.5 py-1 text-xs font-semibold ring-1', statusToneMap[status] || 'bg-blue-50 text-blue-700 ring-blue-100')}>
+    <span className={adminClassNames('inline-flex whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-semibold ring-1', statusToneMap[status] || 'bg-blue-50 text-blue-700 ring-blue-100')}>
       {status}
     </span>
   );
@@ -102,7 +114,7 @@ export function AdminInput({
       value={value}
       onChange={(event) => onChange?.(event.target.value)}
       className={adminClassNames(
-        'h-11 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50',
+        'h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50',
         className
       )}
     />
@@ -128,7 +140,7 @@ export function AdminSelect({
       <select
         value={value}
         onChange={(event) => onChange?.(event.target.value)}
-        className="h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+        className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
       >
         {normalizedOptions.map((option) => (
           <option key={option.value} value={option.value}>
@@ -157,7 +169,7 @@ export function AdminButton({
 }) {
   const toneClass =
     tone === 'primary'
-      ? 'bg-blue-600 text-white hover:bg-blue-700'
+      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20 hover:bg-blue-700'
       : tone === 'danger'
         ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
         : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50';
@@ -168,7 +180,7 @@ export function AdminButton({
       onClick={onClick}
       disabled={disabled}
       className={adminClassNames(
-        'inline-flex h-11 items-center justify-center rounded-lg px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
         toneClass,
         className
       )}
@@ -206,7 +218,7 @@ export function AdminPagination({
       <span>共 {total} 条</span>
       <div className="flex items-center gap-2">
         <button
-          className="h-8 rounded-lg border border-slate-200 px-3 text-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
           disabled={!canGoPrevious}
           onClick={() => canGoPrevious && onPageChange?.(safePage - 1)}
         >
@@ -222,7 +234,7 @@ export function AdminPagination({
               key={`page-${item}`}
               className={adminClassNames(
                 'h-8 min-w-8 rounded-lg px-3 font-medium',
-                item === safePage ? 'bg-blue-600 text-white' : 'border border-slate-200 text-slate-600'
+                item === safePage ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20' : 'border border-slate-200 bg-white text-slate-600'
               )}
               onClick={() => onPageChange?.(item)}
             >
@@ -231,7 +243,7 @@ export function AdminPagination({
           )
         )}
         <button
-          className="h-8 rounded-lg border border-slate-200 px-3 text-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
           disabled={!canGoNext}
           onClick={() => canGoNext && onPageChange?.(safePage + 1)}
         >
@@ -240,7 +252,7 @@ export function AdminPagination({
         <select
           value={pageSize}
           onChange={(event) => onPageSizeChange?.(Number(event.target.value))}
-          className="ml-3 h-8 rounded-lg border border-slate-200 px-2 text-slate-600"
+          className="ml-3 h-8 rounded-lg border border-slate-200 bg-white px-2 text-slate-600"
         >
           {[10, 20, 50].map((size) => (
             <option key={size} value={size}>
