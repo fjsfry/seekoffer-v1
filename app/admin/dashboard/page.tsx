@@ -73,19 +73,30 @@ const emptyAnalytics: AdminAnalyticsPayload = {
   recentVisitors: []
 };
 
+const emptyAiWaitlistMetrics: AiWaitlistMetricsPayload = {
+  totalLeads: 0,
+  todayLeads: 0,
+  riskLeads: 0,
+  materialLeads: 0,
+  briefLeads: 0
+};
+
 export default function AdminDashboardPage() {
   const [overviewMetrics, setOverviewMetrics] = useState<AdminOverviewMetrics>(emptyOverview);
   const [analytics, setAnalytics] = useState<AdminAnalyticsPayload>(emptyAnalytics);
+  const [aiWaitlistMetrics, setAiWaitlistMetrics] = useState<AiWaitlistMetricsPayload>(emptyAiWaitlistMetrics);
   const [metrics, setMetrics] = useState<AdminMetric[]>(buildLiveMetrics(emptyOverview, emptyAnalytics.metrics));
   const [trends, setTrends] = useState<TrendPoint[]>(buildEmptyTrends());
   const [pendingNotices, setPendingNotices] = useState<AdminNoticeRow[]>([]);
   const [pendingOffers, setPendingOffers] = useState<AdminOfferRow[]>([]);
   const [latestFeedback, setLatestFeedback] = useState<AdminFeedbackRow[]>([]);
   const [message, setMessage] = useState('正在连接后台真实统计数据...');
+  const [dataError, setDataError] = useState('');
+  const [lastLoadedAt, setLastLoadedAt] = useState('');
 
   async function loadDashboard() {
     try {
-      const [overview, analyticsData, notices, offers, feedback] = await Promise.all([
+      const [overview, analyticsData, notices, offers, feedback, aiWaitlist] = await Promise.all([
         invokeAdminApi<{ metrics: AdminOverviewMetrics; trends: TrendPoint[] }>({ resource: 'overview', action: 'get' }),
         invokeAdminApi<AdminAnalyticsPayload>({ resource: 'analytics', action: 'overview' }),
         invokeAdminApi<{ notices: NoticeApiRow[] }>({
@@ -97,26 +108,33 @@ export default function AdminDashboardPage() {
           sort: 'updated_desc'
         }),
         invokeAdminApi<{ offers: OfferApiRow[] }>({ resource: 'offers', action: 'list', page: 1, pageSize: 20 }),
-        invokeAdminApi<{ feedback: FeedbackApiRow[] }>({ resource: 'feedback', action: 'list', page: 1, pageSize: 5 })
+        invokeAdminApi<{ feedback: FeedbackApiRow[] }>({ resource: 'feedback', action: 'list', page: 1, pageSize: 5 }),
+        invokeAdminApi<AiWaitlistResponse>({ resource: 'ai_waitlist', action: 'list', page: 1, pageSize: 1 })
       ]);
 
       setOverviewMetrics(overview.metrics);
       setAnalytics(analyticsData);
+      setAiWaitlistMetrics(aiWaitlist.metrics || emptyAiWaitlistMetrics);
       setMetrics(buildLiveMetrics(overview.metrics, analyticsData.metrics));
       setTrends(overview.trends?.length ? overview.trends : buildEmptyTrends());
       setPendingNotices(notices.notices.map(mapNoticeApiRow));
       setPendingOffers(offers.offers.filter((item) => item.review_status === 'pending' || item.reports_count > 0).slice(0, 5).map(mapOfferApiRow));
       setLatestFeedback(feedback.feedback.map(mapFeedbackApiRow));
+      setDataError('');
+      setLastLoadedAt(new Date().toISOString());
       setMessage('已连接 Supabase，数据概览、趋势和待处理列表均来自真实业务表。');
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '真实 API 暂不可用，请稍后重试。';
       setOverviewMetrics(emptyOverview);
       setAnalytics(emptyAnalytics);
+      setAiWaitlistMetrics(emptyAiWaitlistMetrics);
       setMetrics(buildLiveMetrics(emptyOverview, emptyAnalytics.metrics));
       setTrends(buildEmptyTrends());
       setPendingNotices([]);
       setPendingOffers([]);
       setLatestFeedback([]);
-      setMessage(error instanceof Error ? `真实 API 暂不可用：${error.message}` : '真实 API 暂不可用，请稍后重试。');
+      setDataError(errorMessage);
+      setMessage(`真实 API 暂不可用：${errorMessage}`);
     }
   }
 
@@ -136,9 +154,10 @@ export default function AdminDashboardPage() {
 
   const maxNotices = Math.max(...trends.map((item) => item.notices), 1);
   const maxOffers = Math.max(...trends.map((item) => item.offers), 1);
+  const dataHealthy = !dataError;
   const todoCards = [
     { href: '/admin/notices', label: '通知审核', value: overviewMetrics.pendingNotices, hint: '待发布通知', tone: 'bg-amber-50 text-amber-700' },
-    { href: '/admin/ai-leads', label: 'AI线索待查看', value: latestFeedback.length + overviewMetrics.pendingFeedback, hint: '需求与反馈', tone: 'bg-cyan-50 text-cyan-700' },
+    { href: '/admin/ai-leads', label: 'AI线索待查看', value: aiWaitlistMetrics.totalLeads, hint: `今日新增 ${formatNumber(aiWaitlistMetrics.todayLeads)}`, tone: 'bg-cyan-50 text-cyan-700' },
     { href: '/admin/feedback', label: '反馈工单', value: overviewMetrics.pendingFeedback, hint: '待处理举报', tone: 'bg-rose-50 text-rose-700' },
     { href: '/admin/offers', label: '高风险操作', value: overviewMetrics.pendingOffers, hint: 'Offer 审核', tone: 'bg-violet-50 text-violet-700' }
   ];
@@ -165,9 +184,9 @@ export default function AdminDashboardPage() {
   const operationAlerts = recentActivities.length
     ? recentActivities
     : [
-        { label: '系统将持续自动刷新后台数据。', time: '现在', href: '/admin/dashboard', tone: 'bg-blue-500' },
-        { label: '请重点关注待审核通知和用户反馈。', time: '今日', href: '/admin/notices', tone: 'bg-amber-500' },
-        { label: '操作日志会按系统设置保留并可导出。', time: '长期', href: '/admin/logs', tone: 'bg-emerald-500' }
+        { label: `当前待审核通知 ${formatNumber(overviewMetrics.pendingNotices)} 条`, time: '实时', href: '/admin/notices', tone: 'bg-blue-500' },
+        { label: `当前待处理反馈 ${formatNumber(overviewMetrics.pendingFeedback)} 条`, time: '实时', href: '/admin/feedback', tone: 'bg-amber-500' },
+        { label: `实时在线访客 ${formatNumber(analytics.metrics.onlineVisitors)} 人`, time: `最近 ${analytics.metrics.activeWindowMinutes} 分钟`, href: '/admin/dashboard', tone: 'bg-emerald-500' }
       ];
   const quickLinks: Array<{ href: string; label: string; hint: string; icon: typeof Bell }> = [
     { href: '/admin/notices', label: '通知管理', hint: '审核与发布通知', icon: Bell },
@@ -196,17 +215,22 @@ export default function AdminDashboardPage() {
   return (
     <AdminShell title="数据概览">
       <div className="space-y-6">
-        <section className="flex flex-col gap-4 rounded-[22px] border border-blue-100 bg-blue-50/80 px-5 py-4 text-sm text-blue-700 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <section
+          className={adminClassNames(
+            'flex flex-col gap-4 rounded-[22px] border px-5 py-4 text-sm shadow-sm lg:flex-row lg:items-center lg:justify-between',
+            dataHealthy ? 'border-blue-100 bg-blue-50/80 text-blue-700' : 'border-rose-100 bg-rose-50/80 text-rose-700'
+          )}
+        >
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <span className="inline-flex items-center gap-2 font-semibold">
               <ShieldCheck className="h-4 w-4" />
-              数据状态：正常
+              数据状态：{dataHealthy ? '正常' : '异常'}
             </span>
             <span className="inline-flex items-center gap-2">
               <Database className="h-4 w-4" />
               数据源：Supabase
             </span>
-            <span>最后刷新：{new Date().toLocaleString('zh-CN')}</span>
+            <span>最后刷新：{lastLoadedAt ? formatBeijingDateTime(lastLoadedAt) : '等待同步'}</span>
             <span>{message}</span>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -258,20 +282,27 @@ export default function AdminDashboardPage() {
             </div>
           </AdminPanel>
 
-          <AdminPanel title="系统健康状态" action={<span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">整体健康</span>}>
+          <AdminPanel
+            title="系统健康状态"
+            action={
+              <span className={adminClassNames('rounded-full px-3 py-1 text-xs font-semibold', dataHealthy ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700')}>
+                {dataHealthy ? '整体健康' : '需要排查'}
+              </span>
+            }
+          >
             <div className="space-y-3 p-5 text-sm">
               {[
-                ['Supabase 连接', '正常'],
-                ['数据同步', '最近同步中'],
-                ['权限策略', '角色权限配置正常'],
-                ['异常告警', overviewMetrics.bannedUsers > 0 ? `${overviewMetrics.bannedUsers} 个账号已封禁` : '无告警']
+                ['Supabase 连接', dataHealthy ? '正常' : '异常'],
+                ['数据规模', `通知 ${formatNumber(overviewMetrics.totalNotices)} 条 / 访客 ${formatNumber(analytics.metrics.totalVisitors)} 人`],
+                ['待处理队列', `通知 ${formatNumber(overviewMetrics.pendingNotices)} / Offer ${formatNumber(overviewMetrics.pendingOffers)} / 反馈 ${formatNumber(overviewMetrics.pendingFeedback)}`],
+                ['异常告警', overviewMetrics.bannedUsers + overviewMetrics.restrictedUsers > 0 ? `封禁 ${formatNumber(overviewMetrics.bannedUsers)} / 限制 ${formatNumber(overviewMetrics.restrictedUsers)}` : '无告警']
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                   <span className="flex items-center gap-2 text-slate-600">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <CheckCircle2 className={adminClassNames('h-4 w-4', dataHealthy ? 'text-emerald-600' : 'text-rose-600')} />
                     {label}
                   </span>
-                  <span className="font-semibold text-emerald-700">{value}</span>
+                  <span className={adminClassNames('font-semibold', dataHealthy ? 'text-emerald-700' : 'text-rose-700')}>{value}</span>
                 </div>
               ))}
               <Link href="/admin/settings" className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600">
@@ -467,6 +498,18 @@ type AdminAnalyticsPayload = {
   metrics: AdminAnalyticsMetrics;
   onlineVisitors: AdminVisitorRow[];
   recentVisitors: AdminVisitorRow[];
+};
+
+type AiWaitlistMetricsPayload = {
+  totalLeads: number;
+  todayLeads: number;
+  riskLeads: number;
+  materialLeads: number;
+  briefLeads: number;
+};
+
+type AiWaitlistResponse = {
+  metrics: AiWaitlistMetricsPayload;
 };
 
 function buildLiveMetrics(metrics: AdminOverviewMetrics, analytics: AdminAnalyticsMetrics): AdminMetric[] {

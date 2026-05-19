@@ -825,7 +825,7 @@ function SettingsView({
 
 function OperationsMaturityChecklist() {
   const checks = [
-    ['真实 API', '用户、反馈、日志均通过 Supabase Edge Function 读取，不再依赖静态 mock。', '已接入'],
+    ['真实 API', '用户、反馈、日志均通过 Supabase Edge Function 读取，不再依赖历史静态展示。', '已接入'],
     ['权限留痕', '封禁、限制、处理反馈、修改设置等关键操作会写入操作日志。', '已启用'],
     ['审核闭环', '反馈举报拥有待处理、处理中、已解决、已关闭的完整状态链路。', '已完善'],
     ['发布保护', '内容审核、Offer 提交、举报提醒与日志保留都集中在系统设置中管理。', '可配置']
@@ -851,6 +851,24 @@ function OperationsMaturityChecklist() {
 }
 
 function SettingsCard({ onUpdateSetting }: { onUpdateSetting?: (key: string, value: unknown) => void }) {
+  if (!onUpdateSetting) {
+    return (
+      <AdminPanel title="审计规则 / 基础配置">
+        <div className="space-y-4 p-5 text-sm">
+          <p className="leading-6 text-slate-500">
+            后台开关、日志保留天数和审核策略统一由系统设置页读取真实配置。当前侧栏只保留入口，不再展示静态开关。
+          </p>
+          <Link
+            href="/admin/settings"
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700"
+          >
+            进入系统设置
+          </Link>
+        </div>
+      </AdminPanel>
+    );
+  }
+
   const settings = [
     ['content_review_enabled', '开启内容审核', '开启后，用户发布内容需审核', true],
     ['offer_submit_enabled', '允许用户提交Offer', '开启后，用户可提交Offer', true],

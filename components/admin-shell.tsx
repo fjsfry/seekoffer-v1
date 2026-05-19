@@ -23,6 +23,8 @@ import {
   UsersRound
 } from 'lucide-react';
 import { refreshAdminSession, signOutAdmin, watchAdminSession, type AdminSession } from '@/lib/admin-session';
+import { invokeAdminApi } from '@/lib/admin-api';
+import packageJson from '../package.json';
 import { adminClassNames } from './admin-ui';
 
 const adminNavItems = [
@@ -43,6 +45,49 @@ const quickActions = [
   { href: '/admin/ai-leads', label: '查看 AI 内测', icon: BrainCircuit },
   { href: '/admin/logs', label: '查看/导出日志', icon: Download }
 ];
+
+type ShellOverviewMetrics = {
+  pendingNotices: number;
+  pendingOffers: number;
+  pendingFeedback: number;
+};
+
+type ShellAnalyticsPayload = {
+  metrics: {
+    onlineVisitors: number;
+    totalVisitors: number;
+    todayPageViews: number;
+    activeWindowMinutes: number;
+  };
+};
+
+type ShellStatus = {
+  loading: boolean;
+  error: string;
+  apiLatencyMs: number | null;
+  pendingNotices: number;
+  pendingOffers: number;
+  pendingFeedback: number;
+  onlineVisitors: number;
+  totalVisitors: number;
+  todayPageViews: number;
+  lastCheckedAt: string;
+};
+
+const emptyShellStatus: ShellStatus = {
+  loading: true,
+  error: '',
+  apiLatencyMs: null,
+  pendingNotices: 0,
+  pendingOffers: 0,
+  pendingFeedback: 0,
+  onlineVisitors: 0,
+  totalVisitors: 0,
+  todayPageViews: 0,
+  lastCheckedAt: ''
+};
+
+const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || packageJson.version;
 
 function getRoleName(role: string) {
   const map: Record<string, string> = {
@@ -96,6 +141,7 @@ export function AdminShell({
   const [sessionReady, setSessionReady] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
+  const [shellStatus, setShellStatus] = useState<ShellStatus>(emptyShellStatus);
   const normalizedPathname = pathname.replace(/\/$/, '') || '/';
 
   useEffect(() => {
@@ -129,6 +175,66 @@ export function AdminShell({
     router.replace(`/admin/login${next}`);
   }, [pathname, router, session, sessionReady]);
 
+  useEffect(() => {
+    if (!session) {
+      setShellStatus(emptyShellStatus);
+      return;
+    }
+
+    let disposed = false;
+
+    const loadShellStatus = async () => {
+      const startedAt = performance.now();
+      setShellStatus((current) => ({ ...current, loading: true, error: '' }));
+
+      try {
+        const [overview, analytics] = await Promise.all([
+          invokeAdminApi<{ metrics: ShellOverviewMetrics }>({ resource: 'overview', action: 'get' }),
+          invokeAdminApi<ShellAnalyticsPayload>({ resource: 'analytics', action: 'overview' })
+        ]);
+
+        if (disposed) {
+          return;
+        }
+
+        setShellStatus({
+          loading: false,
+          error: '',
+          apiLatencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
+          pendingNotices: overview.metrics.pendingNotices || 0,
+          pendingOffers: overview.metrics.pendingOffers || 0,
+          pendingFeedback: overview.metrics.pendingFeedback || 0,
+          onlineVisitors: analytics.metrics.onlineVisitors || 0,
+          totalVisitors: analytics.metrics.totalVisitors || 0,
+          todayPageViews: analytics.metrics.todayPageViews || 0,
+          lastCheckedAt: new Date().toISOString()
+        });
+      } catch (error) {
+        if (disposed) {
+          return;
+        }
+
+        setShellStatus((current) => ({
+          ...current,
+          loading: false,
+          error: error instanceof Error ? error.message : '后台状态接口暂不可用',
+          apiLatencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
+          lastCheckedAt: new Date().toISOString()
+        }));
+      }
+    };
+
+    void loadShellStatus();
+    const interval = window.setInterval(() => {
+      void loadShellStatus();
+    }, 60_000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, [session]);
+
   if (!sessionReady) {
     return (
       <AdminAuthGate
@@ -146,6 +252,17 @@ export function AdminShell({
       />
     );
   }
+
+  const pendingCount = shellStatus.pendingNotices + shellStatus.pendingOffers + shellStatus.pendingFeedback;
+  const reminderHref =
+    shellStatus.pendingNotices > 0
+      ? '/admin/notices'
+      : shellStatus.pendingOffers > 0
+        ? '/admin/offers'
+        : shellStatus.pendingFeedback > 0
+          ? '/admin/feedback'
+          : '/admin/logs';
+  const systemHealthy = !shellStatus.error;
 
   return (
     <div className="min-h-screen bg-[#f6f8fb] text-slate-900">
@@ -186,17 +303,18 @@ export function AdminShell({
         </nav>
 
         <div className="absolute bottom-5 left-5 right-5">
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
+          <div className={adminClassNames('rounded-2xl border p-4', systemHealthy ? 'border-emerald-100 bg-emerald-50/80' : 'border-rose-100 bg-rose-50/80')}>
+            <div className={adminClassNames('flex items-center gap-2 text-sm font-semibold', systemHealthy ? 'text-emerald-700' : 'text-rose-700')}>
               <ShieldCheck className="h-4 w-4" />
-              系统运行正常
+              {shellStatus.loading ? '正在同步后台状态' : systemHealthy ? '系统运行正常' : '后台状态异常'}
             </div>
             <dl className="mt-3 space-y-2 text-xs">
-              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">API 响应</dt><dd className="font-semibold text-emerald-700">128ms</dd></div>
-              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">数据库</dt><dd className="font-semibold text-emerald-700">正常</dd></div>
-              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">存储服务</dt><dd className="font-semibold text-emerald-700">正常</dd></div>
-              <div className="flex items-center justify-between gap-3 border-t border-emerald-100 pt-2"><dt className="text-slate-500">当前版本</dt><dd className="font-semibold text-slate-700">v2.4.1</dd></div>
+              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">API 响应</dt><dd className={adminClassNames('font-semibold', systemHealthy ? 'text-emerald-700' : 'text-rose-700')}>{shellStatus.apiLatencyMs ? `${shellStatus.apiLatencyMs}ms` : '待检测'}</dd></div>
+              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">实时在线</dt><dd className="font-semibold text-slate-700">{shellStatus.onlineVisitors}</dd></div>
+              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">待处理</dt><dd className="font-semibold text-slate-700">{pendingCount}</dd></div>
+              <div className={adminClassNames('flex items-center justify-between gap-3 border-t pt-2', systemHealthy ? 'border-emerald-100' : 'border-rose-100')}><dt className="text-slate-500">当前版本</dt><dd className="font-semibold text-slate-700">v{appVersion}</dd></div>
             </dl>
+            {shellStatus.error ? <p className="mt-3 line-clamp-2 text-xs text-rose-600">{shellStatus.error}</p> : null}
             <Link href="/admin/settings" className="mt-3 inline-flex text-xs font-semibold text-blue-700">
               查看系统详情 →
             </Link>
@@ -262,12 +380,16 @@ export function AdminShell({
             <div className="h-8 w-px bg-slate-200" />
 
             <Link
-              href="/admin/dashboard"
+              href={reminderHref}
               className="relative hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 md:flex"
-              aria-label="后台提醒"
+              aria-label={`后台提醒，当前 ${pendingCount} 条待处理`}
             >
               <Bell className="h-5 w-5" />
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white">12</span>
+              {pendingCount > 0 ? (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white">
+                  {pendingCount > 99 ? '99+' : pendingCount}
+                </span>
+              ) : null}
             </Link>
 
             <Link
