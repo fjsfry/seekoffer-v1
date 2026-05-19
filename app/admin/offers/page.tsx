@@ -38,6 +38,7 @@ export default function AdminOffersPage() {
   const [message, setMessage] = useState('正在连接后台真实 Offer 数据...');
   const [pending, setPending] = useState('');
   const [selectedOffer, setSelectedOffer] = useState<AdminOfferRow | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -75,6 +76,7 @@ export default function AdminOffersPage() {
       setPageSize(data.pageSize);
       setMetrics(data.metrics);
       setFilters(nextFilters);
+      setSelectedIds([]);
       setMessage(`已连接 Supabase，共匹配 ${data.total} 条 Offer。`);
       setSelectedOffer((current) => {
         if (!current) return null;
@@ -111,10 +113,53 @@ export default function AdminOffersPage() {
     }
   }
 
+  async function updateSelectedOffers(status: string, note: string) {
+    if (!selectedIds.length) {
+      setMessage('请先选择需要处理的 Offer。');
+      return;
+    }
+
+    if ((status === 'deleted' || status === 'hidden') && !window.confirm(`确认处理 ${selectedIds.length} 条 Offer 吗？该操作会写入后台日志。`)) {
+      return;
+    }
+
+    setPending(`bulk:${status}`);
+    try {
+      await Promise.all(
+        selectedIds.map((id) =>
+          invokeAdminApi({
+            resource: 'offers',
+            action: 'update_status',
+            id,
+            status,
+            note
+          })
+        )
+      );
+      setMessage(`批量操作成功：已处理 ${selectedIds.length} 条 Offer。`);
+      await loadOffers();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Offer 批量操作失败，请稍后重试。');
+    } finally {
+      setPending('');
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  }
+
+  function toggleAll() {
+    const visibleIds = rows.map((item) => item.id);
+    setSelectedIds((current) => (visibleIds.every((id) => current.includes(id)) ? [] : visibleIds));
+  }
+
   function previewOffer(offer: AdminOfferRow) {
     setSelectedOffer(offer);
     setMessage(`已打开 ${offer.school} · ${offer.major} 的 Offer 审核预览。`);
   }
+
+  const allVisibleSelected = rows.length > 0 && rows.every((item) => selectedIds.includes(item.id));
 
   return (
     <AdminShell title="Offer池管理" description="审核用户贡献的 Offer 动态，优先排查隐私、引流和明显虚假内容。">
@@ -161,12 +206,27 @@ export default function AdminOffersPage() {
             ))}
           </section>
 
-          <AdminPanel title="Offer列表">
+          <AdminPanel
+            title="Offer列表"
+            action={
+              <div className="flex flex-wrap gap-2">
+                <AdminButton tone="secondary" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateSelectedOffers('approved', '批量审核通过 Offer')}>
+                  批量通过
+                </AdminButton>
+                <AdminButton tone="secondary" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateSelectedOffers('hidden', '批量隐藏 Offer')}>
+                  批量隐藏
+                </AdminButton>
+                <AdminButton tone="danger" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateSelectedOffers('deleted', '批量删除 Offer')}>
+                  批量删除
+                </AdminButton>
+              </div>
+            }
+          >
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1120px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs font-semibold text-slate-500">
                   <tr>
-                    <th className="px-5 py-3"><input type="checkbox" aria-label="选择全部 Offer" /></th>
+                    <th className="px-5 py-3"><input type="checkbox" aria-label="选择全部 Offer" checked={allVisibleSelected} onChange={toggleAll} /></th>
                     <th className="px-5 py-3">提交用户</th>
                     <th className="px-5 py-3">申请学校</th>
                     <th className="px-5 py-3">申请专业</th>
@@ -182,7 +242,14 @@ export default function AdminOffersPage() {
                 <tbody>
                   {rows.map((offer, index) => (
                     <tr key={`${offer.id}-${index}`} className="border-t border-slate-100">
-                      <td className="px-5 py-4"><input type="checkbox" aria-label={`选择 ${offer.user}`} /></td>
+                      <td className="px-5 py-4">
+                        <input
+                          type="checkbox"
+                          aria-label={`选择 ${offer.user}`}
+                          checked={selectedIds.includes(offer.id)}
+                          onChange={() => toggleSelected(offer.id)}
+                        />
+                      </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">

@@ -71,15 +71,15 @@ export function AdminPanel({
 
 export function AdminMetricCard({ metric, icon: Icon }: { metric: AdminMetric; icon: LucideIcon }) {
   return (
-    <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-[0_14px_42px_rgba(15,23,42,0.04)]">
+    <div className="group rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-[0_14px_42px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-blue-100 hover:shadow-[0_18px_50px_rgba(37,99,235,0.08)]">
       <div className="flex items-center gap-4">
-        <div className={adminClassNames('flex h-14 w-14 items-center justify-center rounded-2xl ring-1', metricToneMap[metric.tone])}>
+        <div className={adminClassNames('flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ring-1 transition group-hover:scale-105', metricToneMap[metric.tone])}>
           <Icon className="h-6 w-6" />
         </div>
-        <div>
+        <div className="min-w-0">
           <div className="text-sm font-medium text-slate-500">{metric.label}</div>
           <div className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">{metric.value}</div>
-          <div className="mt-1 text-xs leading-5 text-slate-500">{metric.hint}</div>
+          <div className="mt-1 truncate text-xs leading-5 text-slate-500" title={metric.hint}>{metric.hint}</div>
         </div>
       </div>
     </div>

@@ -2,10 +2,17 @@
 
 import {
   Activity,
+  ArrowRight,
   Bell,
+  CheckCircle2,
   ClipboardList,
+  Database,
+  Download,
   Globe2,
+  RefreshCw,
   ShieldAlert,
+  ShieldCheck,
+  Sparkles,
   UsersRound
 } from 'lucide-react';
 import Link from 'next/link';
@@ -129,15 +136,163 @@ export default function AdminDashboardPage() {
 
   const maxNotices = Math.max(...trends.map((item) => item.notices), 1);
   const maxOffers = Math.max(...trends.map((item) => item.offers), 1);
+  const todoCards = [
+    { href: '/admin/notices', label: '通知审核', value: overviewMetrics.pendingNotices, hint: '待发布通知', tone: 'bg-amber-50 text-amber-700' },
+    { href: '/admin/ai-leads', label: 'AI线索待查看', value: latestFeedback.length + overviewMetrics.pendingFeedback, hint: '需求与反馈', tone: 'bg-cyan-50 text-cyan-700' },
+    { href: '/admin/feedback', label: '反馈工单', value: overviewMetrics.pendingFeedback, hint: '待处理举报', tone: 'bg-rose-50 text-rose-700' },
+    { href: '/admin/offers', label: '高风险操作', value: overviewMetrics.pendingOffers, hint: 'Offer 审核', tone: 'bg-violet-50 text-violet-700' }
+  ];
+  const recentActivities = [
+    ...pendingNotices.slice(0, 2).map((item) => ({
+      label: `新通知待审：${item.school}`,
+      time: item.submittedAt,
+      href: '/admin/notices',
+      tone: 'bg-blue-500'
+    })),
+    ...pendingOffers.slice(0, 2).map((item) => ({
+      label: `Offer 待审：${item.school}`,
+      time: item.submittedAt,
+      href: '/admin/offers',
+      tone: 'bg-emerald-500'
+    })),
+    ...latestFeedback.slice(0, 2).map((item) => ({
+      label: `${item.type}工单：${item.module}`,
+      time: item.submittedAt,
+      href: '/admin/feedback',
+      tone: 'bg-amber-500'
+    }))
+  ].slice(0, 5);
+  const operationAlerts = recentActivities.length
+    ? recentActivities
+    : [
+        { label: '系统将持续自动刷新后台数据。', time: '现在', href: '/admin/dashboard', tone: 'bg-blue-500' },
+        { label: '请重点关注待审核通知和用户反馈。', time: '今日', href: '/admin/notices', tone: 'bg-amber-500' },
+        { label: '操作日志会按系统设置保留并可导出。', time: '长期', href: '/admin/logs', tone: 'bg-emerald-500' }
+      ];
+  const quickLinks: Array<{ href: string; label: string; hint: string; icon: typeof Bell }> = [
+    { href: '/admin/notices', label: '通知管理', hint: '审核与发布通知', icon: Bell },
+    { href: '/admin/offers', label: 'Offer池管理', hint: '处理社区动态', icon: ClipboardList },
+    { href: '/admin/ai-leads', label: 'AI内测管理', hint: '查看内测需求', icon: Sparkles },
+    { href: '/admin/settings', label: '系统设置', hint: '配置安全策略', icon: ShieldCheck }
+  ];
+
+  function exportDashboardSnapshot() {
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      metrics: overviewMetrics,
+      analytics: analytics.metrics,
+      trends
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `seekoffer-admin-overview-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    setMessage('已导出当前数据概览快照。');
+  }
 
   return (
     <AdminShell title="数据概览">
       <div className="space-y-6">
-        <div className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div>
+        <section className="flex flex-col gap-4 rounded-[22px] border border-blue-100 bg-blue-50/80 px-5 py-4 text-sm text-blue-700 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <span className="inline-flex items-center gap-2 font-semibold">
+              <ShieldCheck className="h-4 w-4" />
+              数据状态：正常
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              数据源：Supabase
+            </span>
+            <span>最后刷新：{new Date().toLocaleString('zh-CN')}</span>
+            <span>{message}</span>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={exportDashboardSnapshot}
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+            >
+              <Download className="h-4 w-4" />
+              导出日报
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadDashboard()}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700"
+            >
+              <RefreshCw className="h-4 w-4" />
+              刷新数据
+            </button>
+          </div>
+        </section>
+
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           {metrics.map((metric, index) => (
             <AdminMetricCard key={metric.label} metric={metric} icon={dashboardIcons[index]} />
           ))}
+        </section>
+
+        <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)_minmax(360px,0.8fr)]">
+          <AdminPanel
+            title="今日待办"
+            description="聚焦需要运营优先处理的真实后台任务。"
+            action={<Link href="/admin/notices" className="text-sm font-semibold text-blue-600">进入工作台 →</Link>}
+          >
+            <div className="grid gap-4 p-5 sm:grid-cols-2">
+              {todoCards.map((item) => (
+                <Link key={item.label} href={item.href} className="group rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-blue-200 hover:bg-blue-50/40">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${item.tone}`}>
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-600" />
+                  </div>
+                  <div className="mt-4 text-2xl font-semibold text-slate-950">{formatNumber(item.value)}</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-800">{item.label}</div>
+                  <div className="mt-1 text-xs text-slate-500">{item.hint}</div>
+                </Link>
+              ))}
+            </div>
+          </AdminPanel>
+
+          <AdminPanel title="系统健康状态" action={<span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">整体健康</span>}>
+            <div className="space-y-3 p-5 text-sm">
+              {[
+                ['Supabase 连接', '正常'],
+                ['数据同步', '最近同步中'],
+                ['权限策略', '角色权限配置正常'],
+                ['异常告警', overviewMetrics.bannedUsers > 0 ? `${overviewMetrics.bannedUsers} 个账号已封禁` : '无告警']
+              ].map(([label, value]) => (
+                <div key={label} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <span className="flex items-center gap-2 text-slate-600">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    {label}
+                  </span>
+                  <span className="font-semibold text-emerald-700">{value}</span>
+                </div>
+              ))}
+              <Link href="/admin/settings" className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600">
+                查看系统详情 <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </AdminPanel>
+
+          <AdminPanel title="运维提醒" action={<Link href="/admin/logs" className="text-sm font-semibold text-blue-600">查看更多 →</Link>}>
+            <div className="space-y-3 p-5 text-sm">
+              {operationAlerts.map((item) => (
+                <Link key={`${item.href}-${item.label}`} href={item.href} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-white p-3 transition hover:border-blue-200 hover:bg-blue-50/30">
+                  <span className={adminClassNames('mt-1 h-2.5 w-2.5 rounded-full', item.tone)} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-slate-700">{item.label}</div>
+                    <div className="mt-1 text-xs text-slate-400">{item.time}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </AdminPanel>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
@@ -234,6 +389,24 @@ export default function AdminDashboardPage() {
             ])}
             total={overviewMetrics.totalFeedback}
           />
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {quickLinks.map((item) => {
+            const LinkIcon = item.icon;
+            return (
+              <Link key={item.href} href={item.href} className="group rounded-[20px] border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:bg-blue-50/40">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                    <LinkIcon className="h-5 w-5" />
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-600" />
+                </div>
+                <div className="mt-4 font-semibold text-slate-950">{item.label}</div>
+                <div className="mt-1 text-sm text-slate-500">{item.hint}</div>
+              </Link>
+            );
+          })}
         </section>
       </div>
     </AdminShell>

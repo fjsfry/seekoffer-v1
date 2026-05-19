@@ -339,6 +339,7 @@ function UsersView({
   const icons = [UsersRound, UserPlus, CheckCircle2, Ban];
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [draftFilters, setDraftFilters] = useState<UserFilters>(filters);
+  const [noteDraft, setNoteDraft] = useState('');
   const selectedUser = users.find((user) => user.id === selectedUserId) || users[0] || null;
 
   function previewUser(user: AdminUserRow) {
@@ -346,10 +347,20 @@ function UsersView({
     onNotify(`已打开 ${user.nickname} 的用户详情预览。`);
   }
 
+  function startUserNote(user: AdminUserRow) {
+    setSelectedUserId(user.id);
+    setNoteDraft('');
+    onNotify(`请在右侧为 ${user.nickname} 填写后台备注，保存后会写入操作日志。`);
+  }
+
   function saveUserNote(user: AdminUserRow) {
-    const note = window.prompt(`给 ${user.nickname} 添加后台备注`, '');
-    if (!note?.trim()) return;
-    onUpdateUserStatus(user.id, userStatusToApi(user.status), note.trim());
+    const note = noteDraft.trim();
+    if (!note) {
+      onNotify('请先填写后台备注内容。');
+      return;
+    }
+    onUpdateUserStatus(user.id, userStatusToApi(user.status), note);
+    setNoteDraft('');
   }
 
   return (
@@ -434,7 +445,7 @@ function UsersView({
                           <button className="text-blue-600" onClick={() => previewUser(user)}>详情</button>
                           <button className="text-blue-600" onClick={() => onUpdateUserStatus(user.id, 'restricted', '后台限制用户提交')}>限制</button>
                           <button className="text-blue-600" onClick={() => onUpdateUserStatus(user.id, 'banned', '后台封禁用户')}>封禁</button>
-                          <button className="text-blue-600" onClick={() => saveUserNote(user)}>备注</button>
+                          <button className="text-blue-600" onClick={() => startUserNote(user)}>备注</button>
                         </div>
                       </td>
                     </tr>
@@ -484,7 +495,12 @@ function UsersView({
                   ['申请记录数', String(selectedUser.applicationCount)]
                 ]}
               />
-              <textarea className="mt-5 h-24 w-full rounded-lg border border-slate-200 p-3 text-sm outline-none" placeholder="后台备注" />
+              <textarea
+                value={noteDraft}
+                onChange={(event) => setNoteDraft(event.target.value)}
+                className="mt-5 h-24 w-full rounded-lg border border-slate-200 p-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                placeholder="后台备注会写入操作日志，例如：已电话核验、限制原因、用户申诉记录等。"
+              />
               <button className="mt-3 text-sm font-semibold text-blue-600" onClick={() => saveUserNote(selectedUser)}>编辑备注</button>
             </>
           ) : (
@@ -783,7 +799,7 @@ function SettingsView({
   onNotify: (message: string) => void;
 }) {
   function roleMessage(role: string) {
-    onNotify(`${role} 的细粒度权限编辑暂未开放。当前版本只允许超级管理员在 Supabase 后台维护管理员名单。`);
+    onNotify(`${role} 权限说明已同步到当前矩阵。管理员名单和角色变更统一由超级管理员在 Supabase admin_users 表维护，后台入口只做展示和审计。`);
   }
 
   return (
@@ -794,10 +810,10 @@ function SettingsView({
           <SimpleTable
             columns={['角色', '权限范围', '高危权限', '成员数', '操作']}
             rows={[
-              ['超级管理员', '全部权限', '删除 / 封禁 / 导出 / 配置', '1', <button key="edit-super" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('超级管理员')}>查看说明</button>],
-              ['内容审核员', '通知与 Offer 审核', '下架内容', '3', <button key="edit-review" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('内容审核员')}>查看说明</button>],
-              ['运营管理员', '用户、反馈、内容处理', '限制用户', '2', <button key="edit-ops" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('运营管理员')}>查看说明</button>],
-              ['只读管理员', '只读数据', '无', '1', <button key="edit-read" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('只读管理员')}>查看说明</button>]
+              ['超级管理员', '全部权限', '删除 / 封禁 / 导出 / 配置', '1', <button key="edit-super" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('超级管理员')}>权限说明</button>],
+              ['内容审核员', '通知与 Offer 审核', '下架内容', '3', <button key="edit-review" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('内容审核员')}>权限说明</button>],
+              ['运营管理员', '用户、反馈、内容处理', '限制用户', '2', <button key="edit-ops" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('运营管理员')}>权限说明</button>],
+              ['只读管理员', '只读数据', '无', '1', <button key="edit-read" className="text-slate-500 hover:text-blue-600" onClick={() => roleMessage('只读管理员')}>权限说明</button>]
             ]}
           />
         </AdminPanel>
@@ -852,6 +868,7 @@ function SettingsCard({ onUpdateSetting }: { onUpdateSetting?: (key: string, val
               <div className="mt-1 text-sm text-slate-500">{description}</div>
             </div>
             <button
+              type="button"
               className="h-7 w-12 rounded-full bg-blue-600 p-1"
               onClick={() => onUpdateSetting?.(key, typeof value === 'boolean' ? !value : value)}
             >

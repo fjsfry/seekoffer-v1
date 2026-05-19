@@ -251,32 +251,33 @@ export default function AdminNoticesPage() {
           ))}
         </section>
 
-        <AdminPanel
-          title="通知列表"
-          action={
-            <AdminButton tone="secondary" onClick={() => void loadNotices()} disabled={pending === 'load'}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              刷新列表
-            </AdminButton>
-          }
-        >
-          <div className="flex flex-wrap gap-3 px-5 py-4">
-            <AdminButton tone="secondary" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'published', '批量通过通知')}>
-              批量通过
-            </AdminButton>
-            <AdminButton tone="danger" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'rejected', '批量驳回通知')}>
-              批量驳回
-            </AdminButton>
-            <AdminButton tone="secondary" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'hidden', '批量下架通知')}>
-              批量下架
-            </AdminButton>
-            <AdminButton tone="danger" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'deleted', '批量删除通知')}>
-              批量删除
-            </AdminButton>
-          </div>
+        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_380px]">
+          <AdminPanel
+            title="通知列表"
+            action={
+              <AdminButton tone="secondary" onClick={() => void loadNotices()} disabled={pending === 'load'}>
+                <RotateCcw className="mr-2 h-4 w-4" />
+                刷新列表
+              </AdminButton>
+            }
+          >
+            <div className="flex flex-wrap gap-3 px-5 py-4">
+              <AdminButton tone="secondary" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'published', '批量通过通知')}>
+                批量通过
+              </AdminButton>
+              <AdminButton tone="danger" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'rejected', '批量驳回通知')}>
+                批量驳回
+              </AdminButton>
+              <AdminButton tone="secondary" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'hidden', '批量下架通知')}>
+                批量下架
+              </AdminButton>
+              <AdminButton tone="danger" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'deleted', '批量删除通知')}>
+                批量删除
+              </AdminButton>
+            </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1240px] text-left text-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1240px] text-left text-sm">
               <thead className="bg-slate-50 text-xs font-semibold text-slate-500">
                 <tr>
                   <th className="px-5 py-3">
@@ -333,105 +334,118 @@ export default function AdminNoticesPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-
-          {!rows.length ? (
-            <div className="border-t border-slate-100 px-5 py-12 text-center text-sm text-slate-500">
-              当前筛选条件下没有通知。可以重置筛选，或新建一条待审核通知。
+              </table>
             </div>
-          ) : null}
 
-          <AdminPagination
-            total={total}
-            page={page}
-            pageSize={pageSize}
-            onPageChange={(nextPage) => void loadNotices({ page: nextPage })}
-            onPageSizeChange={(nextPageSize) => void loadNotices({ page: 1, pageSize: nextPageSize })}
-          />
-        </AdminPanel>
+            {!rows.length ? (
+              <div className="border-t border-slate-100 px-5 py-12 text-center text-sm text-slate-500">
+                当前筛选条件下没有通知。可以重置筛选，或新建一条待审核通知。
+              </div>
+            ) : null}
 
-        {selectedNotice ? (
+            <AdminPagination
+              total={total}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={(nextPage) => void loadNotices({ page: nextPage })}
+              onPageSizeChange={(nextPageSize) => void loadNotices({ page: 1, pageSize: nextPageSize })}
+            />
+          </AdminPanel>
+
           <AdminPanel
-            title="通知审核工作台"
+            title="通知详情"
+            className="2xl:sticky 2xl:top-24 2xl:self-start"
             action={
-              <button className="text-sm font-semibold text-slate-500 hover:text-slate-900" onClick={() => setSelectedNotice(null)}>
-                关闭
-              </button>
+              selectedNotice ? (
+                <button className="text-sm font-semibold text-slate-500 hover:text-slate-900" onClick={() => setSelectedNotice(null)}>
+                  关闭
+                </button>
+              ) : null
             }
           >
-            <div className="grid gap-6 p-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-              <div className="space-y-4">
-                <div>
+            {selectedNotice ? (
+              <div className="space-y-5 p-5">
+                <div className="rounded-2xl bg-slate-50 p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <AdminStatusBadge status={selectedNotice.status} />
-                    <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{selectedNotice.type}</span>
+                    <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{selectedNotice.type}</span>
                     {selectedNotice.verified ? <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">已核验</span> : null}
                   </div>
-                  <h3 className="mt-3 text-xl font-semibold leading-8 text-slate-950">{selectedNotice.title}</h3>
+                  <h3 className="mt-4 text-lg font-semibold leading-7 text-slate-950">{selectedNotice.title}</h3>
                   <p className="mt-2 text-sm text-slate-500">{selectedNotice.school} · {selectedNotice.department}</p>
                 </div>
-                <div className="grid gap-3 rounded-xl bg-slate-50 p-4 text-sm text-slate-600 sm:grid-cols-2">
-                  <span>发布时间：{selectedNotice.publishedAt}</span>
-                  <span>截止时间：{selectedNotice.deadline}</span>
-                  <span>最后核验：{selectedNotice.checkedAt}</span>
-                  <span>提交来源：{selectedNotice.submitter}</span>
-                </div>
+
+                <dl className="space-y-3 text-sm">
+                  <DetailRow label="提交来源" value={selectedNotice.submitter} />
+                  <DetailRow label="发布时间" value={selectedNotice.publishedAt || '-'} />
+                  <DetailRow label="截止时间" value={selectedNotice.deadline} />
+                  <DetailRow label="最后核验" value={selectedNotice.checkedAt || '-'} />
+                </dl>
+
                 <div className="rounded-xl border border-slate-200 p-4">
-                  <div className="text-sm font-semibold text-slate-900">通知正文 / 材料要求</div>
-                  <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-600">{selectedNotice.requirements || '暂无正文，建议打开官方原文核验后补充。'}</p>
+                  <div className="text-sm font-semibold text-slate-900">AI 解析信息</div>
+                  <p className="mt-3 line-clamp-5 whitespace-pre-wrap text-sm leading-7 text-slate-600">
+                    {selectedNotice.requirements || '暂无正文，建议打开官方原文核验后补充。'}
+                  </p>
                 </div>
-                <div className="flex flex-wrap gap-3">
+
+                <div className="grid gap-3">
                   <a
                     href={selectedNotice.sourceUrl || `/notices/${selectedNotice.id}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                   >
-                    官方原文
+                    打开官方原文
                     <ExternalLink className="h-4 w-4" />
                   </a>
                   <a
                     href={`/notices/${selectedNotice.id}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                   >
-                    前台详情页
+                    查看前台详情页
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 </div>
-              </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="text-sm font-semibold text-slate-950">审核备注</div>
-                <textarea
-                  value={reviewNote}
-                  onChange={(event) => setReviewNote(event.target.value)}
-                  className="mt-3 min-h-[150px] w-full rounded-lg border border-slate-200 p-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
-                  placeholder="记录核验结果、下架原因、驳回原因等，操作会写入日志。"
-                />
-                <div className="mt-4 grid gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-950">审核备注</div>
+                  <textarea
+                    value={reviewNote}
+                    onChange={(event) => setReviewNote(event.target.value)}
+                    className="mt-3 min-h-[140px] w-full rounded-lg border border-slate-200 p-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                    placeholder="记录核验结果、下架原因、驳回原因等，操作会写入日志。"
+                  />
+                </div>
+
+                <div className="grid gap-3">
                   <AdminButton disabled={Boolean(pending)} onClick={() => reviewSelected('published', '审核通过并发布')}>
                     通过并同步前台
                   </AdminButton>
-                  <AdminButton tone="danger" disabled={Boolean(pending)} onClick={() => reviewSelected('rejected', '内容不符合规范，驳回')}>
-                    驳回
-                  </AdminButton>
-                  <AdminButton tone="secondary" disabled={Boolean(pending)} onClick={() => reviewSelected('hidden', '暂时下架，前台不展示')}>
-                    下架
-                  </AdminButton>
+                  <div className="grid grid-cols-2 gap-3">
+                    <AdminButton tone="danger" disabled={Boolean(pending)} onClick={() => reviewSelected('rejected', '内容不符合规范，驳回')}>
+                      驳回
+                    </AdminButton>
+                    <AdminButton tone="secondary" disabled={Boolean(pending)} onClick={() => reviewSelected('hidden', '暂时下架，前台不展示')}>
+                      下架
+                    </AdminButton>
+                  </div>
                   <AdminButton tone="danger" disabled={Boolean(pending)} onClick={() => reviewSelected('deleted', '逻辑删除，前台不展示')}>
                     删除
                   </AdminButton>
                 </div>
-                <div className="mt-4 rounded-lg bg-blue-50 p-3 text-xs leading-6 text-blue-700">
-                  发布会设置为公开可见；驳回、下架、删除会从前台首页和通知库隐藏。所有动作会记录管理员、时间和备注。
+              </div>
+            ) : (
+              <div className="p-5">
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm leading-7 text-slate-500">
+                  从左侧通知列表点击“查看”，这里会展示审核详情、来源入口、审核备注和发布操作。
                 </div>
               </div>
-            </div>
+            )}
           </AdminPanel>
-        ) : null}
+        </div>
       </div>
     </AdminShell>
   );
@@ -529,4 +543,13 @@ function mapNoticeStatus(status?: string): AdminNoticeRow['status'] {
   if (status === 'hidden') return '已下架';
   if (status === 'deleted') return '已删除';
   return '已发布';
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0">
+      <dt className="text-slate-500">{label}</dt>
+      <dd className="text-right font-semibold text-slate-800">{value || '-'}</dd>
+    </div>
+  );
 }

@@ -41,7 +41,7 @@ const quickActions = [
   { href: '/admin/notices', label: '审核通知', icon: Bell },
   { href: '/admin/offers', label: '审核 Offer', icon: ClipboardList },
   { href: '/admin/ai-leads', label: '查看 AI 内测', icon: BrainCircuit },
-  { href: '/admin/logs', label: '导出日志', icon: Download }
+  { href: '/admin/logs', label: '查看/导出日志', icon: Download }
 ];
 
 function getRoleName(role: string) {
