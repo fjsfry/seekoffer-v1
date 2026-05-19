@@ -4,14 +4,18 @@ import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
+  BarChart3,
   BellRing,
+  CalendarCheck,
+  CheckCircle2,
+  Eye,
   KeyRound,
   LoaderCircle,
   LockKeyhole,
-  LogIn,
   Mail,
   ShieldCheck,
-  UserPlus
+  UserPlus,
+  X
 } from 'lucide-react';
 import { SUPABASE_ENABLE_ANONYMOUS, SUPABASE_ENABLE_PHONE_AUTH } from '@/lib/supabase-env';
 import {
@@ -33,7 +37,7 @@ function looksLikePhoneIdentifier(value: string) {
   return /^[+\d\s\-()]{6,}$/.test(value.trim());
 }
 
-function FeatureRow({
+function AuthFeature({
   icon,
   title,
   description
@@ -43,13 +47,13 @@ function FeatureRow({
   description: string;
 }) {
   return (
-    <div className="flex gap-4">
-      <div className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/16 text-emerald-100">
+    <div className="flex items-start gap-4">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/14 bg-white/10 text-emerald-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
         {icon}
       </div>
       <div>
         <div className="text-base font-semibold text-white">{title}</div>
-        <p className="mt-1 text-sm leading-6 text-white/74">{description}</p>
+        <p className="mt-1 text-sm leading-6 text-white/72">{description}</p>
       </div>
     </div>
   );
@@ -58,25 +62,21 @@ function FeatureRow({
 function PrimaryButton({
   icon,
   pending,
-  children,
-  type = 'submit',
-  onClick
+  children
 }: {
   icon: React.ReactNode;
   pending?: boolean;
   children: React.ReactNode;
-  type?: 'button' | 'submit';
-  onClick?: () => void;
 }) {
   return (
     <button
-      type={type}
-      onClick={onClick}
+      type="submit"
       disabled={pending}
-      className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand to-brand-deep px-4 text-base font-semibold text-white shadow-[0_18px_36px_rgba(23,73,77,0.22)] transition hover:-translate-y-0.5 disabled:translate-y-0 disabled:bg-brand/70"
+      className="group inline-flex min-h-16 w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#0f5b5b] via-[#0d6764] to-[#064849] px-5 text-lg font-semibold text-white shadow-[0_22px_46px_rgba(6,72,73,0.26)] transition hover:-translate-y-0.5 hover:shadow-[0_26px_56px_rgba(6,72,73,0.32)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70"
     >
       {pending ? <LoaderCircle className="h-5 w-5 animate-spin" /> : icon}
       {children}
+      {!pending ? <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" /> : null}
     </button>
   );
 }
@@ -89,7 +89,7 @@ function IconInput({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mt-2 flex h-14 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 transition focus-within:border-brand/50 focus-within:ring-4 focus-within:ring-brand/10">
+    <div className="mt-3 flex h-[64px] items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 shadow-[0_10px_30px_rgba(15,38,50,0.04)] transition focus-within:border-brand/55 focus-within:ring-4 focus-within:ring-brand/10">
       <span className="text-slate-400">{icon}</span>
       {children}
     </div>
@@ -98,12 +98,14 @@ function IconInput({
 
 export function LoginMethodPanel({
   mode = 'modal',
+  onClose,
   onSuccess
 }: {
   mode?: 'card' | 'popover' | 'modal';
+  onClose?: () => void;
   onSuccess?: () => void;
 }) {
-  const compact = mode === 'popover';
+  const compact = mode !== 'modal';
   const [activeView, setActiveView] = useState<AuthView>('password');
   const [passwordMode, setPasswordMode] = useState<PasswordMode>('login');
   const [account, setAccount] = useState('');
@@ -116,6 +118,8 @@ export function LoginMethodPanel({
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [resendIn, setResendIn] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [pending, setPending] = useState<
     | ''
     | 'guest'
@@ -133,14 +137,22 @@ export function LoginMethodPanel({
   const accountLabel = SUPABASE_ENABLE_PHONE_AUTH ? '邮箱或手机号' : '邮箱';
   const accountPlaceholder = SUPABASE_ENABLE_PHONE_AUTH ? '请输入邮箱或手机号' : '请输入邮箱地址';
   const isEmailAccount = isEmailIdentifier(account);
-  const passwordActionLabel = passwordMode === 'login' ? '立即登录' : signupCodeSent ? '完成注册' : '发送注册验证码';
   const passwordPending = pending === 'password' || pending === 'register' || pending === 'verify-signup';
-  const idleHint =
-    activeView === 'otp'
-      ? '已完成注册后，可用邮箱验证码直接登录，不需要输入密码。'
-      : passwordMode === 'register'
-        ? '注册会发送 6 位邮箱验证码；输入后即完成账号确认并登录。'
-        : '登录后会自动继续你刚才的动作，申请表和待办也会同步保存。';
+  const passwordActionLabel =
+    passwordMode === 'login' ? '立即登录并查看进度' : signupCodeSent ? '完成注册并进入工作台' : '发送注册验证码';
+  const formIntro = useMemo(() => {
+    if (passwordMode === 'register') {
+      return signupCodeSent
+        ? '注册验证码已发送，输入 6 位数字后即可完成账号确认。'
+        : '使用邮箱和密码创建 SeekOffer 账号，注册邮件会发送 6 位验证码。';
+    }
+
+    if (activeView === 'otp') {
+      return '输入邮箱验证码即可登录，适合忘记密码或临时登录。';
+    }
+
+    return '使用邮箱和密码登录你的 SeekOffer 账号。';
+  }, [activeView, passwordMode, signupCodeSent]);
 
   const helperText = useMemo(() => {
     if (!account.trim()) {
@@ -267,6 +279,25 @@ export function LoginMethodPanel({
       return;
     }
 
+    if (passwordMode === 'register' && signupCodeSent) {
+      if (!signupCode.trim()) {
+        setError('请输入注册邮件中的 6 位验证码。');
+        return;
+      }
+
+      const result = await runTask(
+        'verify-signup',
+        () => verifySignupConfirmationCode(signupEmail || identifier, signupCode.trim()),
+        { successMessage: '注册完成，已经进入当前会话。' }
+      );
+
+      if (result) {
+        resetSignupChallenge();
+      }
+
+      return;
+    }
+
     if (!password.trim()) {
       setError('请输入密码。');
       return;
@@ -284,25 +315,6 @@ export function LoginMethodPanel({
 
     if (passwordMode === 'login') {
       await runTask('password', () => signInWithPasswordAccount({ identifier, password }));
-      return;
-    }
-
-    if (signupCodeSent) {
-      if (!signupCode.trim()) {
-        setError('请输入注册邮件中的 6 位验证码。');
-        return;
-      }
-
-      const result = await runTask(
-        'verify-signup',
-        () => verifySignupConfirmationCode(signupEmail || identifier, signupCode.trim()),
-        { successMessage: '注册完成，已经进入当前会话。' }
-      );
-
-      if (result) {
-        resetSignupChallenge();
-      }
-
       return;
     }
 
@@ -398,6 +410,20 @@ export function LoginMethodPanel({
     await runTask('verify-code', () => verifyEmailLoginCode(email, otpCode.trim()));
   }
 
+  function switchToLogin(nextView: AuthView = 'password') {
+    resetFeedback();
+    resetSignupChallenge();
+    setPasswordMode('login');
+    setActiveView(nextView);
+  }
+
+  function switchToRegister() {
+    resetFeedback();
+    resetSignupChallenge();
+    setActiveView('password');
+    setPasswordMode('register');
+  }
+
   function handleFormSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (activeView === 'password') {
@@ -415,33 +441,49 @@ export function LoginMethodPanel({
 
   return (
     <section
-      className={`overflow-hidden border border-slate-100 bg-white shadow-[0_26px_90px_rgba(18,32,38,0.12)] ${
-        compact ? 'rounded-[24px]' : 'rounded-[32px] lg:grid lg:grid-cols-[400px_minmax(0,1fr)]'
+      className={`relative w-full overflow-hidden border border-white/75 bg-white shadow-[0_36px_120px_rgba(15,38,50,0.22)] ${
+        compact
+          ? 'max-h-[92vh] overflow-y-auto rounded-t-[28px] sm:max-w-[560px] sm:rounded-[30px]'
+          : 'max-w-[1120px] rounded-[34px] lg:grid lg:grid-cols-[480px_minmax(0,1fr)]'
       }`}
     >
-      <aside className="relative hidden overflow-hidden bg-gradient-to-br from-brand via-[#0f5b5d] to-brand-deep px-10 py-11 text-white lg:block">
+      <aside className="relative hidden min-h-[720px] overflow-hidden bg-[radial-gradient(circle_at_80%_18%,rgba(103,232,249,0.22),transparent_26%),linear-gradient(145deg,#073f41,#0b6764_48%,#063536)] px-14 py-14 text-white lg:block">
+        <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:radial-gradient(circle_at_72%_26%,rgba(255,255,255,0.45)_0_3px,transparent_4px),radial-gradient(circle_at_80%_70%,rgba(255,255,255,0.42)_0_3px,transparent_4px)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_40%_86%,rgba(116,255,190,0.28),transparent_24%)]" />
+        <div className="pointer-events-none absolute -bottom-20 left-0 right-0 h-64 rounded-[50%] bg-[#0b4c4d]" />
+        <div className="pointer-events-none absolute -bottom-28 left-20 h-60 w-96 rounded-[50%] bg-emerald-300/20 blur-2xl" />
+
         <div className="relative z-10">
-          <div className="flex items-center gap-3">
-            <Image src="/logo.png" alt="寻鹿 Seekoffer" width={42} height={42} className="h-10 w-10 rounded-xl bg-white object-cover" />
-            <div className="text-xl font-semibold">寻鹿 Seekoffer</div>
+          <div className="flex items-center gap-4">
+            <Image src="/logo.png" alt="SeekOffer" width={58} height={58} className="h-14 w-14 rounded-2xl bg-white object-cover shadow-lg" />
+            <div>
+              <div className="text-2xl font-semibold tracking-tight">SeekOffer</div>
+              <div className="mt-1 text-sm text-white/72">保研 · 留学申请管理平台</div>
+            </div>
           </div>
 
-          <h3 className="mt-12 text-[30px] font-semibold leading-tight">
-            一个账号，
+          <h3 className="mt-20 text-[36px] font-semibold leading-[1.25] tracking-tight">
+            一个账号
             <br />
-            接住你的申请进度
+            掌握你的申请<span className="text-emerald-200">全进度</span>
           </h3>
+          <p className="mt-5 text-base leading-7 text-white/72">科学规划 · 高效跟进 · 结果尽在掌握</p>
 
-          <div className="mt-10 space-y-9">
-            <FeatureRow
-              icon={<ShieldCheck className="h-5 w-5" />}
-              title="安全可靠"
-              description="数据加密保护，信息安全无忧。"
+          <div className="mt-12 space-y-8">
+            <AuthFeature
+              icon={<CalendarCheck className="h-6 w-6" />}
+              title="全流程申请管理"
+              description="从选校到录取，关键节点清晰可见"
             />
-            <FeatureRow
-              icon={<BellRing className="h-5 w-5" />}
-              title="高效同步"
-              description="多端同步进度，随时继续申请。"
+            <AuthFeature
+              icon={<BarChart3 className="h-6 w-6" />}
+              title="进度可视化"
+              description="实时更新状态，重要提醒不错过"
+            />
+            <AuthFeature
+              icon={<BellRing className="h-6 w-6" />}
+              title="关键信息提醒"
+              description="截止时间、材料反馈及时通知"
             />
           </div>
 
@@ -450,55 +492,62 @@ export function LoginMethodPanel({
               type="button"
               onClick={() => void runTask('guest', () => signInAsGuest())}
               disabled={pending === 'guest'}
-              className="mt-12 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-white/45 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/16 disabled:text-white/50"
+              className="mt-12 inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl border border-white/34 bg-white/10 px-5 text-base font-semibold text-white transition hover:bg-white/16 disabled:opacity-60"
             >
-              {pending === 'guest' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-              {pending === 'guest' ? '进入中...' : '先以试用态浏览'}
+              {pending === 'guest' ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
+              {pending === 'guest' ? '进入中...' : '先试用态浏览'}
             </button>
           ) : null}
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 h-56 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.16),transparent_24%),linear-gradient(180deg,transparent,rgba(5,45,48,0.78))]" />
-        <div className="absolute bottom-0 left-0 right-0 h-20 bg-brand-deep/55" />
-        <div className="absolute bottom-12 left-10 text-6xl text-white/12">鹿</div>
-        <div className="absolute -bottom-7 left-0 right-0 h-24 rounded-[50%] bg-brand-deep/70" />
+        <div className="absolute bottom-24 left-24 z-10 h-40 w-56 rotate-[-8deg] rounded-[28px] border border-white/30 bg-white/18 p-6 shadow-[0_22px_60px_rgba(0,0,0,0.25)] backdrop-blur">
+          <div className="h-4 w-28 rounded-full bg-white/55" />
+          <div className="mt-5 h-3 w-36 rounded-full bg-emerald-100/55" />
+          <div className="mt-4 h-3 w-24 rounded-full bg-white/40" />
+          <CheckCircle2 className="absolute -right-4 -bottom-4 h-14 w-14 rounded-full bg-white p-3 text-emerald-500 shadow-2xl" />
+        </div>
       </aside>
 
-      <form className="px-6 py-7 sm:px-11 sm:py-11" onSubmit={handleFormSubmit}>
-        <div className="grid grid-cols-2 gap-1 rounded-2xl border border-slate-200 bg-slate-100 p-1">
+      <form className="relative px-7 py-8 sm:px-12 sm:py-11 lg:px-14" onSubmit={handleFormSubmit}>
+        {onClose ? (
           <button
             type="button"
-            onClick={() => {
-              resetFeedback();
-              if (passwordMode === 'register') {
-                resetSignupChallenge();
-                setActiveView('password');
-              }
-              setPasswordMode('login');
-            }}
-            className={`min-h-12 rounded-xl text-base font-semibold transition ${
-              passwordMode === 'login' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
+            onClick={onClose}
+            className="absolute right-6 top-6 inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800"
+            aria-label="关闭"
           >
-            登录
+            <X className="h-6 w-6" />
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              resetFeedback();
-              resetSignupChallenge();
-              setActiveView('password');
-              setPasswordMode('register');
-            }}
-            className={`min-h-12 rounded-xl text-base font-semibold transition ${
-              passwordMode === 'register' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            注册
-          </button>
+        ) : null}
+
+        <div className="pr-12">
+          <div className="grid grid-cols-2 border-b border-slate-200 text-center">
+            <button
+              type="button"
+              onClick={() => switchToLogin('password')}
+              className={`relative min-h-16 text-2xl font-semibold transition ${
+                passwordMode === 'login' ? 'text-brand' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              登录
+              {passwordMode === 'login' ? <span className="absolute bottom-[-1px] left-8 right-8 h-0.5 rounded-full bg-brand" /> : null}
+            </button>
+            <button
+              type="button"
+              onClick={switchToRegister}
+              className={`relative min-h-16 text-2xl font-semibold transition ${
+                passwordMode === 'register' ? 'text-brand' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              注册
+              {passwordMode === 'register' ? <span className="absolute bottom-[-1px] left-8 right-8 h-0.5 rounded-full bg-brand" /> : null}
+            </button>
+          </div>
         </div>
 
-        <div className="mt-8 inline-flex rounded-2xl bg-slate-100 p-1">
+        <p className="mt-9 text-base leading-7 text-slate-600">{formIntro}</p>
+
+        <div className="mt-7 inline-flex rounded-2xl bg-slate-100 p-1">
           <button
             type="button"
             onClick={() => {
@@ -510,16 +559,11 @@ export function LoginMethodPanel({
             }`}
           >
             <LockKeyhole className="h-4 w-4" />
-            {passwordMode === 'register' ? '密码注册' : '密码'}
+            密码
           </button>
           <button
             type="button"
-            onClick={() => {
-              resetFeedback();
-              resetSignupChallenge();
-              setPasswordMode('login');
-              setActiveView('otp');
-            }}
+            onClick={() => switchToLogin('otp')}
             className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold transition ${
               activeView === 'otp' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
@@ -529,9 +573,9 @@ export function LoginMethodPanel({
           </button>
         </div>
 
-        <div className="mt-7 space-y-5">
+        <div className="mt-8 space-y-6">
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">{accountLabel}</span>
+            <span className="text-base font-medium text-slate-800">{accountLabel}</span>
             <IconInput icon={<Mail className="h-5 w-5" />}>
               <input
                 type={SUPABASE_ENABLE_PHONE_AUTH ? 'text' : 'email'}
@@ -544,73 +588,84 @@ export function LoginMethodPanel({
                   resetSignupChallenge();
                 }}
                 placeholder={accountPlaceholder}
-                className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-slate-400"
               />
             </IconInput>
-            <span
-              className={`mt-2 block text-xs ${
-                isEmailAccount ? 'text-emerald-600' : account.trim() ? 'text-amber-700' : 'text-slate-500'
-              }`}
-            >
+            <span className={`mt-2 block text-sm ${isEmailAccount ? 'text-emerald-600' : account.trim() ? 'text-amber-700' : 'text-slate-500'}`}>
               {helperText}
             </span>
           </label>
 
           {activeView === 'password' ? (
-            <div className="space-y-5">
-              <label className="block">
-                <span className="text-sm font-medium text-slate-700">密码</span>
-                <IconInput icon={<KeyRound className="h-5 w-5" />}>
-                  <input
-                    type="password"
-                    autoComplete={passwordMode === 'login' ? 'current-password' : 'new-password'}
-                    value={password}
-                    onChange={(event) => {
-                      setPassword(event.target.value);
-                      resetFeedback();
-                      resetSignupChallenge();
-                    }}
-                    placeholder="请输入密码"
-                    className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-                  />
-                </IconInput>
-              </label>
-
-              {passwordMode === 'register' ? (
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700">确认密码</span>
-                  <IconInput icon={<KeyRound className="h-5 w-5" />}>
-                    <input
-                      type="password"
-                      autoComplete="new-password"
-                      value={passwordConfirm}
-                      onChange={(event) => {
-                        setPasswordConfirm(event.target.value);
-                        resetFeedback();
-                        resetSignupChallenge();
-                      }}
-                      placeholder="再次输入密码"
-                      className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-                    />
-                  </IconInput>
-                </label>
-              ) : (
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <label className="inline-flex items-center gap-2 text-slate-500">
-                    <input type="checkbox" className="h-4 w-4 rounded border-slate-300" />
-                    下次自动登录
+            <div className="space-y-6">
+              {!signupCodeSent ? (
+                <>
+                  <label className="block">
+                    <span className="text-base font-medium text-slate-800">密码</span>
+                    <IconInput icon={<KeyRound className="h-5 w-5" />}>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete={passwordMode === 'login' ? 'current-password' : 'new-password'}
+                        value={password}
+                        onChange={(event) => {
+                          setPassword(event.target.value);
+                          resetFeedback();
+                        }}
+                        placeholder="请输入密码"
+                        className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-slate-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((current) => !current)}
+                        className="text-slate-400 transition hover:text-slate-600"
+                        aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                      >
+                        <Eye className="h-5 w-5" />
+                      </button>
+                    </IconInput>
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => void handlePasswordReset()}
-                    disabled={pending === 'reset-password'}
-                    className="inline-flex items-center gap-1 font-semibold text-brand transition hover:text-brand-deep disabled:text-slate-400"
-                  >
-                    {pending === 'reset-password' ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : null}
-                    {pending === 'reset-password' ? '发送中...' : '忘记密码？'}
-                  </button>
-                </div>
-              )}
+
+                  {passwordMode === 'register' ? (
+                    <label className="block">
+                      <span className="text-base font-medium text-slate-800">确认密码</span>
+                      <IconInput icon={<KeyRound className="h-5 w-5" />}>
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          autoComplete="new-password"
+                          value={passwordConfirm}
+                          onChange={(event) => {
+                            setPasswordConfirm(event.target.value);
+                            resetFeedback();
+                          }}
+                          placeholder="再次输入密码"
+                          className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-slate-400"
+                        />
+                      </IconInput>
+                    </label>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3 text-base">
+                      <label className="inline-flex items-center gap-3 text-slate-500">
+                        <input
+                          type="checkbox"
+                          checked={rememberMe}
+                          onChange={(event) => setRememberMe(event.target.checked)}
+                          className="h-5 w-5 rounded border-slate-300"
+                        />
+                        记住我
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => void handlePasswordReset()}
+                        disabled={pending === 'reset-password'}
+                        className="inline-flex items-center gap-1 font-semibold text-brand transition hover:text-brand-deep disabled:text-slate-400"
+                      >
+                        {pending === 'reset-password' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+                        {pending === 'reset-password' ? '发送中...' : '忘记密码？'}
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : null}
 
               {passwordMode === 'register' && signupCodeSent ? (
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
@@ -620,7 +675,7 @@ export function LoginMethodPanel({
                       注册验证码已发送至 <strong>{signupEmail || account}</strong>，请输入邮件里的 6 位数字完成注册。
                     </span>
                   </div>
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-4 flex gap-3">
                     <input
                       value={signupCode}
                       onChange={(event) => {
@@ -630,13 +685,13 @@ export function LoginMethodPanel({
                       inputMode="numeric"
                       autoComplete="one-time-code"
                       placeholder="6 位注册验证码"
-                      className="h-12 min-w-0 flex-1 rounded-xl border border-emerald-200 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand/50 focus:ring-4 focus:ring-brand/10"
+                      className="h-[52px] min-w-0 flex-1 rounded-xl border border-emerald-200 bg-white px-4 text-base outline-none transition placeholder:text-slate-400 focus:border-brand/50 focus:ring-4 focus:ring-brand/10"
                     />
                     <button
                       type="button"
                       onClick={() => void handleResendSignupCode()}
                       disabled={pending === 'resend-signup' || signupResendIn > 0}
-                      className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 disabled:text-emerald-400"
+                      className="inline-flex h-[52px] shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 disabled:text-emerald-400"
                     >
                       {pending === 'resend-signup' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
                       {signupResendIn > 0 ? `${signupResendIn}s` : '重发'}
@@ -648,7 +703,7 @@ export function LoginMethodPanel({
               <PrimaryButton
                 icon={
                   passwordMode === 'login' ? (
-                    <LogIn className="h-5 w-5" />
+                    <ArrowRight className="h-5 w-5" />
                   ) : signupCodeSent ? (
                     <ShieldCheck className="h-5 w-5" />
                   ) : (
@@ -661,7 +716,7 @@ export function LoginMethodPanel({
               </PrimaryButton>
             </div>
           ) : (
-            <div className="space-y-5">
+            <div className="space-y-6">
               <div className="flex gap-3">
                 <IconInput icon={<ShieldCheck className="h-5 w-5" />}>
                   <input
@@ -673,14 +728,14 @@ export function LoginMethodPanel({
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     placeholder="6 位验证码"
-                    className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                    className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-slate-400"
                   />
                 </IconInput>
                 <button
                   type="button"
                   onClick={() => void handleSendCode()}
                   disabled={pending === 'send-code' || resendIn > 0}
-                  className="mt-2 inline-flex h-14 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:text-slate-400"
+                  className="mt-3 inline-flex h-[64px] shrink-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:text-slate-400"
                 >
                   {pending === 'send-code' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
                   {resendIn > 0 ? `${resendIn}s` : otpSent ? '重发' : '发送'}
@@ -705,41 +760,31 @@ export function LoginMethodPanel({
               {error}
             </div>
           ) : null}
-          {!message && !error ? <p className="text-sm leading-6 text-slate-500">{idleHint}</p> : null}
+          {!message && !error ? (
+            <p className="text-sm leading-6 text-slate-500">
+              登录即代表你已同意 <span className="font-semibold text-brand">《用户协议》</span> 与{' '}
+              <span className="font-semibold text-brand">《隐私政策》</span>
+            </p>
+          ) : null}
         </div>
 
-        <div className="mt-4 text-center text-sm text-slate-500">
+        <div className="mt-3">
           {passwordMode === 'login' ? (
-            <>
-              还没有账号？
-              <button
-                type="button"
-                onClick={() => {
-                  resetFeedback();
-                  resetSignupChallenge();
-                  setActiveView('password');
-                  setPasswordMode('register');
-                }}
-                className="ml-2 font-semibold text-brand"
-              >
-                立即注册
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={switchToRegister}
+              className="inline-flex min-h-14 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white text-base font-semibold text-slate-600 transition hover:border-brand/40 hover:text-brand"
+            >
+              还没有账号？<span className="ml-2 text-brand">立即注册</span>
+            </button>
           ) : (
-            <>
-              已有账号？
-              <button
-                type="button"
-                onClick={() => {
-                  resetFeedback();
-                  resetSignupChallenge();
-                  setPasswordMode('login');
-                }}
-                className="ml-2 font-semibold text-brand"
-              >
-                现在登录
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => switchToLogin('password')}
+              className="inline-flex min-h-14 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white text-base font-semibold text-slate-600 transition hover:border-brand/40 hover:text-brand"
+            >
+              已有账号？<span className="ml-2 text-brand">现在登录</span>
+            </button>
           )}
         </div>
       </form>

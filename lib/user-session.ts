@@ -52,6 +52,10 @@ type SupabaseUserLike = {
   user_metadata?: Record<string, unknown> | null;
 };
 
+type SupabaseSignUpUserLike = SupabaseUserLike & {
+  identities?: unknown[] | null;
+};
+
 const SESSION_STORAGE_KEY = 'seekoffer-user-session';
 const SESSION_EVENT_NAME = 'seekoffer-user-session-updated';
 
@@ -307,6 +311,15 @@ function buildMemberSession(user: SupabaseUserLike, provider: AuthProviderType, 
   } satisfies UserSession;
 }
 
+function isExistingEmailSignUpResponse(user: SupabaseUserLike | null | undefined) {
+  if (!user) {
+    return false;
+  }
+
+  const identities = (user as SupabaseSignUpUserLike).identities;
+  return Array.isArray(identities) && identities.length === 0;
+}
+
 export function getUserSession(): UserSession | null {
   if (!canUseBrowserStorage()) {
     return null;
@@ -493,6 +506,10 @@ export async function signUpWithPasswordAccount(payload: CredentialsPayload): Pr
     const { data, error } = await supabase.auth.signUp(credentials);
     if (error) {
       throw error;
+    }
+
+    if (!isPhoneIdentifier(identifier) && isExistingEmailSignUpResponse(data.user)) {
+      throw new Error('该邮箱已经注册，请直接登录，或切换到“验证码”通过邮箱验证码登录。');
     }
 
     if (data.session) {
