@@ -713,14 +713,14 @@ function SchoolApplicationMark({
   size: 'lg' | 'xl';
 }) {
   const label = getDisplaySchoolName(project.schoolName);
+  const frameClass = size === 'xl' ? 'h-20 w-20 rounded-[1.75rem]' : 'h-16 w-16 rounded-3xl';
+  const markSize = size === 'xl' ? 'xl' : 'lg';
 
   return (
     <div
-      className={`shrink-0 rounded-full bg-white p-1 ring-1 ring-slate-200 shadow-sm ${
-        size === 'xl' ? 'h-[4.75rem] w-[4.75rem]' : 'h-16 w-16'
-      }`}
+      className={`flex shrink-0 items-center justify-center bg-white ring-1 ring-slate-200 shadow-sm ${frameClass}`}
     >
-      <ExternalSiteMark source={resolveNoticeLogoSource(project)} label={label} size={size} rounded="full" variant="image" />
+      <ExternalSiteMark source={resolveNoticeLogoSource(project)} label={label} size={markSize} rounded="full" variant="image" />
     </div>
   );
 }
