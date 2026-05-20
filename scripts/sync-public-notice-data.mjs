@@ -53,6 +53,29 @@ function compact(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
 
+const APPLICATION_ONLY_LINK_PATTERN =
+  /(wjx|wenjuan|jinshuju|questionnaire|survey|docs\.qq\.com\/form|feishu\.cn\/share\/base\/form|forms?\.|\/forms?\/|\/form\/|\/survey\/|\/questionnaire\/|\/collect\/)/i;
+
+function isLikelyApplicationOnlyLink(value) {
+  const link = compact(value);
+  return Boolean(link && /^https?:\/\//i.test(link) && APPLICATION_ONLY_LINK_PATTERN.test(link));
+}
+
+function pickApplyLink(row) {
+  return compact(row.applyLink || row.apply_link || row.applyUrl || row.apply_url || row.sourceLink || row.source_link);
+}
+
+function pickSourceLink(row) {
+  const directSource = compact(row.sourceLink || row.source_link || row.detailUrl || row.detail_url);
+
+  if (directSource) {
+    return directSource;
+  }
+
+  const fallback = compact(row.applyLink || row.apply_link || row.applyUrl || row.apply_url);
+  return fallback && !isLikelyApplicationOnlyLink(fallback) ? fallback : '';
+}
+
 function cleanProjectTitle(value) {
   let title = compact(value)
     .replace(/^招生通知\s*[|｜]\s*/i, '')
@@ -350,8 +373,8 @@ function normalizeProject(row) {
     deadlineDate,
     eventStartDate: normalizeDateOnly(row.eventStartDate || row.event_start_date || row.eventStart) || publishDate,
     eventEndDate: normalizeDateOnly(row.eventEndDate || row.event_end_date || row.eventEnd) || deadlineDate.slice(0, 10),
-    applyLink: compact(row.applyLink || row.apply_link || row.applyUrl || row.apply_url || row.sourceLink || row.source_link),
-    sourceLink: compact(row.sourceLink || row.source_link || row.detailUrl || row.detail_url || row.applyLink || row.apply_link),
+    applyLink: pickApplyLink(row),
+    sourceLink: pickSourceLink(row),
     requirements: compact(row.requirements) || '以原通知申请条件为准，建议打开官网原文核对。',
     materialsRequired: toArray(row.materialsRequired || row.materials_required).length
       ? toArray(row.materialsRequired || row.materials_required)

@@ -20,6 +20,7 @@ import {
   getDisplayTags,
   normalizeNoticeTitle
 } from '@/lib/notice-display';
+import { getNoticeApplicationLink, getNoticeOriginalLink } from '@/lib/notice-links';
 import { baseNoticeProjects } from '@/lib/notice-source';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
@@ -88,6 +89,8 @@ export default async function NoticeDetailPage({
   }
 
   const departmentName = getDisplayNoticeDepartment(project);
+  const originalLink = getNoticeOriginalLink(project);
+  const applicationLink = getNoticeApplicationLink(project);
 
   return (
     <SiteShell>
@@ -192,24 +195,32 @@ export default async function NoticeDetailPage({
             <div className="text-lg font-semibold text-ink">操作</div>
             <div className="mt-4 grid gap-3">
               <ApplicationActionButton projectId={project.id} />
-              <a
-                href={project.applyLink}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"
-              >
-                打开原文入口
-                <ArrowUpRight className="h-4 w-4" />
-              </a>
-              <a
-                href={project.sourceLink}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-brand shadow-sm"
-              >
-                查看官网原文
-                <ArrowUpRight className="h-4 w-4" />
-              </a>
+              {originalLink ? (
+                <a
+                  href={originalLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"
+                >
+                  打开原文通知
+                  <ArrowUpRight className="h-4 w-4" />
+                </a>
+              ) : (
+                <span className="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-400">
+                  暂无原文链接
+                </span>
+              )}
+              {applicationLink ? (
+                <a
+                  href={applicationLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-brand shadow-sm"
+                >
+                  打开报名入口
+                  <ArrowUpRight className="h-4 w-4" />
+                </a>
+              ) : null}
               <a
                 href={QQ_GROUP_URL}
                 target="_blank"
