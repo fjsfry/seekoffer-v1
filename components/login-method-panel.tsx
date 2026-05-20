@@ -453,12 +453,11 @@ export function LoginMethodPanel({
         <div className="pointer-events-none absolute -bottom-20 left-0 right-0 h-64 rounded-[50%] bg-[#0b4c4d]" />
         <div className="pointer-events-none absolute -bottom-28 left-20 h-60 w-96 rounded-[50%] bg-emerald-300/20 blur-2xl" />
 
-        <div className="relative z-10">
+        <div className="relative z-20">
           <div className="flex items-center gap-4">
             <Image src="/logo.png" alt="SeekOffer" width={58} height={58} className="h-14 w-14 rounded-2xl bg-white object-cover shadow-lg" />
             <div>
               <div className="text-2xl font-semibold tracking-tight">SeekOffer</div>
-              <div className="mt-1 text-sm text-white/72">保研 · 留学申请管理平台</div>
             </div>
           </div>
 
@@ -469,7 +468,7 @@ export function LoginMethodPanel({
           </h3>
           <p className="mt-5 text-base leading-7 text-white/72">科学规划 · 高效跟进 · 结果尽在掌握</p>
 
-          <div className="mt-12 space-y-8">
+          <div className="relative z-20 mt-12 space-y-8">
             <AuthFeature
               icon={<CalendarCheck className="h-6 w-6" />}
               title="全流程申请管理"
@@ -500,7 +499,7 @@ export function LoginMethodPanel({
           ) : null}
         </div>
 
-        <div className="absolute bottom-24 left-24 z-10 h-40 w-56 rotate-[-8deg] rounded-[28px] border border-white/30 bg-white/18 p-6 shadow-[0_22px_60px_rgba(0,0,0,0.25)] backdrop-blur">
+        <div className="pointer-events-none absolute bottom-14 left-24 z-0 h-40 w-56 rotate-[-8deg] rounded-[28px] border border-white/24 bg-white/12 p-6 opacity-55 shadow-[0_22px_60px_rgba(0,0,0,0.2)] backdrop-blur">
           <div className="h-4 w-28 rounded-full bg-white/55" />
           <div className="mt-5 h-3 w-36 rounded-full bg-emerald-100/55" />
           <div className="mt-4 h-3 w-24 rounded-full bg-white/40" />
