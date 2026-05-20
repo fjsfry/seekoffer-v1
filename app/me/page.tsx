@@ -927,16 +927,16 @@ function ApplicationProgressCard({
   const href = project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id);
 
   return (
-    <article className="rounded-[26px] border border-slate-100 bg-white px-5 py-5 shadow-sm">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_130px_150px_96px_96px] lg:items-center">
-        <div className="flex min-w-0 items-start gap-4">
-          <ExternalSiteMark source={resolveNoticeLogoSource(project)} label={getDisplaySchoolName(project.schoolName)} size="lg" rounded="full" />
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate text-lg font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</h3>
+    <article className="rounded-[28px] border border-slate-100 bg-white px-5 py-5 shadow-sm transition hover:border-brand/20 hover:shadow-soft md:px-7">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.85fr)_140px_170px_104px_112px] xl:items-center">
+        <div className="flex min-w-0 items-start gap-5">
+          <WorkbenchApplicationMark project={project} />
+          <div className="min-w-0 flex-1 pt-1">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <h3 className="max-w-full truncate text-xl font-semibold leading-tight text-ink">{getDisplaySchoolName(project.schoolName)}</h3>
               <span className="text-sm font-semibold text-slate-500">· {getDisplayNoticeDepartment(project)}</span>
             </div>
-            <p className="mt-2 line-clamp-1 text-sm text-slate-600">{normalizeNoticeTitle(project.projectName, 62)}</p>
+            <p className="mt-2 line-clamp-2 max-w-2xl text-base leading-7 text-slate-600">{normalizeNoticeTitle(project.projectName, 72)}</p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
               <span className="rounded-full bg-slate-100 px-2.5 py-1">{getDisplayDiscipline(project.discipline)}</span>
               <span className="rounded-full bg-slate-100 px-2.5 py-1">{getDisplaySchoolName(project.schoolName).includes('大学') ? '高校项目' : '目标项目'}</span>
@@ -944,7 +944,7 @@ function ApplicationProgressCard({
           </div>
         </div>
 
-        <div className="text-sm">
+        <div className="rounded-2xl bg-slate-50/70 px-4 py-3 text-sm xl:bg-transparent xl:px-0 xl:py-0">
           <div className="text-xs font-semibold text-slate-400">截止时间</div>
           <div className={project.deadlineLevel === 'expired' || project.deadlineLevel === 'today' ? 'mt-2 font-semibold text-rose-500' : 'mt-2 font-semibold text-brand'}>
             {formatNoticeDateOnly(project.deadlineDate)}
@@ -952,7 +952,7 @@ function ApplicationProgressCard({
           <div className="mt-1 text-xs text-slate-500">{daysLeft === null ? '待补充' : daysLeft < 0 ? `超期 ${Math.abs(daysLeft)} 天` : `剩余 ${daysLeft} 天`}</div>
         </div>
 
-        <div>
+        <div className="rounded-2xl bg-slate-50/70 px-4 py-3 xl:bg-transparent xl:px-0 xl:py-0">
           <div className="mb-2 flex items-center justify-between text-xs">
             <span className="font-semibold text-slate-400">材料进度</span>
             <span className="font-semibold text-ink">{completed} / {total}</span>
@@ -962,14 +962,14 @@ function ApplicationProgressCard({
           </div>
         </div>
 
-        <div>
+        <div className="rounded-2xl bg-slate-50/70 px-4 py-3 xl:bg-transparent xl:px-0 xl:py-0">
           <div className="mb-2 text-xs font-semibold text-slate-400">优先级</div>
           <span className={`rounded-xl px-3 py-2 text-xs font-semibold ${getPriorityTone(item.priorityLevel)}`}>
             {item.priorityLevel}
           </span>
         </div>
 
-        <div>
+        <div className="rounded-2xl bg-slate-50/70 px-4 py-3 xl:bg-transparent xl:px-0 xl:py-0">
           <div className="mb-2 text-xs font-semibold text-slate-400">状态</div>
           <span className={`rounded-xl px-3 py-2 text-xs font-semibold ${getWorkbenchStatusTone(item.myStatus)}`}>
             {item.myStatus}
@@ -1018,6 +1018,16 @@ function ApplicationProgressCard({
         </div>
       </div>
     </article>
+  );
+}
+
+function WorkbenchApplicationMark({ project }: { project: ApplicationRow['project'] }) {
+  const label = getDisplaySchoolName(project.schoolName);
+
+  return (
+    <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-[1.35rem] bg-white shadow-sm ring-1 ring-slate-200">
+      <ExternalSiteMark source={resolveNoticeLogoSource(project)} label={label} size="xl" rounded="full" variant="image" />
+    </div>
   );
 }
 
