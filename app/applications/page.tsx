@@ -12,10 +12,12 @@ import {
   FileText,
   FolderPlus,
   LayoutList,
+  ListChecks,
   MoreHorizontal,
   RefreshCw,
   Search,
   ShieldCheck,
+  Square,
   Trash2
 } from 'lucide-react';
 import { ExternalSiteMark } from '@/components/external-site-mark';
@@ -52,6 +54,14 @@ import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 
 type ViewMode = 'table' | 'board';
 type StatusFilter = '全部' | UserProjectRecord['myStatus'];
+
+const applicationStatusTabs: Array<StatusFilter | '待审核'> = [
+  '全部',
+  '准备材料中',
+  '已提交',
+  '待审核',
+  '已通过'
+];
 
 function parseDeadlineTimestamp(deadlineDate: string) {
   const timestamp = new Date(`${deadlineDate.replace(' ', 'T')}:00+08:00`).getTime();
@@ -113,6 +123,16 @@ function rowMatchesSearch(row: ApplicationRow, keyword: string) {
   return text.includes(keyword.toLowerCase());
 }
 
+function getTabCount(rows: ApplicationRow[], tab: StatusFilter | '待审核') {
+  if (tab === '全部') return rows.length;
+  if (tab === '待审核') return rows.filter((row) => row.item.myStatus === '待考核').length;
+  return rows.filter((row) => row.item.myStatus === tab).length;
+}
+
+function getTabStatus(tab: StatusFilter | '待审核'): StatusFilter {
+  return tab === '待审核' ? '待考核' : tab;
+}
+
 export default function ApplicationsPage() {
   const [rows, setRows] = useState<ApplicationRow[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
@@ -169,13 +189,6 @@ export default function ApplicationsPage() {
     }),
     [rows]
   );
-
-  const statusCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    userStatusOptions.forEach((status) => counts.set(status, 0));
-    rows.forEach((row) => counts.set(row.item.myStatus, (counts.get(row.item.myStatus) || 0) + 1));
-    return counts;
-  }, [rows]);
 
   async function refreshRows() {
     const merged = await fetchApplicationRows();
@@ -234,21 +247,64 @@ export default function ApplicationsPage() {
 
   return (
     <SiteShell>
-      <section className="relative overflow-hidden rounded-[36px] border border-brand/10 bg-gradient-to-r from-white via-emerald-50/70 to-white px-6 py-8 shadow-soft lg:px-9 lg:py-10">
-        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[44%] overflow-hidden lg:block">
-          <div className="absolute bottom-[-5rem] right-[-4rem] h-72 w-[36rem] rounded-[50%] bg-brand/8" />
-          <div className="absolute bottom-[-4rem] right-20 h-52 w-[30rem] rounded-[50%] border-t border-brand/20" />
-          <div className="absolute right-32 top-16 text-7xl text-brand/12">鹿</div>
-        </div>
-        <div className="relative z-10">
-          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">我的申请表</h1>
-          <p className="mt-4 max-w-2xl text-base leading-8 text-slate-600">
-            集中管理你的申请项目、材料与截止时间，高效推进每一步。
-          </p>
+      <section className="page-hero px-6 py-8 lg:px-10 lg:py-10">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_440px] lg:items-center">
+          <div>
+            <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">我的申请表</h1>
+            <p className="mt-4 max-w-2xl text-base leading-8 text-slate-600">
+              集中管理你的申请项目、材料与截止时间，高效推进每一步。
+            </p>
+          </div>
+
+          <div className="relative hidden min-h-[170px] lg:block">
+            <div className="absolute inset-0 rounded-[34px] bg-gradient-to-br from-emerald-100/70 via-white to-white shadow-soft" />
+            <div className="absolute right-7 top-6 h-28 w-28 rounded-full bg-brand/10" />
+            <div className="absolute left-8 top-7 w-56 rounded-[24px] border border-white/80 bg-white/90 p-4 shadow-float">
+              <div className="flex items-center gap-2 text-sm font-semibold text-brand">
+                <ListChecks className="h-4 w-4" />
+                申请进度
+              </div>
+              <div className="mt-4 grid gap-3">
+                {sortedRows.slice(0, 3).map((row) => (
+                  <div key={row.item.userProjectId} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2 text-xs">
+                    <span className="flex min-w-0 items-center gap-2 text-slate-600">
+                      <Square className="h-3 w-3 shrink-0 text-brand/50" />
+                      <span className="line-clamp-1">{getDisplaySchoolName(row.project.schoolName)}</span>
+                    </span>
+                    <span className="font-semibold text-brand">{row.item.myStatus}</span>
+                  </div>
+                ))}
+                {!sortedRows.length ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                      <span className="flex items-center gap-2"><Square className="h-3 w-3 text-brand/50" />清华大学</span>
+                      <span className="font-semibold text-brand">待材料</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                      <span className="flex items-center gap-2"><Square className="h-3 w-3 text-brand/50" />复旦大学</span>
+                      <span className="font-semibold text-rose-500">7天截止</span>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            </div>
+            <div className="absolute bottom-7 right-8 grid grid-cols-3 gap-3">
+              {[
+                ['申请中', stats.total],
+                ['已提交', stats.submitted],
+                ['7天截止', stats.upcoming7]
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-[20px] border border-white/80 bg-white/95 px-5 py-4 text-center shadow-sm">
+                  <div className="text-2xl font-semibold text-brand">{value}</div>
+                  <div className="mt-1 text-xs text-slate-500">{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-brand/15 bg-emerald-50/60 px-5 py-4 text-sm text-brand shadow-sm">
+      <section className="rounded-[28px] border border-brand/15 bg-white/86 px-5 py-4 text-sm text-brand shadow-sm backdrop-blur">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-3">
             <RefreshCw className="mt-0.5 h-4 w-4 shrink-0" />
@@ -277,10 +333,10 @@ export default function ApplicationsPage() {
 
       <ManualProjectEntryCard onCreated={refreshRows} />
 
-      <section className="overflow-hidden rounded-[30px] border border-black/5 bg-white shadow-soft">
-        <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-1 flex-wrap items-center gap-3">
-            <label className="relative min-w-[240px] flex-1 lg:max-w-[320px]">
+      <section className="overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
+        <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-5 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-center">
+            <label className="relative min-w-[240px] flex-1 lg:max-w-[360px]">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 value={searchKeyword}
@@ -291,34 +347,29 @@ export default function ApplicationsPage() {
             </label>
 
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setStatusFilter('全部')}
-                className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                  statusFilter === '全部' ? 'bg-brand text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                全部 <span className="ml-1">{rows.length}</span>
-              </button>
-              {userStatusOptions.slice(1, 5).map((status) => (
+              {applicationStatusTabs.map((tab) => {
+                const targetStatus = getTabStatus(tab);
+                const active = statusFilter === targetStatus;
+                return (
                 <button
-                  key={status}
+                  key={tab}
                   type="button"
-                  onClick={() => setStatusFilter(status)}
+                  onClick={() => setStatusFilter(targetStatus)}
                   className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                    statusFilter === status ? 'bg-brand text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    active ? 'bg-brand text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  {status} <span className="ml-1">{statusCounts.get(status) || 0}</span>
+                  {tab} <span className="ml-1">{getTabCount(rows, tab)}</span>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600"
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 shadow-sm"
             >
               排序：截止时间
               <ChevronDown className="h-4 w-4" />
@@ -342,9 +393,9 @@ export default function ApplicationsPage() {
                 className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${
                   viewMode === 'table' ? 'bg-white text-brand shadow-sm' : 'text-slate-500'
                 }`}
+                aria-label="表格视图"
               >
                 <LayoutList className="h-4 w-4" />
-                表格视图
               </button>
               <button
                 type="button"
@@ -352,9 +403,9 @@ export default function ApplicationsPage() {
                 className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${
                   viewMode === 'board' ? 'bg-white text-brand shadow-sm' : 'text-slate-500'
                 }`}
+                aria-label="看板视图"
               >
                 <Columns3 className="h-4 w-4" />
-                看板视图
               </button>
             </div>
           </div>
