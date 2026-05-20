@@ -415,8 +415,8 @@ export default function ApplicationsPage() {
           <EmptyApplicationsState />
         ) : viewMode === 'table' ? (
           <div className="overflow-x-auto">
-            <div className="min-w-[1180px]">
-              <div className="grid grid-cols-[1.25fr_0.75fr_0.85fr_0.7fr_0.65fr_0.85fr_0.95fr] gap-4 border-b border-slate-100 bg-slate-50/70 px-5 py-4 text-sm font-semibold text-slate-500">
+            <div className="min-w-[1380px]">
+              <div className="grid grid-cols-[minmax(420px,1.7fr)_120px_150px_130px_110px_160px_150px] gap-4 border-b border-slate-100 bg-slate-50/70 px-5 py-4 text-sm font-semibold text-slate-500">
                 <div>学校 / 项目</div>
                 <div>项目类型</div>
                 <div>截止时间</div>
@@ -547,9 +547,9 @@ function ApplicationTableRow({
 
   return (
     <div>
-      <div className="grid grid-cols-[1.25fr_0.75fr_0.85fr_0.7fr_0.65fr_0.85fr_0.95fr] gap-4 px-5 py-5 text-sm">
-        <div className="flex min-w-0 items-center gap-4">
-          <ExternalSiteMark source={resolveNoticeLogoSource(project)} label={getDisplaySchoolName(project.schoolName)} size="lg" rounded="full" />
+      <div className="grid grid-cols-[minmax(420px,1.7fr)_120px_150px_130px_110px_160px_150px] gap-4 px-5 py-5 text-sm">
+        <div className="flex min-w-0 items-start gap-4">
+          <SchoolApplicationMark project={project} size="xl" />
           <div className="min-w-0">
             <div className="text-lg font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</div>
             <div className="mt-1 truncate text-slate-500">{getDisplayNoticeDepartment(project)}</div>
@@ -686,7 +686,7 @@ function ApplicationBoardCard({
     <div className="rounded-2xl bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <ExternalSiteMark source={resolveNoticeLogoSource(row.project)} label={getDisplaySchoolName(row.project.schoolName)} size="md" rounded="full" />
+          <SchoolApplicationMark project={row.project} size="lg" />
           <div className="min-w-0">
             <div className="font-semibold text-ink">{getDisplaySchoolName(row.project.schoolName)}</div>
             <div className="mt-1 line-clamp-2 text-sm text-slate-500">{normalizeNoticeTitle(row.project.projectName, 48)}</div>
@@ -701,6 +701,26 @@ function ApplicationBoardCard({
       <div className="mt-3 h-2 rounded-full bg-slate-100">
         <div className="h-full rounded-full bg-brand" style={{ width: `${row.item.materialsProgress}%` }} />
       </div>
+    </div>
+  );
+}
+
+function SchoolApplicationMark({
+  project,
+  size
+}: {
+  project: ApplicationRow['project'];
+  size: 'lg' | 'xl';
+}) {
+  const label = getDisplaySchoolName(project.schoolName);
+
+  return (
+    <div
+      className={`shrink-0 rounded-full bg-white p-1 ring-1 ring-slate-200 shadow-sm ${
+        size === 'xl' ? 'h-[4.75rem] w-[4.75rem]' : 'h-16 w-16'
+      }`}
+    >
+      <ExternalSiteMark source={resolveNoticeLogoSource(project)} label={label} size={size} rounded="full" variant="image" />
     </div>
   );
 }
