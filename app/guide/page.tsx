@@ -9,7 +9,6 @@ import {
   ExternalLink,
   FileCheck2,
   Flag,
-  HelpCircle,
   LayoutDashboard,
   MessageCircle,
   Search,
@@ -128,25 +127,6 @@ const productStatus = [
   ['Offer 池', '内测演示', '当前用于展示信息结构，不作为真实补录或录取依据。'],
   ['AI 定位', '内测登记', '当前收集需求与使用场景，不提供录取保证或确定性判断。'],
   ['自动提醒', '逐步完善', '当前先展示截止风险，后续会继续完善更主动的提醒机制。']
-] as const;
-
-const faqs = [
-  {
-    question: '为什么有些功能看起来还不能直接用？',
-    answer: 'Seekoffer 当前处于公开内测阶段。通知库、院校库、资源库和基础工作台已可用；Offer 池和 AI 定位仍在内测，会明确标注状态，避免误导。'
-  },
-  {
-    question: '加入申请表后数据保存在哪里？',
-    answer: '登录后会保存到你的个人工作台。你可以在工作台里更新状态、材料进度、优先级和备注。'
-  },
-  {
-    question: '原文通知和报名入口有什么区别？',
-    answer: '原文通知用于核对官方说明；报名入口可能跳转到问卷、飞书表单或院校系统。正式提交前，请以院校官网或公众号原文为准。'
-  },
-  {
-    question: '如果发现通知信息不准怎么办？',
-    answer: `可以通过页面反馈入口，或加入 QQ 群 ${QQ_GROUP_NUMBER} 告诉我们。请尽量附上原文链接或截图，方便快速核对。`
-  }
 ] as const;
 
 export default function GuidePage() {
@@ -378,28 +358,6 @@ export default function GuidePage() {
         </div>
       </section>
 
-      <section id="faq" className="surface-card rounded-[34px] p-6 md:p-8">
-        <PageSectionTitle
-          eyebrow="常见问题"
-          title="常见问题"
-          subtitle="这里回答最容易让新用户困惑的问题。后续我们会继续补充更多教程截图和视频。"
-        />
-        <div className="grid gap-4 md:grid-cols-2">
-          {faqs.map((item) => (
-            <div key={item.question} className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-sm">
-              <div className="flex items-start gap-3">
-                <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-cream text-brand">
-                  <HelpCircle className="h-4 w-4" />
-                </span>
-                <div>
-                  <div className="font-semibold text-ink">{item.question}</div>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">{item.answer}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
     </SiteShell>
   );
 }
