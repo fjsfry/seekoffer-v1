@@ -37,7 +37,8 @@ import { buildNoticeDetailHref } from '@/lib/notice-links';
 import { collegeDirectory } from '@/lib/college-directory';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { baseNoticeProjects } from '@/lib/notice-source';
-import { offerFeedItems, officialResourceSections } from '@/lib/portal-data';
+import { officialResourceSections } from '@/lib/portal-data';
+import { fetchPublicOffers } from '@/lib/offers';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
 
@@ -48,6 +49,8 @@ export default function HomePage() {
     filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
   );
   const [noticesLoading, setNoticesLoading] = useState(true);
+  const [offerCount, setOfferCount] = useState(0);
+  const [offersLoading, setOffersLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -66,6 +69,31 @@ export default function HomePage() {
       .finally(() => {
         if (active) {
           setNoticesLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    fetchPublicOffers()
+      .then((rows) => {
+        if (active) {
+          setOfferCount(rows.length);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setOfferCount(0);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setOffersLoading(false);
         }
       });
 
@@ -120,8 +148,8 @@ export default function HomePage() {
     },
     {
       label: 'Offer 动态',
-      value: `${offerFeedItems.length}`,
-      hint: '内测进行中',
+      value: offerCount ? `${offerCount}` : '开放中',
+      hint: offersLoading ? '正在同步审核动态' : '审核后展示',
       icon: CalendarDays
     }
   ];
