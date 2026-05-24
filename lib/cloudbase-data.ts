@@ -15,9 +15,11 @@ import {
 import { filterMainNoticeProjects } from './notice-quality';
 import { baseNoticeProjects } from './notice-source';
 import { canCreateMoreApplications } from './billing-api';
+import type { AiPositioningInput, AiPositioningReport } from './ai-positioning';
 
 const APPLICATION_STORAGE_KEY = 'seekoffer-my-application-table';
 const MANUAL_PROJECT_STORAGE_KEY = 'seekoffer-manual-projects';
+const AI_POSITIONING_REPORT_STORAGE_KEY = 'seekoffer-ai-positioning-report';
 const APPLICATION_EVENT_NAME = 'seekoffer-applications-updated';
 const NOTICE_TARGET_YEAR = 2026;
 const PUBLIC_NOTICE_QUERY_LIMIT = 1500;
@@ -965,6 +967,70 @@ export async function submitAiWaitlistLead(input: {
     ok,
     lead
   };
+}
+
+export function readStoredAiPositioningReport() {
+  if (!canUseBrowserStorage()) {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(AI_POSITIONING_REPORT_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as AiPositioningReport;
+    return parsed?.generatedAt && parsed?.summary ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveAiPositioningReport(report: AiPositioningReport, input: AiPositioningInput) {
+  if (canUseBrowserStorage()) {
+    window.localStorage.setItem(AI_POSITIONING_REPORT_STORAGE_KEY, JSON.stringify(report));
+  }
+
+  const context = getSupabaseMemberContext();
+  if (!context) {
+    return {
+      ok: false,
+      reason: 'local-only'
+    };
+  }
+
+  try {
+    const supabase = getSupabaseBrowserClient();
+    const { error } = await supabase.from('ai_positioning_reports').insert({
+      user_id: context.userId,
+      profile_snapshot: {
+        undergraduateSchool: input.undergraduateSchool,
+        major: input.major,
+        grade: input.grade,
+        targetMajor: input.targetMajor,
+        targetRegion: input.targetRegion
+      },
+      input_snapshot: input,
+      report,
+      source: 'ai-page'
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      ok: true,
+      reason: 'remote-saved'
+    };
+  } catch (error) {
+    logWorkspaceSyncWarning('ai-positioning-report-save', error);
+    return {
+      ok: false,
+      reason: 'remote-failed'
+    };
+  }
 }
 
 export async function updateUserProject(userProjectId: string, patch: Partial<UserProjectRecord>) {

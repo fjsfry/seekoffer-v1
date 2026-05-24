@@ -161,10 +161,6 @@ export default function OffersPage() {
         </Link>
       </section>
 
-      <section className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-5 py-4 text-sm leading-7 text-emerald-900 shadow-sm">
-        Offer 池已接入 Supabase 真实数据链路：登录用户提交后进入待审核队列，后台通过后公开展示；发现疑似虚假、隐私泄露或引流内容可以直接举报。
-      </section>
-
       <section className="grid gap-5 lg:grid-cols-3">
         {metrics.map((item) => {
           const Icon = item.icon || TrendingUp;
