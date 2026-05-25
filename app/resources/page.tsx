@@ -9,6 +9,7 @@ import {
   Mail,
   Wrench
 } from 'lucide-react';
+import Link from 'next/link';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
 import { officialResourceSections } from '@/lib/portal-data';
@@ -42,7 +43,8 @@ const applicationKits = [
     title: 'GPA 与材料工具',
     description: '把申请期反复计算和检查的事情工具化，减少低价值重复劳动。',
     items: ['GPA 换算', '材料进度', '截止提醒'],
-    icon: Calculator
+    icon: Calculator,
+    href: '/gpa'
   }
 ];
 
@@ -134,6 +136,12 @@ export default function ResourcesPage() {
                     </span>
                   ))}
                 </div>
+                {item.href ? (
+                  <Link href={item.href} className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand">
+                    打开工具
+                    <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                  </Link>
+                ) : null}
               </article>
             );
           })}
