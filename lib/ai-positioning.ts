@@ -280,7 +280,7 @@ function scoreProject(
 
   if (trackedProjectIds.has(project.id)) {
     score += 6;
-    reasons.push('已在申请表跟进');
+    reasons.push('已加入清单');
   }
 
   if (project.requirements && /(排名|成绩|英语|科研|论文|竞赛)/.test(project.requirements)) {
@@ -421,7 +421,7 @@ function buildActionItems(
   if (!input.gpa || !input.rankPercent) {
     actions.push({
       title: '补齐成绩与排名',
-      detail: '把 GPA、百分制或专业排名补进定位表，重新生成一次报告。',
+      detail: '把 GPA、百分制或专业排名补进定位表，重新生成一次方案。',
       priority: 'high'
     });
   }
@@ -436,7 +436,7 @@ function buildActionItems(
 
   if (rows.length < 8) {
     actions.push({
-      title: '扩充申请表',
+      title: '扩充申请清单',
       detail: '从推荐项目里至少加入 3 个稳妥项目和 2 个保底项目。',
       priority: 'medium'
     });
@@ -466,7 +466,7 @@ function buildSummary(
     ? `优先从 ${top.schoolName} 等 ${recommendations.length} 个高匹配项目里做组合。`
     : '暂未找到强匹配项目，建议先放宽地区或目标方向。';
   const gapPart = gaps.length ? `最需要处理的是${gaps.slice(0, 2).map((item) => item.title).join('、')}。` : '核心材料状态较完整。';
-  const tablePart = trackedCount ? `申请表已有 ${trackedCount} 个项目，可直接纳入排序。` : '申请表为空，建议先加入候选项目。';
+  const tablePart = trackedCount ? `申请清单已有 ${trackedCount} 个项目，可直接纳入排序。` : '申请清单还比较薄，建议先加入候选项目。';
 
   return `${base}${projectPart}${gapPart}${tablePart}`;
 }
