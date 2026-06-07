@@ -7,6 +7,8 @@ const SUPABASE_INGEST_URL =
 const SUPABASE_INGEST_SECRET = process.env.SUPABASE_INGEST_SECRET || process.env.SEEKOFFER_INGEST_SECRET || '';
 const SUPABASE_INGEST_SOURCE = process.env.SUPABASE_INGEST_SOURCE || 'github-actions-sync';
 const TARGET_YEAR = Number(process.env.TARGET_YEAR || '2026');
+const SYNC_MODE = normalizeSyncMode(process.env.SYNC_MODE || 'full');
+const IS_INCREMENTAL_SYNC = SYNC_MODE === 'incremental';
 
 const PRIMARY_WEB_DETAIL_URL = 'https://www.baoyantongzhi.com/notice/detail/{id}';
 const PRIMARY_LIST_ENDPOINT = '/backgd/notice/show/list';
@@ -15,13 +17,20 @@ const SECONDARY_LIST_ENDPOINT = '/articles';
 
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 30000);
 const PRIMARY_PAGE_SIZE = Number(process.env.PRIMARY_PAGE_SIZE || 40);
-const PRIMARY_MAX_PAGES = parseOptionalInteger(process.env.PRIMARY_MAX_PAGES);
+const DEFAULT_INCREMENTAL_PRIMARY_MAX_PAGES = 4;
+const DEFAULT_INCREMENTAL_SECONDARY_MAX_PAGES = 5;
+const DEFAULT_FULL_SECONDARY_MAX_PAGES = 30;
+const PRIMARY_MAX_PAGES =
+  parseOptionalInteger(process.env.PRIMARY_MAX_PAGES) ||
+  (IS_INCREMENTAL_SYNC ? DEFAULT_INCREMENTAL_PRIMARY_MAX_PAGES : null);
 const PRIMARY_MAX_DETAILS = parseOptionalInteger(process.env.PRIMARY_MAX_DETAILS);
 const PRIMARY_ORDER_BY = process.env.PRIMARY_ORDER_BY || 'publishTime';
 const PRIMARY_DETAIL_CONCURRENCY = Math.max(1, Number(process.env.PRIMARY_DETAIL_CONCURRENCY || 3));
 const PRIMARY_DETAIL_DELAY_MS = Math.max(0, Number(process.env.PRIMARY_DETAIL_DELAY_MS || 150));
 const SECONDARY_PAGE_SIZE = Number(process.env.SECONDARY_PAGE_SIZE || 25);
-const SECONDARY_MAX_PAGES = Number(process.env.SECONDARY_MAX_PAGES || 30);
+const SECONDARY_MAX_PAGES =
+  parseOptionalInteger(process.env.SECONDARY_MAX_PAGES) ||
+  (IS_INCREMENTAL_SYNC ? DEFAULT_INCREMENTAL_SECONDARY_MAX_PAGES : DEFAULT_FULL_SECONDARY_MAX_PAGES);
 const DRY_RUN = /^1|true|yes$/i.test(process.env.DRY_RUN || '');
 
 const PRIMARY_HEADERS = {
@@ -366,6 +375,11 @@ function shouldKeepNotice(notice) {
   if (DIRTY_NOTICE_PATTERN.test(text)) return false;
   if (COMPETITION_NOTICE_PATTERN.test(text)) return false;
   return true;
+}
+
+function normalizeSyncMode(value) {
+  const mode = String(value || '').trim().toLowerCase();
+  return mode === 'incremental' || mode === 'full' ? mode : 'full';
 }
 
 function extractFirstYear(value) {
@@ -812,9 +826,11 @@ async function runSync() {
       {
         event: 'sync_started',
         source: SUPABASE_INGEST_SOURCE,
+        syncMode: SYNC_MODE,
         targetYear: TARGET_YEAR,
         primaryOrderBy: PRIMARY_ORDER_BY,
         primaryMaxPages: PRIMARY_MAX_PAGES || 'all',
+        secondaryMaxPages: SECONDARY_MAX_PAGES,
         dryRun: DRY_RUN,
         startedAt
       },
@@ -840,15 +856,18 @@ async function runSync() {
   }
 
   const summary = {
+    syncMode: SYNC_MODE,
     targetYear: TARGET_YEAR,
     startedAt,
     finishedAt: nowText(),
     primaryOrderBy: PRIMARY_ORDER_BY,
+    primaryMaxPages: PRIMARY_MAX_PAGES || 'all',
     primaryFetched: primaryListRecords.length,
     primaryParsed: primaryProjects.length,
     primaryRequestedDetails: requestedDetails,
     primaryFailed: primaryFailures.length,
     primaryFailures: primaryFailures.slice(0, 10),
+    secondaryMaxPages: SECONDARY_MAX_PAGES,
     secondaryFetched: secondaryRecords.length,
     secondaryParsed: secondaryProjects.length,
     secondarySkippedAsDuplicate: skippedSecondaryDuplicates,

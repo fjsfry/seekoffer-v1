@@ -2,10 +2,27 @@ name: Sync notices to Supabase
 
 on:
   schedule:
-    # Every hour at minute 20. GitHub cron uses UTC; this is hourly in Beijing time too.
+    # Hourly incremental sync. GitHub cron uses UTC; this is hourly in Beijing time too.
     - cron: '20 * * * *'
+    # Nightly full reconciliation at 02:10 Beijing time.
+    - cron: '10 18 * * *'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/sync-notices.yml'
+      - 'scripts/sync-baoyan-notices-to-supabase.mjs'
+      - 'supabase/functions/ingest-notices/**'
   workflow_dispatch:
     inputs:
+      sync_mode:
+        description: 'Sync mode'
+        required: false
+        default: 'incremental'
+        type: choice
+        options:
+          - incremental
+          - full
       target_year:
         description: 'Notice target year'
         required: false
@@ -32,18 +49,18 @@ jobs:
   sync:
     name: Sync public notices
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     permissions:
       contents: read
 
     env:
+      SYNC_MODE: ${{ github.event.inputs.sync_mode || (github.event.schedule == '10 18 * * *' && 'full' || 'incremental') }}
       TARGET_YEAR: ${{ github.event.inputs.target_year || '2026' }}
       PRIMARY_ORDER_BY: publishTime
       PRIMARY_MAX_PAGES: ${{ github.event.inputs.primary_max_pages }}
       PRIMARY_MAX_DETAILS: ${{ github.event.inputs.primary_max_details }}
-      PRIMARY_DETAIL_CONCURRENCY: '3'
-      PRIMARY_DETAIL_DELAY_MS: '150'
-      SECONDARY_MAX_PAGES: '30'
+      PRIMARY_DETAIL_CONCURRENCY: '6'
+      PRIMARY_DETAIL_DELAY_MS: '50'
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       SUPABASE_INGEST_URL: ${{ secrets.SUPABASE_INGEST_URL }}
       SUPABASE_INGEST_SECRET: ${{ secrets.SEEKOFFER_INGEST_SECRET || secrets.SUPABASE_INGEST_SECRET }}
