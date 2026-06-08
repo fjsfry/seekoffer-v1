@@ -1,3 +1,6 @@
+import http from 'node:http';
+import https from 'node:https';
+
 const PRIMARY_API_BASE_URL = process.env.API_BASE_URL || 'https://ajqwsiasyqyi.sealosgzg.site';
 const SECONDARY_API_BASE_URL = process.env.BAOYANWANG_API_BASE_URL || 'http://api.baoyanwang.com.cn/api/v1';
 const SUPABASE_PROJECT_REF = process.env.SUPABASE_PROJECT_REF || '';
@@ -16,14 +19,19 @@ const PRIMARY_DETAIL_ENDPOINT = '/backgd/notice/show/{id}';
 const SECONDARY_LIST_ENDPOINT = '/articles';
 
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 30000);
+const MAX_RATE_LIMIT_RETRY_AFTER_SECONDS = Number(process.env.MAX_RATE_LIMIT_RETRY_AFTER_SECONDS || 30);
 const PRIMARY_PAGE_SIZE = Number(process.env.PRIMARY_PAGE_SIZE || 40);
-const DEFAULT_INCREMENTAL_PRIMARY_MAX_PAGES = 4;
-const DEFAULT_INCREMENTAL_SECONDARY_MAX_PAGES = 5;
+const DEFAULT_INCREMENTAL_PRIMARY_MAX_PAGES = 2;
+const DEFAULT_INCREMENTAL_PRIMARY_MAX_DETAILS = 40;
+const DEFAULT_INCREMENTAL_SECONDARY_MAX_PAGES = 3;
 const DEFAULT_FULL_SECONDARY_MAX_PAGES = 30;
+const DEFAULT_FULL_PRIMARY_MAX_DETAILS = 120;
 const PRIMARY_MAX_PAGES =
   parseOptionalInteger(process.env.PRIMARY_MAX_PAGES) ||
   (IS_INCREMENTAL_SYNC ? DEFAULT_INCREMENTAL_PRIMARY_MAX_PAGES : null);
-const PRIMARY_MAX_DETAILS = parseOptionalInteger(process.env.PRIMARY_MAX_DETAILS);
+const PRIMARY_MAX_DETAILS =
+  parseOptionalInteger(process.env.PRIMARY_MAX_DETAILS) ||
+  (IS_INCREMENTAL_SYNC ? DEFAULT_INCREMENTAL_PRIMARY_MAX_DETAILS : DEFAULT_FULL_PRIMARY_MAX_DETAILS);
 const PRIMARY_ORDER_BY = process.env.PRIMARY_ORDER_BY || 'publishTime';
 const PRIMARY_DETAIL_CONCURRENCY = Math.max(1, Number(process.env.PRIMARY_DETAIL_CONCURRENCY || 3));
 const PRIMARY_DETAIL_DELAY_MS = Math.max(0, Number(process.env.PRIMARY_DETAIL_DELAY_MS || 150));
@@ -31,7 +39,37 @@ const SECONDARY_PAGE_SIZE = Number(process.env.SECONDARY_PAGE_SIZE || 25);
 const SECONDARY_MAX_PAGES =
   parseOptionalInteger(process.env.SECONDARY_MAX_PAGES) ||
   (IS_INCREMENTAL_SYNC ? DEFAULT_INCREMENTAL_SECONDARY_MAX_PAGES : DEFAULT_FULL_SECONDARY_MAX_PAGES);
+const SECONDARY_CATEGORY = process.env.SECONDARY_CATEGORY || '\u4fdd\u7814\u4fe1\u606f';
 const DRY_RUN = /^1|true|yes$/i.test(process.env.DRY_RUN || '');
+
+const SOURCE_PRIORITY = {
+  保研通知网: 100,
+  保研信息网: 70
+};
+
+const TITLE_BODY_START_PATTERNS = [
+  /发布时间[:：]?\s*20\d{2}/i,
+  /发布日期[:：]?\s*20\d{2}/i,
+  /发稿时间[:：]?\s*20\d{2}/i,
+  /时间[:：]?\s*20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}/i,
+  /阅读量[:：]?\s*\d+/i,
+  /发布人[:：]?/i,
+  /发布者[:：]?/i,
+  /作者[:：]?/i,
+  /来源[:：]?/i,
+  /publish(?:ed)?\s*time[:：]?\s*20\d{2}/i,
+  /author[:：]?/i,
+  /source[:：]?/i,
+  /一[、.．]\s*/,
+  /各位同学[:：]?/,
+  /全国高校的优秀本科学子[:：]?/,
+  /为促进/,
+  /为了/,
+  /为增进/,
+  /现定于/,
+  /具体事项通知如下/,
+  /申请条件/
+];
 
 const PRIMARY_HEADERS = {
   'User-Agent':
@@ -127,6 +165,20 @@ function nowText() {
 
 function nowDateText() {
   return nowText().slice(0, 10);
+}
+
+function logEvent(event, payload = {}) {
+  console.log(
+    JSON.stringify(
+      {
+        event,
+        ...payload,
+        at: nowText()
+      },
+      null,
+      2
+    )
+  );
 }
 
 function formatDateTimeInChina(date) {
@@ -349,11 +401,95 @@ function buildTags(record, text, discipline, materials) {
   return unique(tags).slice(0, 8);
 }
 
-function cleanTitle(value) {
-  return normalizeSpace(value)
+function truncateTitleAtBodyStart(value) {
+  let title = normalizeSpace(value);
+
+  for (const pattern of TITLE_BODY_START_PATTERNS) {
+    const match = title.match(pattern);
+    if (match?.index && match.index >= 8) {
+      title = title.slice(0, match.index);
+      break;
+    }
+  }
+
+  return normalizeSpace(title);
+}
+
+function cleanTitle(value, limit = 140) {
+  let title = truncateTitleAtBodyStart(
+    decodeHtmlEntities(value)
+      .replace(/[\u00a0\t]+/g, ' ')
+      .replace(/\.pdf$/i, '')
+      .replace(/^【?招生通知】?\s*/i, '')
+      .replace(/^(正式启动|报名开启|重磅发布|最新发布)[｜|]\s*/i, '')
+  )
     .replace(/\.pdf$/i, '')
     .replace(/^【?招生通知】?\s*/i, '')
-    .slice(0, 140);
+    .trim();
+
+  const sentenceCut = title.search(/[。；;！!](?=.{12,})/);
+  if (sentenceCut >= 12) {
+    title = title.slice(0, sentenceCut);
+  }
+
+  return normalizeSpace(title).slice(0, limit);
+}
+
+function isSuspiciousTitle(value) {
+  const title = normalizeSpace(value);
+  if (!title || title.length > 150) {
+    return true;
+  }
+
+  return TITLE_BODY_START_PATTERNS.some((pattern) => pattern.test(title));
+}
+
+function extractDeadlineFromText(text) {
+  const source = normalizeSpace(text);
+  if (!source) {
+    return '';
+  }
+
+  const labeledPatterns = [
+    /(?:报名|申请|提交材料|网上报名)?截止(?:时间|日期)?[:：为至到\s]*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)/i,
+    /(?:报名|申请)时间[:：]?\s*20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?.{0,12}?(?:至|到|-|—|~)\s*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)/i,
+    /(?:请于|须于|需于)\s*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)\s*(?:前|之前)/i
+  ];
+
+  for (const pattern of labeledPatterns) {
+    const match = source.match(pattern);
+    const deadline = normalizeDateTime(match?.[1] || '', '23:59');
+    if (deadline) {
+      return deadline;
+    }
+  }
+
+  return '';
+}
+
+function normalizeCanonicalText(value) {
+  const stopWords = [
+    '2026年',
+    '2026',
+    '全国优秀大学生',
+    '优秀大学生',
+    '夏令营',
+    '暑期学校',
+    '开放日',
+    '报名通知',
+    '活动通知',
+    '通知',
+    '活动',
+    '简章',
+    '关于举办'
+  ];
+  let text = normalizeSpace(value).toLowerCase();
+
+  for (const word of stopWords) {
+    text = text.split(word).join('');
+  }
+
+  return text.replace(/[\s\p{P}\p{S}]/gu, '');
 }
 
 function shouldKeepNotice(notice) {
@@ -377,6 +513,89 @@ function shouldKeepNotice(notice) {
   return true;
 }
 
+function assessNoticeQuality(notice, extraReasons = []) {
+  const reasons = [...extraReasons];
+  const text = [
+    notice.school_name,
+    notice.department_name,
+    notice.project_name,
+    notice.project_type,
+    notice.discipline,
+    notice.requirements,
+    notice.tags?.join(' ')
+  ]
+    .map(normalizeSpace)
+    .join(' ');
+
+  if (!notice.id || !notice.school_name || !notice.project_name) {
+    reasons.push('missing_required_identity');
+    return { tier: 'hidden', adminStatus: 'hidden', reasons };
+  }
+
+  if (notice.project_name.length < 6) {
+    reasons.push('title_too_short');
+  }
+
+  if (isDeadlineOlderThanTargetYear(notice.deadline_date, TARGET_YEAR)) {
+    reasons.push('outdated_deadline');
+  }
+
+  if (DIRTY_NOTICE_PATTERN.test(text)) {
+    reasons.push('dirty_or_test_content');
+  }
+
+  if (COMPETITION_NOTICE_PATTERN.test(text)) {
+    reasons.push('competition_or_contest');
+  }
+
+  if (!normalizeSpace(notice.deadline_date)) {
+    reasons.push('missing_deadline');
+  }
+
+  if (isSuspiciousTitle(notice.project_name)) {
+    reasons.push('suspicious_or_body_like_title');
+  }
+
+  if (!normalizeSpace(notice.source_link) && !normalizeSpace(notice.apply_link)) {
+    reasons.push('missing_source_link');
+  }
+
+  const hardReasons = new Set([
+    'missing_required_identity',
+    'title_too_short',
+    'outdated_deadline',
+    'dirty_or_test_content',
+    'competition_or_contest',
+    'duplicate_notice'
+  ]);
+  const hasHardReason = reasons.some((reason) => hardReasons.has(reason));
+
+  if (hasHardReason) {
+    return { tier: 'hidden', adminStatus: 'hidden', reasons: unique(reasons) };
+  }
+
+  if (reasons.length) {
+    return { tier: 'needs_review', adminStatus: 'pending', reasons: unique(reasons) };
+  }
+
+  return { tier: 'clean', adminStatus: 'published', reasons: [] };
+}
+
+function applyQualityGate(notice, extraReasons = []) {
+  const quality = assessNoticeQuality(notice, extraReasons);
+  const reviewNote = quality.reasons.length ? `auto_quality:${quality.reasons.join(',')}` : '';
+
+  return {
+    ...notice,
+    admin_status: quality.adminStatus,
+    admin_review_note: reviewNote,
+    is_private: quality.adminStatus !== 'published',
+    is_verified: quality.adminStatus === 'published',
+    quality_tier: quality.tier,
+    quality_reasons: quality.reasons
+  };
+}
+
 function normalizeSyncMode(value) {
   const mode = String(value || '').trim().toLowerCase();
   return mode === 'incremental' || mode === 'full' ? mode : 'full';
@@ -398,7 +617,10 @@ function buildPrimaryProject(record, detail = {}, targetYear = TARGET_YEAR) {
   const textLines = htmlToTextLines(detail.detailContent || detail.content || '');
   const plainText = textLines.join('\n');
   const publishDate = normalizeDate(detail.publishTime || record.publishTime) || nowDateText();
-  const deadlineDate = normalizeDateTime(detail.endTime || record.endTime);
+  const deadlineDate =
+    normalizeDateTime(detail.endTime || record.endTime) ||
+    extractDeadlineFromText(`${title} ${plainText}`) ||
+    '';
   const eventStartDate = normalizeDate(detail.startTime || record.startTime);
   const eventEndDate = normalizeDate(detail.endTime || record.endTime);
   const deadlineLevel = inferDeadlineLevel(deadlineDate);
@@ -490,11 +712,11 @@ function parseSecondaryContent(record) {
 }
 
 function buildSecondaryProject(record, targetYear = TARGET_YEAR) {
-  const title = cleanTitle(record.title);
   const contentMeta = parseSecondaryContent(record);
+  const title = cleanTitle(contentMeta.summary || record.title, 140) || cleanTitle(record.title, 100);
   const summaryText = [title, contentMeta.summary, normalizeSpace(record.description)].filter(Boolean).join(' ');
   const publishDate = normalizeDate(record.updated_time || record.updated_at || record.created_at) || nowDateText();
-  const deadlineDate = normalizeDateTime(record.sign_up_end || record.end_time);
+  const deadlineDate = normalizeDateTime(record.sign_up_end || record.end_time) || extractDeadlineFromText(summaryText);
   const eventStartDate = normalizeDate(record.start_time || record.sign_up_start);
   const eventEndDate = normalizeDate(record.end_time || record.sign_up_end);
   const deadlineLevel = inferDeadlineLevel(deadlineDate);
@@ -506,7 +728,7 @@ function buildSecondaryProject(record, targetYear = TARGET_YEAR) {
     source_record_id: Number(record.id),
     school_name: pickFirst(record.college, record.school) || '待识别学校',
     department_name: pickFirst(record.academy, record.department) || '待补充院系',
-    project_name: pickFirst(contentMeta.summary, title),
+    project_name: title,
     project_type: inferProjectType(title, record.tags, contentMeta.summary),
     discipline,
     publish_date: publishDate,
@@ -546,16 +768,23 @@ function normalizeFingerprint(value) {
 }
 
 function buildFingerprints(project) {
+  const deadlineDay = normalizeSpace(project.deadline_date).slice(0, 10);
+  const school = normalizeCanonicalText(project.school_name);
+  const department = normalizeCanonicalText(project.department_name);
+  const title = normalizeCanonicalText(project.project_name);
+
   return unique([
     normalizeFingerprint(project.source_link),
     normalizeFingerprint(project.apply_link),
+    deadlineDay && school && department ? `identity:${school}|${department}|${deadlineDay}` : '',
+    deadlineDay && school && title ? `title:${school}|${title.slice(0, 28)}|${deadlineDay}` : '',
     normalizeFingerprint(`${project.school_name}|${project.department_name}|${project.project_name}`),
     normalizeFingerprint(`${project.school_name}|${project.project_name}`)
   ]).filter(Boolean);
 }
 
 function mergeProjects(primaryProjects, secondaryProjects) {
-  const fingerprints = new Set();
+  const fingerprints = new Map();
   const merged = [];
   const ids = new Set();
   let skippedSecondaryDuplicates = 0;
@@ -563,7 +792,7 @@ function mergeProjects(primaryProjects, secondaryProjects) {
   let skippedQuality = 0;
 
   for (const project of [...primaryProjects, ...secondaryProjects]) {
-    if (!shouldKeepNotice(project)) {
+    if (!project.id || !project.school_name || !project.project_name) {
       skippedQuality += 1;
       continue;
     }
@@ -573,16 +802,35 @@ function mergeProjects(primaryProjects, secondaryProjects) {
       continue;
     }
 
-    const projectFingerprints = buildFingerprints(project);
-    const isDuplicate = projectFingerprints.some((fingerprint) => fingerprints.has(fingerprint));
-    if (isDuplicate && project.source_site !== '保研通知网') {
+    const duplicate = buildFingerprints(project)
+      .map((fingerprint) => fingerprints.get(fingerprint))
+      .find(Boolean);
+    const duplicateReasons = [];
+
+    if (duplicate) {
       skippedSecondaryDuplicates += 1;
-      continue;
+      const currentPriority = SOURCE_PRIORITY[project.source_site] || 0;
+      const duplicatePriority = SOURCE_PRIORITY[duplicate.source_site] || 0;
+      if (currentPriority <= duplicatePriority) {
+        duplicateReasons.push('duplicate_notice');
+        duplicateReasons.push(`duplicate_of:${duplicate.id}`);
+      }
     }
 
-    merged.push(project);
+    const gatedProject = applyQualityGate(project, duplicateReasons);
+    merged.push(gatedProject);
     ids.add(project.id);
-    projectFingerprints.forEach((fingerprint) => fingerprints.add(fingerprint));
+
+    if (gatedProject.admin_status !== 'hidden') {
+      buildFingerprints(gatedProject).forEach((fingerprint) => {
+        if (!fingerprints.has(fingerprint)) {
+          fingerprints.set(fingerprint, {
+            id: gatedProject.id,
+            source_site: gatedProject.source_site
+          });
+        }
+      });
+    }
   }
 
   return {
@@ -596,35 +844,85 @@ function mergeProjects(primaryProjects, secondaryProjects) {
 async function requestJson(baseUrl, path, params = {}, headers = {}, attempt = 0) {
   const url = new URL(`${baseUrl}${path}`);
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
+    if (value !== undefined && value !== null) {
       url.searchParams.set(key, String(value));
     }
   });
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
   try {
-    const response = await fetch(url, {
-      headers,
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}: ${url.toString()}`);
-    }
-
-    const payload = await response.json();
-    if (payload?.code === 4029 && attempt < 3) {
+    const payload = await requestJsonWithNode(url, headers);
+    if (payload?.code === 4029) {
       const retryAfter = Number(payload?.data?.retryAfter || 2);
+      if (retryAfter > MAX_RATE_LIMIT_RETRY_AFTER_SECONDS) {
+        throw new Error(`Source rate limited for ${retryAfter}s: ${url.toString()}`);
+      }
+
+      if (attempt >= 3) {
+        throw new Error(`Source rate limited after retries: ${url.toString()}`);
+      }
+
       await sleep((retryAfter + attempt) * 1000);
       return requestJson(baseUrl, path, params, headers, attempt + 1);
     }
 
     return payload;
-  } finally {
-    clearTimeout(timeout);
+  } catch (error) {
+    if (attempt < 2) {
+      await sleep((attempt + 1) * 1000);
+      return requestJson(baseUrl, path, params, headers, attempt + 1);
+    }
+
+    throw error;
   }
+}
+
+function requestJsonWithNode(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const client = url.protocol === 'http:' ? http : https;
+    const request = client.request(
+      url,
+      {
+        method: 'GET',
+        headers,
+        timeout: REQUEST_TIMEOUT_MS
+      },
+      (response) => {
+        const statusCode = Number(response.statusCode || 0);
+        const chunks = [];
+        let totalBytes = 0;
+
+        response.on('data', (chunk) => {
+          totalBytes += chunk.length;
+          if (totalBytes > 20 * 1024 * 1024) {
+            request.destroy(new Error(`Response too large: ${url.toString()}`));
+            return;
+          }
+          chunks.push(chunk);
+        });
+
+        response.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8');
+
+          if (statusCode < 200 || statusCode >= 300) {
+            reject(new Error(`Request failed with status ${statusCode}: ${url.toString()} ${text.slice(0, 300)}`));
+            return;
+          }
+
+          try {
+            resolve(JSON.parse(text));
+          } catch (error) {
+            reject(new Error(`Invalid JSON from ${url.toString()}: ${error instanceof Error ? error.message : String(error)}`));
+          }
+        });
+      }
+    );
+
+    request.on('timeout', () => {
+      request.destroy(new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms: ${url.toString()}`));
+    });
+    request.on('error', reject);
+    request.end();
+  });
 }
 
 async function fetchPrimaryNoticeRecords(year) {
@@ -637,6 +935,24 @@ async function fetchPrimaryNoticeRecords(year) {
       break;
     }
 
+    logEvent('primary_page_fetch_started', { page: current, pageSize: PRIMARY_PAGE_SIZE });
+    if (process.env.DEBUG_SYNC_URLS) {
+      const debugUrl = new URL(`${PRIMARY_API_BASE_URL}${PRIMARY_LIST_ENDPOINT}`);
+      Object.entries({
+        current,
+        size: PRIMARY_PAGE_SIZE,
+        recruitType: '',
+        majorName: '',
+        orderBy: PRIMARY_ORDER_BY,
+        universityLevel: '',
+        school: '',
+        status: '',
+        subjectCodes: '',
+        categoryCode: '',
+        year
+      }).forEach(([key, value]) => debugUrl.searchParams.set(key, String(value)));
+      logEvent('primary_page_url', { url: debugUrl.toString() });
+    }
     const payload = await requestJson(
       PRIMARY_API_BASE_URL,
       PRIMARY_LIST_ENDPOINT,
@@ -660,6 +976,12 @@ async function fetchPrimaryNoticeRecords(year) {
     records.push(...batch);
 
     totalPages = Number(data.pages || totalPages || 1);
+    logEvent('primary_page_fetch_finished', {
+      page: current,
+      records: batch.length,
+      totalPages,
+      totalRecords: records.length
+    });
     current += 1;
   }
 
@@ -698,9 +1020,15 @@ async function mapWithConcurrency(items, limit, mapper) {
 }
 
 async function buildPrimaryProjects(records) {
-  const limitedRecords = PRIMARY_MAX_DETAILS ? records.slice(0, PRIMARY_MAX_DETAILS) : records;
+  const detailRecords = PRIMARY_MAX_DETAILS ? records.slice(0, PRIMARY_MAX_DETAILS) : records;
+  const fallbackRecords = PRIMARY_MAX_DETAILS ? records.slice(PRIMARY_MAX_DETAILS) : [];
   const failures = [];
-  const projects = await mapWithConcurrency(limitedRecords, PRIMARY_DETAIL_CONCURRENCY, async (record) => {
+  logEvent('primary_detail_fetch_started', {
+    requestedDetails: detailRecords.length,
+    fallbackDetails: fallbackRecords.length,
+    concurrency: PRIMARY_DETAIL_CONCURRENCY
+  });
+  const detailedProjects = await mapWithConcurrency(detailRecords, PRIMARY_DETAIL_CONCURRENCY, async (record) => {
     const noticeId = Number(record.id);
 
     try {
@@ -715,11 +1043,18 @@ async function buildPrimaryProjects(records) {
       return buildPrimaryProject(record, record, TARGET_YEAR);
     }
   });
+  const fallbackProjects = fallbackRecords.map((record) => buildPrimaryProject(record, record, TARGET_YEAR));
+  logEvent('primary_detail_fetch_finished', {
+    requestedDetails: detailRecords.length,
+    fallbackDetails: fallbackRecords.length,
+    failed: failures.length
+  });
 
   return {
-    projects,
+    projects: [...detailedProjects, ...fallbackProjects],
     failures,
-    requestedDetails: limitedRecords.length
+    requestedDetails: detailRecords.length,
+    fallbackDetails: fallbackRecords.length
   };
 }
 
@@ -728,19 +1063,25 @@ async function fetchSecondaryNoticeRecords(targetYear) {
   let emptyTargetPages = 0;
 
   for (let page = 1; page <= SECONDARY_MAX_PAGES; page += 1) {
+    logEvent('secondary_page_fetch_started', { page, pageSize: SECONDARY_PAGE_SIZE });
     const payload = await requestJson(
       SECONDARY_API_BASE_URL,
       SECONDARY_LIST_ENDPOINT,
       {
         page,
         size: SECONDARY_PAGE_SIZE,
-        category: '保研信息',
+        category: SECONDARY_CATEGORY,
         all: 1
       },
       SECONDARY_HEADERS
     );
 
     const batch = normalizeSecondaryPayload(payload);
+    logEvent('secondary_page_fetch_finished', {
+      page,
+      records: batch.length,
+      targetRecords: batch.filter((record) => isSecondaryTargetRecord(record, targetYear)).length
+    });
     if (!batch.length) {
       break;
     }
@@ -819,6 +1160,112 @@ async function pushProjectsToSupabase(projects, summary) {
   }
 }
 
+function countBy(items, picker) {
+  return items.reduce((result, item) => {
+    const key = picker(item) || 'unknown';
+    result[key] = (result[key] || 0) + 1;
+    return result;
+  }, {});
+}
+
+function maxDateText(values) {
+  return values.map(normalizeSpace).filter(Boolean).sort().at(-1) || '';
+}
+
+function getProjectPublishDate(project) {
+  return normalizeSpace(project.publish_date).slice(0, 10);
+}
+
+function getPrimaryRecordPublishDate(record) {
+  return normalizeDate(record.publishTime || record.publish_time || record.updatedTime || record.updated_time);
+}
+
+function getSecondaryRecordPublishDate(record) {
+  return normalizeDate(record.updated_time || record.updated_at || record.created_at || record.sign_up_start);
+}
+
+function buildSourceStats(primaryRecords, secondaryRecords) {
+  const primaryDates = primaryRecords.map(getPrimaryRecordPublishDate).filter(Boolean);
+  const secondaryDates = secondaryRecords.map(getSecondaryRecordPublishDate).filter(Boolean);
+
+  return {
+    maxSourcePublishDate: maxDateText([...primaryDates, ...secondaryDates]),
+    maxPrimaryPublishDate: maxDateText(primaryDates),
+    maxSecondaryPublishDate: maxDateText(secondaryDates),
+    primaryDateHistogram: countBy(primaryDates, (date) => date),
+    secondaryDateHistogram: countBy(secondaryDates, (date) => date)
+  };
+}
+
+function buildQualityStats(projects) {
+  const published = projects.filter((project) => project.admin_status === 'published');
+  const privateProjects = projects.filter((project) => project.is_private);
+  const longPublishedTitles = published.filter((project) => normalizeSpace(project.project_name).length > 140);
+
+  return {
+    byAdminStatus: countBy(projects, (project) => project.admin_status),
+    byQualityTier: countBy(projects, (project) => project.quality_tier),
+    bySource: countBy(projects, (project) => project.source_site),
+    published: published.length,
+    private: privateProjects.length,
+    maxOutputPublishDate: maxDateText(projects.map(getProjectPublishDate)),
+    maxPublishedPublishDate: maxDateText(published.map(getProjectPublishDate)),
+    publishedLongTitleCount: longPublishedTitles.length,
+    publishedLongTitleIds: longPublishedTitles.slice(0, 10).map((project) => project.id),
+    missingDeadlineCount: projects.filter((project) => !normalizeSpace(project.deadline_date)).length,
+    duplicateHiddenCount: projects.filter((project) => project.quality_reasons?.some((reason) => reason === 'duplicate_notice')).length,
+    reviewSamples: projects
+      .filter((project) => project.admin_status !== 'published')
+      .slice(0, 10)
+      .map((project) => ({
+        id: project.id,
+        status: project.admin_status,
+        source: project.source_site,
+        title: project.project_name,
+        reasons: project.quality_reasons
+      }))
+  };
+}
+
+function assessSyncHealth(sourceStats, qualityStats) {
+  const errors = [];
+  const warnings = [];
+
+  if (!qualityStats.published) {
+    errors.push('no_published_notices');
+  }
+
+  if (qualityStats.publishedLongTitleCount > 0) {
+    errors.push('published_body_like_titles');
+  }
+
+  if (sourceStats.maxSourcePublishDate && qualityStats.maxOutputPublishDate && sourceStats.maxSourcePublishDate > qualityStats.maxOutputPublishDate) {
+    errors.push('source_newer_than_output');
+  }
+
+  if (
+    sourceStats.maxSourcePublishDate &&
+    qualityStats.maxPublishedPublishDate &&
+    sourceStats.maxSourcePublishDate > qualityStats.maxPublishedPublishDate
+  ) {
+    warnings.push('latest_source_date_has_no_public_notice');
+  }
+
+  if (qualityStats.duplicateHiddenCount > 0) {
+    warnings.push('duplicates_hidden');
+  }
+
+  if (qualityStats.missingDeadlineCount > 0) {
+    warnings.push('missing_deadline_routed_to_review');
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    warnings
+  };
+}
+
 async function runSync() {
   const startedAt = nowText();
   console.log(
@@ -830,7 +1277,9 @@ async function runSync() {
         targetYear: TARGET_YEAR,
         primaryOrderBy: PRIMARY_ORDER_BY,
         primaryMaxPages: PRIMARY_MAX_PAGES || 'all',
+        primaryMaxDetails: PRIMARY_MAX_DETAILS || 'all',
         secondaryMaxPages: SECONDARY_MAX_PAGES,
+        requestTimeoutMs: REQUEST_TIMEOUT_MS,
         dryRun: DRY_RUN,
         startedAt
       },
@@ -841,7 +1290,7 @@ async function runSync() {
 
   const primaryListRecords = await fetchPrimaryNoticeRecords(TARGET_YEAR);
   const primaryNoticeRecords = primaryListRecords.filter((record) => normalizeSpace(record?.name) && record?.id);
-  const { projects: primaryProjects, failures: primaryFailures, requestedDetails } = await buildPrimaryProjects(
+  const { projects: primaryProjects, failures: primaryFailures, requestedDetails, fallbackDetails } = await buildPrimaryProjects(
     primaryNoticeRecords
   );
   const secondaryRecords = await fetchSecondaryNoticeRecords(TARGET_YEAR);
@@ -855,6 +1304,19 @@ async function runSync() {
     throw new Error('No valid projects parsed, aborting sync.');
   }
 
+  const sourceStats = buildSourceStats(primaryNoticeRecords, secondaryRecords);
+  const qualityStats = buildQualityStats(merged);
+  const health = assessSyncHealth(sourceStats, qualityStats);
+
+  if (!health.ok) {
+    logEvent('sync_health_failed', {
+      sourceStats,
+      qualityStats,
+      health
+    });
+    throw new Error(`Notice sync health check failed: ${health.errors.join(', ')}`);
+  }
+
   const summary = {
     syncMode: SYNC_MODE,
     targetYear: TARGET_YEAR,
@@ -865,6 +1327,7 @@ async function runSync() {
     primaryFetched: primaryListRecords.length,
     primaryParsed: primaryProjects.length,
     primaryRequestedDetails: requestedDetails,
+    primaryFallbackDetails: fallbackDetails,
     primaryFailed: primaryFailures.length,
     primaryFailures: primaryFailures.slice(0, 10),
     secondaryMaxPages: SECONDARY_MAX_PAGES,
@@ -874,6 +1337,9 @@ async function runSync() {
     skippedDuplicateIds,
     skippedQuality,
     mergedProjects: merged.length,
+    sourceStats,
+    qualityStats,
+    health,
     dryRun: DRY_RUN
   };
 

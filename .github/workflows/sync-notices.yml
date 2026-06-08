@@ -61,6 +61,8 @@ jobs:
       PRIMARY_MAX_DETAILS: ${{ github.event.inputs.primary_max_details }}
       PRIMARY_DETAIL_CONCURRENCY: '6'
       PRIMARY_DETAIL_DELAY_MS: '50'
+      REQUEST_TIMEOUT_MS: '15000'
+      MAX_RATE_LIMIT_RETRY_AFTER_SECONDS: '30'
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       SUPABASE_INGEST_URL: ${{ secrets.SUPABASE_INGEST_URL }}
       SUPABASE_INGEST_SECRET: ${{ secrets.SEEKOFFER_INGEST_SECRET || secrets.SUPABASE_INGEST_SECRET }}
@@ -74,7 +76,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Sync notices
         run: npm run sync:notices:github

@@ -30,6 +30,8 @@ type NoticePayload = {
   is_verified?: boolean;
   change_log?: unknown[];
   history_records?: unknown[];
+  admin_status?: string;
+  admin_review_note?: string;
 };
 
 type IngestBody = {
@@ -49,6 +51,7 @@ function json(status: number, body: Record<string, unknown>) {
 
 function normalizeNotice(notice: NoticePayload) {
   const nowText = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const adminStatus = normalizeAdminStatus(notice.admin_status);
 
   return {
     id: String(notice.id),
@@ -73,14 +76,25 @@ function normalizeNotice(notice: NoticePayload) {
     year: Number(notice.year || 2026),
     deadline_level: String(notice.deadline_level || '').trim() || 'future',
     source_site: String(notice.source_site || '').trim() || 'CloudBase Spider',
-    is_private: Boolean(notice.is_private),
+    is_private: adminStatus !== 'published' || Boolean(notice.is_private),
     collected_at: String(notice.collected_at || '').trim() || nowText,
     updated_at: String(notice.updated_at || '').trim() || nowText,
     last_checked_at: String(notice.last_checked_at || '').trim() || nowText,
     is_verified: Boolean(notice.is_verified),
     change_log: Array.isArray(notice.change_log) ? notice.change_log : [],
-    history_records: Array.isArray(notice.history_records) ? notice.history_records : []
+    history_records: Array.isArray(notice.history_records) ? notice.history_records : [],
+    admin_status: adminStatus,
+    admin_review_note: String(notice.admin_review_note || '').trim()
   };
+}
+
+function normalizeAdminStatus(value: unknown) {
+  const status = String(value || '').trim();
+  if (status === 'pending' || status === 'rejected' || status === 'hidden') {
+    return status;
+  }
+
+  return 'published';
 }
 
 function dedupeNoticesById(notices: ReturnType<typeof normalizeNotice>[]) {
@@ -155,7 +169,45 @@ Deno.serve(async (request) => {
     }
   });
 
-  const { error: noticeError } = await supabase.from('notices').upsert(notices, {
+  const existingById = new Map<string, { admin_status?: string; admin_reviewed_by?: string; admin_deleted_at?: string | null }>();
+  for (let index = 0; index < notices.length; index += 1000) {
+    const batchIds = notices.slice(index, index + 1000).map((notice) => notice.id);
+    const { data: existingRows, error: existingError } = await supabase
+      .from('notices')
+      .select('id,admin_status,admin_reviewed_by,admin_deleted_at')
+      .in('id', batchIds);
+
+    if (existingError) {
+      return json(500, {
+        error: 'existing_lookup_failed',
+        detail: existingError.message
+      });
+    }
+
+    (existingRows || []).forEach((row) => existingById.set(String(row.id), row));
+  }
+
+  const noticesForUpsert = notices.map((notice) => {
+    const existing = existingById.get(notice.id);
+    const manuallyModerated =
+      existing &&
+      existing.admin_status &&
+      existing.admin_status !== 'published' &&
+      String(existing.admin_reviewed_by || '').trim();
+
+    if (!manuallyModerated) {
+      return notice;
+    }
+
+    return {
+      ...notice,
+      admin_status: existing.admin_status,
+      is_private: true,
+      admin_review_note: notice.admin_review_note || 'preserved_manual_moderation'
+    };
+  });
+
+  const { error: noticeError } = await supabase.from('notices').upsert(noticesForUpsert, {
     onConflict: 'id'
   });
 
@@ -169,13 +221,15 @@ Deno.serve(async (request) => {
   await supabase.from('crawler_runs').insert({
     source: body.source || 'cloudbase-sync',
     notices_received: notices.length,
-    notices_upserted: notices.length,
+    notices_upserted: noticesForUpsert.length,
     success: true,
     summary: {
       ...(body.summary || {}),
       originalNoticesReceived: normalizedNotices.length,
       skippedOutdatedDeadline: normalizedNotices.length - publishableNotices.length,
-      dedupedNotices: notices.length
+      dedupedNotices: notices.length,
+      publishedNotices: noticesForUpsert.filter((notice) => notice.admin_status === 'published' && !notice.is_private).length,
+      privateNotices: noticesForUpsert.filter((notice) => notice.is_private).length
     }
   });
 
@@ -183,6 +237,8 @@ Deno.serve(async (request) => {
     ok: true,
     noticesReceived: normalizedNotices.length,
     noticesSkipped: normalizedNotices.length - publishableNotices.length,
-    noticesUpserted: notices.length
+    noticesUpserted: noticesForUpsert.length,
+    noticesPublished: noticesForUpsert.filter((notice) => notice.admin_status === 'published' && !notice.is_private).length,
+    noticesPrivate: noticesForUpsert.filter((notice) => notice.is_private).length
   });
 });
