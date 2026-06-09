@@ -404,6 +404,8 @@ async function listNotices(service: SupabaseService, body: Record<string, unknow
   const filters = readFilters(body);
   const sort = String(body.sort || 'publish_desc');
   const status = normalizeFilter(filters.status);
+  const scope = normalizeFilter(filters.scope) || 'active';
+  const selectedStatus = status && status !== 'all' ? mapNoticeStatus(status) : '';
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
@@ -414,12 +416,18 @@ async function listNotices(service: SupabaseService, body: Record<string, unknow
       { count: 'exact' }
     );
 
-  if (status === 'deleted') {
+  if (scope === 'deleted' || selectedStatus === 'deleted') {
     query = query.not('admin_deleted_at', 'is', null);
+  } else if (scope === 'all_with_deleted') {
+    if (selectedStatus) {
+      query = query.eq('admin_status', selectedStatus);
+    }
   } else {
     query = query.is('admin_deleted_at', null);
-    if (status && status !== 'all') {
-      query = query.eq('admin_status', mapNoticeStatus(status));
+    if (scope === 'hidden') {
+      query = query.eq('admin_status', 'hidden');
+    } else if (selectedStatus) {
+      query = query.eq('admin_status', selectedStatus);
     }
   }
 

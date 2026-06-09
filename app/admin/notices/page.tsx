@@ -31,6 +31,7 @@ const defaultFilters = {
   query: '',
   school: '',
   type: '全部类型',
+  scope: '当前内容',
   status: '全部状态',
   dateFrom: '',
   dateTo: ''
@@ -160,6 +161,36 @@ export default function AdminNoticesPage() {
     void loadNotices({ page: 1, filters: defaultFilters, sort: 'publish_desc' });
   }
 
+  function updateScope(scope: string) {
+    setFilters((current) => ({
+      ...current,
+      scope,
+      status:
+        scope === '下架区'
+          ? '已下架'
+          : scope === '回收站'
+            ? '已删除'
+            : current.status === '已删除'
+              ? '全部状态'
+              : current.status
+    }));
+  }
+
+  function updateStatus(status: string) {
+    setFilters((current) => ({
+      ...current,
+      status,
+      scope:
+        status === '已下架'
+          ? '下架区'
+          : status === '已删除'
+            ? '回收站'
+            : current.scope !== '当前内容'
+              ? '当前内容'
+              : current.scope
+    }));
+  }
+
   const metricCards = buildNoticeMetricCards(metrics);
   const allVisibleSelected = rows.length > 0 && rows.every((item) => selectedIds.includes(item.id));
 
@@ -179,7 +210,7 @@ export default function AdminNoticesPage() {
       <div className="space-y-6">
         <AdminPanel>
           <div className="grid gap-5 p-5">
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_180px_180px_180px_160px_160px_120px]">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_160px_150px_150px_150px_140px_140px_120px]">
               <AdminInput
                 placeholder="搜索通知标题 / 学校 / 学院"
                 value={filters.query}
@@ -198,9 +229,15 @@ export default function AdminNoticesPage() {
               />
               <AdminSelect
                 label=""
+                value={filters.scope}
+                options={['当前内容', '下架区', '回收站']}
+                onChange={updateScope}
+              />
+              <AdminSelect
+                label=""
                 value={filters.status}
                 options={['全部状态', '待审核', '已发布', '已驳回', '已下架', '已删除']}
-                onChange={(value) => setFilters((current) => ({ ...current, status: value }))}
+                onChange={updateStatus}
               />
               <AdminInput
                 type="date"
@@ -262,8 +299,8 @@ export default function AdminNoticesPage() {
             }
           >
             <div className="flex flex-wrap gap-3 px-5 py-4">
-              <AdminButton tone="secondary" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'published', '批量通过通知')}>
-                批量通过
+              <AdminButton tone="secondary" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'published', '批量发布或重新上架通知')}>
+                批量发布/重新上架
               </AdminButton>
               <AdminButton tone="danger" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'rejected', '批量驳回通知')}>
                 批量驳回
@@ -326,9 +363,15 @@ export default function AdminNoticesPage() {
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap gap-3 text-sm font-medium">
                         <button className="text-blue-600 hover:underline" onClick={() => openNoticeDetail(notice)}>查看</button>
-                        <button className="text-emerald-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'published', '后台审核通过并发布')}>发布</button>
-                        <button className="text-slate-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'hidden', '后台下架通知')}>下架</button>
-                        <button className="text-rose-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'deleted', '后台删除通知')}>删除</button>
+                        <button className="text-emerald-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'published', notice.status === '已下架' || notice.status === '已删除' ? '后台重新上架通知' : '后台审核通过并发布')}>
+                          {notice.status === '已下架' || notice.status === '已删除' ? '重新上架' : '发布'}
+                        </button>
+                        {notice.status !== '已下架' && notice.status !== '已删除' ? (
+                          <button className="text-slate-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'hidden', '后台下架通知')}>下架</button>
+                        ) : null}
+                        {notice.status !== '已删除' ? (
+                          <button className="text-rose-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'deleted', '后台删除通知')}>删除</button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -339,7 +382,7 @@ export default function AdminNoticesPage() {
 
             {!rows.length ? (
               <div className="border-t border-slate-100 px-5 py-12 text-center text-sm text-slate-500">
-                当前筛选条件下没有通知。可以重置筛选，或新建一条待审核通知。
+                当前筛选条件下没有通知。可以切换到“下架区”或“回收站”查找历史处理记录，也可以重置筛选。
               </div>
             ) : null}
 
@@ -380,6 +423,8 @@ export default function AdminNoticesPage() {
                   <DetailRow label="发布时间" value={selectedNotice.publishedAt || '-'} />
                   <DetailRow label="截止时间" value={selectedNotice.deadline} />
                   <DetailRow label="最后核验" value={selectedNotice.checkedAt || '-'} />
+                  {selectedNotice.reviewedAt ? <DetailRow label="处理时间" value={selectedNotice.reviewedAt} /> : null}
+                  {selectedNotice.deletedAt ? <DetailRow label="删除时间" value={selectedNotice.deletedAt} /> : null}
                 </dl>
 
                 <div className="rounded-xl border border-slate-200 p-4">
@@ -421,20 +466,28 @@ export default function AdminNoticesPage() {
                 </div>
 
                 <div className="grid gap-3">
-                  <AdminButton disabled={Boolean(pending)} onClick={() => reviewSelected('published', '审核通过并发布')}>
-                    通过并同步前台
+                  <AdminButton disabled={Boolean(pending)} onClick={() => reviewSelected('published', selectedNotice.status === '已下架' || selectedNotice.status === '已删除' ? '重新上架并同步前台' : '审核通过并发布')}>
+                    {selectedNotice.status === '已下架' || selectedNotice.status === '已删除' ? '重新上架并同步前台' : '通过并同步前台'}
                   </AdminButton>
                   <div className="grid grid-cols-2 gap-3">
                     <AdminButton tone="danger" disabled={Boolean(pending)} onClick={() => reviewSelected('rejected', '内容不符合规范，驳回')}>
                       驳回
                     </AdminButton>
-                    <AdminButton tone="secondary" disabled={Boolean(pending)} onClick={() => reviewSelected('hidden', '暂时下架，前台不展示')}>
-                      下架
-                    </AdminButton>
+                    {selectedNotice.status !== '已下架' && selectedNotice.status !== '已删除' ? (
+                      <AdminButton tone="secondary" disabled={Boolean(pending)} onClick={() => reviewSelected('hidden', '暂时下架，前台不展示')}>
+                        下架
+                      </AdminButton>
+                    ) : (
+                      <AdminButton tone="secondary" disabled={Boolean(pending)} onClick={() => reviewSelected('pending', '恢复为待审核')}>
+                        转待审核
+                      </AdminButton>
+                    )}
                   </div>
-                  <AdminButton tone="danger" disabled={Boolean(pending)} onClick={() => reviewSelected('deleted', '逻辑删除，前台不展示')}>
-                    删除
-                  </AdminButton>
+                  {selectedNotice.status !== '已删除' ? (
+                    <AdminButton tone="danger" disabled={Boolean(pending)} onClick={() => reviewSelected('deleted', '逻辑删除，前台不展示')}>
+                      删除
+                    </AdminButton>
+                  ) : null}
                 </div>
               </div>
             ) : (
@@ -480,20 +533,33 @@ type NoticeApiRow = {
   admin_review_note?: string;
   admin_reviewed_by?: string;
   admin_reviewed_at?: string;
+  admin_deleted_at?: string;
 };
 
 function serializeFilters(filters: NoticeFilters) {
+  const scope = noticeScopeToApi(filters.scope);
+
   return {
     query: filters.query.trim(),
     school: filters.school.trim(),
     type: filters.type === '全部类型' ? 'all' : filters.type,
-    status: noticeStatusToApi(filters.status),
+    scope,
+    status: noticeStatusToApi(filters.status, scope),
     dateFrom: filters.dateFrom,
     dateTo: filters.dateTo
   };
 }
 
-function noticeStatusToApi(status: string) {
+function noticeScopeToApi(scope: string) {
+  if (scope === '下架区') return 'hidden';
+  if (scope === '回收站') return 'deleted';
+  if (scope === '全部含删除') return 'all_with_deleted';
+  return 'active';
+}
+
+function noticeStatusToApi(status: string, scope = 'active') {
+  if (scope === 'hidden') return 'hidden';
+  if (scope === 'deleted') return 'deleted';
   if (status === '待审核') return 'pending';
   if (status === '已发布') return 'published';
   if (status === '已驳回') return 'rejected';
@@ -533,7 +599,8 @@ function mapNoticeApiRow(row: NoticeApiRow): AdminNoticeRow {
     verified: Boolean(row.is_verified),
     reviewNote: row.admin_review_note || '',
     reviewedBy: row.admin_reviewed_by || '',
-    reviewedAt: formatBeijingDateTime(row.admin_reviewed_at, '')
+    reviewedAt: formatBeijingDateTime(row.admin_reviewed_at, ''),
+    deletedAt: formatBeijingDateTime(row.admin_deleted_at, '')
   };
 }
 

@@ -40,6 +40,7 @@ export type AdminNoticeRow = {
   reviewNote?: string;
   reviewedBy?: string;
   reviewedAt?: string;
+  deletedAt?: string;
 };
 
 export type AdminOfferRow = {
