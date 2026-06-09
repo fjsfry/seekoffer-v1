@@ -779,7 +779,11 @@ export function watchApplicationTable(callback: () => void) {
   };
 }
 
-export async function fetchPublicNotices() {
+export async function fetchPublicNotices(options: { refresh?: boolean } = {}) {
+  if (options.refresh) {
+    publicNoticeCachePromise = null;
+  }
+
   if (!publicNoticeCachePromise) {
     publicNoticeCachePromise = (async () => {
       try {

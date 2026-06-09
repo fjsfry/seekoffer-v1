@@ -121,6 +121,14 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function toErrorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isSourceRateLimitError(error) {
+  return /^Source rate limited/.test(toErrorMessage(error));
+}
+
 function normalizeSpace(value) {
   if (value === null || value === undefined) {
     return '';
@@ -492,27 +500,6 @@ function normalizeCanonicalText(value) {
   return text.replace(/[\s\p{P}\p{S}]/gu, '');
 }
 
-function shouldKeepNotice(notice) {
-  const text = [
-    notice.school_name,
-    notice.department_name,
-    notice.project_name,
-    notice.project_type,
-    notice.discipline,
-    notice.requirements,
-    notice.tags?.join(' ')
-  ]
-    .map(normalizeSpace)
-    .join(' ');
-
-  if (!notice.id || !notice.school_name || !notice.project_name) return false;
-  if (notice.project_name.length < 6) return false;
-  if (isDeadlineOlderThanTargetYear(notice.deadline_date, TARGET_YEAR)) return false;
-  if (DIRTY_NOTICE_PATTERN.test(text)) return false;
-  if (COMPETITION_NOTICE_PATTERN.test(text)) return false;
-  return true;
-}
-
 function assessNoticeQuality(notice, extraReasons = []) {
   const reasons = [...extraReasons];
   const text = [
@@ -867,6 +854,10 @@ async function requestJson(baseUrl, path, params = {}, headers = {}, attempt = 0
 
     return payload;
   } catch (error) {
+    if (isSourceRateLimitError(error)) {
+      throw error;
+    }
+
     if (attempt < 2) {
       await sleep((attempt + 1) * 1000);
       return requestJson(baseUrl, path, params, headers, attempt + 1);
@@ -1288,25 +1279,77 @@ async function runSync() {
     )
   );
 
-  const primaryListRecords = await fetchPrimaryNoticeRecords(TARGET_YEAR);
-  const primaryNoticeRecords = primaryListRecords.filter((record) => normalizeSpace(record?.name) && record?.id);
-  const { projects: primaryProjects, failures: primaryFailures, requestedDetails, fallbackDetails } = await buildPrimaryProjects(
-    primaryNoticeRecords
-  );
-  const secondaryRecords = await fetchSecondaryNoticeRecords(TARGET_YEAR);
-  const secondaryProjects = secondaryRecords.map((record) => buildSecondaryProject(record, TARGET_YEAR));
+  const sourceErrors = [];
+  let primaryListRecords = [];
+  let primaryNoticeRecords = [];
+  let primaryProjects = [];
+  let primaryFailures = [];
+  let requestedDetails = 0;
+  let fallbackDetails = 0;
+
+  try {
+    primaryListRecords = await fetchPrimaryNoticeRecords(TARGET_YEAR);
+    primaryNoticeRecords = primaryListRecords.filter((record) => normalizeSpace(record?.name) && record?.id);
+    const primaryBuildResult = await buildPrimaryProjects(primaryNoticeRecords);
+    primaryProjects = primaryBuildResult.projects;
+    primaryFailures = primaryBuildResult.failures;
+    requestedDetails = primaryBuildResult.requestedDetails;
+    fallbackDetails = primaryBuildResult.fallbackDetails;
+  } catch (error) {
+    const message = toErrorMessage(error);
+    sourceErrors.push({
+      source: 'primary',
+      sourceSite: '保研通知网',
+      stage: 'primary_fetch',
+      error: message
+    });
+    logEvent('source_fetch_failed', {
+      source: 'primary',
+      sourceSite: '保研通知网',
+      error: message
+    });
+  }
+
+  let secondaryRecords = [];
+  let secondaryProjects = [];
+
+  try {
+    secondaryRecords = await fetchSecondaryNoticeRecords(TARGET_YEAR);
+    secondaryProjects = secondaryRecords.map((record) => buildSecondaryProject(record, TARGET_YEAR));
+  } catch (error) {
+    const message = toErrorMessage(error);
+    sourceErrors.push({
+      source: 'secondary',
+      sourceSite: '保研信息网',
+      stage: 'secondary_fetch',
+      error: message
+    });
+    logEvent('source_fetch_failed', {
+      source: 'secondary',
+      sourceSite: '保研信息网',
+      error: message
+    });
+  }
+
   const { merged, skippedSecondaryDuplicates, skippedDuplicateIds, skippedQuality } = mergeProjects(
     primaryProjects,
     secondaryProjects
   );
 
   if (!merged.length) {
-    throw new Error('No valid projects parsed, aborting sync.');
+    throw new Error(
+      `No valid projects parsed, aborting sync.${
+        sourceErrors.length ? ` Source errors: ${sourceErrors.map((item) => `${item.source}:${item.error}`).join(' | ')}` : ''
+      }`
+    );
   }
 
   const sourceStats = buildSourceStats(primaryNoticeRecords, secondaryRecords);
   const qualityStats = buildQualityStats(merged);
   const health = assessSyncHealth(sourceStats, qualityStats);
+  if (sourceErrors.length) {
+    health.warnings.push(...sourceErrors.map((item) => `${item.source}_source_unavailable`));
+  }
 
   if (!health.ok) {
     logEvent('sync_health_failed', {
@@ -1340,6 +1383,7 @@ async function runSync() {
     sourceStats,
     qualityStats,
     health,
+    sourceErrors,
     dryRun: DRY_RUN
   };
 

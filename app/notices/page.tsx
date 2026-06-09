@@ -162,6 +162,18 @@ function getBeijingDateString(date = new Date()) {
   return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
+function getBeijingTimeString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || '';
+
+  return `${value('hour')}:${value('minute')}`;
+}
+
 function sortProjects(rows: PublicNoticeProject[], sortBy: SortOption) {
   return rows.sort((left, right) => {
     if (sortBy === 'deadline') {
@@ -420,6 +432,9 @@ function NoticesPageContent() {
     filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [lastLoadedAt, setLastLoadedAt] = useState('');
   const [loadError, setLoadError] = useState('');
   const [keyword, setKeyword] = useState(initialNoticeState.keyword);
   const [schoolName, setSchoolName] = useState(initialNoticeState.schoolName);
@@ -463,9 +478,10 @@ function NoticesPageContent() {
       setLoadError('');
 
       try {
-        const rows = await fetchPublicNotices();
+        const rows = await fetchPublicNotices({ refresh: reloadToken > 0 });
         if (active) {
           setProjects(rows.filter((item) => String(item.year) === '2026'));
+          setLastLoadedAt(getBeijingTimeString());
         }
       } catch {
         if (active) {
@@ -475,6 +491,7 @@ function NoticesPageContent() {
       } finally {
         if (active) {
           setIsLoading(false);
+          setIsRefreshing(false);
         }
       }
     }
@@ -484,7 +501,7 @@ function NoticesPageContent() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadToken]);
 
   const categoryOptions = useMemo(
     () => ['全部', ...Array.from(new Set(projects.map((item) => inferDisciplineCategory(item.discipline))))],
@@ -719,6 +736,15 @@ function NoticesPageContent() {
     });
   }
 
+  function refreshLatestNotices() {
+    if (isLoading || isRefreshing) {
+      return;
+    }
+
+    setIsRefreshing(true);
+    setReloadToken((value) => value + 1);
+  }
+
   function applyQuickFilter(filter: (typeof quickFilters)[number]) {
     if (filter.kind === 'progress') {
       setProgress(filter.value as ProgressFilter);
@@ -917,11 +943,23 @@ function NoticesPageContent() {
               >
                 按截止时间排序
               </button>
+              {lastLoadedAt ? <span className="text-slate-400">已同步 {lastLoadedAt}</span> : null}
             </div>
-            <button onClick={resetFilters} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-brand">
-              <RefreshCw className="h-4 w-4" />
-              重置筛选
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={refreshLatestNotices}
+                disabled={isLoading || isRefreshing}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-brand transition hover:text-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? '刷新中' : '刷新最新'}
+              </button>
+              <button onClick={resetFilters} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-brand">
+                <RefreshCw className="h-4 w-4" />
+                重置筛选
+              </button>
+            </div>
           </div>
 
           {isNoticeLoading ? (
