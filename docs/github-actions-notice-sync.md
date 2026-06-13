@@ -12,6 +12,7 @@ Add these secrets in GitHub:
 Optional:
 
 - `SUPABASE_INGEST_URL`: only needed if the ingest endpoint is not the default `https://<SUPABASE_PROJECT_REF>.supabase.co/functions/v1/ingest-notices`.
+- `SECONDARY_REPAIR_DETAIL_IDS`: optional comma-separated 保研信息网 article IDs to force re-fetch by detail API during full reconciliation.
 
 ## Schedule
 
@@ -47,3 +48,4 @@ GitHub Actions schedule
 - Secrets must not be committed to the repository.
 - The crawler orders source data by publish time, so recent notices are picked up first.
 - The script filters obvious test data and non-baoyan competition notices before ingestion.
+- Full reconciliation also re-fetches known historical 保研信息网 detail records whose list cards were not covered by the latest page window, so repaired school names can overwrite older weak rows.

@@ -17,6 +17,7 @@ const PRIMARY_WEB_DETAIL_URL = 'https://www.baoyantongzhi.com/notice/detail/{id}
 const PRIMARY_LIST_ENDPOINT = '/backgd/notice/show/list';
 const PRIMARY_DETAIL_ENDPOINT = '/backgd/notice/show/{id}';
 const SECONDARY_LIST_ENDPOINT = '/articles';
+const SECONDARY_DETAIL_ENDPOINT = '/articles/{id}';
 
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 30000);
 const MAX_RATE_LIMIT_RETRY_AFTER_SECONDS = Number(process.env.MAX_RATE_LIMIT_RETRY_AFTER_SECONDS || 30);
@@ -40,6 +41,12 @@ const SECONDARY_MAX_PAGES =
   parseOptionalInteger(process.env.SECONDARY_MAX_PAGES) ||
   (IS_INCREMENTAL_SYNC ? DEFAULT_INCREMENTAL_SECONDARY_MAX_PAGES : DEFAULT_FULL_SECONDARY_MAX_PAGES);
 const SECONDARY_CATEGORY = process.env.SECONDARY_CATEGORY || '\u4fdd\u7814\u4fe1\u606f';
+const DEFAULT_SECONDARY_REPAIR_DETAIL_IDS = IS_INCREMENTAL_SYNC ? [] : ['7308'];
+const SECONDARY_REPAIR_DETAIL_IDS = unique([
+  ...DEFAULT_SECONDARY_REPAIR_DETAIL_IDS,
+  ...parseDelimitedList(process.env.SECONDARY_REPAIR_DETAIL_IDS)
+]);
+const SECONDARY_DETAIL_DELAY_MS = Math.max(0, Number(process.env.SECONDARY_DETAIL_DELAY_MS || 120));
 const DRY_RUN = /^1|true|yes$/i.test(process.env.DRY_RUN || '');
 
 const SOURCE_PRIORITY = {
@@ -118,6 +125,13 @@ function parseOptionalInteger(value) {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : null;
+}
+
+function parseDelimitedList(value) {
+  return String(value || '')
+    .split(/[\s,;，；]+/)
+    .map(normalizeSpace)
+    .filter(Boolean);
 }
 
 function sleep(ms) {
@@ -744,11 +758,44 @@ function normalizeSecondaryDepartment(value) {
   return '';
 }
 
+function quillOpsToText(ops) {
+  if (!Array.isArray(ops)) {
+    return '';
+  }
+
+  return normalizeSpace(
+    ops
+      .map((op) => (typeof op?.insert === 'string' ? op.insert : ''))
+      .filter(Boolean)
+      .join(' ')
+  );
+}
+
 function parseSecondaryContent(record) {
-  const contentPayload = safeJsonParse(record.content || '{}', {});
+  const contentPayload = safeJsonParse(record.content || '{}', null);
+  let coverUrl = normalizeSpace(record.cover_url);
+  let summary = '';
+
+  if (Array.isArray(contentPayload)) {
+    summary = quillOpsToText(contentPayload);
+  } else if (contentPayload && typeof contentPayload === 'object') {
+    coverUrl = normalizeSpace(contentPayload.cover_url || coverUrl);
+    summary = normalizeSpace(
+      contentPayload.p ||
+        contentPayload.text ||
+        contentPayload.summary ||
+        contentPayload.description ||
+        quillOpsToText(contentPayload.ops)
+    );
+  }
+
+  if (!summary && typeof record.content === 'string' && /<[^>]+>/.test(record.content)) {
+    summary = htmlToTextLines(record.content).join(' ');
+  }
+
   return {
-    coverUrl: normalizeSpace(contentPayload.cover_url || record.cover_url),
-    summary: normalizeSpace(contentPayload.p || record.description || record.title)
+    coverUrl,
+    summary: normalizeSpace(summary || record.description || record.sub_title || record.title)
   };
 }
 
@@ -1155,6 +1202,66 @@ async function fetchSecondaryNoticeRecords(targetYear) {
   return records;
 }
 
+async function fetchSecondaryNoticeDetail(articleId) {
+  const id = normalizeSpace(articleId);
+  if (!/^\d+$/.test(id)) {
+    throw new Error(`Invalid secondary detail id: ${articleId}`);
+  }
+
+  const payload = await requestJson(
+    SECONDARY_API_BASE_URL,
+    SECONDARY_DETAIL_ENDPOINT.replace('{id}', id),
+    {},
+    SECONDARY_HEADERS
+  );
+  const record = payload?.result || payload?.data || payload?.article;
+  if (!record || typeof record !== 'object') {
+    throw new Error(`Secondary detail missing record: ${id}`);
+  }
+
+  return record;
+}
+
+async function fetchSecondaryRepairRecords(existingRecords, targetYear) {
+  const existingIds = new Set(existingRecords.map((record) => normalizeSpace(record.id)));
+  const repairIds = SECONDARY_REPAIR_DETAIL_IDS.filter((id) => !existingIds.has(id));
+  const records = [];
+  const failures = [];
+
+  for (const id of repairIds) {
+    logEvent('secondary_detail_repair_started', { id });
+    try {
+      const record = await fetchSecondaryNoticeDetail(id);
+      if (isSecondaryTargetRecord(record, targetYear)) {
+        records.push(record);
+      }
+      logEvent('secondary_detail_repair_finished', {
+        id,
+        included: isSecondaryTargetRecord(record, targetYear)
+      });
+    } catch (error) {
+      failures.push({
+        id,
+        error: toErrorMessage(error)
+      });
+      logEvent('secondary_detail_repair_failed', {
+        id,
+        error: toErrorMessage(error)
+      });
+    }
+
+    if (SECONDARY_DETAIL_DELAY_MS > 0) {
+      await sleep(SECONDARY_DETAIL_DELAY_MS);
+    }
+  }
+
+  return {
+    records,
+    failures,
+    requestedIds: repairIds
+  };
+}
+
 async function pushProjectsToSupabase(projects, summary) {
   if (DRY_RUN) {
     return {
@@ -1336,6 +1443,7 @@ async function runSync() {
         primaryMaxPages: PRIMARY_MAX_PAGES || 'all',
         primaryMaxDetails: PRIMARY_MAX_DETAILS || 'all',
         secondaryMaxPages: SECONDARY_MAX_PAGES,
+        secondaryRepairDetailIds: SECONDARY_REPAIR_DETAIL_IDS,
         requestTimeoutMs: REQUEST_TIMEOUT_MS,
         dryRun: DRY_RUN,
         startedAt
@@ -1378,9 +1486,17 @@ async function runSync() {
 
   let secondaryRecords = [];
   let secondaryProjects = [];
+  let secondaryRepairRecords = [];
+  let secondaryRepairFailures = [];
+  let secondaryRepairRequestedIds = [];
 
   try {
     secondaryRecords = await fetchSecondaryNoticeRecords(TARGET_YEAR);
+    const secondaryRepairResult = await fetchSecondaryRepairRecords(secondaryRecords, TARGET_YEAR);
+    secondaryRepairRecords = secondaryRepairResult.records;
+    secondaryRepairFailures = secondaryRepairResult.failures;
+    secondaryRepairRequestedIds = secondaryRepairResult.requestedIds;
+    secondaryRecords = [...secondaryRecords, ...secondaryRepairRecords];
     secondaryProjects = secondaryRecords.map((record) => buildSecondaryProject(record, TARGET_YEAR));
   } catch (error) {
     const message = toErrorMessage(error);
@@ -1416,6 +1532,9 @@ async function runSync() {
   if (sourceErrors.length) {
     health.warnings.push(...sourceErrors.map((item) => `${item.source}_source_unavailable`));
   }
+  if (secondaryRepairFailures.length) {
+    health.warnings.push('secondary_detail_repair_failed');
+  }
 
   if (!health.ok) {
     logEvent('sync_health_failed', {
@@ -1441,6 +1560,10 @@ async function runSync() {
     primaryFailures: primaryFailures.slice(0, 10),
     secondaryMaxPages: SECONDARY_MAX_PAGES,
     secondaryFetched: secondaryRecords.length,
+    secondaryRepairRequestedIds,
+    secondaryRepairFetched: secondaryRepairRecords.length,
+    secondaryRepairFailed: secondaryRepairFailures.length,
+    secondaryRepairFailures: secondaryRepairFailures.slice(0, 10),
     secondaryParsed: secondaryProjects.length,
     secondarySkippedAsDuplicate: skippedSecondaryDuplicates,
     skippedDuplicateIds,
