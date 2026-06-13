@@ -1,20 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell, CheckCircle2, ExternalLink, Plus, RotateCcw, Trash2, XCircle } from 'lucide-react';
+import { Bell, CheckCircle2, Download, ExternalLink, FileSearch, Plus, RotateCcw, Trash2, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AdminShell } from '@/components/admin-shell';
 import {
   AdminButton,
+  AdminActionBanner,
+  AdminEmptyState,
+  AdminFilterSummary,
   AdminInput,
   AdminMetricCard,
   AdminPagination,
   AdminPanel,
   AdminSelect,
+  AdminSelectionBar,
   AdminStatusBadge
 } from '@/components/admin-ui';
 import type { AdminMetric, AdminNoticeRow } from '@/lib/admin-data';
-import { invokeAdminApi } from '@/lib/admin-api';
+import { getAdminErrorMessage, invokeAdminApi } from '@/lib/admin-api';
 import { formatBeijingDateTime } from '@/lib/admin-time';
 
 const noticeIcons = [Bell, CheckCircle2, XCircle, Trash2];
@@ -49,7 +53,7 @@ export default function AdminNoticesPage() {
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
   const [pending, setPending] = useState('');
-  const [message, setMessage] = useState('正在连接后台真实数据...');
+  const [message, setMessage] = useState('正在加载通知数据...');
   const [selectedNotice, setSelectedNotice] = useState<AdminNoticeRow | null>(null);
   const [reviewNote, setReviewNote] = useState('');
 
@@ -103,9 +107,9 @@ export default function AdminNoticesPage() {
         if (!current) return null;
         return data.notices.map(mapNoticeApiRow).find((item) => item.id === current.id) || null;
       });
-      setMessage(`已连接 Supabase，共匹配 ${data.total} 条通知，当前第 ${data.page} 页。`);
+      setMessage(`已匹配 ${data.total} 条通知，当前第 ${data.page} 页。`);
     } catch (error) {
-      setMessage(error instanceof Error ? `真实 API 暂不可用：${error.message}` : '真实 API 暂不可用，请稍后重试。');
+      setMessage(`通知数据暂时无法更新：${getAdminErrorMessage(error)}`);
     } finally {
       setPending('');
     }
@@ -144,10 +148,10 @@ export default function AdminNoticesPage() {
 
       const nextPage = rows.length === ids.length && page > 1 ? page - 1 : page;
       window.localStorage.setItem('seekoffer-admin-notice-version', String(Date.now()));
-      setMessage('操作成功：状态已写入 Supabase。线上前台会通过实时公开接口隐藏/展示，下一次构建也会同步静态兜底数据。');
+      setMessage('操作成功：通知展示状态已更新，前台会按最新状态展示。');
       await loadNotices({ page: nextPage });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '通知操作失败，请稍后重试。');
+      setMessage(getAdminErrorMessage(error, '通知操作失败，请稍后重试。'));
     } finally {
       setPending('');
     }
@@ -205,12 +209,32 @@ export default function AdminNoticesPage() {
     void updateNoticeStatus([selectedNotice.id], status, reviewNote.trim() || defaultNote);
   }
 
+  function exportCurrentPage() {
+    const header = ['标题', '学校', '学院', '类型', '来源链接', '提交人', '提交时间', '状态'];
+    const lines = rows.map((notice) =>
+      [notice.title, notice.school, notice.department, notice.type, notice.sourceUrl, notice.submitter, notice.submittedAt, notice.status]
+        .map((cell) => `"${String(cell).replaceAll('"', '""')}"`)
+        .join(',')
+    );
+    const blob = new Blob([`\uFEFF${[header.join(','), ...lines].join('\n')}`], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `seekoffer-admin-notices-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    setMessage(`已导出当前页 ${rows.length} 条通知。`);
+  }
+
   return (
     <AdminShell title="通知管理" description="审核、发布、下架和删除通知内容；已发布内容才会进入前台首页与通知库。">
       <div className="space-y-6">
         <AdminPanel>
           <div className="grid gap-5 p-5">
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_160px_150px_150px_150px_140px_140px_120px]">
+            <div
+              className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_160px_150px_150px_150px_140px_140px_120px]"
+              onKeyDown={(event) => event.key === 'Enter' && applyFilters()}
+            >
               <AdminInput
                 placeholder="搜索通知标题 / 学校 / 学院"
                 value={filters.query}
@@ -278,7 +302,19 @@ export default function AdminNoticesPage() {
                 </AdminButton>
               </div>
             </div>
-            <div className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div>
+            <AdminFilterSummary
+              filters={[
+                { label: '关键词', value: filters.query },
+                { label: '学校', value: filters.school },
+                { label: '类型', value: filters.type, mutedValue: '全部类型' },
+                { label: '范围', value: filters.scope, mutedValue: '当前内容' },
+                { label: '状态', value: filters.status, mutedValue: '全部状态' },
+                { label: '开始', value: filters.dateFrom },
+                { label: '结束', value: filters.dateTo }
+              ]}
+              onClear={resetFilters}
+            />
+            <AdminActionBanner tone={message.includes('失败') || message.includes('无法') ? 'danger' : 'info'}>{message}</AdminActionBanner>
           </div>
         </AdminPanel>
 
@@ -292,13 +328,19 @@ export default function AdminNoticesPage() {
           <AdminPanel
             title="通知列表"
             action={
-              <AdminButton tone="secondary" onClick={() => void loadNotices()} disabled={pending === 'load'}>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                刷新列表
-              </AdminButton>
+              <div className="flex flex-wrap gap-2">
+                <AdminButton tone="secondary" onClick={exportCurrentPage} disabled={!rows.length}>
+                  <Download className="mr-2 h-4 w-4" />
+                  导出当前页
+                </AdminButton>
+                <AdminButton tone="secondary" onClick={() => void loadNotices()} disabled={pending === 'load'}>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  刷新列表
+                </AdminButton>
+              </div>
             }
           >
-            <div className="flex flex-wrap gap-3 px-5 py-4">
+            <AdminSelectionBar selectedCount={selectedIds.length} totalCount={rows.length} onClear={() => setSelectedIds([])}>
               <AdminButton tone="secondary" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'published', '批量发布或重新上架通知')}>
                 批量发布/重新上架
               </AdminButton>
@@ -311,7 +353,7 @@ export default function AdminNoticesPage() {
               <AdminButton tone="danger" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateNoticeStatus(selectedIds, 'deleted', '批量删除通知')}>
                 批量删除
               </AdminButton>
-            </div>
+            </AdminSelectionBar>
 
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1240px] text-left text-sm">
@@ -363,14 +405,14 @@ export default function AdminNoticesPage() {
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap gap-3 text-sm font-medium">
                         <button className="text-blue-600 hover:underline" onClick={() => openNoticeDetail(notice)}>查看</button>
-                        <button className="text-emerald-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'published', notice.status === '已下架' || notice.status === '已删除' ? '后台重新上架通知' : '后台审核通过并发布')}>
+                        <button className="text-emerald-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'published', notice.status === '已下架' || notice.status === '已删除' ? '重新上架通知' : '审核通过并发布')}>
                           {notice.status === '已下架' || notice.status === '已删除' ? '重新上架' : '发布'}
                         </button>
                         {notice.status !== '已下架' && notice.status !== '已删除' ? (
-                          <button className="text-slate-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'hidden', '后台下架通知')}>下架</button>
+                          <button className="text-slate-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'hidden', '下架通知')}>下架</button>
                         ) : null}
                         {notice.status !== '已删除' ? (
-                          <button className="text-rose-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'deleted', '后台删除通知')}>删除</button>
+                          <button className="text-rose-600 hover:underline" onClick={() => updateNoticeStatus([notice.id], 'deleted', '删除通知')}>删除</button>
                         ) : null}
                       </div>
                     </td>
@@ -381,9 +423,18 @@ export default function AdminNoticesPage() {
             </div>
 
             {!rows.length ? (
-              <div className="border-t border-slate-100 px-5 py-12 text-center text-sm text-slate-500">
-                当前筛选条件下没有通知。可以切换到“下架区”或“回收站”查找历史处理记录，也可以重置筛选。
-              </div>
+              <AdminEmptyState
+                icon={FileSearch}
+                title={pending === 'load' ? '正在加载通知' : '没有匹配的通知'}
+                description={pending === 'load' ? '系统正在读取最新审核列表，请稍候。' : '可以切换到下架区或回收站查找历史处理记录，也可以重置筛选。'}
+                action={
+                  pending !== 'load' ? (
+                    <AdminButton tone="secondary" onClick={resetFilters}>
+                      重置筛选
+                    </AdminButton>
+                  ) : null
+                }
+              />
             ) : null}
 
             <AdminPagination
@@ -466,8 +517,8 @@ export default function AdminNoticesPage() {
                 </div>
 
                 <div className="grid gap-3">
-                  <AdminButton disabled={Boolean(pending)} onClick={() => reviewSelected('published', selectedNotice.status === '已下架' || selectedNotice.status === '已删除' ? '重新上架并同步前台' : '审核通过并发布')}>
-                    {selectedNotice.status === '已下架' || selectedNotice.status === '已删除' ? '重新上架并同步前台' : '通过并同步前台'}
+                  <AdminButton disabled={Boolean(pending)} onClick={() => reviewSelected('published', selectedNotice.status === '已下架' || selectedNotice.status === '已删除' ? '重新上架并展示' : '审核通过并发布')}>
+                    {selectedNotice.status === '已下架' || selectedNotice.status === '已删除' ? '重新上架并展示' : '通过并展示'}
                   </AdminButton>
                   <div className="grid grid-cols-2 gap-3">
                     <AdminButton tone="danger" disabled={Boolean(pending)} onClick={() => reviewSelected('rejected', '内容不符合规范，驳回')}>
@@ -585,7 +636,7 @@ function mapNoticeApiRow(row: NoticeApiRow): AdminNoticeRow {
     department: row.department_name || '待补充学院',
     type: row.project_type || '其他',
     sourceUrl: row.source_link || `/notices/${row.id}`,
-    submitter: row.is_private ? '用户提交' : '系统同步',
+    submitter: row.is_private ? '用户提交' : '平台收录',
     submittedAt: formatBeijingDateTime(row.updated_at_ts || row.created_at, row.publish_date || '-'),
     deadline: row.deadline_date || '待确认',
     status: mapNoticeStatus(row.admin_status),

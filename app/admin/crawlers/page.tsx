@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { AdminShell } from '@/components/admin-shell';
 import {
   AdminButton,
+  AdminActionBanner,
   AdminInput,
   AdminMetricCard,
   AdminPagination,
@@ -16,7 +17,7 @@ import {
   AdminStatusBadge
 } from '@/components/admin-ui';
 import type { AdminFeedbackRow, AdminMetric, AdminOperationLog, AdminUserRow } from '@/lib/admin-data';
-import { invokeAdminApi } from '@/lib/admin-api';
+import { getAdminErrorMessage, invokeAdminApi } from '@/lib/admin-api';
 import { formatBeijingDateTime } from '@/lib/admin-time';
 
 type OperationsSection = 'users' | 'feedback' | 'logs' | 'settings';
@@ -102,7 +103,7 @@ export default function AdminOperationsPage() {
   const [userFilters, setUserFilters] = useState<UserFilters>(defaultUserFilters);
   const [feedbackFilters, setFeedbackFilters] = useState<FeedbackFilters>(defaultFeedbackFilters);
   const [logFilters, setLogFilters] = useState<LogFilters>(defaultLogFilters);
-  const [message, setMessage] = useState('正在连接后台真实运营数据...');
+  const [message, setMessage] = useState('正在加载运营数据...');
 
   useEffect(() => {
     const syncSection = () => {
@@ -189,12 +190,12 @@ export default function AdminOperationsPage() {
       setUserFilters(nextUserFilters);
       setFeedbackFilters(nextFeedbackFilters);
       setLogFilters(nextLogFilters);
-      setMessage('已连接 Supabase，运营数据和操作按钮已切换到真实后台 API。');
+      setMessage('运营数据已更新，当前页面展示最新记录。');
     } catch (error) {
       setUsers([]);
       setFeedback([]);
       setLogs([]);
-      setMessage(error instanceof Error ? `真实 API 暂不可用：${error.message}` : '真实 API 暂不可用，请稍后重试。');
+      setMessage(`运营数据暂时无法更新：${getAdminErrorMessage(error)}`);
     }
   }
 
@@ -208,7 +209,7 @@ export default function AdminOperationsPage() {
       setMessage('用户状态已更新，并写入操作日志。');
       await loadOperationsData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '用户状态更新失败。');
+      setMessage(getAdminErrorMessage(error, '用户状态更新失败。'));
     }
   }
 
@@ -218,7 +219,7 @@ export default function AdminOperationsPage() {
       setMessage('反馈/举报状态已更新，并写入操作日志。');
       await loadOperationsData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '反馈处理失败。');
+      setMessage(getAdminErrorMessage(error, '反馈处理失败。'));
     }
   }
 
@@ -227,7 +228,7 @@ export default function AdminOperationsPage() {
       await invokeAdminApi({ resource: 'settings', action: 'update', key, value });
       setMessage('系统设置已更新，并写入操作日志。');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '系统设置更新失败。');
+      setMessage(getAdminErrorMessage(error, '系统设置更新失败。'));
     }
   }
 
@@ -235,7 +236,7 @@ export default function AdminOperationsPage() {
     <AdminShell title={operationsSectionTitles[activeSection]} description={operationsSectionDescriptions[activeSection]}>
       <div className="space-y-8">
         <OperationsSwitch activeSection={activeSection} />
-        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div>
+        <AdminActionBanner tone={message.includes('失败') || message.includes('无法') ? 'danger' : 'info'}>{message}</AdminActionBanner>
         {activeSection === 'users' ? (
           <UsersView
             users={users}
@@ -394,7 +395,7 @@ function UsersView({
               onClick={() => {
                 setDraftFilters(defaultUserFilters);
                 onApplyFilters(defaultUserFilters);
-                onNotify('用户筛选条件已重置，并重新加载真实用户列表。');
+                onNotify('用户筛选条件已重置，并重新加载列表。');
               }}
             >
               重置
@@ -454,7 +455,7 @@ function UsersView({
                   <tr className="border-t border-slate-100">
                     <td colSpan={11} className="px-5 py-14 text-center">
                       <div className="mx-auto max-w-sm rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
-                        暂无用户数据。请确认 Supabase 管理员会话有效，或稍后刷新重试。
+                        暂无用户数据。请确认管理员登录状态有效，或稍后刷新重试。
                       </div>
                     </td>
                   </tr>
@@ -505,7 +506,7 @@ function UsersView({
             </>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
-              暂无用户数据。请确认 Supabase API 可用后刷新。
+              暂无用户数据。请稍后刷新，或检查当前筛选条件。
             </div>
           )}
         </div>
@@ -799,7 +800,7 @@ function SettingsView({
   onNotify: (message: string) => void;
 }) {
   function roleMessage(role: string) {
-    onNotify(`${role} 权限说明已同步到当前矩阵。管理员名单和角色变更统一由超级管理员在 Supabase admin_users 表维护，后台入口只做展示和审计。`);
+    onNotify(`${role} 权限说明已更新到当前矩阵。管理员名单和角色变更由超级管理员统一维护。`);
   }
 
   return (
@@ -825,7 +826,7 @@ function SettingsView({
 
 function OperationsMaturityChecklist() {
   const checks = [
-    ['真实 API', '用户、反馈、日志均通过 Supabase Edge Function 读取，不再依赖历史静态展示。', '已接入'],
+    ['数据可用', '用户、反馈、日志均展示最新运营记录，避免依赖过期页面。', '已接入'],
     ['权限留痕', '封禁、限制、处理反馈、修改设置等关键操作会写入操作日志。', '已启用'],
     ['审核闭环', '反馈举报拥有待处理、处理中、已解决、已关闭的完整状态链路。', '已完善'],
     ['发布保护', '内容审核、Offer 提交、举报提醒与日志保留都集中在系统设置中管理。', '可配置']
@@ -856,7 +857,7 @@ function SettingsCard({ onUpdateSetting }: { onUpdateSetting?: (key: string, val
       <AdminPanel title="审计规则 / 基础配置">
         <div className="space-y-4 p-5 text-sm">
           <p className="leading-6 text-slate-500">
-            后台开关、日志保留天数和审核策略统一由系统设置页读取真实配置。当前侧栏只保留入口，不再展示静态开关。
+            后台开关、日志保留天数和审核策略统一在系统设置页管理。当前侧栏只保留入口，避免分散配置。
           </p>
           <Link
             href="/admin/settings"
@@ -1163,7 +1164,7 @@ function SimpleTable({ columns, rows }: { columns: string[]; rows: Array<Array<R
             <tr className="border-t border-slate-100">
               <td colSpan={columns.length + 1} className="px-5 py-14 text-center">
                 <div className="mx-auto max-w-sm rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
-                  暂无数据。请确认筛选条件或刷新后台 API。
+                  暂无数据。请确认筛选条件或稍后刷新。
                 </div>
               </td>
             </tr>

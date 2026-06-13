@@ -106,7 +106,7 @@ export const adminNoticeRows: AdminNoticeRow[] = sortedNotices.slice(0, 48).map(
   department: item.departmentName || '待补充学院',
   type: item.projectType || '其他通知',
   sourceUrl: item.sourceLink || 'https://www.seekoffer.com.cn/notices',
-  submitter: index % 5 === 0 ? '用户提交' : index % 3 === 0 ? '运营录入' : '系统同步',
+  submitter: index % 5 === 0 ? '用户提交' : index % 3 === 0 ? '运营录入' : '平台收录',
   submittedAt: item.updatedAt?.slice(0, 16).replace('T', ' ') || `${item.publishDate} 10:${String(index).padStart(2, '0')}`,
   deadline: item.deadlineDate || '待确认',
   status: noticeStatusPool[index % noticeStatusPool.length],

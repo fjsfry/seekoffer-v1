@@ -9,21 +9,22 @@ import {
   BrainCircuit,
   ChevronDown,
   ClipboardList,
-  Database,
   Download,
   Flag,
   LayoutDashboard,
   LogOut,
+  Menu,
   Plus,
   Search,
   Settings,
   ShieldCheck,
   Sparkles,
   UserRound,
-  UsersRound
+  UsersRound,
+  X
 } from 'lucide-react';
 import { refreshAdminSession, signOutAdmin, watchAdminSession, type AdminSession } from '@/lib/admin-session';
-import { invokeAdminApi } from '@/lib/admin-api';
+import { getAdminErrorMessage, invokeAdminApi } from '@/lib/admin-api';
 import packageJson from '../package.json';
 import { adminClassNames } from './admin-ui';
 
@@ -43,7 +44,7 @@ const quickActions = [
   { href: '/admin/notices', label: '审核通知', icon: Bell },
   { href: '/admin/offers', label: '审核 Offer', icon: ClipboardList },
   { href: '/admin/ai-leads', label: '查看 AI 内测', icon: BrainCircuit },
-  { href: '/admin/logs', label: '查看/导出日志', icon: Download }
+  { href: '/admin/logs', label: '查看操作记录', icon: Download }
 ];
 
 type ShellOverviewMetrics = {
@@ -141,6 +142,7 @@ export function AdminShell({
   const [sessionReady, setSessionReady] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [shellStatus, setShellStatus] = useState<ShellStatus>(emptyShellStatus);
   const normalizedPathname = pathname.replace(/\/$/, '') || '/';
 
@@ -148,10 +150,19 @@ export function AdminShell({
     let disposed = false;
 
     const syncSession = async () => {
-      const verifiedSession = await refreshAdminSession();
-      if (!disposed) {
-        setSession(verifiedSession);
-        setSessionReady(true);
+      try {
+        const verifiedSession = await refreshAdminSession();
+        if (!disposed) {
+          setSession(verifiedSession);
+        }
+      } catch {
+        if (!disposed) {
+          setSession(null);
+        }
+      } finally {
+        if (!disposed) {
+          setSessionReady(true);
+        }
       }
     };
 
@@ -174,6 +185,11 @@ export function AdminShell({
     const next = pathname && pathname !== '/admin/login' ? `?next=${encodeURIComponent(pathname)}` : '';
     router.replace(`/admin/login${next}`);
   }, [pathname, router, session, sessionReady]);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+    setQuickMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!session) {
@@ -217,7 +233,7 @@ export function AdminShell({
         setShellStatus((current) => ({
           ...current,
           loading: false,
-          error: error instanceof Error ? error.message : '后台状态接口暂不可用',
+          error: getAdminErrorMessage(error, '工作台暂时无法更新，请稍后刷新'),
           apiLatencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
           lastCheckedAt: new Date().toISOString()
         }));
@@ -239,7 +255,7 @@ export function AdminShell({
     return (
       <AdminAuthGate
         title="正在校验后台会话"
-        description="我们正在确认你的管理员登录状态。通过校验后才会加载后台导航、用户数据和审核工具。"
+        description="正在确认你的管理员权限。通过校验后会加载运营导航、用户数据和审核工具。"
       />
     );
   }
@@ -248,12 +264,18 @@ export function AdminShell({
     return (
       <AdminAuthGate
         title="请先登录运营后台"
-        description="后台只面向管理员开放。未登录时不会展示用户、反馈、日志和系统设置等运营入口。"
+        description="运营后台只面向授权成员开放。未登录时不会展示用户、反馈、记录和设置入口。"
       />
     );
   }
 
   const pendingCount = shellStatus.pendingNotices + shellStatus.pendingOffers + shellStatus.pendingFeedback;
+  const lastCheckedLabel = shellStatus.lastCheckedAt
+    ? new Date(shellStatus.lastCheckedAt).toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : '待检测';
   const reminderHref =
     shellStatus.pendingNotices > 0
       ? '/admin/notices'
@@ -263,73 +285,127 @@ export function AdminShell({
           ? '/admin/feedback'
           : '/admin/logs';
   const systemHealthy = !shellStatus.error;
+  const renderNavItems = (onNavigate?: () => void) =>
+    adminNavItems.map((item) => {
+      const Icon = item.icon;
+      const itemPath = item.href.replace(/\/$/, '');
+      const active =
+        normalizedPathname === itemPath ||
+        (itemPath !== '/admin/dashboard' && normalizedPathname.startsWith(`${itemPath}/`));
+
+      return (
+        <Link
+          key={item.href}
+          href={item.href}
+          onClick={onNavigate}
+          className={adminClassNames(
+            'relative flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-medium transition',
+            active ? 'bg-emerald-50 text-teal-700 shadow-sm' : 'text-slate-700 hover:bg-slate-50 hover:text-teal-700'
+          )}
+          aria-current={active ? 'page' : undefined}
+        >
+          {active ? <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-teal-700" /> : null}
+          <Icon className="h-5 w-5" />
+          {item.label}
+        </Link>
+      );
+    });
 
   return (
-    <div className="min-h-screen bg-[#f6f8fb] text-slate-900">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[252px] border-r border-slate-200 bg-white lg:block">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.10),transparent_34%),linear-gradient(180deg,#f7fbfa_0%,#f6f8fb_46%,#f8fafc_100%)] text-slate-900">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] border-r border-slate-200/80 bg-white/92 shadow-[18px_0_50px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:block">
         <div className="flex h-20 items-center gap-3 border-b border-slate-100 px-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-blue-500 text-lg font-black text-white shadow-sm shadow-blue-500/20">S</div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-700 to-emerald-500 text-lg font-black text-white shadow-sm shadow-teal-500/20">S</div>
           <div>
-            <div className="text-lg font-semibold text-blue-600">SeekOffer</div>
-            <div className="text-sm font-medium text-slate-700">运营管理后台</div>
-            <div className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">SeekOffer Admin</div>
+            <div className="text-lg font-semibold text-teal-800">Seekoffer</div>
+            <div className="text-sm font-medium text-slate-700">运营管理中台</div>
+            <div className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-teal-700">运营中台</div>
           </div>
         </div>
 
         <nav className="space-y-2 px-3 py-5">
-          {adminNavItems.map((item) => {
-            const Icon = item.icon;
-            const itemPath = item.href.replace(/\/$/, '');
-            const active =
-              normalizedPathname === itemPath ||
-              (itemPath !== '/admin/dashboard' && normalizedPathname.startsWith(`${itemPath}/`));
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={adminClassNames(
-                  'relative flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-medium transition',
-                  active ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-slate-700 hover:bg-slate-50 hover:text-blue-600'
-                )}
-                aria-current={active ? 'page' : undefined}
-              >
-                {active ? <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-blue-600" /> : null}
-                <Icon className="h-5 w-5" />
-                {item.label}
-              </Link>
-            );
-          })}
+          {renderNavItems()}
         </nav>
 
         <div className="absolute bottom-5 left-5 right-5">
           <div className={adminClassNames('rounded-2xl border p-4', systemHealthy ? 'border-emerald-100 bg-emerald-50/80' : 'border-rose-100 bg-rose-50/80')}>
             <div className={adminClassNames('flex items-center gap-2 text-sm font-semibold', systemHealthy ? 'text-emerald-700' : 'text-rose-700')}>
               <ShieldCheck className="h-4 w-4" />
-              {shellStatus.loading ? '正在同步后台状态' : systemHealthy ? '系统运行正常' : '后台状态异常'}
+              {shellStatus.loading ? '正在更新工作台状态' : systemHealthy ? '工作台运行正常' : '工作台需要关注'}
             </div>
             <dl className="mt-3 space-y-2 text-xs">
-              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">API 响应</dt><dd className={adminClassNames('font-semibold', systemHealthy ? 'text-emerald-700' : 'text-rose-700')}>{shellStatus.apiLatencyMs ? `${shellStatus.apiLatencyMs}ms` : '待检测'}</dd></div>
+              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">数据同步</dt><dd className={adminClassNames('font-semibold', systemHealthy ? 'text-emerald-700' : 'text-rose-700')}>{shellStatus.loading ? '同步中' : systemHealthy ? '正常' : '异常'}</dd></div>
               <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">实时在线</dt><dd className="font-semibold text-slate-700">{shellStatus.onlineVisitors}</dd></div>
               <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">待处理</dt><dd className="font-semibold text-slate-700">{pendingCount}</dd></div>
-              <div className={adminClassNames('flex items-center justify-between gap-3 border-t pt-2', systemHealthy ? 'border-emerald-100' : 'border-rose-100')}><dt className="text-slate-500">当前版本</dt><dd className="font-semibold text-slate-700">v{appVersion}</dd></div>
+              <div className={adminClassNames('flex items-center justify-between gap-3 border-t pt-2', systemHealthy ? 'border-emerald-100' : 'border-rose-100')}><dt className="text-slate-500">最近检查</dt><dd className="font-semibold text-slate-700">{lastCheckedLabel}</dd></div>
             </dl>
             {shellStatus.error ? <p className="mt-3 line-clamp-2 text-xs text-rose-600">{shellStatus.error}</p> : null}
             <Link href="/admin/settings" className="mt-3 inline-flex text-xs font-semibold text-blue-700">
-              查看系统详情 →
+              查看运营设置 →
             </Link>
           </div>
         </div>
       </aside>
 
-      <div className="lg:pl-[252px]">
-        <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur lg:px-8">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">{title}</h1>
-            {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
+      {mobileNavOpen ? (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <button
+            type="button"
+            aria-label="关闭后台导航"
+            className="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px]"
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <aside className="absolute inset-y-0 left-0 flex w-[min(86vw,320px)] flex-col border-r border-slate-200 bg-white shadow-2xl">
+            <div className="flex h-20 items-center justify-between gap-3 border-b border-slate-100 px-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-700 to-emerald-500 text-lg font-black text-white shadow-sm shadow-teal-500/20">S</div>
+                <div>
+                  <div className="text-lg font-semibold text-teal-800">Seekoffer</div>
+                  <div className="text-sm font-medium text-slate-700">运营管理中台</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                aria-label="关闭导航"
+                onClick={() => setMobileNavOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-5">
+              {renderNavItems(() => setMobileNavOpen(false))}
+            </nav>
+            <div className="border-t border-slate-100 p-4">
+              <div className={adminClassNames('rounded-2xl border p-4 text-sm', systemHealthy ? 'border-emerald-100 bg-emerald-50/80' : 'border-rose-100 bg-rose-50/80')}>
+                <div className={adminClassNames('font-semibold', systemHealthy ? 'text-emerald-700' : 'text-rose-700')}>
+                  {shellStatus.loading ? '正在更新工作台状态' : systemHealthy ? '工作台运行正常' : '工作台需要关注'}
+                </div>
+                <div className="mt-2 text-xs text-slate-500">待处理 {pendingCount} 条 · v{appVersion}</div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      ) : null}
+
+      <div className="lg:pl-[264px]">
+        <header className="sticky top-0 z-20 flex min-h-20 items-center justify-between gap-3 border-b border-slate-200/80 bg-white/92 px-4 py-3 shadow-[0_12px_40px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              aria-label="打开后台导航"
+              onClick={() => setMobileNavOpen(true)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 lg:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-semibold tracking-tight text-slate-950 lg:text-2xl">{title}</h1>
+              {description ? <p className="mt-1 line-clamp-1 text-sm text-slate-500">{description}</p> : null}
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-2 lg:gap-4">
             <label className="relative hidden md:block">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -342,8 +418,8 @@ export function AdminShell({
                     window.location.href = `${targetPath}?query=${encodeURIComponent(keyword)}`;
                   }
                 }}
-                className="h-11 w-[360px] rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
-                placeholder="搜索通知、学校、用户；回车进入通知管理"
+                className="h-11 w-[360px] rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-emerald-50"
+                placeholder="搜索通知、学校、用户"
               />
             </label>
 
@@ -353,7 +429,7 @@ export function AdminShell({
                 onClick={() => setQuickMenuOpen((open) => !open)}
                 className="hidden h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 xl:inline-flex"
               >
-                <Sparkles className="h-4 w-4 text-blue-600" />
+                <Sparkles className="h-4 w-4 text-teal-700" />
                 快捷操作
                 <ChevronDown className="h-4 w-4 text-slate-400" />
               </button>
@@ -366,7 +442,7 @@ export function AdminShell({
                         key={action.href}
                         href={action.href}
                         onClick={() => setQuickMenuOpen(false)}
-                        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+                        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-teal-700"
                       >
                         <Icon className="h-4 w-4" />
                         {action.label}
@@ -397,7 +473,7 @@ export function AdminShell({
               className="hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 md:flex"
               aria-label="数据概览"
             >
-              <Database className="h-5 w-5" />
+              <LayoutDashboard className="h-5 w-5" />
             </Link>
 
             <div className="flex items-center gap-3">
@@ -432,7 +508,7 @@ export function AdminShell({
                 <ShieldCheck className="h-8 w-8" />
               </div>
               <h2 className="mt-6 text-2xl font-semibold text-slate-950">请先登录运营后台</h2>
-              <p className="mt-3 text-sm leading-7 text-slate-500">后台用于审核通知、Offer、用户反馈和系统日志，所有关键操作都会留痕。</p>
+              <p className="mt-3 text-sm leading-7 text-slate-500">登录后可处理通知、Offer、用户反馈和操作记录，关键动作都会留痕。</p>
               <Link
                 href="/admin/login"
                 className="mt-6 inline-flex h-11 items-center justify-center rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white"

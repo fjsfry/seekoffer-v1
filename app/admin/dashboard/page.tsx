@@ -6,7 +6,6 @@ import {
   Bell,
   CheckCircle2,
   ClipboardList,
-  Database,
   Download,
   Globe2,
   RefreshCw,
@@ -27,7 +26,7 @@ import {
   adminClassNames
 } from '@/components/admin-ui';
 import type { AdminFeedbackRow, AdminMetric, AdminNoticeRow, AdminOfferRow, TrendPoint } from '@/lib/admin-data';
-import { invokeAdminApi } from '@/lib/admin-api';
+import { getAdminErrorMessage, invokeAdminApi } from '@/lib/admin-api';
 import { formatBeijingDateTime } from '@/lib/admin-time';
 
 const dashboardIcons = [Activity, Globe2, UsersRound, Bell, ClipboardList, ShieldAlert];
@@ -90,7 +89,7 @@ export default function AdminDashboardPage() {
   const [pendingNotices, setPendingNotices] = useState<AdminNoticeRow[]>([]);
   const [pendingOffers, setPendingOffers] = useState<AdminOfferRow[]>([]);
   const [latestFeedback, setLatestFeedback] = useState<AdminFeedbackRow[]>([]);
-  const [message, setMessage] = useState('正在连接后台真实统计数据...');
+  const [message, setMessage] = useState('正在更新运营数据...');
   const [dataError, setDataError] = useState('');
   const [lastLoadedAt, setLastLoadedAt] = useState('');
 
@@ -122,9 +121,9 @@ export default function AdminDashboardPage() {
       setLatestFeedback(feedback.feedback.map(mapFeedbackApiRow));
       setDataError('');
       setLastLoadedAt(new Date().toISOString());
-      setMessage('已连接 Supabase，数据概览、趋势和待处理列表均来自真实业务表。');
+      setMessage('数据已更新，待办、趋势和访问情况已准备好。');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '真实 API 暂不可用，请稍后重试。';
+      const errorMessage = getAdminErrorMessage(error, '数据暂时无法更新，请稍后重试。');
       setOverviewMetrics(emptyOverview);
       setAnalytics(emptyAnalytics);
       setAiWaitlistMetrics(emptyAiWaitlistMetrics);
@@ -134,7 +133,7 @@ export default function AdminDashboardPage() {
       setPendingOffers([]);
       setLatestFeedback([]);
       setDataError(errorMessage);
-      setMessage(`真实 API 暂不可用：${errorMessage}`);
+      setMessage(`数据暂时无法更新：${errorMessage}`);
     }
   }
 
@@ -224,13 +223,9 @@ export default function AdminDashboardPage() {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <span className="inline-flex items-center gap-2 font-semibold">
               <ShieldCheck className="h-4 w-4" />
-              数据状态：{dataHealthy ? '正常' : '异常'}
+              工作台状态：{dataHealthy ? '正常' : '需要关注'}
             </span>
-            <span className="inline-flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              数据源：Supabase
-            </span>
-            <span>最后刷新：{lastLoadedAt ? formatBeijingDateTime(lastLoadedAt) : '等待同步'}</span>
+            <span>最近更新：{lastLoadedAt ? formatBeijingDateTime(lastLoadedAt) : '等待刷新'}</span>
             <span>{message}</span>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -262,7 +257,7 @@ export default function AdminDashboardPage() {
         <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)_minmax(360px,0.8fr)]">
           <AdminPanel
             title="今日待办"
-            description="聚焦需要运营优先处理的真实后台任务。"
+            description="优先处理会影响内容质量、用户体验和公开展示的事项。"
             action={<Link href="/admin/notices" className="text-sm font-semibold text-blue-600">进入工作台 →</Link>}
           >
             <div className="grid gap-4 p-5 sm:grid-cols-2">
@@ -283,7 +278,7 @@ export default function AdminDashboardPage() {
           </AdminPanel>
 
           <AdminPanel
-            title="系统健康状态"
+            title="运营状态"
             action={
               <span className={adminClassNames('rounded-full px-3 py-1 text-xs font-semibold', dataHealthy ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700')}>
                 {dataHealthy ? '整体健康' : '需要排查'}
@@ -292,9 +287,9 @@ export default function AdminDashboardPage() {
           >
             <div className="space-y-3 p-5 text-sm">
               {[
-                ['Supabase 连接', dataHealthy ? '正常' : '异常'],
-                ['数据规模', `通知 ${formatNumber(overviewMetrics.totalNotices)} 条 / 访客 ${formatNumber(analytics.metrics.totalVisitors)} 人`],
-                ['待处理队列', `通知 ${formatNumber(overviewMetrics.pendingNotices)} / Offer ${formatNumber(overviewMetrics.pendingOffers)} / 反馈 ${formatNumber(overviewMetrics.pendingFeedback)}`],
+                ['数据更新', dataHealthy ? '正常' : '需要刷新'],
+                ['内容规模', `通知 ${formatNumber(overviewMetrics.totalNotices)} 条 / 访客 ${formatNumber(analytics.metrics.totalVisitors)} 人`],
+                ['待处理事项', `通知 ${formatNumber(overviewMetrics.pendingNotices)} / Offer ${formatNumber(overviewMetrics.pendingOffers)} / 反馈 ${formatNumber(overviewMetrics.pendingFeedback)}`],
                 ['异常告警', overviewMetrics.bannedUsers + overviewMetrics.restrictedUsers > 0 ? `封禁 ${formatNumber(overviewMetrics.bannedUsers)} / 限制 ${formatNumber(overviewMetrics.restrictedUsers)}` : '无告警']
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
@@ -311,7 +306,7 @@ export default function AdminDashboardPage() {
             </div>
           </AdminPanel>
 
-          <AdminPanel title="运维提醒" action={<Link href="/admin/logs" className="text-sm font-semibold text-blue-600">查看更多 →</Link>}>
+          <AdminPanel title="重点提醒" action={<Link href="/admin/logs" className="text-sm font-semibold text-teal-700">查看更多 →</Link>}>
             <div className="space-y-3 p-5 text-sm">
               {operationAlerts.map((item) => (
                 <Link key={`${item.href}-${item.label}`} href={item.href} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-white p-3 transition hover:border-blue-200 hover:bg-blue-50/30">
@@ -329,13 +324,13 @@ export default function AdminDashboardPage() {
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
           <VisitorPanel
             title="实时在线访客"
-            description={`最近 ${analytics.metrics.activeWindowMinutes} 分钟内有心跳的非后台访客`}
+            description={`最近 ${analytics.metrics.activeWindowMinutes} 分钟内仍在浏览的前台访客`}
             rows={analytics.onlineVisitors}
             empty="当前暂无在线访客。"
           />
           <VisitorPanel
             title="最近访问"
-            description="按最后活跃时间排序，帮助你判断站点真实使用情况"
+            description="按最后活跃时间排序，帮助你判断站点访问节奏"
             rows={analytics.recentVisitors}
             empty="暂无访客记录。"
           />
@@ -560,7 +555,7 @@ function mapNoticeApiRow(row: NoticeApiRow): AdminNoticeRow {
     department: row.department_name || '待补充学院',
     type: row.project_type || '其他',
     sourceUrl: row.source_link || `/notices/${row.id}`,
-    submitter: row.is_private ? '用户提交' : '系统同步',
+    submitter: row.is_private ? '用户提交' : '平台收录',
     submittedAt: formatBeijingDateTime(row.updated_at_ts || row.created_at, row.publish_date || '-'),
     deadline: row.deadline_date || '待确认',
     status: mapNoticeStatus(row.admin_status),

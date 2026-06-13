@@ -7,7 +7,7 @@ export function adminClassNames(...classes: Array<string | false | null | undefi
 }
 
 const metricToneMap: Record<AdminMetric['tone'], string> = {
-  blue: 'bg-blue-50 text-blue-600 ring-blue-100',
+  blue: 'bg-cyan-50 text-teal-700 ring-cyan-100',
   green: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
   amber: 'bg-amber-50 text-amber-600 ring-amber-100',
   rose: 'bg-rose-50 text-rose-600 ring-rose-100',
@@ -49,12 +49,12 @@ export function AdminPanel({
   className?: string;
 }) {
   return (
-    <section className={adminClassNames('rounded-[22px] border border-slate-200/80 bg-white shadow-[0_16px_48px_rgba(15,23,42,0.04)]', className)}>
+    <section className={adminClassNames('rounded-[22px] border border-slate-200/80 bg-white/95 shadow-[0_18px_52px_rgba(15,23,42,0.05)] backdrop-blur', className)}>
       {title || action || eyebrow || description ? (
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
           {title || eyebrow || description ? (
             <div>
-              {eyebrow ? <div className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">{eyebrow}</div> : null}
+              {eyebrow ? <div className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">{eyebrow}</div> : null}
               {title ? <h2 className="text-base font-semibold text-slate-950">{title}</h2> : null}
               {description ? <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p> : null}
             </div>
@@ -71,7 +71,7 @@ export function AdminPanel({
 
 export function AdminMetricCard({ metric, icon: Icon }: { metric: AdminMetric; icon: LucideIcon }) {
   return (
-    <div className="group rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-[0_14px_42px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-blue-100 hover:shadow-[0_18px_50px_rgba(37,99,235,0.08)]">
+    <div className="group rounded-[18px] border border-slate-200/80 bg-white/95 p-5 shadow-[0_14px_42px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-emerald-100 hover:shadow-[0_18px_50px_rgba(13,148,136,0.08)]">
       <div className="flex items-center gap-4">
         <div className={adminClassNames('flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ring-1 transition group-hover:scale-105', metricToneMap[metric.tone])}>
           <Icon className="h-6 w-6" />
@@ -114,7 +114,7 @@ export function AdminInput({
       value={value}
       onChange={(event) => onChange?.(event.target.value)}
       className={adminClassNames(
-        'h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50',
+        'h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-emerald-50',
         className
       )}
     />
@@ -140,7 +140,7 @@ export function AdminSelect({
       <select
         value={value}
         onChange={(event) => onChange?.(event.target.value)}
-        className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+        className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-emerald-50"
       >
         {normalizedOptions.map((option) => (
           <option key={option.value} value={option.value}>
@@ -169,7 +169,7 @@ export function AdminButton({
 }) {
   const toneClass =
     tone === 'primary'
-      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20 hover:bg-blue-700'
+      ? 'bg-teal-700 text-white shadow-sm shadow-teal-700/20 hover:bg-teal-800'
       : tone === 'danger'
         ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
         : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50';
@@ -187,6 +187,131 @@ export function AdminButton({
     >
       {children}
     </button>
+  );
+}
+
+export function AdminActionBanner({
+  tone = 'info',
+  children,
+  action
+}: {
+  tone?: 'info' | 'success' | 'warning' | 'danger';
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  const toneClass =
+    tone === 'success'
+      ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+      : tone === 'warning'
+        ? 'border-amber-100 bg-amber-50 text-amber-800'
+        : tone === 'danger'
+          ? 'border-rose-100 bg-rose-50 text-rose-700'
+          : 'border-blue-100 bg-blue-50 text-blue-700';
+
+  return (
+    <div className={adminClassNames('flex flex-col gap-3 rounded-2xl border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between', toneClass)}>
+      <div className="min-w-0 leading-6">{children}</div>
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </div>
+  );
+}
+
+export function AdminFilterSummary({
+  filters,
+  onClear
+}: {
+  filters: Array<{ label: string; value: string | number | undefined | null; mutedValue?: string }>;
+  onClear?: () => void;
+}) {
+  const activeFilters = filters.filter((item) => {
+    const value = String(item.value ?? '').trim();
+    return value && value !== item.mutedValue;
+  });
+
+  if (!activeFilters.length) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <span className="font-semibold text-slate-500">已筛选</span>
+      {activeFilters.map((item) => (
+        <span key={`${item.label}-${item.value}`} className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600 ring-1 ring-slate-200">
+          {item.label}：{item.value}
+        </span>
+      ))}
+      {onClear ? (
+        <button type="button" onClick={onClear} className="rounded-full px-2 py-1 font-semibold text-blue-700 hover:bg-blue-50">
+          清空
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+export function AdminSelectionBar({
+  selectedCount,
+  totalCount,
+  children,
+  onClear
+}: {
+  selectedCount: number;
+  totalCount?: number;
+  children: React.ReactNode;
+  onClear?: () => void;
+}) {
+  const hasSelection = selectedCount > 0;
+
+  return (
+    <div
+      className={adminClassNames(
+        'flex flex-col gap-3 border-b border-slate-100 px-5 py-4 text-sm lg:flex-row lg:items-center lg:justify-between',
+        hasSelection ? 'bg-blue-50/80' : 'bg-white'
+      )}
+    >
+      <div className="font-medium text-slate-600">
+        {hasSelection ? (
+          <span className="text-blue-700">已选择 {selectedCount} 条{totalCount ? ` / 当前页 ${totalCount} 条` : ''}</span>
+        ) : (
+          <span>选择记录后可进行批量处理</span>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {children}
+        {hasSelection && onClear ? (
+          <button type="button" onClick={onClear} className="h-10 rounded-xl px-3 text-sm font-semibold text-slate-500 hover:bg-white">
+            取消选择
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function AdminEmptyState({
+  title,
+  description,
+  action,
+  icon: Icon
+}: {
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+  icon?: LucideIcon;
+}) {
+  return (
+    <div className="border-t border-slate-100 px-5 py-12 text-center">
+      <div className="mx-auto max-w-md rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6">
+        {Icon ? (
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white text-slate-500 ring-1 ring-slate-200">
+            <Icon className="h-5 w-5" />
+          </div>
+        ) : null}
+        <div className="text-sm font-semibold text-slate-800">{title}</div>
+        <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
+        {action ? <div className="mt-5">{action}</div> : null}
+      </div>
+    </div>
   );
 }
 
@@ -215,14 +340,14 @@ export function AdminPagination({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 text-sm text-slate-500">
-      <span>共 {total} 条</span>
+      <span>共 {totalNumber.toLocaleString('zh-CN')} 条 · 第 {safePage} / {pageCount} 页</span>
       <div className="flex items-center gap-2">
         <button
           className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
           disabled={!canGoPrevious}
           onClick={() => canGoPrevious && onPageChange?.(safePage - 1)}
         >
-          ‹
+          上一页
         </button>
         {visiblePages.map((item, index) =>
           item === 'ellipsis' ? (
@@ -234,7 +359,7 @@ export function AdminPagination({
               key={`page-${item}`}
               className={adminClassNames(
                 'h-8 min-w-8 rounded-lg px-3 font-medium',
-                item === safePage ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20' : 'border border-slate-200 bg-white text-slate-600'
+                item === safePage ? 'bg-teal-700 text-white shadow-sm shadow-teal-700/20' : 'border border-slate-200 bg-white text-slate-600'
               )}
               onClick={() => onPageChange?.(item)}
             >
@@ -247,7 +372,7 @@ export function AdminPagination({
           disabled={!canGoNext}
           onClick={() => canGoNext && onPageChange?.(safePage + 1)}
         >
-          ›
+          下一页
         </button>
         <select
           value={pageSize}

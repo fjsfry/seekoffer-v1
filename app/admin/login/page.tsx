@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BarChart3, Bell, ClipboardCheck, LoaderCircle, LockKeyhole, ShieldCheck, UsersRound } from 'lucide-react';
-import { isAdminApiConfigured } from '@/lib/admin-api';
+import { getAdminErrorMessage } from '@/lib/admin-api';
 import { refreshAdminSession, signInAdmin } from '@/lib/admin-session';
 
 function getSafeAdminNextPath() {
@@ -22,7 +22,6 @@ function getSafeAdminNextPath() {
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const liveMode = isAdminApiConfigured();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
@@ -53,32 +52,32 @@ export default function AdminLoginPage() {
       await signInAdmin(email, password);
       router.push(getSafeAdminNextPath());
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : '后台登录失败，请稍后重试。');
+      setError(getAdminErrorMessage(loginError, '后台登录失败，请稍后重试。'));
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f8fb] px-4 py-8">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.12),transparent_34%),linear-gradient(180deg,#f7fbfa_0%,#f6f8fb_52%,#ffffff_100%)] px-4 py-8">
       <div className="mx-auto grid min-h-[calc(100vh-64px)] max-w-[1180px] items-center gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
-        <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm lg:p-10">
-          <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-600">
+        <section className="rounded-3xl border border-slate-200/80 bg-white/95 p-8 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur lg:p-10">
+          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-teal-700">
             <ShieldCheck className="h-4 w-4" />
-            SeekOffer Admin
+            Seekoffer Console
           </div>
           <h1 className="mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-slate-950">
-            运营管理后台，先把内容质量和用户秩序管起来。
+            面向运营团队的内容与用户治理工作台。
           </h1>
           <p className="mt-5 max-w-2xl text-sm leading-8 text-slate-600">
-            后台只服务网站运营：审核通知、管理 Offer 池、处理用户反馈、查看操作日志与基础增长数据。用户个人申请表只做统计，不进入具体内容。
+            集中处理通知审核、Offer 质量、用户反馈、操作记录与基础增长数据。个人申请表只做汇总统计，不进入具体内容。
           </p>
 
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             {[
               [BarChart3, '数据概览', '一眼看清用户增长、待审核内容和申请功能使用趋势。'],
               [Bell, '通知审核', '审核、发布、驳回、下架和删除通知，保障前台可信。'],
-              [ClipboardCheck, 'Offer 管理', '控制演示/用户贡献内容的真实性、隐私和举报风险。'],
+              [ClipboardCheck, 'Offer 管理', '控制用户贡献内容的真实性、隐私和举报风险。'],
               [UsersRound, '用户与反馈', '查看用户状态，处理反馈举报，所有关键操作留痕。']
             ].map(([Icon, title, description]) => (
               <div key={String(title)} className="rounded-2xl bg-slate-50 p-5">
@@ -90,25 +89,25 @@ export default function AdminLoginPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600">
+        <section className="rounded-3xl border border-slate-200/80 bg-white/95 p-8 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="inline-flex items-center gap-2 text-sm font-semibold text-teal-700">
             <LockKeyhole className="h-4 w-4" />
             后台登录
           </div>
           <h2 className="mt-4 text-2xl font-semibold text-slate-950">进入运营工作台</h2>
           <p className="mt-3 text-sm leading-7 text-slate-500">
-            {liveMode
-              ? '使用 Supabase 管理员账号登录，权限会由 Edge Function 在服务端校验。'
-              : '当前缺少 Supabase 环境变量。为避免误放后台入口，演示账号登录已禁用。'}
+            使用授权管理员账号登录。系统会按你的角色开放对应的运营入口，并记录关键操作。
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-slate-800">管理员邮箱</span>
               <input
+                type="email"
+                autoComplete="username"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-emerald-50"
               />
             </label>
 
@@ -116,15 +115,16 @@ export default function AdminLoginPage() {
               <span className="text-sm font-semibold text-slate-800">密码</span>
               <input
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-emerald-50"
               />
             </label>
 
             <button
               type="submit"
-              className="mt-2 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white transition hover:bg-blue-700"
+              className="mt-2 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-teal-700 px-5 text-sm font-semibold text-white transition hover:bg-teal-800"
             >
               {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
               {pending ? '登录中...' : '进入后台'}
@@ -132,11 +132,9 @@ export default function AdminLoginPage() {
           </form>
 
           {error ? <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
-          {!liveMode ? (
-            <div className="mt-6 rounded-2xl bg-amber-50 p-4 text-sm leading-7 text-amber-700">
-              后台 API 未配置时不会开放任何演示登录。请先配置 Supabase URL、Anon Key 和 admin-api Edge Function。
-            </div>
-          ) : null}
+          <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-500">
+            仅限内部授权成员访问。若无法登录，请确认账号权限或联系管理员处理。
+          </div>
         </section>
       </div>
     </main>

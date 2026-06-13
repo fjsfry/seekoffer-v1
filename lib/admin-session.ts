@@ -98,7 +98,7 @@ export async function signInAdmin(email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
 
   if (!isAdminApiConfigured()) {
-    throw new Error('后台真实 API 未配置，已禁止使用前端演示账号登录。');
+    throw new Error('当前无法完成登录，请稍后再试或联系管理员。');
   }
 
   const supabase = getSupabaseBrowserClient();
@@ -108,13 +108,13 @@ export async function signInAdmin(email: string, password: string) {
   });
 
   if (signInError) {
-    throw new Error(signInError.message || '管理员账号或密码不正确。');
+    throw new Error('管理员账号或密码不正确。');
   }
 
   const session = await refreshAdminSession({ force: true });
   if (!session) {
     await supabase.auth.signOut().catch(() => undefined);
-    throw new Error('管理员权限校验未通过。');
+    throw new Error('当前账号没有后台访问权限。');
   }
 
   return session;

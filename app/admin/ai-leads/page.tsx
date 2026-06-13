@@ -1,10 +1,20 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { BrainCircuit, CalendarClock, FileText, Search, ShieldAlert, Sparkles } from 'lucide-react';
-import { AdminInput, AdminMetricCard, AdminPagination, AdminPanel, AdminSelect, AdminStatusBadge } from '@/components/admin-ui';
+import { BrainCircuit, CalendarClock, Download, FileSearch, FileText, Search, ShieldAlert, Sparkles } from 'lucide-react';
+import {
+  AdminActionBanner,
+  AdminEmptyState,
+  AdminFilterSummary,
+  AdminInput,
+  AdminMetricCard,
+  AdminPagination,
+  AdminPanel,
+  AdminSelect,
+  AdminStatusBadge
+} from '@/components/admin-ui';
 import { AdminShell } from '@/components/admin-shell';
-import { invokeAdminApi } from '@/lib/admin-api';
+import { getAdminErrorMessage, invokeAdminApi } from '@/lib/admin-api';
 import type { AdminMetric } from '@/lib/admin-data';
 import { formatBeijingDateTime } from '@/lib/admin-time';
 
@@ -143,12 +153,12 @@ export default function AdminAiLeadsPage() {
         if (current && response.aiWaitlistLeads?.some((item) => item.id === current)) return current;
         return response.aiWaitlistLeads?.[0]?.id || null;
       });
-      setMessage('AI 内测提交已接入 Supabase，当前列表展示真实登记数据。');
+      setMessage('AI 内测登记已更新，当前列表展示最新提交记录。');
     } catch (error) {
       setLeads([]);
       setTotal(0);
       setMetrics(buildAiMetrics());
-      setMessage(error instanceof Error ? `AI 内测数据读取失败：${error.message}` : 'AI 内测数据读取失败，请稍后重试。');
+      setMessage(`AI 内测数据读取失败：${getAdminErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }
@@ -170,7 +180,7 @@ export default function AdminAiLeadsPage() {
           })}
         </section>
 
-        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div>
+        <AdminActionBanner tone={message.includes('失败') ? 'danger' : 'info'}>{message}</AdminActionBanner>
 
         <AdminPanel>
           <div className="grid gap-4 p-5 xl:grid-cols-[minmax(0,1fr)_220px_120px_120px]">
@@ -197,6 +207,15 @@ export default function AdminAiLeadsPage() {
             >
               重置
             </button>
+            <div className="xl:col-span-4">
+              <AdminFilterSummary
+                filters={[
+                  { label: '关键词', value: query },
+                  { label: '需求', value: primaryNeed, mutedValue: '全部需求' }
+                ]}
+                onClear={resetFilters}
+              />
+            </div>
           </div>
         </AdminPanel>
 
@@ -208,8 +227,9 @@ export default function AdminAiLeadsPage() {
                 type="button"
                 onClick={() => exportLeads(leads)}
                 disabled={!leads.length}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
+                <Download className="h-4 w-4" />
                 导出当前页
               </button>
             }
@@ -246,18 +266,17 @@ export default function AdminAiLeadsPage() {
                         </td>
                       </tr>
                     ))
-                  ) : (
-                    <tr className="border-t border-slate-100">
-                      <td colSpan={7} className="px-5 py-14 text-center">
-                        <div className="mx-auto max-w-md rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm leading-6 text-slate-500">
-                          {loading ? '正在加载 AI 内测提交...' : '暂无匹配的 AI 内测提交。可以尝试清空搜索条件，或确认前台表单是否已成功提交。'}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
+                  ) : null}
                 </tbody>
               </table>
             </div>
+            {!leads.length ? (
+              <AdminEmptyState
+                icon={FileSearch}
+                title={loading ? '正在加载内测登记' : '没有匹配的内测登记'}
+                description={loading ? '系统正在读取 AI 内测提交记录，请稍候。' : '可以清空搜索条件，或确认前台表单是否已成功提交。'}
+              />
+            ) : null}
             <AdminPagination
               total={total}
               page={page}

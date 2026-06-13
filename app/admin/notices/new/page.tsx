@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { ArrowLeft, Save } from 'lucide-react';
 import { AdminShell } from '@/components/admin-shell';
 import { AdminButton, AdminInput, AdminPanel, AdminSelect } from '@/components/admin-ui';
-import { invokeAdminApi } from '@/lib/admin-api';
+import { getAdminErrorMessage, invokeAdminApi } from '@/lib/admin-api';
 
 const emptyForm = {
   school_name: '',
@@ -51,10 +51,10 @@ export default function AdminNewNoticePage() {
         action: 'create',
         notice: form
       });
-      setMessage('通知已提交到 Supabase，当前状态为待审核。');
+      setMessage('通知已提交，当前状态为待审核。');
       setForm(emptyForm);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '提交失败，请稍后重试。');
+      setMessage(getAdminErrorMessage(error, '提交失败，请稍后重试。'));
     } finally {
       setPending(false);
     }

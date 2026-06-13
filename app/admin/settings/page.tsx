@@ -17,9 +17,9 @@ import {
   SlidersHorizontal,
   UsersRound
 } from 'lucide-react';
-import { AdminButton, AdminPanel, adminClassNames } from '@/components/admin-ui';
+import { AdminActionBanner, AdminButton, AdminPanel, adminClassNames } from '@/components/admin-ui';
 import { AdminShell } from '@/components/admin-shell';
-import { invokeAdminApi } from '@/lib/admin-api';
+import { getAdminErrorMessage, invokeAdminApi } from '@/lib/admin-api';
 
 type AdminSettingKey =
   | 'content_review_enabled'
@@ -150,7 +150,7 @@ export default function AdminSettingsPage() {
   const [retentionDraft, setRetentionDraft] = useState(String(defaultSettings.operation_log_retention_days));
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<AdminSettingKey | null>(null);
-  const [message, setMessage] = useState('正在读取 Supabase 后台设置...');
+  const [message, setMessage] = useState('正在读取后台设置...');
   const [lastCheckedAt, setLastCheckedAt] = useState('');
 
   const disabledWarnings = useMemo(
@@ -175,9 +175,9 @@ export default function AdminSettingsPage() {
       setSettingMeta(nextMeta);
       setRetentionDraft(String(nextSettings.operation_log_retention_days));
       setLastCheckedAt(new Date().toLocaleString('zh-CN'));
-      setMessage('系统设置已从 Supabase 读取，当前页面展示的是线上真实配置。');
+      setMessage('系统设置已更新，当前页面展示最新配置。');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '系统设置读取失败，请稍后重试。');
+      setMessage(getAdminErrorMessage(error, '系统设置读取失败，请稍后重试。'));
     } finally {
       setLoading(false);
     }
@@ -224,7 +224,7 @@ export default function AdminSettingsPage() {
       }
       setMessage(`${definition.title} 已更新，并写入后台操作日志。`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : `${definition.title} 更新失败。`);
+      setMessage(getAdminErrorMessage(error, `${definition.title} 更新失败。`));
     } finally {
       setSavingKey(null);
     }
@@ -239,11 +239,11 @@ export default function AdminSettingsPage() {
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
                   <LockKeyhole className="h-4 w-4" />
-                  Supabase Admin API
+                  运营安全中心
                 </div>
                 <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">后台设置中心</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-500">
-                  当前设置页只读取和写入 `admin_system_settings`，不会额外拉取用户、反馈或日志数据。所有写操作都会经过管理员权限校验，并写入操作日志。
+                  集中管理内容审核、Offer 提交、举报提醒和操作记录保留周期。所有调整都会校验管理员权限，并保留变更记录。
                 </p>
               </div>
               <AdminButton tone="secondary" onClick={loadSettings} disabled={loading}>
@@ -253,20 +253,20 @@ export default function AdminSettingsPage() {
             </div>
           </AdminPanel>
 
-          <AdminPanel title="健康状态">
+          <AdminPanel title="保护状态">
             <div className="space-y-4 p-5 text-sm">
-              <HealthRow label="鉴权方式" value="Supabase Auth + admin_users" good />
-              <HealthRow label="设置写入" value="仅 super_admin" good />
-              <HealthRow label="RLS 边界" value="浏览器直连默认拒绝" good />
+              <HealthRow label="登录校验" value="已开启" good />
+              <HealthRow label="设置变更" value="核心管理员" good />
+              <HealthRow label="访问边界" value="已启用" good />
               <HealthRow label="最近检查" value={lastCheckedAt || '等待刷新'} good={Boolean(lastCheckedAt)} />
             </div>
           </AdminPanel>
         </section>
 
         {message ? (
-          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+          <AdminActionBanner tone={message.includes('失败') || message.includes('不可用') ? 'danger' : 'info'}>
             {message}
-          </div>
+          </AdminActionBanner>
         ) : null}
 
         {disabledWarnings.length ? (
@@ -301,11 +301,11 @@ export default function AdminSettingsPage() {
             </div>
           </AdminPanel>
 
-          <AdminPanel title="安全策略说明">
+          <AdminPanel title="治理策略说明">
             <div className="space-y-4 p-5 text-sm text-slate-600">
-              <PolicyItem title="不依赖前端隐藏权限" description="按钮是否显示只是体验优化，真正的权限判断在 admin-api 和数据库侧完成。" />
-              <PolicyItem title="设置写入有白名单" description="后端只接受固定设置键和值类型，避免任意配置被注入。" />
-              <PolicyItem title="关键操作有留痕" description="配置更新会写入 admin_operation_logs，方便后续审计。" />
+              <PolicyItem title="按角色开放操作" description="不同管理员只看到并使用与岗位匹配的操作入口，降低误操作风险。" />
+              <PolicyItem title="关键设置受保护" description="只允许修改经过确认的配置项，避免运营策略被随意改动。" />
+              <PolicyItem title="关键操作有留痕" description="配置更新、封禁、删除、下架等动作都会保留记录，方便后续复盘。" />
             </div>
           </AdminPanel>
         </section>

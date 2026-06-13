@@ -1,25 +1,28 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type RefObject } from 'react';
 import Link from 'next/link';
 import {
+  AlertTriangle,
   ArrowRight,
   BarChart3,
   BookOpenCheck,
   BrainCircuit,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
-  FileText,
+  Crown,
+  FileCheck2,
   Flag,
+  Info,
   Layers3,
   LoaderCircle,
   RefreshCw,
-  Route,
-  Search,
-  ShieldAlert,
+  RotateCw,
+  ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  Target,
   TrendingUp,
   UserRoundCheck
 } from 'lucide-react';
@@ -38,8 +41,6 @@ import {
 import {
   buildAiPositioningReport,
   createDefaultAiPositioningInput,
-  type AiActionItem,
-  type AiMaterialGap,
   type AiPositioningInput,
   type AiPositioningReport,
   type AiProjectTier,
@@ -69,6 +70,8 @@ export default function AiPage() {
   const [feedbackDetails, setFeedbackDetails] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [showAdvancedInput, setShowAdvancedInput] = useState(false);
+  const inputPanelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const profileKey = session?.userId || session?.email || session?.phone || 'guest';
@@ -127,7 +130,19 @@ export default function AiPage() {
   }, [loggedIn]);
 
   const materialSnapshot = useMemo(() => getMaterialSnapshot(applicationRows), [applicationRows]);
-  const highPriorityActions = report?.actionItems.filter((item) => item.priority === 'high').length || 0;
+  const quickInputItems = useMemo(
+    () => [
+      { label: '本科院校', done: Boolean(input.undergraduateSchool.trim()) },
+      { label: '本科专业', done: Boolean(input.major.trim()) },
+      { label: 'GPA/排名', done: Boolean(input.gpa.trim() || input.rankPercent.trim()) },
+      { label: '目标方向', done: Boolean(input.targetMajor.trim()) },
+      { label: '目标地区', done: Boolean(input.targetRegion.trim()) }
+    ],
+    [input.gpa, input.major, input.rankPercent, input.targetMajor, input.targetRegion, input.undergraduateSchool]
+  );
+  const quickInputCount = quickInputItems.filter((item) => item.done).length;
+  const quickInputReady = quickInputCount === quickInputItems.length;
+  const quickMissingLabels = quickInputItems.filter((item) => !item.done).map((item) => item.label);
 
   function updateInput<Key extends keyof AiPositioningInput>(key: Key, value: AiPositioningInput[Key]) {
     setInput((current) => ({
@@ -168,6 +183,13 @@ export default function AiPage() {
   }
 
   async function handleGenerate() {
+    if (!quickInputReady) {
+      const missingText = quickMissingLabels.slice(0, 3).join('、');
+      setMessage(`先补齐快速定位的 ${quickMissingLabels.length} 项：${missingText}。填完 5 项即可生成初版方案。`);
+      inputPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
     setGenerating(true);
     setMessage('');
 
@@ -175,7 +197,7 @@ export default function AiPage() {
       const nextReport = buildAiPositioningReport(input, publicProjects, applicationRows);
       setReport(nextReport);
       await saveAiPositioningReport(nextReport, input);
-      setMessage('定位方案已更新。建议先看申请组合，再处理高优先级材料。');
+      setMessage('定位方案已自动保存。建议先核对前 5 个项目，再把合适项目加入申请清单。');
     } finally {
       setGenerating(false);
     }
@@ -197,7 +219,7 @@ export default function AiPage() {
         details: feedbackDetails || report?.summary || ''
       });
 
-      setFeedbackMessage(result.ok ? '已收到你的复盘需求，我们会优先围绕你选择的问题看。' : '已记录你的复盘需求。');
+      setFeedbackMessage(result.ok ? '已收到你的人工复核需求，我们会优先围绕你选择的问题看。' : '已记录你的人工复核需求。');
     } finally {
       setFeedbackSubmitting(false);
     }
@@ -205,29 +227,23 @@ export default function AiPage() {
 
   return (
     <SiteShell>
-      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-center lg:px-8">
+      <section className="page-hero grid gap-6 px-6 py-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(520px,1.18fr)] lg:items-end lg:px-8">
         <div>
-          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">AI 申请定位助手</h1>
-          <p className="mt-4 text-base leading-8 text-slate-600">
-            把背景、目标和材料进度整理成一份可执行的申请方案，帮你判断冲刺、稳妥和保底项目怎么排，本周先推进什么。
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">AI 申请定位助手</h1>
+            <span className="rounded-xl border border-brand/20 bg-brand/8 px-3 py-1 text-sm font-semibold text-brand">AI LAB</span>
+          </div>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
+            输入背景信息，AI 为你评估申请竞争力、定位风险，并推荐更适合的院校项目。
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={generating || loading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-6 py-4 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep disabled:opacity-60"
-        >
-          {generating ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <BrainCircuit className="h-5 w-5" />}
-          {generating ? '生成中...' : '生成方案'}
-        </button>
-      </section>
 
-      <section className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="可选项目" value={loading ? '...' : publicProjects.length.toString()} hint="从近期通知里筛选" icon={Search} tone="brand" />
-        <MetricCard label="已跟进" value={loading ? '...' : applicationRows.length.toString()} hint={loggedIn ? '来自你的申请清单' : '登录后纳入判断'} icon={ClipboardList} tone="green" />
-        <MetricCard label="准备度" value={report ? `${report.readinessScore}` : '--'} hint={report ? report.applicantBand : '生成后显示'} icon={BarChart3} tone="blue" />
-        <MetricCard label="优先事项" value={report ? highPriorityActions.toString() : '--'} hint="先处理最影响结果的事" icon={ShieldAlert} tone="orange" />
+        <div className="grid gap-3 rounded-[28px] border border-white/70 bg-white/88 p-4 shadow-soft backdrop-blur sm:grid-cols-2 xl:grid-cols-4">
+          <TopMetricCard label="可选项目" value={loading ? '...' : publicProjects.length.toString()} hint="覆盖近期公开通知" icon={ClipboardList} tone="green" />
+          <TopMetricCard label="已定位次数" value={report ? '1' : '0'} hint={report ? '本机已保存方案' : '生成后自动保存'} icon={FileCheck2} tone="brand" />
+          <TopMetricCard label="本轮推荐" value={report ? report.recommendedProjects.length.toString() : '--'} hint={report ? `稳妥 ${countRecommendationTier(report.recommendedProjects, '稳妥')} 个候选` : '生成后显示'} icon={ShieldCheck} tone="orange" />
+          <TopMetricCard label="今日剩余额度" value="2/5" hint="刷新后不扣次数" icon={BarChart3} tone="blue" />
+        </div>
       </section>
 
       {message ? (
@@ -239,94 +255,250 @@ export default function AiPage() {
         </section>
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[440px_minmax(0,1fr)]">
-        <section className="overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
-          <div className="border-b border-slate-100 px-6 py-5">
-            <div className="flex items-center justify-between gap-4">
-              <SectionHeading icon={SlidersHorizontal} eyebrow="定位输入" title="背景与目标" />
-              {session?.profile ? (
-                <button
-                  type="button"
-                  onClick={syncProfile}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-brand/25 bg-white px-3 py-2 text-xs font-semibold text-brand shadow-sm"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  带入档案
-                </button>
-              ) : null}
-            </div>
+      <section className="grid gap-5 xl:grid-cols-[minmax(380px,0.84fr)_minmax(0,1.16fr)]">
+        <PositioningInputPanel
+          input={input}
+          quickInputCount={quickInputCount}
+          quickInputItems={quickInputItems}
+          loading={loading}
+          generating={generating}
+          showAdvancedInput={showAdvancedInput}
+          hasProfile={Boolean(session?.profile)}
+          onSyncProfile={syncProfile}
+          onToggleAdvanced={() => setShowAdvancedInput((current) => !current)}
+          onGenerate={handleGenerate}
+          onToggleProjectType={toggleProjectType}
+          onUpdateInput={updateInput}
+          inputPanelRef={inputPanelRef}
+        />
+
+        <AnalysisResultPanel
+          report={report}
+          loading={loading}
+          materialSnapshot={materialSnapshot}
+          trackedProjectCount={applicationRows.length}
+        />
+      </section>
+
+      {report ? <RecommendationPanel projects={report.recommendedProjects} /> : null}
+
+      <NextActionCards
+        report={report}
+        loggedIn={loggedIn}
+        trackedProjectCount={applicationRows.length}
+        materialSnapshot={materialSnapshot}
+        wechatId={wechatId}
+        primaryNeed={primaryNeed}
+        feedbackDetails={feedbackDetails}
+        feedbackMessage={feedbackMessage}
+        feedbackSubmitting={feedbackSubmitting}
+        onWechatChange={setWechatId}
+        onNeedChange={setPrimaryNeed}
+        onDetailsChange={setFeedbackDetails}
+        onSubmit={handleFeedbackSubmit}
+      />
+
+      <div className="fixed inset-x-4 bottom-4 z-30 lg:hidden">
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={generating || loading}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float disabled:opacity-60"
+        >
+          {generating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <BrainCircuit className="h-4 w-4" />}
+          {generating ? '生成中...' : quickInputReady ? '生成定位方案' : `补齐快速定位 ${quickInputCount}/5`}
+        </button>
+      </div>
+    </SiteShell>
+  );
+}
+
+function PositioningInputPanel({
+  input,
+  quickInputCount,
+  quickInputItems,
+  loading,
+  generating,
+  showAdvancedInput,
+  hasProfile,
+  onSyncProfile,
+  onToggleAdvanced,
+  onGenerate,
+  onToggleProjectType,
+  onUpdateInput,
+  inputPanelRef
+}: {
+  input: AiPositioningInput;
+  quickInputCount: number;
+  quickInputItems: Array<{ label: string; done: boolean }>;
+  loading: boolean;
+  generating: boolean;
+  showAdvancedInput: boolean;
+  hasProfile: boolean;
+  onSyncProfile: () => void;
+  onToggleAdvanced: () => void;
+  onGenerate: () => void;
+  onToggleProjectType: (type: ProjectType) => void;
+  onUpdateInput: <Key extends keyof AiPositioningInput>(key: Key, value: AiPositioningInput[Key]) => void;
+  inputPanelRef: RefObject<HTMLElement | null>;
+}) {
+  const completion = quickInputCount * 20;
+
+  return (
+    <section ref={inputPanelRef} className="scroll-mt-6 overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
+      <div className="border-b border-slate-100 px-5 py-5 lg:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-ink">申请背景输入</h2>
+            <p className="mt-2 text-sm text-slate-500">信息只用于定位分析，不会公开展示。</p>
           </div>
+          {hasProfile ? (
+            <button
+              type="button"
+              onClick={onSyncProfile}
+              className="inline-flex items-center gap-2 rounded-2xl border border-brand/25 bg-white px-4 py-2.5 text-xs font-semibold text-brand shadow-sm"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              带入档案
+            </button>
+          ) : null}
+        </div>
 
-          <div className="grid gap-6 px-6 py-6">
-            <div className="rounded-2xl bg-brand/5 px-4 py-3 text-sm leading-7 text-slate-600">
-              不需要一次填满。优先补排名、语言成绩、科研经历和目标方向，结果会更贴近真实申请策略。
-            </div>
+        <div className="mt-5 grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 text-xs font-semibold">
+          {['填写背景', 'AI 分析', '查看结果'].map((step, index) => (
+            <FragmentStep key={step} label={step} index={index + 1} active={index === 0} done={quickInputCount === 5 && index === 0} />
+          ))}
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {quickInputItems.map((item) => (
+            <span
+              key={item.label}
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                item.done ? 'bg-brand/8 text-brand' : 'bg-slate-100 text-slate-500'
+              }`}
+            >
+              {item.label}
+            </span>
+          ))}
+        </div>
+      </div>
 
-            <InputGroup title="基础背景" icon={UserRoundCheck}>
-              <Field label="本科院校">
-                <input
-                  value={input.undergraduateSchool}
-                  onChange={(event) => updateInput('undergraduateSchool', event.target.value)}
-                  placeholder="例如 华东师范大学 / 211 / 双一流"
-                  className={inputClassName}
-                />
-              </Field>
-              <Field label="本科专业">
-                <input
-                  value={input.major}
-                  onChange={(event) => updateInput('major', event.target.value)}
-                  placeholder="例如 计算机科学与技术"
-                  className={inputClassName}
-                />
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="GPA / 均分">
-                  <input
-                    value={input.gpa}
-                    onChange={(event) => updateInput('gpa', event.target.value)}
-                    placeholder="3.7/4 或 88"
-                    className={inputClassName}
-                  />
-                </Field>
-                <Field label="专业排名">
-                  <input
-                    value={input.rankPercent}
-                    onChange={(event) => updateInput('rankPercent', event.target.value)}
-                    placeholder="前 10%"
-                    className={inputClassName}
-                  />
-                </Field>
-              </div>
-            </InputGroup>
+      <div className="grid gap-6 px-5 py-5 lg:px-6">
+        <section>
+          <PanelTitle icon={UserRoundCheck} title="基本信息" />
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <Field label="本科院校">
+              <input
+                value={input.undergraduateSchool}
+                onChange={(event) => onUpdateInput('undergraduateSchool', event.target.value)}
+                placeholder="请输入本科学校名称"
+                className={inputClassName}
+              />
+            </Field>
+            <Field label="本科专业">
+              <input
+                value={input.major}
+                onChange={(event) => onUpdateInput('major', event.target.value)}
+                placeholder="请输入本科专业"
+                className={inputClassName}
+              />
+            </Field>
+            <Field label="GPA / 均分">
+              <input
+                value={input.gpa}
+                onChange={(event) => onUpdateInput('gpa', event.target.value)}
+                placeholder="如：3.72 / 4.0 或 88"
+                className={inputClassName}
+              />
+            </Field>
+            <Field label="专业排名">
+              <input
+                value={input.rankPercent}
+                onChange={(event) => onUpdateInput('rankPercent', event.target.value)}
+                placeholder="如：前 10%"
+                className={inputClassName}
+              />
+            </Field>
+            <Field label="英语成绩" className="md:col-span-2">
+              <input
+                value={input.englishLevel}
+                onChange={(event) => onUpdateInput('englishLevel', event.target.value)}
+                placeholder="如：TOEFL 100 / IELTS 7.0 / 六级 560"
+                className={inputClassName}
+              />
+            </Field>
+          </div>
+        </section>
 
-            <InputGroup title="目标偏好" icon={Target}>
-              <Field label="目标方向">
-                <input
-                  value={input.targetMajor}
-                  onChange={(event) => updateInput('targetMajor', event.target.value)}
-                  placeholder="例如 人工智能 / 金融科技 / 生物医学"
-                  className={inputClassName}
-                />
-              </Field>
-              <Field label="目标地区">
-                <input
-                  value={input.targetRegion}
-                  onChange={(event) => updateInput('targetRegion', event.target.value)}
-                  placeholder="例如 北京 / 上海 / 长三角"
-                  className={inputClassName}
-                />
-              </Field>
-              <Field label="项目类型">
+        <section>
+          <PanelTitle icon={SlidersHorizontal} title="申请偏好" />
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <Field label="目标方向">
+              <input
+                value={input.targetMajor}
+                onChange={(event) => onUpdateInput('targetMajor', event.target.value)}
+                placeholder="选择或输入你的目标专业方向"
+                className={inputClassName}
+              />
+            </Field>
+            <Field label="意向地区">
+              <input
+                value={input.targetRegion}
+                onChange={(event) => onUpdateInput('targetRegion', event.target.value)}
+                placeholder="选择你倾向的留学地区"
+                className={inputClassName}
+              />
+            </Field>
+            <Field label="目标院校关键词" className="md:col-span-2">
+              <input
+                value={input.targetSchoolKeywords}
+                onChange={(event) => onUpdateInput('targetSchoolKeywords', event.target.value)}
+                placeholder="如：清华、北大、上交、浙大"
+                className={inputClassName}
+              />
+            </Field>
+          </div>
+        </section>
+
+        <section>
+          <PanelTitle icon={BookOpenCheck} title="经历与能力" />
+          <div className="mt-4 grid gap-4">
+            <Field label="科研 / 竞赛 / 项目经历">
+              <textarea
+                rows={3}
+                value={input.researchExperience}
+                onChange={(event) => onUpdateInput('researchExperience', event.target.value)}
+                placeholder="请简要描述你的科研、竞赛、实习或项目经历"
+                className={`${inputClassName} resize-none`}
+              />
+            </Field>
+            <Field label="备注补充（选填）">
+              <textarea
+                rows={3}
+                value={input.notes}
+                onChange={(event) => onUpdateInput('notes', event.target.value)}
+                placeholder="如有其他补充信息，可在此说明"
+                className={`${inputClassName} resize-none`}
+              />
+            </Field>
+          </div>
+        </section>
+
+        {showAdvancedInput ? (
+          <section className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-4">
+            <PanelTitle icon={Layers3} title="高级补充" />
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <Field label="项目类型" className="md:col-span-2">
                 <div className="grid grid-cols-3 gap-2">
                   {projectTypeChoices.map((type) => (
                     <button
                       key={type}
                       type="button"
-                      onClick={() => toggleProjectType(type)}
-                      className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                      onClick={() => onToggleProjectType(type)}
+                      className={`rounded-2xl border px-3 py-3 text-sm font-semibold transition ${
                         input.preferredProjectTypes.includes(type)
                           ? 'border-brand bg-brand-cream text-brand'
-                          : 'border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                          : 'border-slate-100 bg-white text-slate-500 hover:bg-slate-100'
                       }`}
                     >
                       {type}
@@ -334,337 +506,300 @@ export default function AiPage() {
                   ))}
                 </div>
               </Field>
-              <Field label="目标院校关键词">
+              <Field label="论文 / 专利">
                 <input
-                  value={input.targetSchoolKeywords}
-                  onChange={(event) => updateInput('targetSchoolKeywords', event.target.value)}
-                  placeholder="例如 复旦、上交、浙大"
+                  value={input.paperExperience}
+                  onChange={(event) => onUpdateInput('paperExperience', event.target.value)}
+                  placeholder="没有可留空"
                   className={inputClassName}
                 />
               </Field>
-            </InputGroup>
+              <Field label="竞赛 / 奖项">
+                <input
+                  value={input.competitionExperience}
+                  onChange={(event) => onUpdateInput('competitionExperience', event.target.value)}
+                  placeholder="国奖 / 竞赛 / 奖学金"
+                  className={inputClassName}
+                />
+              </Field>
+            </div>
+          </section>
+        ) : null}
 
-            <InputGroup title="经历材料" icon={BookOpenCheck}>
-              <Field label="英语 / 语言成绩">
-                <input
-                  value={input.englishLevel}
-                  onChange={(event) => updateInput('englishLevel', event.target.value)}
-                  placeholder="例如 六级 560 / 雅思 7.0"
-                  className={inputClassName}
-                />
-              </Field>
-              <Field label="科研经历">
-                <textarea
-                  rows={3}
-                  value={input.researchExperience}
-                  onChange={(event) => updateInput('researchExperience', event.target.value)}
-                  placeholder="实验室、课程项目、毕业设计或实习研究经历"
-                  className={`${inputClassName} resize-none`}
-                />
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="论文 / 专利">
-                  <input
-                    value={input.paperExperience}
-                    onChange={(event) => updateInput('paperExperience', event.target.value)}
-                    placeholder="没有可留空"
-                    className={inputClassName}
-                  />
-                </Field>
-                <Field label="竞赛 / 奖项">
-                  <input
-                    value={input.competitionExperience}
-                    onChange={(event) => updateInput('competitionExperience', event.target.value)}
-                    placeholder="国奖 / 竞赛 / 奖学金"
-                    className={inputClassName}
-                  />
-                </Field>
+        <div className="rounded-[24px] bg-slate-50/80 p-4">
+          <div className="flex items-center justify-between gap-4 text-sm font-semibold text-ink">
+            <span>信息完整度</span>
+            <span>{completion}%</span>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+            <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${completion}%` }} />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={generating || loading}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-4 text-sm font-semibold text-white shadow-float transition hover:bg-brand-deep disabled:opacity-60"
+        >
+          {generating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          {generating ? '生成中...' : quickInputCount === 5 ? '生成定位分析' : `补齐快速定位 ${quickInputCount}/5`}
+        </button>
+
+        <button
+          type="button"
+          onClick={onToggleAdvanced}
+          className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-brand"
+        >
+          {showAdvancedInput ? '收起高级补充' : '展开高级补充'}
+          {showAdvancedInput ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function AnalysisResultPanel({
+  report,
+  loading,
+  materialSnapshot,
+  trackedProjectCount
+}: {
+  report: AiPositioningReport | null;
+  loading: boolean;
+  materialSnapshot: Array<{ label: string; ready: boolean }>;
+  trackedProjectCount: number;
+}) {
+  const generatedAt = report
+    ? new Intl.DateTimeFormat('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(new Date(report.generatedAt))
+    : '--';
+
+  return (
+    <section className="overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-5 py-5 lg:px-6">
+        <div>
+          <h2 className="text-xl font-semibold text-ink">定位分析结果</h2>
+          <p className="mt-2 text-sm text-slate-500">{report ? '基于你提供的信息生成' : loading ? '正在整理申请线索' : '生成后展示定位结论和风险提示'}</p>
+        </div>
+        <div className="inline-flex items-center gap-3 rounded-2xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+          分析时间：{generatedAt}
+          <RotateCw className="h-4 w-4 text-slate-400" />
+        </div>
+      </div>
+
+      {report ? (
+        <div className="grid gap-5 px-5 py-5 lg:px-6">
+          <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
+            <div className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-5">
+              <div className="text-sm font-semibold text-slate-500">综合适配度</div>
+              <div className="mt-4 flex items-end gap-1">
+                <span className="text-5xl font-semibold tracking-tight text-brand">{report.readinessScore}</span>
+                <span className="pb-1 text-lg font-semibold text-slate-500">/100</span>
               </div>
-            </InputGroup>
-          </div>
+              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-ink">
+                <span className="h-2 w-2 rounded-full bg-brand" />
+                {report.applicantBand}
+              </div>
+            </div>
 
-          <div className="border-t border-slate-100 bg-slate-50/70 px-6 py-5">
-            <button
-              type="button"
-              onClick={handleGenerate}
-              disabled={generating || loading}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:bg-brand-deep disabled:opacity-60"
-            >
-              {generating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {generating ? '生成中...' : '生成方案'}
-            </button>
-            <div className="mt-3 text-xs leading-6 text-slate-500">
-              信息越完整，组合建议越接近你的真实申请进度。
+            <div className="rounded-[24px] border border-slate-100 bg-white p-5">
+              <div className="text-sm font-semibold text-ink">定位结论</div>
+              <p className="mt-3 text-sm leading-8 text-slate-600">{cleanUserFacingText(report.summary)}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Badge tone="brand">背景分 {report.applicantScore}</Badge>
+                <Badge tone="blue">档案完整度 {report.profileCompleteness}%</Badge>
+                <Badge tone="green">匹配项目 {report.stats.matchedProjectCount}</Badge>
+              </div>
             </div>
           </div>
-        </section>
 
-        <section className="grid content-start gap-5">
-          {report ? (
-            <>
-              <ReportOverview report={report} loggedIn={loggedIn} />
-              <section className="grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-                <TierPlanPanel report={report} />
-                <MaterialPanel gaps={report.materialGaps} snapshot={materialSnapshot} />
-              </section>
-              <ActionPanel actions={report.actionItems} warnings={report.portfolioWarnings} />
-            </>
-          ) : (
-            <EmptyReport loading={loading} />
-          )}
-        </section>
-      </section>
-
-      {report ? <RecommendationPanel projects={report.recommendedProjects} /> : null}
-
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <section className="overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
-          <div className="border-b border-slate-100 px-6 py-5">
-            <SectionHeading icon={Route} eyebrow="推进路径" title="下一步怎么做" />
+          <div className="grid gap-4 md:grid-cols-3">
+            {report.tierPlan.map((item) => (
+              <AnalysisMetric key={item.tier} label={`${item.tier}项目数`} value={countRecommendationTier(report.recommendedProjects, item.tier)} hint={item.advice} tier={item.tier} />
+            ))}
           </div>
-          <div className="grid gap-4 px-6 py-6 md:grid-cols-3">
-            <DataSourceCard title="补齐背景" value="01" detail="先确认排名、语言、科研和目标方向。" icon={FileText} />
-            <DataSourceCard title="检查组合" value="02" detail="看冲刺、稳妥、保底是否数量均衡。" icon={Layers3} />
-            <DataSourceCard title="推进项目" value="03" detail="把最合适的项目加入清单，按截止时间处理材料。" icon={Route} />
-          </div>
-        </section>
 
-        <section className="overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
-          <div className="border-b border-slate-100 px-6 py-5">
-            <SectionHeading icon={Flag} eyebrow="人工复盘" title="提交复核需求" />
-          </div>
-          <div className="grid gap-3 px-6 py-6">
-            <input
-              value={wechatId}
-              onChange={(event) => setWechatId(event.target.value)}
-              placeholder="微信号"
-              className={inputClassName}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <InsightListCard
+              icon={AlertTriangle}
+              title="风险提示 / 短板分析"
+              items={
+                report.portfolioWarnings.length
+                  ? report.portfolioWarnings.slice(0, 5).map((warning, index) => ({
+                      label: cleanUserFacingText(warning),
+                      tag: index === 0 ? '高风险' : index <= 2 ? '中风险' : '低风险',
+                      tone: index === 0 ? 'danger' : index <= 2 ? 'warning' : 'safe'
+                    }))
+                  : [{ label: '当前组合没有明显结构性风险，继续按截止时间推进即可。', tag: '低风险', tone: 'safe' }]
+              }
             />
-            <div className="grid gap-2">
-              {needOptions.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => setPrimaryNeed(option)}
-                  className={`rounded-2xl border px-4 py-2.5 text-left text-sm font-semibold ${
-                    primaryNeed === option ? 'border-brand bg-brand-cream text-brand' : 'border-slate-100 bg-slate-50 text-slate-600'
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-            <textarea
-              rows={3}
-              value={feedbackDetails}
-              onChange={(event) => setFeedbackDetails(event.target.value)}
-              placeholder="补充你最担心的院校、材料或方向"
-              className={`${inputClassName} resize-none`}
+            <InsightListCard
+              icon={FileCheck2}
+              title="材料与准备建议"
+              items={buildMaterialInsightItems(report, materialSnapshot, trackedProjectCount)}
             />
-            <button
-              type="button"
-              onClick={handleFeedbackSubmit}
-              disabled={feedbackSubmitting}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              {feedbackSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-              提交复盘需求
-            </button>
-            {feedbackMessage ? <div className="text-sm leading-6 text-slate-500">{feedbackMessage}</div> : null}
           </div>
-        </section>
-      </section>
-    </SiteShell>
-  );
-}
-
-function ReportOverview({ report, loggedIn }: { report: AiPositioningReport; loggedIn: boolean }) {
-  return (
-    <section className="overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
-      <div className="grid gap-0 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <div className="bg-ink px-6 py-6 text-white">
-          <div className="text-sm font-semibold text-white/70">申请准备度</div>
-          <div className="mt-3 text-6xl font-semibold tracking-tight">{report.readinessScore}</div>
-          <div className="mt-2 text-sm text-white/70">/ 100</div>
-          <div className="mt-5 rounded-2xl bg-white/10 px-4 py-3 text-sm font-semibold">{report.applicantBand}</div>
         </div>
-        <div className="px-6 py-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="brand">背景分 {report.applicantScore}</Badge>
-            <Badge tone="blue">档案完整度 {report.profileCompleteness}%</Badge>
-            <Badge tone="green">匹配项目 {report.stats.matchedProjectCount}</Badge>
-          </div>
-          <h2 className="mt-4 text-2xl font-semibold text-ink">定位结论</h2>
-          <p className="mt-3 text-sm leading-8 text-slate-600">{cleanUserFacingText(report.summary)}</p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <MiniStat label="公开项目" value={report.stats.publicProjectCount.toString()} />
-            <MiniStat label="已跟进" value={report.stats.trackedProjectCount.toString()} />
-            <MiniStat label="7 天内截止" value={report.stats.urgentTrackedCount.toString()} />
-          </div>
-          {!loggedIn ? (
-            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-700">
-              当前方案暂未结合你已跟进的项目。登录后重新生成，组合判断会更贴近真实进度。
-            </div>
-          ) : null}
+      ) : (
+        <div className="flex min-h-[560px] flex-col items-center justify-center px-8 py-12 text-center">
+          <span className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-brand/8 text-brand">
+            {loading ? <LoaderCircle className="h-7 w-7 animate-spin" /> : <Sparkles className="h-7 w-7" />}
+          </span>
+          <h3 className="mt-5 text-2xl font-semibold text-ink">{loading ? '正在整理申请线索' : '等待生成定位分析'}</h3>
+          <p className="mt-3 max-w-lg text-sm leading-7 text-slate-500">
+            填完左侧核心信息后，系统会输出综合适配度、冲稳保项目数、风险提示和材料建议。
+          </p>
         </div>
-      </div>
+      )}
     </section>
   );
 }
 
-function TierPlanPanel({ report }: { report: AiPositioningReport }) {
+function NextActionCards({
+  report,
+  loggedIn,
+  trackedProjectCount,
+  materialSnapshot,
+  wechatId,
+  primaryNeed,
+  feedbackDetails,
+  feedbackMessage,
+  feedbackSubmitting,
+  onWechatChange,
+  onNeedChange,
+  onDetailsChange,
+  onSubmit
+}: {
+  report: AiPositioningReport | null;
+  loggedIn: boolean;
+  trackedProjectCount: number;
+  materialSnapshot: Array<{ label: string; ready: boolean }>;
+  wechatId: string;
+  primaryNeed: AiWaitlistNeed;
+  feedbackDetails: string;
+  feedbackMessage: string;
+  feedbackSubmitting: boolean;
+  onWechatChange: (value: string) => void;
+  onNeedChange: (value: AiWaitlistNeed) => void;
+  onDetailsChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  const nextStepPlan = buildAdaptiveNextStepPlan(report, materialSnapshot, trackedProjectCount, loggedIn);
+  const explanationPlan = buildAdaptiveExplanationPlan(report, trackedProjectCount);
+
   return (
-    <section className="product-card rounded-[30px] p-5">
-      <SectionHeading icon={Layers3} eyebrow="组合" title="目标层级" />
-      <div className="mt-4 grid gap-3">
-        {report.tierPlan.map((item) => (
-          <div key={item.tier} className="rounded-2xl bg-white px-4 py-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <span className={`rounded-xl px-3 py-1 text-xs font-semibold ${getTierTone(item.tier)}`}>{item.tier}</span>
-              <span className="text-sm font-semibold text-ink">
-                {item.currentCount} / {item.targetCount}
-              </span>
+    <section className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(380px,1.08fr)]">
+      <ActionSummaryCard
+        icon={Flag}
+        eyebrow="申请推进"
+        title="下一步怎么做"
+        description={nextStepPlan.description}
+        tone="green"
+        items={nextStepPlan.items}
+        footerLabel={nextStepPlan.footerLabel}
+        footerValue={nextStepPlan.footerValue}
+        actionLabel="查看申请全流程指南"
+        href="/guide"
+      />
+      <ActionSummaryCard
+        icon={Info}
+        eyebrow="可信边界"
+        title="结果说明"
+        description={explanationPlan.description}
+        tone="blue"
+        items={explanationPlan.items}
+        footerLabel={explanationPlan.footerLabel}
+        footerValue={explanationPlan.footerValue}
+        actionLabel="了解定位模型与算法"
+        href="/disclaimer"
+      />
+      <section className="relative flex h-full flex-col overflow-hidden rounded-[32px] border border-orange-200/80 bg-white shadow-soft">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-orange-400 via-orange-500 to-amber-400" />
+        <div className="bg-gradient-to-br from-orange-50 via-white to-white px-5 pb-4 pt-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="inline-flex rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-600">人工复核</div>
+              <h3 className="mt-4 text-2xl font-semibold tracking-tight text-ink">找老师进一步优化定位</h3>
+              <p className="mt-3 text-sm leading-7 text-slate-600">
+                专业导师 1V1 复核你的背景、目标和材料，给出更稳的项目组合。
+              </p>
             </div>
-            <p className="mt-3 text-sm leading-6 text-slate-500">{cleanUserFacingText(item.advice)}</p>
+            <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-orange-100 text-orange-500">
+              <Crown className="h-7 w-7" />
+            </span>
           </div>
-        ))}
-      </div>
-    </section>
-  );
-}
 
-function MaterialPanel({ gaps, snapshot }: { gaps: AiMaterialGap[]; snapshot: Array<{ label: string; ready: boolean }> }) {
-  return (
-    <section className="product-card rounded-[30px] p-5">
-      <SectionHeading icon={BookOpenCheck} eyebrow="材料" title="短板清单" />
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {snapshot.map((item) => (
-          <div key={item.label} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm shadow-sm">
-            <span className="font-semibold text-ink">{item.label}</span>
-            <span className={item.ready ? 'text-brand' : 'text-slate-400'}>{item.ready ? '已覆盖' : '待补'}</span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 grid gap-3">
-        {gaps.slice(0, 4).map((gap) => (
-          <div key={gap.title} className="rounded-2xl bg-slate-50 px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-semibold text-ink">{gap.title}</span>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${getPriorityTone(gap.priority)}`}>
-                {formatPriority(gap.priority)}
-              </span>
-            </div>
-            <p className="mt-2 text-xs leading-6 text-slate-500">{cleanUserFacingText(gap.detail)}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function RecommendationPanel({ projects }: { projects: AiRecommendedProject[] }) {
-  return (
-    <section className="overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
-        <SectionHeading icon={TrendingUp} eyebrow="推荐" title="优先核对项目" />
-        <Link href="/notices" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-brand">
-          通知库
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
-
-      <div className="grid gap-4 px-6 py-6">
-        {projects.length ? (
-          projects.map((project) => <RecommendedProjectCard key={project.id} project={project} />)
-        ) : (
-          <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">
-            当前筛选条件下暂无高匹配项目，放宽目标地区或专业关键词后重新生成。
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function RecommendedProjectCard({ project }: { project: AiRecommendedProject }) {
-  const href = buildNoticeDetailHref(project.id);
-
-  return (
-    <article className="rounded-[26px] border border-slate-100 bg-white px-5 py-5 shadow-sm">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_150px_150px] xl:items-center">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-xl px-2.5 py-1 text-xs font-semibold ${getTierTone(project.tier)}`}>{project.tier}</span>
-            <span className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">{project.schoolRange}</span>
-            <span className="rounded-xl bg-brand/8 px-2.5 py-1 text-xs font-semibold text-brand">匹配 {project.score}</span>
-            {project.alreadyTracked ? <span className="rounded-xl bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-brand">已跟进</span> : null}
-          </div>
-          <Link href={href} className="mt-3 block text-lg font-semibold text-ink hover:text-brand">
-            {getDisplaySchoolName(project.schoolName)} · {getDisplayNoticeDepartment(project)}
-          </Link>
-          <p className="mt-2 line-clamp-2 text-sm leading-7 text-slate-600">{normalizeNoticeTitle(project.projectName, 88)}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {project.reasons.map((reason) => (
-              <span key={reason} className="rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
-                {cleanUserFacingText(reason)}
-              </span>
+          <div className="mt-5 grid gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+            {['背景诊断', '项目清单', '材料建议'].map((item) => (
+              <div key={item} className="rounded-2xl border border-orange-100 bg-white/85 px-3 py-2 text-center text-xs font-semibold text-orange-700">
+                {item}
+              </div>
             ))}
           </div>
         </div>
-        <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm">
-          <div className="text-xs font-semibold text-slate-400">截止时间</div>
-          <div className="mt-2 font-semibold text-ink">{formatNoticeDateOnly(project.deadlineDate) || '待确认'}</div>
-          <div className="mt-1 text-xs text-slate-500">
-            {project.daysLeft === null ? '官网待补充' : project.daysLeft <= 0 ? '今天截止' : `剩余 ${project.daysLeft} 天`}
-          </div>
-        </div>
-        <div className="flex flex-col gap-2">
-          <ApplicationActionButton projectId={project.id} variant="secondary" label="加入清单" addedLabel="已在清单" />
-          <Link href={href} className="inline-flex justify-center rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:border-brand/30 hover:text-brand">
-            查看通知
-          </Link>
-        </div>
-      </div>
-    </article>
-  );
-}
 
-function ActionPanel({ actions, warnings }: { actions: AiActionItem[]; warnings: string[] }) {
-  return (
-    <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
-      <section className="product-card rounded-[30px] p-5">
-        <SectionHeading icon={CheckCircle2} eyebrow="行动" title="本周动作" />
-        <div className="mt-4 grid gap-3">
-          {actions.map((item, index) => (
-            <div key={`${item.title}-${index}`} className="flex gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
-              <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-xs font-semibold ${getPriorityTone(item.priority)}`}>
-                {index + 1}
-              </span>
-              <span>
-                <span className="block text-sm font-semibold text-ink">{cleanUserFacingText(item.title)}</span>
-                <span className="mt-1 block text-xs leading-6 text-slate-500">{cleanUserFacingText(item.detail)}</span>
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="product-card rounded-[30px] p-5">
-        <SectionHeading icon={ShieldAlert} eyebrow="风险" title="风险提示" />
-        <div className="mt-4 grid gap-3">
-          {warnings.length ? (
-            warnings.map((warning) => (
-              <div key={warning} className="rounded-2xl bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-700">
-                {cleanUserFacingText(warning)}
+        <div className="flex flex-1 flex-col gap-4 px-5 py-5">
+          <div className="grid gap-3">
+            {['深度分析背景与短板', '定制院校与项目清单', '文书与材料优化建议'].map((item) => (
+              <div key={item} className="flex items-center gap-3 rounded-2xl bg-orange-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700">
+                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-orange-500 shadow-sm">
+                  <CheckCircle2 className="h-4 w-4" />
+                </span>
+                {item}
               </div>
-            ))
-          ) : (
-            <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm leading-7 text-brand">
-              当前组合没有明显结构性风险，继续按截止时间推进即可。
+            ))}
+          </div>
+
+          <div className="mt-auto grid gap-3 rounded-[24px] border border-orange-100 bg-white p-4 shadow-sm">
+            <label className="grid gap-2">
+              <span className="text-xs font-semibold text-slate-500">联系方式</span>
+              <input value={wechatId} onChange={(event) => onWechatChange(event.target.value)} placeholder="微信号" className={inputClassName} />
+            </label>
+
+            <div className="grid gap-2">
+              <span className="text-xs font-semibold text-slate-500">主要需求</span>
+              <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+            {needOptions.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => onNeedChange(option)}
+                    className={`rounded-2xl border px-3 py-2.5 text-center text-sm font-semibold transition ${
+                  primaryNeed === option ? 'border-orange-300 bg-orange-50 text-orange-600 shadow-sm' : 'border-slate-100 bg-slate-50 text-slate-600 hover:bg-white'
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+              </div>
             </div>
-          )}
-          <div className="rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500">
-            结果仅用于申请规划，不构成录取承诺，也不能替代院校官网通知。
+
+            <label className="grid gap-2">
+              <span className="text-xs font-semibold text-slate-500">补充说明</span>
+              <textarea
+                rows={3}
+                value={feedbackDetails}
+                onChange={(event) => onDetailsChange(event.target.value)}
+                placeholder="补充你最担心的院校、材料或方向"
+                className={`${inputClassName} resize-none`}
+              />
+            </label>
+
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={feedbackSubmitting}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-orange-500 px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600 disabled:opacity-60"
+          >
+            {feedbackSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+            提交人工定位需求
+          </button>
+          {feedbackMessage ? <div className="text-xs leading-6 text-slate-500">{feedbackMessage}</div> : null}
           </div>
         </div>
       </section>
@@ -672,35 +807,114 @@ function ActionPanel({ actions, warnings }: { actions: AiActionItem[]; warnings:
   );
 }
 
-function EmptyReport({ loading }: { loading: boolean }) {
-  return (
-    <section className="overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
-      <div className="flex min-h-[500px] flex-col items-center justify-center px-8 py-12 text-center">
-        <span className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-brand/8 text-brand">
-          {loading ? <LoaderCircle className="h-7 w-7 animate-spin" /> : <Sparkles className="h-7 w-7" />}
-        </span>
-        <h2 className="mt-5 text-2xl font-semibold text-ink">{loading ? '正在整理申请线索' : '生成你的第一份申请方案'}</h2>
-        <p className="mt-3 max-w-xl text-sm leading-7 text-slate-500">
-          方案会结合目标方向、申请清单和材料状态，输出目标组合、推荐项目、短板和本周动作。
-        </p>
-        <div className="mt-6 grid w-full max-w-2xl gap-3 sm:grid-cols-3">
-          {[
-            ['1', '填写背景'],
-            ['2', '生成方案'],
-            ['3', '加入项目']
-          ].map(([step, label]) => (
-            <div key={step} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
-              <span className="mr-2 text-brand">{step}</span>
-              {label}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
+function buildAdaptiveNextStepPlan(
+  report: AiPositioningReport | null,
+  materialSnapshot: Array<{ label: string; ready: boolean }>,
+  trackedProjectCount: number,
+  loggedIn: boolean
+) {
+  if (!report) {
+    return {
+      description: '还没有生成定位结论，下一步只围绕信息采集和状态记录，不判断材料是否完成。',
+      items: [
+        '先补齐左侧 5 个快速定位字段',
+        '已有目标项目时，先加入申请清单',
+        '已完成的简历、成绩单等材料，在清单里标记状态',
+        loggedIn ? '生成定位后再看项目组合和材料短板' : '登录后可结合你的申请清单持续更新'
+      ],
+      footerLabel: '当前状态',
+      footerValue: '等待定位'
+    };
+  }
+
+  const items: string[] = [];
+  const firstProject = report.recommendedProjects[0];
+
+  if (!trackedProjectCount) {
+    items.push('先把前 5 个推荐项目加入申请清单');
+    items.push('在申请清单里标记简历、成绩单、排名证明等材料状态');
+  } else {
+    const pendingMaterials = materialSnapshot.filter((item) => !item.ready).map((item) => item.label);
+    if (pendingMaterials.length) {
+      items.push(`确认或补齐材料状态：${pendingMaterials.slice(0, 3).join('、')}`);
+    } else {
+      items.push('材料状态已记录齐全，下一步核对截止时间和面试要求');
+    }
+  }
+
+  if (firstProject) {
+    items.push(`优先核对 ${firstProject.schoolName} 的官网通知`);
+  }
+
+  report.actionItems.forEach((item) => {
+    const text = cleanUserFacingText(`${item.title}：${item.detail}`);
+    if (!items.some((entry) => entry.includes(item.title))) {
+      items.push(text);
+    }
+  });
+
+  items.push('材料质量目前不自动评分，已完成材料可提交人工复核');
+
+  return {
+    description: trackedProjectCount
+      ? '以下建议基于你已记录的申请清单和材料状态生成，不会假设未记录材料一定没做。'
+      : '当前没有可判断材料状态的申请清单，因此先建议建立清单并记录材料状态。',
+    items: items.slice(0, 4),
+    footerLabel: trackedProjectCount ? '已记录项目' : '材料状态',
+    footerValue: trackedProjectCount ? `${trackedProjectCount} 个项目` : '尚未记录'
+  };
 }
 
-function MetricCard({
+function buildMaterialInsightItems(
+  report: AiPositioningReport,
+  materialSnapshot: Array<{ label: string; ready: boolean }>,
+  trackedProjectCount: number
+) {
+  if (!trackedProjectCount) {
+    return [
+      { label: '材料状态未记录：先把目标项目加入申请清单，再标记简历、成绩单等状态', tag: '未知', tone: 'neutral' },
+      ...report.materialGaps
+        .filter((gap) => !materialChecklistDefinitions.some((item) => item.label === gap.title))
+        .slice(0, 4)
+        .map((gap) => ({
+          label: cleanUserFacingText(gap.title),
+          tag: formatPriority(gap.priority),
+          tone: gap.priority === 'high' ? 'danger' : gap.priority === 'medium' ? 'warning' : 'safe'
+        }))
+    ].slice(0, 5);
+  }
+
+  const pending = materialSnapshot
+    .filter((item) => !item.ready)
+    .slice(0, 3)
+    .map((item) => ({ label: `确认或补齐${item.label}`, tag: '待确认', tone: 'warning' }));
+
+  const gapItems = report.materialGaps.slice(0, 4).map((gap) => ({
+    label: cleanUserFacingText(gap.title),
+    tag: formatPriority(gap.priority),
+    tone: gap.priority === 'high' ? 'danger' : gap.priority === 'medium' ? 'warning' : 'safe'
+  }));
+
+  return [...pending, ...gapItems].slice(0, 5);
+}
+
+function buildAdaptiveExplanationPlan(report: AiPositioningReport | null, trackedProjectCount: number) {
+  return {
+    description: report
+      ? '定位结果只基于已填写背景、推荐项目和已记录的清单状态；未记录的信息不会被当成已完成或未完成。'
+      : '生成定位前，系统只展示说明，不会提前判断你的简历、文书或材料质量。',
+    items: [
+      '综合适配度是规划参考，不等同于录取概率',
+      trackedProjectCount ? '材料建议来自申请清单里的勾选状态' : '未建立申请清单时，材料完成度显示为未知',
+      '简历和文书质量目前不自动评分，需要人工或自查复核',
+      '最终申请要求以院校官网通知和邮件为准'
+    ],
+    footerLabel: '判断边界',
+    footerValue: trackedProjectCount ? '基于已记录状态' : '材料状态未知'
+  };
+}
+
+function TopMetricCard({
   label,
   value,
   hint,
@@ -711,71 +925,285 @@ function MetricCard({
   value: string;
   hint: string;
   icon: ComponentType<{ className?: string }>;
-  tone: string;
+  tone: 'brand' | 'green' | 'orange' | 'blue';
 }) {
   const toneClass =
     tone === 'orange'
-      ? 'bg-orange-50 text-orange-600'
+      ? 'bg-orange-50 text-orange-500'
       : tone === 'blue'
-        ? 'bg-blue-50 text-blue-600'
+        ? 'bg-blue-50 text-blue-500'
         : tone === 'green'
-          ? 'bg-emerald-50 text-emerald-600'
+          ? 'bg-emerald-50 text-brand'
           : 'bg-brand/8 text-brand';
 
   return (
-    <div className="product-card rounded-[24px] p-6">
-      <div className="flex items-center gap-5">
-        <span className={`inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl ${toneClass}`}>
-          <Icon className="h-7 w-7" />
-        </span>
-        <div>
-          <div className="text-sm font-semibold text-slate-600">{label}</div>
-          <div className="mt-2 text-3xl font-semibold tracking-tight text-ink">{value}</div>
-          <div className="mt-2 text-sm text-slate-500">{hint}</div>
-        </div>
+    <div className="flex items-center gap-3 rounded-[22px] bg-white/80 px-3 py-3">
+      <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${toneClass}`}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <div className="min-w-0">
+        <div className="text-xs font-semibold text-slate-500">{label}</div>
+        <div className="mt-1 text-2xl font-semibold tracking-tight text-ink">{value}</div>
+        <div className="mt-1 truncate text-xs text-slate-400">{hint}</div>
       </div>
     </div>
   );
 }
 
-function DataSourceCard({
-  title,
-  value,
-  detail,
-  icon: Icon
-}: {
-  title: string;
-  value: string;
-  detail: string;
-  icon: ComponentType<{ className?: string }>;
-}) {
+function FragmentStep({ label, index, active, done }: { label: string; index: number; active: boolean; done: boolean }) {
   return (
-    <div className="rounded-2xl bg-slate-50 px-5 py-5">
-      <Icon className="h-5 w-5 text-brand" />
-      <div className="mt-3 text-lg font-semibold text-ink">{value}</div>
-      <div className="mt-1 text-sm font-semibold text-slate-600">{title}</div>
-      <div className="mt-2 text-xs leading-6 text-slate-500">{detail}</div>
+    <>
+      <div className="flex items-center gap-2">
+        <span
+          className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
+            active || done ? 'bg-brand text-white shadow-sm' : 'bg-slate-100 text-slate-400'
+          }`}
+        >
+          {index}
+        </span>
+        <span className={active || done ? 'text-ink' : 'text-slate-400'}>{label}</span>
+      </div>
+      {index < 3 ? <div className="h-px bg-slate-200" /> : null}
+    </>
+  );
+}
+
+function PanelTitle({ icon: Icon, title }: { icon: ComponentType<{ className?: string }>; title: string }) {
+  return (
+    <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+      <Icon className="h-4 w-4 text-brand" />
+      {title}
     </div>
   );
 }
 
-function InputGroup({
-  title,
-  icon: Icon,
-  children
+function AnalysisMetric({
+  label,
+  value,
+  hint,
+  tier
 }: {
-  title: string;
-  icon: ComponentType<{ className?: string }>;
-  children: ReactNode;
+  label: string;
+  value: number;
+  hint: string;
+  tier: AiProjectTier;
 }) {
   return (
-    <section className="grid gap-4">
+    <div className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-5 text-center">
+      <div className="text-sm font-semibold text-slate-500">{label}</div>
+      <div className="mt-3 text-3xl font-semibold tracking-tight text-ink">
+        {value}
+        <span className="ml-1 text-base text-slate-500">个</span>
+      </div>
+      <div className={`mx-auto mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getTierTone(tier)}`}>{tier}</div>
+      <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">{cleanUserFacingText(hint)}</p>
+    </div>
+  );
+}
+
+function InsightListCard({
+  icon: Icon,
+  title,
+  items
+}: {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  items: Array<{ label: string; tag: string; tone: string }>;
+}) {
+  return (
+    <div className="rounded-[24px] border border-slate-100 bg-slate-50/70 p-5">
       <div className="flex items-center gap-2 text-sm font-semibold text-ink">
         <Icon className="h-4 w-4 text-brand" />
         {title}
       </div>
-      {children}
+      <div className="mt-4 grid gap-3">
+        {items.map((item) => (
+          <div key={`${item.label}-${item.tag}`} className="flex items-start justify-between gap-3 text-sm">
+            <span className="min-w-0 leading-6 text-slate-600">› {item.label}</span>
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${getInsightTone(item.tone)}`}>{item.tag}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ActionSummaryCard({
+  icon: Icon,
+  eyebrow,
+  title,
+  description,
+  tone,
+  items,
+  footerLabel,
+  footerValue,
+  actionLabel,
+  href
+}: {
+  icon: ComponentType<{ className?: string }>;
+  eyebrow: string;
+  title: string;
+  description: string;
+  tone: 'green' | 'blue';
+  items: string[];
+  footerLabel: string;
+  footerValue: string;
+  actionLabel: string;
+  href: string;
+}) {
+  const iconClass = tone === 'blue' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-brand';
+  const buttonClass = tone === 'blue' ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-emerald-50 text-brand hover:bg-emerald-100';
+  const lineClass = tone === 'blue' ? 'from-blue-400 to-blue-500' : 'from-brand to-emerald-400';
+
+  return (
+    <section className="relative flex h-full min-h-[430px] flex-col overflow-hidden rounded-[32px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
+      <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${lineClass}`} />
+      <div className="flex items-start justify-between gap-4 px-5 pb-4 pt-6">
+        <div>
+          <div className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${iconClass}`}>{eyebrow}</div>
+          <h3 className="mt-4 text-2xl font-semibold tracking-tight text-ink">{title}</h3>
+          <p className="mt-3 text-sm leading-7 text-slate-600">{description}</p>
+        </div>
+        <span className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl ${iconClass}`}>
+          <Icon className="h-7 w-7" />
+        </span>
+      </div>
+
+      <div className="grid gap-2 px-5">
+        {items.map((item, index) => (
+          <div key={item} className="flex items-center gap-3 rounded-2xl bg-slate-50/85 px-3 py-3 text-sm font-semibold text-slate-700">
+            <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs shadow-sm ${tone === 'blue' ? 'text-blue-500' : 'text-brand'}`}>
+              {index + 1}
+            </span>
+            {item}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-auto px-5 pb-5 pt-4">
+        <div className="mb-3 flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm shadow-sm">
+          <span className="font-semibold text-slate-500">{footerLabel}</span>
+          <span className="font-semibold text-ink">{footerValue}</span>
+        </div>
+        <Link href={href} className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition ${buttonClass}`}>
+          {actionLabel}
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
     </section>
+  );
+}
+
+function countRecommendationTier(projects: AiRecommendedProject[], tier: AiProjectTier) {
+  return projects.filter((project) => project.tier === tier).length;
+}
+
+function RecommendationPanel({ projects }: { projects: AiRecommendedProject[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const visibleProjects = showAll ? projects : projects.slice(0, 5);
+
+  return (
+    <section className="overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
+      <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <SectionHeading icon={TrendingUp} eyebrow="推荐" title="优先推荐项目" />
+          <p className="mt-2 text-sm leading-6 text-slate-500">根据你的背景与意向，AI 精选匹配度较高的项目。</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {['全部地区', '全部专业', '匹配度排序'].map((item) => (
+            <button key={item} type="button" className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm">
+              {item}
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="px-5 py-5">
+        {projects.length ? (
+          <div className="overflow-x-auto">
+            <div className="min-w-[920px] divide-y divide-slate-100 overflow-hidden rounded-[24px] border border-slate-100">
+              {visibleProjects.map((project) => <RecommendedProjectRow key={project.id} project={project} />)}
+            </div>
+            {projects.length > 5 ? (
+              <button
+                type="button"
+                onClick={() => setShowAll((current) => !current)}
+                className="mx-auto mt-5 inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-ink hover:text-brand"
+              >
+                {showAll ? '收起项目' : `展开更多 ${projects.length - 5} 个`}
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-10 text-center text-sm text-slate-500">
+            当前筛选条件下暂无高匹配项目，放宽目标地区或专业关键词后重新生成。
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function RecommendedProjectRow({ project }: { project: AiRecommendedProject }) {
+  const href = buildNoticeDetailHref(project.id);
+  const schoolName = getDisplaySchoolName(project.schoolName);
+  const departmentName = getDisplayNoticeDepartment(project);
+
+  return (
+    <article className="grid grid-cols-[minmax(260px,1.25fr)_minmax(230px,1fr)_120px_140px_150px] items-center gap-4 bg-white px-5 py-4 transition hover:bg-slate-50/70">
+      <div className="flex min-w-0 items-center gap-4">
+        <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-brand/10 bg-brand/8 text-xl font-semibold text-brand">
+          {getSchoolInitial(schoolName)}
+        </span>
+        <div className="min-w-0">
+          <Link href={href} className="block truncate text-base font-semibold text-ink hover:text-brand">
+            {schoolName}
+          </Link>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {[project.schoolRange, project.projectType, project.discipline].filter(Boolean).slice(0, 3).map((tag) => (
+              <span key={tag} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="min-w-0">
+        <Link href={href} className="block truncate text-sm font-semibold text-ink hover:text-brand">
+          {normalizeNoticeTitle(project.projectName, 42)}
+        </Link>
+        <div className="mt-1 truncate text-xs text-slate-500">{departmentName}</div>
+      </div>
+
+      <div>
+        <span className={`inline-flex rounded-xl px-3 py-1 text-xs font-semibold ${getTierTone(project.tier)}`}>{project.tier}</span>
+        <div className="mt-2 text-xs text-slate-500">{project.fitLabel}</div>
+      </div>
+
+      <div>
+        <div className="text-xs text-slate-500">匹配度</div>
+        <div className="mt-1 text-xl font-semibold text-ink">{project.score}%</div>
+      </div>
+
+      <div className="grid gap-2">
+        <div>
+          <div className="text-xs text-slate-500">申请截止</div>
+          <div className="mt-1 text-sm font-semibold text-ink">{formatNoticeDateOnly(project.deadlineDate) || '待确认'}</div>
+          <div className="mt-0.5 text-xs text-slate-500">
+            {project.daysLeft === null ? '官网待补充' : project.daysLeft <= 0 ? '今天截止' : `剩余 ${project.daysLeft} 天`}
+          </div>
+        </div>
+        <div className="grid gap-2">
+          <ApplicationActionButton projectId={project.id} variant="secondary" label="加入申请表" addedLabel="已在清单" />
+          <Link href={href} className="inline-flex justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:border-brand/30 hover:text-brand">
+            查看通知
+          </Link>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -799,21 +1227,12 @@ function SectionHeading({
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <label className="block">
+    <label className={`block ${className}`}>
       <div className="mb-2 text-sm font-semibold text-slate-600">{label}</div>
       {children}
     </label>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-slate-50 px-4 py-3">
-      <div className="text-xs font-semibold text-slate-400">{label}</div>
-      <div className="mt-1 text-xl font-semibold text-ink">{value}</div>
-    </div>
   );
 }
 
@@ -841,16 +1260,21 @@ function getTierTone(tier: AiProjectTier) {
   return 'bg-emerald-50 text-brand';
 }
 
-function getPriorityTone(priority: 'high' | 'medium' | 'low') {
-  if (priority === 'high') return 'bg-rose-50 text-rose-600';
-  if (priority === 'low') return 'bg-slate-100 text-slate-500';
-  return 'bg-amber-50 text-amber-700';
-}
-
 function formatPriority(priority: 'high' | 'medium' | 'low') {
   if (priority === 'high') return '高';
   if (priority === 'low') return '低';
   return '中';
+}
+
+function getInsightTone(tone: string) {
+  if (tone === 'danger') return 'bg-rose-50 text-rose-600';
+  if (tone === 'warning') return 'bg-amber-50 text-amber-700';
+  if (tone === 'safe') return 'bg-emerald-50 text-brand';
+  return 'bg-slate-100 text-slate-500';
+}
+
+function getSchoolInitial(name: string) {
+  return name.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, '').slice(0, 1) || '校';
 }
 
 function cleanUserFacingText(value: string) {

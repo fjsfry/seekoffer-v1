@@ -1,19 +1,23 @@
 'use client';
 
-import { CheckCircle2, EyeOff, ShieldCheck, Trash2 } from 'lucide-react';
+import { CheckCircle2, Download, EyeOff, FileSearch, ShieldCheck, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AdminShell } from '@/components/admin-shell';
 import {
   AdminButton,
+  AdminActionBanner,
+  AdminEmptyState,
+  AdminFilterSummary,
   AdminInput,
   AdminMetricCard,
   AdminPagination,
   AdminPanel,
   AdminSelect,
+  AdminSelectionBar,
   AdminStatusBadge
 } from '@/components/admin-ui';
 import type { AdminMetric, AdminOfferRow } from '@/lib/admin-data';
-import { invokeAdminApi } from '@/lib/admin-api';
+import { getAdminErrorMessage, invokeAdminApi } from '@/lib/admin-api';
 import { formatBeijingDateTime } from '@/lib/admin-time';
 
 const offerIcons = [ShieldCheck, CheckCircle2, EyeOff, Trash2];
@@ -35,7 +39,7 @@ export default function AdminOffersPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
-  const [message, setMessage] = useState('正在连接后台真实 Offer 数据...');
+  const [message, setMessage] = useState('正在加载 Offer 数据...');
   const [pending, setPending] = useState('');
   const [selectedOffer, setSelectedOffer] = useState<AdminOfferRow | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -77,14 +81,14 @@ export default function AdminOffersPage() {
       setMetrics(data.metrics);
       setFilters(nextFilters);
       setSelectedIds([]);
-      setMessage(`已连接 Supabase，共匹配 ${data.total} 条 Offer。`);
+      setMessage(`已匹配 ${data.total} 条 Offer。`);
       setSelectedOffer((current) => {
         if (!current) return null;
         return data.offers.map(mapOfferApiRow).find((item) => item.id === current.id) || null;
       });
     } catch (error) {
       setRows([]);
-      setMessage(error instanceof Error ? `真实 API 暂不可用：${error.message}` : '真实 API 暂不可用，请稍后重试。');
+      setMessage(`Offer 数据暂时无法更新：${getAdminErrorMessage(error)}`);
     } finally {
       setPending('');
     }
@@ -104,10 +108,10 @@ export default function AdminOffersPage() {
         status,
         note
       });
-      setMessage('操作成功，已写入 Supabase 并记录日志。');
+      setMessage('操作成功，Offer 展示状态已更新，并保留操作记录。');
       await loadOffers();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Offer 操作失败，请稍后重试。');
+      setMessage(getAdminErrorMessage(error, 'Offer 操作失败，请稍后重试。'));
     } finally {
       setPending('');
     }
@@ -139,7 +143,7 @@ export default function AdminOffersPage() {
       setMessage(`批量操作成功：已处理 ${selectedIds.length} 条 Offer。`);
       await loadOffers();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Offer 批量操作失败，请稍后重试。');
+      setMessage(getAdminErrorMessage(error, 'Offer 批量操作失败，请稍后重试。'));
     } finally {
       setPending('');
     }
@@ -159,6 +163,34 @@ export default function AdminOffersPage() {
     setMessage(`已打开 ${offer.school} · ${offer.major} 的 Offer 审核预览。`);
   }
 
+  function exportCurrentPage() {
+    const header = ['提交用户', '申请学校', '申请专业', '项目类型', '录取结果', '本科背景', '匿名展示', '提交时间', '审核状态', '举报数'];
+    const lines = rows.map((offer) =>
+      [
+        offer.user,
+        offer.school,
+        offer.major,
+        offer.projectType,
+        offer.result,
+        offer.background,
+        offer.anonymous ? '是' : '否',
+        offer.submittedAt,
+        offer.status,
+        offer.reports
+      ]
+        .map((cell) => `"${String(cell).replaceAll('"', '""')}"`)
+        .join(',')
+    );
+    const blob = new Blob([`\uFEFF${[header.join(','), ...lines].join('\n')}`], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `seekoffer-admin-offers-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    setMessage(`已导出当前页 ${rows.length} 条 Offer。`);
+  }
+
   const allVisibleSelected = rows.length > 0 && rows.every((item) => selectedIds.includes(item.id));
 
   return (
@@ -167,7 +199,10 @@ export default function AdminOffersPage() {
         <div className="space-y-6">
           <AdminPanel>
             <div className="grid gap-5 p-5">
-              <div className="grid gap-4 xl:grid-cols-5">
+              <div
+                className="grid gap-4 xl:grid-cols-5"
+                onKeyDown={(event) => event.key === 'Enter' && void loadOffers({ page: 1 })}
+              >
                 <AdminInput placeholder="学校" value={filters.school} onChange={(value) => setFilters((current) => ({ ...current, school: value }))} />
                 <AdminInput placeholder="专业" value={filters.major} onChange={(value) => setFilters((current) => ({ ...current, major: value }))} />
                 <AdminSelect
@@ -190,13 +225,26 @@ export default function AdminOffersPage() {
                   tone="secondary"
                   onClick={() => {
                     void loadOffers({ page: 1, filters: defaultFilters });
-                    setMessage('Offer 筛选条件已重置，并重新加载真实 Offer 列表。');
+                    setMessage('Offer 筛选条件已重置，并重新加载列表。');
                   }}
                 >
                   重置
                 </AdminButton>
               </div>
-              <div className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div>
+              <AdminFilterSummary
+                filters={[
+                  { label: '学校', value: filters.school },
+                  { label: '专业', value: filters.major },
+                  { label: '结果', value: filters.result, mutedValue: '全部结果' },
+                  { label: '状态', value: filters.status, mutedValue: '全部状态' },
+                  { label: '关键词', value: filters.query }
+                ]}
+                onClear={() => {
+                  void loadOffers({ page: 1, filters: defaultFilters });
+                  setMessage('Offer 筛选条件已重置，并重新加载列表。');
+                }}
+              />
+              <AdminActionBanner tone={message.includes('失败') || message.includes('无法') ? 'danger' : 'info'}>{message}</AdminActionBanner>
             </div>
           </AdminPanel>
 
@@ -210,6 +258,14 @@ export default function AdminOffersPage() {
             title="Offer列表"
             action={
               <div className="flex flex-wrap gap-2">
+                <AdminButton tone="secondary" disabled={!rows.length} onClick={exportCurrentPage}>
+                  <Download className="mr-2 h-4 w-4" />
+                  导出当前页
+                </AdminButton>
+              </div>
+            }
+          >
+            <AdminSelectionBar selectedCount={selectedIds.length} totalCount={rows.length} onClear={() => setSelectedIds([])}>
                 <AdminButton tone="secondary" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateSelectedOffers('approved', '批量审核通过 Offer')}>
                   批量通过
                 </AdminButton>
@@ -219,9 +275,7 @@ export default function AdminOffersPage() {
                 <AdminButton tone="danger" disabled={!selectedIds.length || Boolean(pending)} onClick={() => updateSelectedOffers('deleted', '批量删除 Offer')}>
                   批量删除
                 </AdminButton>
-              </div>
-            }
-          >
+            </AdminSelectionBar>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1120px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs font-semibold text-slate-500">
@@ -275,7 +329,7 @@ export default function AdminOffersPage() {
                           <button className="text-blue-600" onClick={() => previewOffer(offer)}>查看</button>
                           <button className="text-emerald-600" disabled={Boolean(pending)} onClick={() => updateOfferStatus(offer.id, 'approved', '审核通过 Offer')}>通过</button>
                           <button className="text-slate-600" disabled={Boolean(pending)} onClick={() => updateOfferStatus(offer.id, 'hidden', '后台隐藏 Offer')}>隐藏</button>
-                          <button className="text-rose-600" disabled={Boolean(pending)} onClick={() => updateOfferStatus(offer.id, 'deleted', '后台删除 Offer')}>删除</button>
+                          <button className="text-rose-600" disabled={Boolean(pending)} onClick={() => updateOfferStatus(offer.id, 'deleted', '删除 Offer')}>删除</button>
                         </div>
                       </td>
                     </tr>
@@ -284,7 +338,26 @@ export default function AdminOffersPage() {
               </table>
             </div>
 
-            {!rows.length ? <div className="border-t border-slate-100 px-5 py-12 text-center text-sm text-slate-500">当前没有匹配的 Offer 动态。</div> : null}
+            {!rows.length ? (
+              <AdminEmptyState
+                icon={FileSearch}
+                title={pending === 'load' ? '正在加载 Offer' : '没有匹配的 Offer'}
+                description={pending === 'load' ? '系统正在读取最新审核列表，请稍候。' : '可以清空筛选条件，或确认前台 Offer 提交通道是否开启。'}
+                action={
+                  pending !== 'load' ? (
+                    <AdminButton
+                      tone="secondary"
+                      onClick={() => {
+                        void loadOffers({ page: 1, filters: defaultFilters });
+                        setMessage('Offer 筛选条件已重置，并重新加载列表。');
+                      }}
+                    >
+                      重置筛选
+                    </AdminButton>
+                  ) : null
+                }
+              />
+            ) : null}
 
             <AdminPagination
               total={total}
@@ -324,7 +397,7 @@ export default function AdminOffersPage() {
                   <AdminButton tone="secondary" disabled={Boolean(pending)} onClick={() => updateOfferStatus(selectedOffer.id, 'hidden', '后台隐藏 Offer')}>
                     隐藏
                   </AdminButton>
-                  <AdminButton tone="danger" disabled={Boolean(pending)} onClick={() => updateOfferStatus(selectedOffer.id, 'deleted', '后台删除 Offer')}>
+                  <AdminButton tone="danger" disabled={Boolean(pending)} onClick={() => updateOfferStatus(selectedOffer.id, 'deleted', '删除 Offer')}>
                     删除
                   </AdminButton>
                 </div>
