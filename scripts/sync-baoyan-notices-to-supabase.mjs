@@ -36,6 +36,8 @@ const PRIMARY_MAX_DETAILS =
 const PRIMARY_ORDER_BY = process.env.PRIMARY_ORDER_BY || 'publishTime';
 const PRIMARY_DETAIL_CONCURRENCY = Math.max(1, Number(process.env.PRIMARY_DETAIL_CONCURRENCY || 3));
 const PRIMARY_DETAIL_DELAY_MS = Math.max(0, Number(process.env.PRIMARY_DETAIL_DELAY_MS || 150));
+const PRIMARY_MISSING_DEADLINE_MAX_DETAILS =
+  parseOptionalInteger(process.env.PRIMARY_MISSING_DEADLINE_MAX_DETAILS) || (IS_INCREMENTAL_SYNC ? 20 : 120);
 const SECONDARY_PAGE_SIZE = Number(process.env.SECONDARY_PAGE_SIZE || 25);
 const SECONDARY_MAX_PAGES =
   parseOptionalInteger(process.env.SECONDARY_MAX_PAGES) ||
@@ -47,12 +49,9 @@ const SECONDARY_REPAIR_DETAIL_IDS = unique([
   ...parseDelimitedList(process.env.SECONDARY_REPAIR_DETAIL_IDS)
 ]);
 const SECONDARY_DETAIL_DELAY_MS = Math.max(0, Number(process.env.SECONDARY_DETAIL_DELAY_MS || 120));
+const SECONDARY_MISSING_DEADLINE_MAX_DETAILS =
+  parseOptionalInteger(process.env.SECONDARY_MISSING_DEADLINE_MAX_DETAILS) || (IS_INCREMENTAL_SYNC ? 20 : 80);
 const DRY_RUN = /^1|true|yes$/i.test(process.env.DRY_RUN || '');
-
-const SOURCE_PRIORITY = {
-  保研通知网: 100,
-  保研信息网: 70
-};
 
 const TITLE_BODY_START_PATTERNS = [
   /发布时间[:：]?\s*20\d{2}/i,
@@ -116,7 +115,7 @@ const MATERIAL_KEYWORDS = [
 const DIRTY_NOTICE_PATTERN =
   /seekoffer\s*test|\bdemo\b|\btest\b|测试|测试数据|占位数据|示例数据|\?{3,}|undefined|null/i;
 const COMPETITION_NOTICE_PATTERN =
-  /蓝桥杯|全国大学生.*竞赛|大学生软件和信息技术大赛|数学建模|程序设计竞赛|\bACM\b|\bICPC\b/i;
+  /蓝桥杯|挑战杯|互联网\+|全国大学生.*竞赛|大学生软件和信息技术大赛|数学建模|程序设计竞赛|创新创业大赛|(?:技能|设计|软件和信息技术|计算机).*大赛|大赛.*(?:章程|报名|参赛|获奖|竞赛)|\bACM\b|\bICPC\b/i;
 
 function parseOptionalInteger(value) {
   if (value === undefined || value === null || String(value).trim() === '') {
@@ -494,7 +493,9 @@ function extractDeadlineFromText(text) {
   const labeledPatterns = [
     /(?:报名|申请|提交材料|网上报名)?截止(?:时间|日期)?[:：为至到\s]*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)/i,
     /(?:报名|申请)时间[:：]?\s*20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?.{0,12}?(?:至|到|-|—|~)\s*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)/i,
-    /(?:请于|须于|需于)\s*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)\s*(?:前|之前)/i
+    /(?:报名|申请|提交|材料|系统|邮箱|纸质材料|电子材料).{0,24}?(?:于|在|至|到|截止至|截止到)\s*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)\s*(?:前|之前|截止)?/i,
+    /(?:请于|须于|需于|应于|务必于)\s*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)\s*(?:前|之前|截止前)/i,
+    /(?:截至|截止到|截止至)\s*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)/i
   ];
 
   for (const pattern of labeledPatterns) {
@@ -873,6 +874,98 @@ function buildFingerprints(project) {
   ]).filter(Boolean);
 }
 
+function isWeakDepartmentName(value) {
+  const text = normalizeSpace(value);
+  return !text || text === '待补充院系' || text === '学院信息待补充' || text === '全校类';
+}
+
+function isGenericContactInfo(value) {
+  const text = normalizeSpace(value);
+  return !text || /以原.*通知.*联系方式为准|以原通知中的联系方式为准/.test(text);
+}
+
+function isGenericExamInfo(value) {
+  const text = normalizeSpace(value);
+  return !text || /未明确|以原文/.test(text);
+}
+
+function chooseProjectTitle(current, candidate) {
+  const currentTitle = normalizeSpace(current);
+  const candidateTitle = normalizeSpace(candidate);
+  if (!currentTitle) return candidateTitle;
+  if (!candidateTitle) return currentTitle;
+
+  const currentSuspicious = isSuspiciousTitle(currentTitle);
+  const candidateSuspicious = isSuspiciousTitle(candidateTitle);
+  if (currentSuspicious && !candidateSuspicious) return candidateTitle;
+  if (!currentSuspicious && candidateSuspicious) return currentTitle;
+  return currentTitle.length <= candidateTitle.length ? currentTitle : candidateTitle;
+}
+
+function chooseLongerText(current, candidate, limit) {
+  const currentText = normalizeSpace(current);
+  const candidateText = normalizeSpace(candidate);
+  const chosen = candidateText.length > currentText.length ? candidateText : currentText;
+  return limit ? shorten(chosen, limit) : chosen;
+}
+
+function mergeDateTime(current, candidate) {
+  return normalizeSpace(current) || normalizeSpace(candidate);
+}
+
+function choosePublishDate(current, candidate) {
+  const currentDate = normalizeSpace(current);
+  const candidateDate = normalizeSpace(candidate);
+  if (!currentDate) return candidateDate;
+  if (!candidateDate) return currentDate;
+  return currentDate >= candidateDate ? currentDate : candidateDate;
+}
+
+function mergeDuplicateProjectData(canonical, duplicate) {
+  const canonicalSource = normalizeSpace(canonical.source_site);
+  const duplicateSource = normalizeSpace(duplicate.source_site);
+  const duplicateSourceLink = normalizeSpace(duplicate.source_link || duplicate.apply_link);
+  const mergeNote = duplicateSource
+    ? `已合并重复来源：${duplicateSource}${duplicateSourceLink ? `（${duplicateSourceLink}）` : ''}`
+    : '';
+
+  return {
+    ...canonical,
+    school_name: isWeakSchoolName(canonical.school_name) && !isWeakSchoolName(duplicate.school_name) ? duplicate.school_name : canonical.school_name,
+    department_name:
+      isWeakDepartmentName(canonical.department_name) && !isWeakDepartmentName(duplicate.department_name)
+        ? duplicate.department_name
+        : canonical.department_name,
+    project_name: chooseProjectTitle(canonical.project_name, duplicate.project_name),
+    project_type: normalizeSpace(canonical.project_type) || normalizeSpace(duplicate.project_type),
+    discipline: normalizeSpace(canonical.discipline) || normalizeSpace(duplicate.discipline),
+    publish_date: choosePublishDate(canonical.publish_date, duplicate.publish_date),
+    deadline_date: mergeDateTime(canonical.deadline_date, duplicate.deadline_date),
+    event_start_date: mergeDateTime(canonical.event_start_date, duplicate.event_start_date),
+    event_end_date: mergeDateTime(canonical.event_end_date, duplicate.event_end_date),
+    apply_link: normalizeSpace(canonical.apply_link) || normalizeSpace(duplicate.apply_link),
+    source_link: normalizeSpace(canonical.source_link) || normalizeSpace(duplicate.source_link),
+    requirements: chooseLongerText(canonical.requirements, duplicate.requirements, 1000),
+    materials_required: unique([...(canonical.materials_required || []), ...(duplicate.materials_required || [])]).slice(0, 12),
+    exam_interview_info: isGenericExamInfo(canonical.exam_interview_info) ? duplicate.exam_interview_info : canonical.exam_interview_info,
+    contact_info: isGenericContactInfo(canonical.contact_info) ? duplicate.contact_info : canonical.contact_info,
+    remarks: shorten(unique([canonical.remarks, duplicate.remarks, mergeNote]).join('；'), 500),
+    tags: unique([...(canonical.tags || []), ...(duplicate.tags || [])]).slice(0, 10),
+    status: inferStatus(inferDeadlineLevel(mergeDateTime(canonical.deadline_date, duplicate.deadline_date))),
+    deadline_level: inferDeadlineLevel(mergeDateTime(canonical.deadline_date, duplicate.deadline_date)),
+    last_checked_at: nowText(),
+    last_checked_source: unique([canonicalSource, duplicateSource]).join(' + '),
+    change_log: [
+      ...(Array.isArray(canonical.change_log) ? canonical.change_log : []),
+      {
+        date: nowText(),
+        field: 'duplicate_merge',
+        change: `合并重复通知 ${duplicate.id}`
+      }
+    ].slice(-20)
+  };
+}
+
 function mergeProjects(primaryProjects, secondaryProjects) {
   const fingerprints = new Map();
   const merged = [];
@@ -895,19 +988,37 @@ function mergeProjects(primaryProjects, secondaryProjects) {
     const duplicate = buildFingerprints(project)
       .map((fingerprint) => fingerprints.get(fingerprint))
       .find(Boolean);
-    const duplicateReasons = [];
 
     if (duplicate) {
       skippedSecondaryDuplicates += 1;
-      const currentPriority = SOURCE_PRIORITY[project.source_site] || 0;
-      const duplicatePriority = SOURCE_PRIORITY[duplicate.source_site] || 0;
-      if (currentPriority <= duplicatePriority) {
-        duplicateReasons.push('duplicate_notice');
-        duplicateReasons.push(`duplicate_of:${duplicate.id}`);
+
+      const canonical = merged[duplicate.index];
+      const canonicalId = canonical?.id || duplicate.id;
+      const duplicateQuality = assessNoticeQuality(project);
+      if (canonical && canonical.admin_status !== 'hidden' && duplicateQuality.adminStatus !== 'hidden') {
+        const mergedCanonical = applyQualityGate(mergeDuplicateProjectData(canonical, project));
+        merged[duplicate.index] = mergedCanonical;
+        buildFingerprints(mergedCanonical).forEach((fingerprint) => {
+          fingerprints.set(fingerprint, {
+            id: mergedCanonical.id,
+            source_site: mergedCanonical.source_site,
+            index: duplicate.index
+          });
+        });
       }
+
+      merged.push(
+        applyQualityGate(project, [
+          'duplicate_notice',
+          `duplicate_of:${canonicalId}`
+        ])
+      );
+      ids.add(project.id);
+      continue;
     }
 
-    const gatedProject = applyQualityGate(project, duplicateReasons);
+    const gatedProject = applyQualityGate(project);
+    const projectIndex = merged.length;
     merged.push(gatedProject);
     ids.add(project.id);
 
@@ -916,7 +1027,8 @@ function mergeProjects(primaryProjects, secondaryProjects) {
         if (!fingerprints.has(fingerprint)) {
           fingerprints.set(fingerprint, {
             id: gatedProject.id,
-            source_site: gatedProject.source_site
+            source_site: gatedProject.source_site,
+            index: projectIndex
           });
         }
       });
@@ -1117,6 +1229,7 @@ async function buildPrimaryProjects(records) {
   const detailRecords = PRIMARY_MAX_DETAILS ? records.slice(0, PRIMARY_MAX_DETAILS) : records;
   const fallbackRecords = PRIMARY_MAX_DETAILS ? records.slice(PRIMARY_MAX_DETAILS) : [];
   const failures = [];
+  const missingDeadlineFailures = [];
   logEvent('primary_detail_fetch_started', {
     requestedDetails: detailRecords.length,
     fallbackDetails: fallbackRecords.length,
@@ -1137,18 +1250,67 @@ async function buildPrimaryProjects(records) {
       return buildPrimaryProject(record, record, TARGET_YEAR);
     }
   });
-  const fallbackProjects = fallbackRecords.map((record) => buildPrimaryProject(record, record, TARGET_YEAR));
+
+  const fallbackProjects = [];
+  const missingDeadlineRecords = [];
+  for (const record of fallbackRecords) {
+    const project = buildPrimaryProject(record, record, TARGET_YEAR);
+    if (!normalizeSpace(project.deadline_date) && missingDeadlineRecords.length < PRIMARY_MISSING_DEADLINE_MAX_DETAILS) {
+      missingDeadlineRecords.push(record);
+    } else {
+      fallbackProjects.push(project);
+    }
+  }
+
+  let missingDeadlineDetailProjects = [];
+  if (missingDeadlineRecords.length) {
+    logEvent('primary_missing_deadline_detail_fetch_started', {
+      requestedDetails: missingDeadlineRecords.length,
+      maxDetails: PRIMARY_MISSING_DEADLINE_MAX_DETAILS,
+      concurrency: PRIMARY_DETAIL_CONCURRENCY
+    });
+    missingDeadlineDetailProjects = await mapWithConcurrency(
+      missingDeadlineRecords,
+      PRIMARY_DETAIL_CONCURRENCY,
+      async (record) => {
+        const noticeId = Number(record.id);
+
+        try {
+          const detail = await fetchPrimaryNoticeDetail(noticeId);
+          await sleep(PRIMARY_DETAIL_DELAY_MS);
+          return buildPrimaryProject(record, detail, TARGET_YEAR);
+        } catch (error) {
+          missingDeadlineFailures.push({
+            id: noticeId,
+            error: toErrorMessage(error)
+          });
+          return buildPrimaryProject(record, record, TARGET_YEAR);
+        }
+      }
+    );
+    logEvent('primary_missing_deadline_detail_fetch_finished', {
+      requestedDetails: missingDeadlineRecords.length,
+      failed: missingDeadlineFailures.length,
+      repaired: missingDeadlineDetailProjects.filter((project) => normalizeSpace(project.deadline_date)).length
+    });
+  }
+
   logEvent('primary_detail_fetch_finished', {
     requestedDetails: detailRecords.length,
     fallbackDetails: fallbackRecords.length,
-    failed: failures.length
+    failed: failures.length,
+    missingDeadlineRequestedDetails: missingDeadlineRecords.length,
+    missingDeadlineFailed: missingDeadlineFailures.length
   });
 
   return {
-    projects: [...detailedProjects, ...fallbackProjects],
-    failures,
-    requestedDetails: detailRecords.length,
-    fallbackDetails: fallbackRecords.length
+    projects: [...detailedProjects, ...missingDeadlineDetailProjects, ...fallbackProjects],
+    failures: [...failures, ...missingDeadlineFailures],
+    requestedDetails: detailRecords.length + missingDeadlineRecords.length,
+    fallbackDetails: fallbackRecords.length,
+    missingDeadlineRequestedDetails: missingDeadlineRecords.length,
+    missingDeadlineRepaired: missingDeadlineDetailProjects.filter((project) => normalizeSpace(project.deadline_date)).length,
+    missingDeadlineFailed: missingDeadlineFailures.length
   };
 }
 
@@ -1259,6 +1421,74 @@ async function fetchSecondaryRepairRecords(existingRecords, targetYear) {
     records,
     failures,
     requestedIds: repairIds
+  };
+}
+
+async function buildSecondaryProjects(records) {
+  const projects = records.map((record) => buildSecondaryProject(record, TARGET_YEAR));
+  const failures = [];
+  const repairCandidates = projects
+    .map((project, index) => ({
+      project,
+      record: records[index],
+      index
+    }))
+    .filter((item) => !normalizeSpace(item.project.deadline_date) && item.record?.id)
+    .slice(0, SECONDARY_MISSING_DEADLINE_MAX_DETAILS);
+
+  if (!repairCandidates.length) {
+    return {
+      projects,
+      failures,
+      requestedDetails: 0,
+      repaired: 0
+    };
+  }
+
+  logEvent('secondary_missing_deadline_detail_fetch_started', {
+    requestedDetails: repairCandidates.length,
+    maxDetails: SECONDARY_MISSING_DEADLINE_MAX_DETAILS
+  });
+
+  let repaired = 0;
+  for (const candidate of repairCandidates) {
+    const id = normalizeSpace(candidate.record.id);
+    try {
+      const detail = await fetchSecondaryNoticeDetail(id);
+      const repairedProject = buildSecondaryProject(
+        {
+          ...candidate.record,
+          ...detail
+        },
+        TARGET_YEAR
+      );
+      projects[candidate.index] = repairedProject;
+      if (normalizeSpace(repairedProject.deadline_date)) {
+        repaired += 1;
+      }
+    } catch (error) {
+      failures.push({
+        id,
+        error: toErrorMessage(error)
+      });
+    }
+
+    if (SECONDARY_DETAIL_DELAY_MS > 0) {
+      await sleep(SECONDARY_DETAIL_DELAY_MS);
+    }
+  }
+
+  logEvent('secondary_missing_deadline_detail_fetch_finished', {
+    requestedDetails: repairCandidates.length,
+    repaired,
+    failed: failures.length
+  });
+
+  return {
+    projects,
+    failures,
+    requestedDetails: repairCandidates.length,
+    repaired
   };
 }
 
@@ -1460,6 +1690,9 @@ async function runSync() {
   let primaryFailures = [];
   let requestedDetails = 0;
   let fallbackDetails = 0;
+  let primaryMissingDeadlineRequestedDetails = 0;
+  let primaryMissingDeadlineRepaired = 0;
+  let primaryMissingDeadlineFailed = 0;
 
   try {
     primaryListRecords = await fetchPrimaryNoticeRecords(TARGET_YEAR);
@@ -1469,6 +1702,9 @@ async function runSync() {
     primaryFailures = primaryBuildResult.failures;
     requestedDetails = primaryBuildResult.requestedDetails;
     fallbackDetails = primaryBuildResult.fallbackDetails;
+    primaryMissingDeadlineRequestedDetails = primaryBuildResult.missingDeadlineRequestedDetails;
+    primaryMissingDeadlineRepaired = primaryBuildResult.missingDeadlineRepaired;
+    primaryMissingDeadlineFailed = primaryBuildResult.missingDeadlineFailed;
   } catch (error) {
     const message = toErrorMessage(error);
     sourceErrors.push({
@@ -1489,6 +1725,9 @@ async function runSync() {
   let secondaryRepairRecords = [];
   let secondaryRepairFailures = [];
   let secondaryRepairRequestedIds = [];
+  let secondaryMissingDeadlineFailures = [];
+  let secondaryMissingDeadlineRequestedDetails = 0;
+  let secondaryMissingDeadlineRepaired = 0;
 
   try {
     secondaryRecords = await fetchSecondaryNoticeRecords(TARGET_YEAR);
@@ -1497,7 +1736,11 @@ async function runSync() {
     secondaryRepairFailures = secondaryRepairResult.failures;
     secondaryRepairRequestedIds = secondaryRepairResult.requestedIds;
     secondaryRecords = [...secondaryRecords, ...secondaryRepairRecords];
-    secondaryProjects = secondaryRecords.map((record) => buildSecondaryProject(record, TARGET_YEAR));
+    const secondaryBuildResult = await buildSecondaryProjects(secondaryRecords);
+    secondaryProjects = secondaryBuildResult.projects;
+    secondaryMissingDeadlineFailures = secondaryBuildResult.failures;
+    secondaryMissingDeadlineRequestedDetails = secondaryBuildResult.requestedDetails;
+    secondaryMissingDeadlineRepaired = secondaryBuildResult.repaired;
   } catch (error) {
     const message = toErrorMessage(error);
     sourceErrors.push({
@@ -1535,6 +1778,9 @@ async function runSync() {
   if (secondaryRepairFailures.length) {
     health.warnings.push('secondary_detail_repair_failed');
   }
+  if (secondaryMissingDeadlineFailures.length) {
+    health.warnings.push('secondary_missing_deadline_detail_failed');
+  }
 
   if (!health.ok) {
     logEvent('sync_health_failed', {
@@ -1556,6 +1802,9 @@ async function runSync() {
     primaryParsed: primaryProjects.length,
     primaryRequestedDetails: requestedDetails,
     primaryFallbackDetails: fallbackDetails,
+    primaryMissingDeadlineRequestedDetails,
+    primaryMissingDeadlineRepaired,
+    primaryMissingDeadlineFailed,
     primaryFailed: primaryFailures.length,
     primaryFailures: primaryFailures.slice(0, 10),
     secondaryMaxPages: SECONDARY_MAX_PAGES,
@@ -1564,6 +1813,10 @@ async function runSync() {
     secondaryRepairFetched: secondaryRepairRecords.length,
     secondaryRepairFailed: secondaryRepairFailures.length,
     secondaryRepairFailures: secondaryRepairFailures.slice(0, 10),
+    secondaryMissingDeadlineRequestedDetails,
+    secondaryMissingDeadlineRepaired,
+    secondaryMissingDeadlineFailed: secondaryMissingDeadlineFailures.length,
+    secondaryMissingDeadlineFailures: secondaryMissingDeadlineFailures.slice(0, 10),
     secondaryParsed: secondaryProjects.length,
     secondarySkippedAsDuplicate: skippedSecondaryDuplicates,
     skippedDuplicateIds,

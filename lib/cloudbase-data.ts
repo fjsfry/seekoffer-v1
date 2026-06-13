@@ -22,7 +22,8 @@ const MANUAL_PROJECT_STORAGE_KEY = 'seekoffer-manual-projects';
 const AI_POSITIONING_REPORT_STORAGE_KEY = 'seekoffer-ai-positioning-report';
 const APPLICATION_EVENT_NAME = 'seekoffer-applications-updated';
 const NOTICE_TARGET_YEAR = 2026;
-const PUBLIC_NOTICE_QUERY_LIMIT = 1500;
+const PUBLIC_NOTICE_QUERY_LIMIT = 5000;
+const PUBLIC_NOTICE_QUERY_PAGE_SIZE = 1000;
 
 type StoredPayload<T> = {
   updatedAt: string;
@@ -747,21 +748,34 @@ async function hydrateWorkspaceFromSupabase() {
 
 async function readRemotePublicNotices() {
   const supabase = getSupabaseBrowserClient();
-  const { data, error } = await supabase
-    .from('notices')
-    .select('*')
-    .eq('year', NOTICE_TARGET_YEAR)
-    .eq('is_private', false)
-    .eq('admin_status', 'published')
-    .is('admin_deleted_at', null)
-    .order('publish_date', { ascending: false })
-    .range(0, PUBLIC_NOTICE_QUERY_LIMIT - 1);
+  const rows: Record<string, unknown>[] = [];
 
-  if (error) {
-    throw error;
+  for (let from = 0; from < PUBLIC_NOTICE_QUERY_LIMIT; from += PUBLIC_NOTICE_QUERY_PAGE_SIZE) {
+    const to = Math.min(from + PUBLIC_NOTICE_QUERY_PAGE_SIZE - 1, PUBLIC_NOTICE_QUERY_LIMIT - 1);
+    const { data, error } = await supabase
+      .from('notices')
+      .select('*')
+      .eq('year', NOTICE_TARGET_YEAR)
+      .eq('is_private', false)
+      .eq('admin_status', 'published')
+      .is('admin_deleted_at', null)
+      .order('publish_date', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    const pageRows = (data || []) as Record<string, unknown>[];
+    rows.push(...pageRows);
+
+    if (pageRows.length < PUBLIC_NOTICE_QUERY_PAGE_SIZE) {
+      break;
+    }
   }
 
-  return (data || []).map((row) => mapNoticeRowToProject(row)).filter(Boolean) as PublicNoticeProject[];
+  return rows.map((row) => mapNoticeRowToProject(row)).filter(Boolean) as PublicNoticeProject[];
 }
 
 export function watchApplicationTable(callback: () => void) {
