@@ -99,8 +99,12 @@ function hasBrokenPublicIdentity(project: PublicNoticeProject) {
     !schoolName ||
     !title ||
     schoolName === '其他' ||
+    schoolName === '待补充' ||
+    schoolName === '待补充院校' ||
+    schoolName === '待识别学校' ||
     schoolName === '待识别院校' ||
     schoolName === '中国大学' ||
+    /^20\d{2}年大学$/.test(schoolName) ||
     /^【.*】/.test(schoolName) ||
     title.length < 6
   );

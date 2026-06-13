@@ -149,6 +149,8 @@ function isWeakSchool(value) {
     text === '???' ||
     text === '其他' ||
     text === '待补充' ||
+    text === '待补充院校' ||
+    text === '待识别学校' ||
     text === '待识别院校' ||
     text === '中国大学' ||
     /^20\d{2}年大学$/.test(text)

@@ -54,7 +54,7 @@ jobs:
       contents: read
 
     env:
-      SYNC_MODE: ${{ github.event.inputs.sync_mode || (github.event.schedule == '10 18 * * *' && 'full' || 'incremental') }}
+      SYNC_MODE: ${{ github.event.inputs.sync_mode || (github.event_name == 'push' && 'full' || (github.event.schedule == '10 18 * * *' && 'full' || 'incremental')) }}
       TARGET_YEAR: ${{ github.event.inputs.target_year || '2026' }}
       PRIMARY_ORDER_BY: publishTime
       PRIMARY_MAX_PAGES: ${{ github.event.inputs.primary_max_pages }}

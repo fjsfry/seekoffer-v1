@@ -51,7 +51,10 @@ const TITLE_BODY_START_PATTERNS = [
   /发布时间[:：]?\s*20\d{2}/i,
   /发布日期[:：]?\s*20\d{2}/i,
   /发稿时间[:：]?\s*20\d{2}/i,
+  /创建时间[:：]?\s*20\d{2}/i,
+  /日期[:：]?\s*20\d{2}/i,
   /时间[:：]?\s*20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}/i,
+  /20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}:\d{2}(?::\d{2})?)?/i,
   /阅读量[:：]?\s*\d+/i,
   /发布人[:：]?/i,
   /发布者[:：]?/i,
@@ -135,6 +138,22 @@ function normalizeSpace(value) {
   }
 
   return String(value).replace(/\s+/g, ' ').trim();
+}
+
+function isWeakSchoolName(value) {
+  const text = normalizeSpace(value);
+  return (
+    !text ||
+    text === '???' ||
+    text === '-' ||
+    text === '其他' ||
+    text === '待补充' ||
+    text === '待补充院校' ||
+    text === '待识别学校' ||
+    text === '待识别院校' ||
+    text === '中国大学' ||
+    /^20\d{2}年大学$/.test(text)
+  );
 }
 
 function safeJsonParse(value, fallback) {
@@ -519,6 +538,10 @@ function assessNoticeQuality(notice, extraReasons = []) {
     return { tier: 'hidden', adminStatus: 'hidden', reasons };
   }
 
+  if (isWeakSchoolName(notice.school_name)) {
+    reasons.push('weak_school_name');
+  }
+
   if (notice.project_name.length < 6) {
     reasons.push('title_too_short');
   }
@@ -550,6 +573,7 @@ function assessNoticeQuality(notice, extraReasons = []) {
   const hardReasons = new Set([
     'missing_required_identity',
     'title_too_short',
+    'weak_school_name',
     'outdated_deadline',
     'dirty_or_test_content',
     'competition_or_contest',
@@ -690,6 +714,36 @@ function pickFirst(...values) {
   return values.map(normalizeSpace).find(Boolean) || '';
 }
 
+function parseSecondaryTitle(value) {
+  const text = normalizeSpace(value);
+  const match = text.match(/^【([^】]{2,60})】\s*[\u2014\u2013\-－]{1,3}\s*(.{2,80})$/);
+
+  if (!match) {
+    return { school: '', department: '' };
+  }
+
+  return {
+    school: normalizeSpace(match[1]),
+    department: normalizeSpace(match[2])
+  };
+}
+
+function normalizeSecondaryDepartment(value) {
+  const text = normalizeSpace(value);
+  if (!text || text === '待补充院系') {
+    return '';
+  }
+
+  if (
+    text === '全校通知' ||
+    /(学院|研究院|研究所|医院|临床学院|学部|系|中心|实验室|书院|基地)/.test(text)
+  ) {
+    return text;
+  }
+
+  return '';
+}
+
 function parseSecondaryContent(record) {
   const contentPayload = safeJsonParse(record.content || '{}', {});
   return {
@@ -700,6 +754,7 @@ function parseSecondaryContent(record) {
 
 function buildSecondaryProject(record, targetYear = TARGET_YEAR) {
   const contentMeta = parseSecondaryContent(record);
+  const titleParts = parseSecondaryTitle(record.title);
   const title = cleanTitle(contentMeta.summary || record.title, 140) || cleanTitle(record.title, 100);
   const summaryText = [title, contentMeta.summary, normalizeSpace(record.description)].filter(Boolean).join(' ');
   const publishDate = normalizeDate(record.updated_time || record.updated_at || record.created_at) || nowDateText();
@@ -713,8 +768,9 @@ function buildSecondaryProject(record, targetYear = TARGET_YEAR) {
   return {
     id: `baoyanwang-${record.id}`,
     source_record_id: Number(record.id),
-    school_name: pickFirst(record.college, record.school) || '待识别学校',
-    department_name: pickFirst(record.academy, record.department) || '待补充院系',
+    school_name: pickFirst(record.college, record.school, titleParts.school) || '待识别学校',
+    department_name:
+      pickFirst(record.academy, record.department, normalizeSecondaryDepartment(titleParts.department)) || '待补充院系',
     project_name: title,
     project_type: inferProjectType(title, record.tags, contentMeta.summary),
     discipline,
@@ -1192,6 +1248,8 @@ function buildQualityStats(projects) {
   const published = projects.filter((project) => project.admin_status === 'published');
   const privateProjects = projects.filter((project) => project.is_private);
   const longPublishedTitles = published.filter((project) => normalizeSpace(project.project_name).length > 140);
+  const weakSchoolProjects = projects.filter((project) => isWeakSchoolName(project.school_name));
+  const publishedWeakSchoolProjects = published.filter((project) => isWeakSchoolName(project.school_name));
 
   return {
     byAdminStatus: countBy(projects, (project) => project.admin_status),
@@ -1203,6 +1261,10 @@ function buildQualityStats(projects) {
     maxPublishedPublishDate: maxDateText(published.map(getProjectPublishDate)),
     publishedLongTitleCount: longPublishedTitles.length,
     publishedLongTitleIds: longPublishedTitles.slice(0, 10).map((project) => project.id),
+    weakSchoolCount: weakSchoolProjects.length,
+    weakSchoolIds: weakSchoolProjects.slice(0, 10).map((project) => project.id),
+    publishedWeakSchoolCount: publishedWeakSchoolProjects.length,
+    publishedWeakSchoolIds: publishedWeakSchoolProjects.slice(0, 10).map((project) => project.id),
     missingDeadlineCount: projects.filter((project) => !normalizeSpace(project.deadline_date)).length,
     duplicateHiddenCount: projects.filter((project) => project.quality_reasons?.some((reason) => reason === 'duplicate_notice')).length,
     reviewSamples: projects
@@ -1228,6 +1290,10 @@ function assessSyncHealth(sourceStats, qualityStats) {
 
   if (qualityStats.publishedLongTitleCount > 0) {
     errors.push('published_body_like_titles');
+  }
+
+  if (qualityStats.publishedWeakSchoolCount > 0) {
+    errors.push('published_weak_school_names');
   }
 
   if (sourceStats.maxSourcePublishDate && qualityStats.maxOutputPublishDate && sourceStats.maxSourcePublishDate > qualityStats.maxOutputPublishDate) {

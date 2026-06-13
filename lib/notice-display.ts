@@ -31,7 +31,16 @@ function isNoisyTag(value: string) {
 
 export function isWeakNoticeValue(value: string | undefined | null) {
   const text = compactText(String(value || ''));
-  return !text || text === '???' || text === '-' || text === '待补充' || text === '待识别院校' || text.toLowerCase() === 'unknown';
+  return (
+    !text ||
+    text === '???' ||
+    text === '-' ||
+    text === '待补充' ||
+    text === '待补充院校' ||
+    text === '待识别学校' ||
+    text === '待识别院校' ||
+    text.toLowerCase() === 'unknown'
+  );
 }
 
 export function getDisplaySchoolName(value: string | undefined | null) {
