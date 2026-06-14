@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   AlertTriangle,
   ArrowRight,
-  BarChart3,
   BookOpenCheck,
   BrainCircuit,
   CheckCircle2,
@@ -54,6 +53,23 @@ const projectTypeChoices: ProjectType[] = ['夏令营', '预推免', '正式推�
 const needOptions: AiWaitlistNeed[] = ['申请风险评估', '材料短板提示', '提炼简章要求'];
 const inputClassName =
   'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-ink outline-none transition placeholder:text-slate-400 focus:border-brand/40 focus:ring-4 focus:ring-brand/8';
+const workflowSteps = [
+  {
+    title: '填写 5 项核心背景',
+    detail: '本科院校、专业、成绩、目标方向和地区先决定初版定位。',
+    icon: UserRoundCheck
+  },
+  {
+    title: '生成冲稳保组合',
+    detail: '系统按背景竞争力、方向匹配和截止时间筛出候选项目。',
+    icon: ShieldCheck
+  },
+  {
+    title: '加入清单推进',
+    detail: '把合适项目加入申请表，再按材料和截止日期持续跟进。',
+    icon: ClipboardList
+  }
+];
 
 export default function AiPage() {
   const { ready, loggedIn, session } = useUserSessionState();
@@ -227,23 +243,43 @@ export default function AiPage() {
 
   return (
     <SiteShell>
-      <section className="page-hero grid gap-6 px-6 py-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(520px,1.18fr)] lg:items-end lg:px-8">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">AI 申请定位助手</h1>
-            <span className="rounded-xl border border-brand/20 bg-brand/8 px-3 py-1 text-sm font-semibold text-brand">AI LAB</span>
-          </div>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
-            输入背景信息，AI 为你评估申请竞争力、定位风险，并推荐更适合的院校项目。
+      <section className="grid gap-6 rounded-[34px] border border-white/70 bg-white/92 px-6 py-7 shadow-soft backdrop-blur lg:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)] lg:items-center lg:px-8">
+        <div className="max-w-3xl">
+          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">AI 保研定位</h1>
+          <p className="mt-4 text-lg font-semibold leading-8 text-ink">先判断你适合冲哪里，再给出能执行的项目组合。</p>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+            这不是聊天窗口。按步骤填完 5 个核心信息后，系统会输出综合适配度、冲稳保建议、风险短板和可加入申请清单的项目。
           </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => inputPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:bg-brand-deep"
+            >
+              开始定位
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            <Link
+              href={report ? '#ai-results' : '#ai-input'}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:border-brand/30 hover:text-brand"
+            >
+              {report ? '查看已保存方案' : '先看需要填写什么'}
+              <ChevronDown className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
 
-        <div className="grid gap-3 rounded-[28px] border border-white/70 bg-white/88 p-4 shadow-soft backdrop-blur sm:grid-cols-2 xl:grid-cols-4">
-          <TopMetricCard label="可选项目" value={loading ? '...' : publicProjects.length.toString()} hint="覆盖近期公开通知" icon={ClipboardList} tone="green" />
-          <TopMetricCard label="已定位次数" value={report ? '1' : '0'} hint={report ? '本机已保存方案' : '生成后自动保存'} icon={FileCheck2} tone="brand" />
-          <TopMetricCard label="本轮推荐" value={report ? report.recommendedProjects.length.toString() : '--'} hint={report ? `稳妥 ${countRecommendationTier(report.recommendedProjects, '稳妥')} 个候选` : '生成后显示'} icon={ShieldCheck} tone="orange" />
-          <TopMetricCard label="今日剩余额度" value="2/5" hint="刷新后不扣次数" icon={BarChart3} tone="blue" />
+        <div className="grid gap-3">
+          {workflowSteps.map((step, index) => (
+            <ProductFlowCard key={step.title} step={index + 1} title={step.title} detail={step.detail} icon={step.icon} />
+          ))}
         </div>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <TopMetricCard label="当前通知池" value={loading ? '...' : publicProjects.length.toLocaleString('zh-CN')} hint="按公开通知实时匹配" icon={ClipboardList} tone="green" />
+        <TopMetricCard label="定位档案" value={`${quickInputCount}/5`} hint={quickInputReady ? '核心信息已完成' : '补齐后可生成'} icon={FileCheck2} tone="brand" />
+        <TopMetricCard label="本轮推荐" value={report ? report.recommendedProjects.length.toString() : '--'} hint={report ? `稳妥 ${countRecommendationTier(report.recommendedProjects, '稳妥')} 个候选` : '生成后显示'} icon={ShieldCheck} tone="orange" />
       </section>
 
       {message ? (
@@ -282,21 +318,23 @@ export default function AiPage() {
 
       {report ? <RecommendationPanel projects={report.recommendedProjects} /> : null}
 
-      <NextActionCards
-        report={report}
-        loggedIn={loggedIn}
-        trackedProjectCount={applicationRows.length}
-        materialSnapshot={materialSnapshot}
-        wechatId={wechatId}
-        primaryNeed={primaryNeed}
-        feedbackDetails={feedbackDetails}
-        feedbackMessage={feedbackMessage}
-        feedbackSubmitting={feedbackSubmitting}
-        onWechatChange={setWechatId}
-        onNeedChange={setPrimaryNeed}
-        onDetailsChange={setFeedbackDetails}
-        onSubmit={handleFeedbackSubmit}
-      />
+      {report ? (
+        <NextActionCards
+          report={report}
+          loggedIn={loggedIn}
+          trackedProjectCount={applicationRows.length}
+          materialSnapshot={materialSnapshot}
+          wechatId={wechatId}
+          primaryNeed={primaryNeed}
+          feedbackDetails={feedbackDetails}
+          feedbackMessage={feedbackMessage}
+          feedbackSubmitting={feedbackSubmitting}
+          onWechatChange={setWechatId}
+          onNeedChange={setPrimaryNeed}
+          onDetailsChange={setFeedbackDetails}
+          onSubmit={handleFeedbackSubmit}
+        />
+      ) : null}
 
       <div className="fixed inset-x-4 bottom-4 z-30 lg:hidden">
         <button
@@ -345,12 +383,12 @@ function PositioningInputPanel({
   const completion = quickInputCount * 20;
 
   return (
-    <section ref={inputPanelRef} className="scroll-mt-6 overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
+    <section id="ai-input" ref={inputPanelRef} className="scroll-mt-6 overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
       <div className="border-b border-slate-100 px-5 py-5 lg:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-ink">申请背景输入</h2>
-            <p className="mt-2 text-sm text-slate-500">信息只用于定位分析，不会公开展示。</p>
+            <h2 className="text-xl font-semibold text-ink">1. 建立定位档案</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">先填 5 个必填项即可生成初版；科研、论文和奖项会让推荐更精细。</p>
           </div>
           {hasProfile ? (
             <button
@@ -362,6 +400,18 @@ function PositioningInputPanel({
               带入档案
             </button>
           ) : null}
+        </div>
+
+        <div className="mt-5 rounded-[24px] border border-brand/10 bg-brand/5 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-ink">生成前还需要</div>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                {quickInputCount === 5 ? '核心信息已完成，可以生成定位方案。' : `补齐 ${5 - quickInputCount} 项：${quickInputItems.filter((item) => !item.done).map((item) => item.label).join('、')}`}
+              </p>
+            </div>
+            <span className="rounded-2xl bg-white px-3 py-2 text-sm font-semibold text-brand shadow-sm">{quickInputCount}/5</span>
+          </div>
         </div>
 
         <div className="mt-5 grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 text-xs font-semibold">
@@ -437,7 +487,7 @@ function PositioningInputPanel({
               <input
                 value={input.targetMajor}
                 onChange={(event) => onUpdateInput('targetMajor', event.target.value)}
-                placeholder="选择或输入你的目标专业方向"
+                placeholder="如：人工智能 / 金融 / 生物医学"
                 className={inputClassName}
               />
             </Field>
@@ -445,7 +495,7 @@ function PositioningInputPanel({
               <input
                 value={input.targetRegion}
                 onChange={(event) => onUpdateInput('targetRegion', event.target.value)}
-                placeholder="选择你倾向的留学地区"
+                placeholder="如：北京 / 上海 / 长三角 / 不限"
                 className={inputClassName}
               />
             </Field>
@@ -580,10 +630,10 @@ function AnalysisResultPanel({
     : '--';
 
   return (
-    <section className="overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
+    <section id="ai-results" className="scroll-mt-6 overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-5 py-5 lg:px-6">
         <div>
-          <h2 className="text-xl font-semibold text-ink">定位分析结果</h2>
+          <h2 className="text-xl font-semibold text-ink">2. 查看定位结论</h2>
           <p className="mt-2 text-sm text-slate-500">{report ? '基于你提供的信息生成' : loading ? '正在整理申请线索' : '生成后展示定位结论和风险提示'}</p>
         </div>
         <div className="inline-flex items-center gap-3 rounded-2xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
@@ -650,10 +700,22 @@ function AnalysisResultPanel({
           <span className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-brand/8 text-brand">
             {loading ? <LoaderCircle className="h-7 w-7 animate-spin" /> : <Sparkles className="h-7 w-7" />}
           </span>
-          <h3 className="mt-5 text-2xl font-semibold text-ink">{loading ? '正在整理申请线索' : '等待生成定位分析'}</h3>
+          <h3 className="mt-5 text-2xl font-semibold text-ink">{loading ? '正在整理申请线索' : '填完左侧信息后生成方案'}</h3>
           <p className="mt-3 max-w-lg text-sm leading-7 text-slate-500">
-            填完左侧核心信息后，系统会输出综合适配度、冲稳保项目数、风险提示和材料建议。
+            生成后你会看到一份可执行的申请定位：你的竞争力区间、冲稳保项目比例、主要风险和下一步动作。
           </p>
+          <div className="mt-6 grid w-full max-w-xl gap-3 text-left sm:grid-cols-3">
+            {[
+              ['定位结论', '判断当前背景更适合冲刺、稳妥还是补强。'],
+              ['风险短板', '指出成绩、方向、材料或清单结构上的问题。'],
+              ['项目推荐', '把可申请项目按匹配度和截止时间排序。']
+            ].map(([title, detail]) => (
+              <div key={title} className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <div className="text-sm font-semibold text-ink">{title}</div>
+                <p className="mt-2 text-xs leading-5 text-slate-500">{detail}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </section>
@@ -950,6 +1012,33 @@ function TopMetricCard({
   );
 }
 
+function ProductFlowCard({
+  step,
+  title,
+  detail,
+  icon: Icon
+}: {
+  step: number;
+  title: string;
+  detail: string;
+  icon: ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div className="flex items-start gap-4 rounded-[26px] border border-slate-100 bg-white px-4 py-4 shadow-sm">
+      <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
+        <Icon className="h-5 w-5" />
+      </span>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">{step}</span>
+          <h2 className="text-base font-semibold text-ink">{title}</h2>
+        </div>
+        <p className="mt-2 text-sm leading-6 text-slate-500">{detail}</p>
+      </div>
+    </div>
+  );
+}
+
 function FragmentStep({ label, index, active, done }: { label: string; index: number; active: boolean; done: boolean }) {
   return (
     <>
@@ -1101,20 +1190,24 @@ function countRecommendationTier(projects: AiRecommendedProject[], tier: AiProje
 function RecommendationPanel({ projects }: { projects: AiRecommendedProject[] }) {
   const [showAll, setShowAll] = useState(false);
   const visibleProjects = showAll ? projects : projects.slice(0, 5);
+  const tierSummary = [
+    { label: '冲刺', value: countRecommendationTier(projects, '冲刺') },
+    { label: '稳妥', value: countRecommendationTier(projects, '稳妥') },
+    { label: '保底', value: countRecommendationTier(projects, '保底') }
+  ];
 
   return (
     <section className="overflow-hidden rounded-[30px] border border-black/5 bg-white/96 shadow-soft backdrop-blur">
       <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <SectionHeading icon={TrendingUp} eyebrow="推荐" title="优先推荐项目" />
-          <p className="mt-2 text-sm leading-6 text-slate-500">根据你的背景与意向，AI 精选匹配度较高的项目。</p>
+          <SectionHeading icon={TrendingUp} eyebrow="3. 选项目" title="优先推荐项目" />
+          <p className="mt-2 text-sm leading-6 text-slate-500">按匹配度和截止时间排序；先核对前 5 个，再把合适项目加入申请清单。</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {['全部地区', '全部专业', '匹配度排序'].map((item) => (
-            <button key={item} type="button" className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm">
-              {item}
-              <ChevronDown className="h-4 w-4" />
-            </button>
+        <div className="flex flex-wrap gap-2">
+          {tierSummary.map((item) => (
+            <span key={item.label} className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
+              {item.label} {item.value}
+            </span>
           ))}
         </div>
       </div>
