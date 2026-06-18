@@ -747,21 +747,31 @@ function NoticesPageContent() {
 
   function applyQuickFilter(filter: (typeof quickFilters)[number]) {
     if (filter.kind === 'progress') {
-      setProgress(filter.value as ProgressFilter);
+      setProgress((current) => (current === filter.value ? '全部' : (filter.value as ProgressFilter)));
+      return;
     }
 
     if (filter.kind === 'deadline') {
+      if (deadlineQuick === 'within7days') {
+        setDeadlineQuick('全部');
+        setProgress((current) => (current === '报名中' ? '全部' : current));
+        setSortBy((current) => (current === 'deadline' ? defaultNoticeListState.sortBy : current));
+        return;
+      }
+
       setProgress('报名中');
       setDeadlineQuick('within7days');
       setSortBy('deadline');
+      return;
     }
 
     if (filter.kind === 'range') {
-      setSchoolRange(filter.value as RangeFilter);
+      setSchoolRange((current) => (current === filter.value ? '全部' : (filter.value as RangeFilter)));
+      return;
     }
 
     if (filter.kind === 'type') {
-      setProjectType(filter.value);
+      setProjectType((current) => (current === filter.value ? '全部' : filter.value));
     }
   }
 
@@ -850,6 +860,7 @@ function NoticesPageContent() {
               key={item.label}
               type="button"
               onClick={() => applyQuickFilter(item)}
+              aria-pressed={isQuickFilterActive(item)}
               className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${
                 isQuickFilterActive(item) ? 'bg-brand text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-brand/8 hover:text-brand'
               }`}

@@ -132,25 +132,29 @@ export default function HomePage() {
       label: '2026 通知',
       value: `${projects.length}+`,
       hint: noticesLoading ? '正在同步最新通知' : '持续更新中',
-      icon: BellRing
+      icon: BellRing,
+      href: '/notices'
     },
     {
       label: '院校入口',
       value: `${collegeDirectory.length}`,
       hint: '覆盖高校院所',
-      icon: Building2
+      icon: Building2,
+      href: '/colleges'
     },
     {
       label: '资源工具',
       value: `${totalResourceLinks}`,
       hint: '高效助力申请',
-      icon: FolderOpen
+      icon: FolderOpen,
+      href: '/resources'
     },
     {
       label: 'Offer 动态',
       value: offerCount ? `${offerCount}` : '开放中',
       hint: offersLoading ? '正在同步审核动态' : '审核后展示',
-      icon: CalendarDays
+      icon: CalendarDays,
+      href: '/offers'
     }
   ];
 
@@ -227,18 +231,23 @@ export default function HomePage() {
           const Icon = item.icon;
 
           return (
-            <div key={item.label} className="product-card rounded-[24px] bg-white/90 p-6 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-soft">
+            <Link
+              key={item.label}
+              href={item.href}
+              aria-label={`查看${item.label}`}
+              className="product-card group rounded-[24px] bg-white/90 p-6 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15"
+            >
               <div className="flex items-start gap-4">
-                <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/8 text-brand shadow-[inset_0_0_0_1px_rgba(23,73,77,0.04)]">
+                <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/8 text-brand shadow-[inset_0_0_0_1px_rgba(23,73,77,0.04)] transition group-hover:bg-brand group-hover:text-white">
                   <Icon className="h-7 w-7" />
                 </span>
-                <div>
+                <div className="min-w-0">
                   <div className="text-sm font-semibold text-slate-600">{item.label}</div>
                   <div className="mt-2 text-3xl font-semibold tracking-tight text-brand">{item.value}</div>
                   <div className="mt-1 text-sm leading-6 text-slate-500">{item.hint}</div>
                 </div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </section>
