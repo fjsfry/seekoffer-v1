@@ -15,10 +15,12 @@ import {
   FolderOpen,
   GraduationCap,
   LayoutDashboard,
+  Megaphone,
   Monitor,
   Search,
   ShieldCheck,
   Target,
+  Trophy,
   UserRound
 } from 'lucide-react';
 import { DeadlineBadge } from '@/components/status-badge';
@@ -37,6 +39,7 @@ import { buildNoticeDetailHref } from '@/lib/notice-links';
 import { collegeDirectory } from '@/lib/college-directory';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { baseNoticeProjects } from '@/lib/notice-source';
+import { getNoticeTypeBucket, getTopCollegeNoticeStats, noticeTypeFilters } from '@/lib/notice-analytics';
 import { officialResourceSections } from '@/lib/portal-data';
 import { fetchPublicOffers } from '@/lib/offers';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
@@ -126,6 +129,32 @@ export default function HomePage() {
 
   const priorityActions = useMemo(() => deadlineProjects.slice(0, 3), [deadlineProjects]);
   const totalResourceLinks = officialResourceSections.flatMap((item) => item.links).length;
+  const typeEntryCards = useMemo(() => {
+    const meta: Record<
+      string,
+      {
+        icon: ComponentType<{ className?: string }>;
+        hint: string;
+        tone: string;
+      }
+    > = {
+      夏令营: { icon: GraduationCap, hint: '集中报名季，先看高价值项目', tone: 'bg-emerald-50 text-brand' },
+      预推免: { icon: ClipboardList, hint: '提前锁定秋招前的关键机会', tone: 'bg-sky-50 text-sky-600' },
+      宣讲会: { icon: Megaphone, hint: '了解项目、导师和申请节奏', tone: 'bg-amber-50 text-amber-600' },
+      入营名单: { icon: Trophy, hint: '跟进入营、优秀营员和结果公示', tone: 'bg-rose-50 text-rose-600' },
+      推免: { icon: ShieldCheck, hint: '正式推免和九推阶段通知', tone: 'bg-slate-100 text-slate-700' }
+    };
+
+    return noticeTypeFilters
+      .filter((item) => item !== '全部')
+      .map((type) => ({
+        type,
+        count: projects.filter((project) => getNoticeTypeBucket(project) === type).length,
+        href: `/notices?type=${encodeURIComponent(type)}`,
+        ...meta[type]
+      }));
+  }, [projects]);
+  const hotCollegeStats = useMemo(() => getTopCollegeNoticeStats(projects, 6), [projects]);
 
   const heroMetrics = [
     {
@@ -250,6 +279,130 @@ export default function HomePage() {
             </Link>
           );
         })}
+      </section>
+
+      <section className="grid gap-5 px-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)] lg:px-12">
+        <div className="product-card rounded-[28px] p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-ink">按类型找机会</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">先按申请阶段进入通知库，再继续筛学校、地区和专业方向。</p>
+            </div>
+            <Link href="/notices" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
+              进入通知库
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {typeEntryCards.map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <Link
+                  key={item.type}
+                  href={item.href}
+                  className="group rounded-[22px] border border-slate-100 bg-white/86 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/20 hover:shadow-soft"
+                >
+                  <span className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ${item.tone}`}>
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div className="mt-4 flex items-end justify-between gap-2">
+                    <div className="whitespace-nowrap text-base font-semibold text-ink">{item.type}</div>
+                    <div className="text-2xl font-semibold leading-none text-brand">{item.count}</div>
+                  </div>
+                  <p className="mt-2 min-h-10 text-xs leading-5 text-slate-500">{item.hint}</p>
+                  <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand">
+                    立即筛选
+                    <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="product-card rounded-[28px] p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-ink">即将截止</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">优先处理近 7 天内需要提交的项目。</p>
+            </div>
+            <Link href="/notices?deadline=within7days&sort=deadline" className="text-sm font-semibold text-brand">
+              全部
+            </Link>
+          </div>
+          <div className="mt-5 divide-y divide-slate-100">
+            {deadlineProjects.slice(0, 4).map((project) => (
+              <Link
+                key={project.id}
+                href={buildNoticeDetailHref(project.id, '/notices?deadline=within7days&sort=deadline')}
+                className="grid grid-cols-[42px_minmax(0,1fr)_88px] items-center gap-3 py-4 transition hover:bg-slate-50/80"
+              >
+                <ExternalSiteMark
+                  source={resolveNoticeLogoSource(project)}
+                  label={getDisplaySchoolName(project.schoolName)}
+                  size="sm"
+                  rounded="full"
+                />
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</div>
+                  <div className="mt-1 truncate text-xs text-slate-500">{getDisplayNoticeDepartment(project)}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-semibold text-rose-500">{getDeadlineDistanceLabel(project.deadlineDate)}</div>
+                  <div className="mt-1 text-[11px] text-slate-400">{formatNoticeDateOnly(project.deadlineDate)}</div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="px-1 lg:px-12">
+        <div className="product-card rounded-[28px] p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-ink">热门院校</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">按当前通知量和报名中项目自动排序，直接进入院校通知。</p>
+            </div>
+            <Link href="/colleges" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
+              查看院校库
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {hotCollegeStats.map((item, index) => (
+              <Link
+                key={item.schoolName}
+                href={`/notices?school=${encodeURIComponent(item.schoolName)}&status=${encodeURIComponent('报名中')}`}
+                className="group rounded-[22px] border border-slate-100 bg-white/86 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/20 hover:shadow-soft"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand/8 text-sm font-semibold text-brand">
+                      {index + 1}
+                    </span>
+                    <div className="truncate text-base font-semibold text-ink">{item.schoolName}</div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand" />
+                </div>
+                <div className="mt-4 grid grid-cols-4 gap-2 text-center">
+                  {[
+                    ['通知', item.total],
+                    ['报名中', item.active],
+                    ['夏令营', item.summer],
+                    ['预推免', item.pre]
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-2xl bg-slate-50 px-2 py-3">
+                      <div className="text-lg font-semibold leading-none text-brand">{value}</div>
+                      <div className="mt-1 text-[11px] font-medium text-slate-500">{label}</div>
+                    </div>
+                  ))}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
       </section>
 
       <section className="px-1 lg:px-12">

@@ -21,6 +21,8 @@ export type PublicOffer = {
   isAnonymous: boolean;
   reportsCount: number;
   createdAt: string;
+  isCuratedSample?: boolean;
+  sourceLabel?: string;
 };
 
 export type OfferSubmitInput = {
@@ -110,6 +112,99 @@ export function getOfferAvatar(label: string) {
   const normalized = label.trim();
   return normalized ? normalized.slice(0, 1).toUpperCase() : 'O';
 }
+
+export const curatedOfferSamples: PublicOffer[] = [
+  {
+    id: 'sample-offer-zju-cs-2026',
+    authorName: '整理样本',
+    schoolName: '浙江大学',
+    major: '计算机科学与技术',
+    projectType: '夏令营',
+    result: '录取',
+    undergraduateBackground: '华东地区 211，专业前 8%，有一段科研训练和省级竞赛经历',
+    content: '材料初筛看重排名、科研经历和项目表达，面试主要围绕简历项目、专业基础和未来方向展开。适合作为计算机方向同学准备材料和面试问题的参考样本。',
+    isAnonymous: true,
+    reportsCount: 0,
+    createdAt: '2026-06-26T09:30:00+08:00',
+    isCuratedSample: true,
+    sourceLabel: '已整理样本'
+  },
+  {
+    id: 'sample-offer-fudan-econ-2026',
+    authorName: '整理样本',
+    schoolName: '复旦大学',
+    major: '应用经济学',
+    projectType: '预推免',
+    result: '候补',
+    undergraduateBackground: '财经类 211，专业前 5%，有论文训练和数模经历',
+    content: '候补样本显示经管方向不仅看成绩，也会关注计量、英语和研究问题表达。建议提前准备一版研究兴趣陈述，并把课程、竞赛和实习经历组织成清晰主线。',
+    isAnonymous: true,
+    reportsCount: 0,
+    createdAt: '2026-06-25T19:20:00+08:00',
+    isCuratedSample: true,
+    sourceLabel: '已整理样本'
+  },
+  {
+    id: 'sample-offer-ustc-auto-2026',
+    authorName: '整理样本',
+    schoolName: '中国科学技术大学',
+    major: '控制科学与工程',
+    projectType: '夏令营',
+    result: '录取',
+    undergraduateBackground: '985，自动化专业前 15%，有机器人项目和导师联系经历',
+    content: '这个样本的关键不是排名特别靠前，而是方向匹配和项目细节讲得清楚。控制、机器人、自动化方向同学可以重点准备项目动机、算法选择和实验结果复盘。',
+    isAnonymous: true,
+    reportsCount: 0,
+    createdAt: '2026-06-24T11:10:00+08:00',
+    isCuratedSample: true,
+    sourceLabel: '已整理样本'
+  },
+  {
+    id: 'sample-offer-nju-business-2026',
+    authorName: '整理样本',
+    schoolName: '南京大学',
+    major: '工商管理',
+    projectType: '预推免',
+    result: '放弃',
+    undergraduateBackground: '综合类 985，专业前 20%，有商赛和咨询实习',
+    content: '放弃原因主要是方向和导师匹配度不如另一个 Offer。这个样本适合提醒同学不要只看学校名，也要把导师方向、培养方式和后续去向一起纳入决策。',
+    isAnonymous: true,
+    reportsCount: 0,
+    createdAt: '2026-06-23T15:45:00+08:00',
+    isCuratedSample: true,
+    sourceLabel: '已整理样本'
+  },
+  {
+    id: 'sample-offer-sjtu-ai-2026',
+    authorName: '整理样本',
+    schoolName: '上海交通大学',
+    major: '人工智能',
+    projectType: '夏令营',
+    result: '录取',
+    undergraduateBackground: '双一流，专业前 3%，有机器学习科研和工程项目',
+    content: '面试集中在机器学习基础、项目贡献和代码实现细节。AI 方向申请人建议把简历中的每个项目拆成问题、方法、结果和个人贡献四部分。',
+    isAnonymous: true,
+    reportsCount: 0,
+    createdAt: '2026-06-22T21:15:00+08:00',
+    isCuratedSample: true,
+    sourceLabel: '已整理样本'
+  },
+  {
+    id: 'sample-offer-pku-law-2026',
+    authorName: '整理样本',
+    schoolName: '北京大学',
+    major: '法学',
+    projectType: '推免',
+    result: '官方确认',
+    undergraduateBackground: '政法类强校，专业前 5%，有论文写作和模拟法庭经历',
+    content: '文法方向样本更强调阅读、写作和问题意识。材料里不要只堆获奖，建议把课程论文、研究兴趣和未来导师方向之间的关系说清楚。',
+    isAnonymous: true,
+    reportsCount: 0,
+    createdAt: '2026-06-21T10:00:00+08:00',
+    isCuratedSample: true,
+    sourceLabel: '已整理样本'
+  }
+];
 
 export async function fetchPublicOffers() {
   if (!isSupabaseConfigured()) {

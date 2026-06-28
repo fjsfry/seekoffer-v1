@@ -1,10 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
+  BellRing,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Clock3,
   ExternalLink,
   Filter,
   GraduationCap,
@@ -12,12 +15,16 @@ import {
   RotateCcw,
   Search,
   SlidersHorizontal,
-  Tags,
   X
 } from 'lucide-react';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
+import { fetchPublicNotices } from '@/lib/cloudbase-data';
 import { collegeDirectory } from '@/lib/college-directory';
+import { buildCollegeNoticeStats } from '@/lib/notice-analytics';
+import { filterMainNoticeProjects } from '@/lib/notice-quality';
+import { baseNoticeProjects } from '@/lib/notice-source';
+import type { PublicNoticeProject } from '@/lib/mock-data';
 
 const PAGE_SIZE = 16;
 const allCityLabel = '全部城市';
@@ -25,9 +32,11 @@ const allGroupLabel = '全部标签';
 const cityOptions = [allCityLabel, ...Array.from(new Set(collegeDirectory.map((item) => item.city)))];
 const groupOptions = [allGroupLabel, '985', '211', '双一流', 'C9', '华五', '国防七子'];
 const hotCities = ['北京', '上海', '南京', '武汉', '广州', '西安', '成都'];
-type SortOption = 'default' | 'name' | 'city';
+type SortOption = 'active' | 'notices' | 'updated' | 'name' | 'city';
 const sortOptions: Array<{ label: string; value: SortOption }> = [
-  { label: '默认排序', value: 'default' },
+  { label: '报名中最多', value: 'active' },
+  { label: '通知最多', value: 'notices' },
+  { label: '最近更新', value: 'updated' },
   { label: '按校名排序', value: 'name' },
   { label: '按城市排序', value: 'city' }
 ];
@@ -59,8 +68,35 @@ export default function CollegesPage() {
   const [pageState, setPageState] = useState({ page: 1, filterKey: '' });
   const [jumpPage, setJumpPage] = useState('');
   const [showAllCities, setShowAllCities] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>('default');
+  const [sortBy, setSortBy] = useState<SortOption>('active');
+  const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
+    filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
+  );
   const filterKey = `${keyword.trim().toLowerCase()}|${city}|${group}|${sortBy}`;
+
+  useEffect(() => {
+    let active = true;
+
+    fetchPublicNotices()
+      .then((rows) => {
+        if (active) {
+          setProjects(rows.filter((item) => String(item.year) === '2026'));
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setProjects(filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026'));
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const collegeStats = useMemo(() => {
+    return new Map(collegeDirectory.map((item) => [item.name, buildCollegeNoticeStats(projects, item.name)]));
+  }, [projects]);
 
   const filteredColleges = useMemo(() => {
     const query = keyword.trim().toLowerCase();
@@ -79,6 +115,32 @@ export default function CollegesPage() {
     });
 
     return [...rows].sort((current, next) => {
+      const currentStats = collegeStats.get(current.name);
+      const nextStats = collegeStats.get(next.name);
+
+      if (sortBy === 'active') {
+        return (
+          (nextStats?.active || 0) - (currentStats?.active || 0) ||
+          (nextStats?.total || 0) - (currentStats?.total || 0) ||
+          current.name.localeCompare(next.name, 'zh-CN')
+        );
+      }
+
+      if (sortBy === 'notices') {
+        return (
+          (nextStats?.total || 0) - (currentStats?.total || 0) ||
+          (nextStats?.active || 0) - (currentStats?.active || 0) ||
+          current.name.localeCompare(next.name, 'zh-CN')
+        );
+      }
+
+      if (sortBy === 'updated') {
+        return (
+          (nextStats?.latestPublishDate || '').localeCompare(currentStats?.latestPublishDate || '') ||
+          current.name.localeCompare(next.name, 'zh-CN')
+        );
+      }
+
       if (sortBy === 'name') {
         return current.name.localeCompare(next.name, 'zh-CN');
       }
@@ -92,7 +154,7 @@ export default function CollegesPage() {
 
       return 0;
     });
-  }, [keyword, city, group, sortBy]);
+  }, [keyword, city, group, sortBy, collegeStats]);
 
   const totalPages = Math.max(1, Math.ceil(filteredColleges.length / PAGE_SIZE));
   const requestedPage = pageState.filterKey === filterKey ? pageState.page : 1;
@@ -100,7 +162,7 @@ export default function CollegesPage() {
   const pagedColleges = filteredColleges.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const visiblePages = getVisiblePages(currentPage, totalPages);
   const hasActiveFilters =
-    Boolean(keyword.trim()) || city !== allCityLabel || group !== allGroupLabel || sortBy !== 'default';
+    Boolean(keyword.trim()) || city !== allCityLabel || group !== allGroupLabel || sortBy !== 'active';
   const activeFilterItems = [
     keyword.trim()
       ? {
@@ -123,11 +185,11 @@ export default function CollegesPage() {
           onClear: () => setGroup(allGroupLabel)
         }
       : null,
-    sortBy !== 'default'
+    sortBy !== 'active'
       ? {
           key: 'sort',
           label: `排序：${sortOptions.find((item) => item.value === sortBy)?.label ?? '自定义'}`,
-          onClear: () => setSortBy('default')
+          onClear: () => setSortBy('active')
         }
       : null
   ].filter(Boolean) as Array<{ key: string; label: string; onClear: () => void }>;
@@ -155,7 +217,7 @@ export default function CollegesPage() {
     setKeyword('');
     setCity(allCityLabel);
     setGroup(allGroupLabel);
-    setSortBy('default');
+    setSortBy('active');
     setJumpPage('');
     setPageState({ page: 1, filterKey: '' });
   }
@@ -173,8 +235,12 @@ export default function CollegesPage() {
         <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
           {[
             { label: '收录院校', value: `${collegeDirectory.length}`, icon: GraduationCap },
-            { label: '覆盖城市', value: `${cityOptions.length - 1}`, icon: MapPin },
-            { label: '当前匹配', value: `${filteredColleges.length}`, icon: Tags }
+            { label: '关联通知', value: `${projects.length}`, icon: BellRing },
+            {
+              label: '报名中',
+              value: `${Array.from(collegeStats.values()).reduce((sum, item) => sum + item.active, 0)}`,
+              icon: Clock3
+            }
           ].map((item) => {
             const Icon = item.icon;
 
@@ -383,13 +449,30 @@ export default function CollegesPage() {
           <div className="text-sm font-semibold text-slate-600">
             共 <span className="text-brand">{filteredColleges.length}</span> 所院校
           </div>
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-brand hover:text-brand"
-          >
-            重置
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="relative">
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as SortOption)}
+                className="h-10 appearance-none rounded-full border border-slate-200 bg-white px-4 pr-9 text-sm font-semibold text-slate-600 outline-none transition hover:border-brand hover:text-brand"
+                aria-label="院校库排序"
+              >
+                {sortOptions.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            </label>
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-brand hover:text-brand"
+            >
+              重置
+            </button>
+          </div>
         </div>
         <div>
           <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3">
@@ -473,41 +556,69 @@ export default function CollegesPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        {pagedColleges.map((item) => (
-          <article
-            key={item.name}
-            className="surface-card rounded-[26px] p-5 transition hover:-translate-y-1 hover:border-brand/15 hover:shadow-soft"
-          >
-            <div className="flex items-start gap-4">
-              <ExternalSiteMark source={item.website} label={item.name} size="lg" rounded="full" />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-brand">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {item.city}
-                  </span>
-                  {item.groups.slice(0, 4).map((entry) => (
-                    <span key={entry} className="rounded-full bg-brand/10 px-3 py-1 text-brand">
-                      {entry}
+        {pagedColleges.map((item) => {
+          const stats = collegeStats.get(item.name) || buildCollegeNoticeStats(projects, item.name);
+
+          return (
+            <article
+              key={item.name}
+              className="surface-card rounded-[26px] p-5 transition hover:-translate-y-1 hover:border-brand/15 hover:shadow-soft"
+            >
+              <div className="flex items-start gap-4">
+                <ExternalSiteMark source={item.website} label={item.name} size="lg" rounded="full" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-brand">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {item.city}
                     </span>
-                  ))}
-                </div>
-                <div className="mt-4 text-2xl font-semibold tracking-tight text-ink">{item.name}</div>
-                <div className="mt-5">
-                  <a
-                    href={item.website}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 rounded-xl border border-brand/25 bg-white px-4 py-2.5 text-sm font-semibold text-brand transition hover:border-brand"
-                  >
-                    打开学校官网
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
+                    {item.groups.slice(0, 4).map((entry) => (
+                      <span key={entry} className="rounded-full bg-brand/10 px-3 py-1 text-brand">
+                        {entry}
+                      </span>
+                    ))}
+                    {stats.latestPublishDate ? (
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">最近更新 {stats.latestPublishDate}</span>
+                    ) : null}
+                  </div>
+                  <div className="mt-4 text-2xl font-semibold tracking-tight text-ink">{item.name}</div>
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                    {[
+                      ['总通知', stats.total],
+                      ['报名中', stats.active],
+                      ['夏令营', stats.summer],
+                      ['预推免', stats.pre],
+                      ['近7天', stats.nearDeadline]
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-2xl bg-slate-50 px-3 py-3 text-center">
+                        <div className="text-lg font-semibold leading-none text-brand">{value}</div>
+                        <div className="mt-1 text-[11px] font-medium text-slate-500">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <Link
+                      href={`/notices?school=${encodeURIComponent(item.name)}`}
+                      className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-deep"
+                    >
+                      查看保研通知
+                      <BellRing className="h-4 w-4" />
+                    </Link>
+                    <a
+                      href={item.website}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl border border-brand/25 bg-white px-4 py-2.5 text-sm font-semibold text-brand transition hover:border-brand"
+                    >
+                      打开学校官网
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </div>
                 </div>
               </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
       </section>
 
       {!pagedColleges.length ? (

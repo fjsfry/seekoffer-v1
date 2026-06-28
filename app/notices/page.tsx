@@ -41,33 +41,44 @@ import {
   normalizeNoticeTitle
 } from '@/lib/notice-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
+import {
+  getNoticeRegion,
+  getNoticeRegionOptions,
+  matchesNoticeType,
+  noticeTypeFilters,
+  type NoticeTypeFilter
+} from '@/lib/notice-analytics';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { baseNoticeProjects, inferDisciplineCategory, inferSchoolRange } from '@/lib/notice-source';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
 
-type SortOption = 'deadline' | 'publish' | 'school';
+type SortOption = 'deadline' | 'publish' | 'updated' | 'school';
 type ProgressFilter = '全部' | '报名中' | '未开始' | '已结束';
 type RangeFilter = '全部' | '985' | '211' | '双一流' | '其他';
-type DeadlineQuickFilter = '全部' | 'within7days';
+type DeadlineQuickFilter = '全部' | 'today' | 'within3days' | 'within7days';
+type FreshFilter = '全部' | 'today';
 type SearchParamReader = Pick<URLSearchParams, 'get' | 'toString'>;
 
 const PAGE_SIZE = 16;
 const NOTICE_LIST_POSITION_STORAGE_KEY = 'seekoffer.noticeListPosition.v1';
-const projectTypeOptions = ['全部', '夏令营', '预推免', '正式推免'] as const;
-const sortOptions: SortOption[] = ['deadline', 'publish', 'school'];
+const projectTypeOptions = noticeTypeFilters;
+const sortOptions: SortOption[] = ['deadline', 'publish', 'updated', 'school'];
 const progressOptions: ProgressFilter[] = ['全部', '报名中', '未开始', '已结束'];
 const rangeOptions: RangeFilter[] = ['全部', '985', '211', '双一流', '其他'];
-const deadlineQuickOptions: DeadlineQuickFilter[] = ['全部', 'within7days'];
+const deadlineQuickOptions: DeadlineQuickFilter[] = ['全部', 'today', 'within3days', 'within7days'];
+const freshOptions: FreshFilter[] = ['全部', 'today'];
 const defaultNoticeListState: NoticeListUrlState = {
   keyword: '',
   schoolName: '',
+  region: '全部',
   majorKeyword: '',
   category: '全部',
   discipline: '全部',
   schoolRange: '全部',
   progress: '全部',
   deadlineQuick: '全部',
+  fresh: '全部',
   projectType: '全部',
   year: '2026',
   sortBy: 'publish',
@@ -191,6 +202,12 @@ function sortProjects(rows: PublicNoticeProject[], sortBy: SortOption) {
       return left.schoolName.localeCompare(right.schoolName, 'zh-CN');
     }
 
+    if (sortBy === 'updated') {
+      const leftValue = left.updatedAt || left.collectedAt || left.publishDate;
+      const rightValue = right.updatedAt || right.collectedAt || right.publishDate;
+      return rightValue.localeCompare(leftValue);
+    }
+
     return right.publishDate.localeCompare(left.publishDate);
   });
 }
@@ -200,23 +217,31 @@ function getCityTag(project: PublicNoticeProject) {
 }
 
 const quickFilters = [
+  { label: '今日新增', kind: 'fresh', value: 'today' },
   { label: '报名中', kind: 'progress', value: '报名中' },
+  { label: '3天内截止', kind: 'deadline', value: 'within3days' },
   { label: '7天内截止', kind: 'deadline', value: 'within7days' },
   { label: '985', kind: 'range', value: '985' },
   { label: '211', kind: 'range', value: '211' },
+  { label: '双一流', kind: 'range', value: '双一流' },
   { label: '夏令营', kind: 'type', value: '夏令营' },
-  { label: '预推免', kind: 'type', value: '预推免' }
+  { label: '预推免', kind: 'type', value: '预推免' },
+  { label: '宣讲会', kind: 'type', value: '宣讲会' },
+  { label: '入营名单', kind: 'type', value: '入营名单' },
+  { label: '推免', kind: 'type', value: '推免' }
 ] as const;
 
 type NoticeListFilterValues = {
   keyword: string;
   schoolName: string;
+  region: string;
   majorKeyword: string;
   category: string;
   discipline: string;
   schoolRange: RangeFilter;
   progress: ProgressFilter;
   deadlineQuick: DeadlineQuickFilter;
+  fresh: FreshFilter;
   projectType: string;
   year: string;
   sortBy: SortOption;
@@ -262,12 +287,14 @@ function buildNoticeFilterKey(values: NoticeListFilterValues) {
   return [
     values.keyword.trim().toLowerCase(),
     values.schoolName.trim().toLowerCase(),
+    values.region,
     values.majorKeyword.trim().toLowerCase(),
     values.category,
     values.discipline,
     values.schoolRange,
     values.progress,
     values.deadlineQuick,
+    values.fresh,
     values.projectType,
     values.year,
     values.sortBy
@@ -282,12 +309,14 @@ function parseNoticeListUrlState(params: SearchParamReader) {
   return {
     keyword: readFirstSearchParam(params, 'q', 'keyword'),
     schoolName: readFirstSearchParam(params, 'school'),
+    region: readFirstSearchParam(params, 'region', 'province') || '全部',
     majorKeyword: readFirstSearchParam(params, 'major'),
     category: readFirstSearchParam(params, 'category') || '全部',
     discipline: readFirstSearchParam(params, 'discipline') || '全部',
     schoolRange: pickAllowedValue(readFirstSearchParam(params, 'range'), rangeOptions, '全部'),
     progress: pickAllowedValue(readFirstSearchParam(params, 'status', 'progress'), progressOptions, '全部'),
     deadlineQuick: pickAllowedValue(readFirstSearchParam(params, 'deadline'), deadlineQuickOptions, '全部'),
+    fresh: pickAllowedValue(readFirstSearchParam(params, 'fresh', 'new'), freshOptions, '全部'),
     projectType: pickAllowedValue(readFirstSearchParam(params, 'type'), projectTypeOptions, '全部'),
     year: readFirstSearchParam(params, 'year') || '2026',
     sortBy: pickAllowedValue(readFirstSearchParam(params, 'sort'), sortOptions, 'publish'),
@@ -309,12 +338,14 @@ function buildNoticeListHref(values: NoticeListFilterValues, page: number, advan
 
   appendSearchParam(params, 'q', values.keyword);
   appendSearchParam(params, 'school', values.schoolName);
+  appendSearchParam(params, 'region', values.region, '全部');
   appendSearchParam(params, 'major', values.majorKeyword);
   appendSearchParam(params, 'category', values.category, '全部');
   appendSearchParam(params, 'discipline', values.discipline, '全部');
   appendSearchParam(params, 'range', values.schoolRange, '全部');
   appendSearchParam(params, 'status', values.progress, '全部');
   appendSearchParam(params, 'deadline', values.deadlineQuick, '全部');
+  appendSearchParam(params, 'fresh', values.fresh, '全部');
   appendSearchParam(params, 'type', values.projectType, '全部');
   appendSearchParam(params, 'year', values.year, '2026');
   appendSearchParam(params, 'sort', values.sortBy, 'publish');
@@ -438,12 +469,14 @@ function NoticesPageContent() {
   const [loadError, setLoadError] = useState('');
   const [keyword, setKeyword] = useState(initialNoticeState.keyword);
   const [schoolName, setSchoolName] = useState(initialNoticeState.schoolName);
+  const [region, setRegion] = useState(initialNoticeState.region);
   const [majorKeyword, setMajorKeyword] = useState(initialNoticeState.majorKeyword);
   const [category, setCategory] = useState(initialNoticeState.category);
   const [discipline, setDiscipline] = useState(initialNoticeState.discipline);
   const [schoolRange, setSchoolRange] = useState<RangeFilter>(initialNoticeState.schoolRange);
   const [progress, setProgress] = useState<ProgressFilter>(initialNoticeState.progress);
   const [deadlineQuick, setDeadlineQuick] = useState<DeadlineQuickFilter>(initialNoticeState.deadlineQuick);
+  const [fresh, setFresh] = useState<FreshFilter>(initialNoticeState.fresh);
   const [projectType, setProjectType] = useState(initialNoticeState.projectType);
   const [year, setYear] = useState(initialNoticeState.year);
   const [sortBy, setSortBy] = useState<SortOption>(initialNoticeState.sortBy);
@@ -456,17 +489,19 @@ function NoticesPageContent() {
     () => ({
       keyword,
       schoolName,
+      region,
       majorKeyword,
       category,
       discipline,
       schoolRange,
       progress,
       deadlineQuick,
+      fresh,
       projectType,
       year,
       sortBy
     }),
-    [keyword, schoolName, majorKeyword, category, discipline, schoolRange, progress, deadlineQuick, projectType, year, sortBy]
+    [keyword, schoolName, region, majorKeyword, category, discipline, schoolRange, progress, deadlineQuick, fresh, projectType, year, sortBy]
   );
   const filterKey = buildNoticeFilterKey(filterValues);
 
@@ -517,6 +552,17 @@ function NoticesPageContent() {
     return ['全部', ...Array.from(new Set(rows.map((item) => getDisplayDiscipline(item.discipline)).filter(Boolean)))];
   }, [projects, category]);
 
+  const regionOptions = useMemo(() => ['全部', ...getNoticeRegionOptions(projects)], [projects]);
+
+  const schoolOptions = useMemo(() => {
+    const rows = region === '全部' ? projects : projects.filter((item) => getNoticeRegion(item) === region);
+    const schools = Array.from(new Set(rows.map((item) => getDisplaySchoolName(item.schoolName)).filter((item) => item && item !== '待识别院校')));
+
+    return ['全部', ...schools.sort((left, right) => left.localeCompare(right, 'zh-CN'))];
+  }, [projects, region]);
+
+  const todayInBeijing = getBeijingDateString();
+
   const filteredProjects = useMemo(() => {
     const noticeKeyword = keyword.trim().toLowerCase();
     const schoolKeyword = schoolName.trim().toLowerCase();
@@ -534,9 +580,11 @@ function NoticesPageContent() {
         .join(' ')
         .toLowerCase();
       const canUseBroadKeyword = noticeKeyword.length >= 4 || /[a-z0-9]/i.test(noticeKeyword);
-      const matchesType = projectType === '全部' ? true : item.projectType === projectType;
+      const matchesType = matchesNoticeType(item, projectType);
       const matchesRange = schoolRange === '全部' ? true : inferSchoolRange(item) === schoolRange;
+      const matchesRegion = region === '全部' ? true : getNoticeRegion(item) === region || (item.tags || []).includes(region);
       const matchesSchool =
+        schoolName === '全部' ||
         !schoolKeyword ||
         [displaySchool, displayDepartment].join(' ').toLowerCase().includes(schoolKeyword);
       const matchesCategory = category === '全部' ? true : inferDisciplineCategory(item.discipline) === category;
@@ -551,7 +599,12 @@ function NoticesPageContent() {
       const matchesDeadlineQuick =
         deadlineQuick === '全部'
           ? true
-          : ['today', 'within3days', 'within7days'].includes(getDeadlineLevelFromDate(item.deadlineDate));
+          : deadlineQuick === 'today'
+            ? getDeadlineLevelFromDate(item.deadlineDate) === 'today'
+            : deadlineQuick === 'within3days'
+              ? ['today', 'within3days'].includes(getDeadlineLevelFromDate(item.deadlineDate))
+              : ['today', 'within3days', 'within7days'].includes(getDeadlineLevelFromDate(item.deadlineDate));
+      const matchesFresh = fresh === '全部' ? true : item.publishDate === todayInBeijing;
       const matchesYear = year === '全部' ? true : String(item.year) === year;
       const matchesKeyword =
         !noticeKeyword ||
@@ -561,26 +614,43 @@ function NoticesPageContent() {
       return (
         matchesType &&
         matchesRange &&
+        matchesRegion &&
         matchesSchool &&
         matchesCategory &&
         matchesDiscipline &&
         matchesMajor &&
         matchesProgressState &&
         matchesDeadlineQuick &&
+        matchesFresh &&
         matchesYear &&
         matchesKeyword
       );
     });
 
     return sortProjects(rows, sortBy);
-  }, [projects, keyword, schoolName, majorKeyword, category, discipline, schoolRange, progress, deadlineQuick, projectType, year, sortBy]);
+  }, [
+    projects,
+    keyword,
+    schoolName,
+    region,
+    majorKeyword,
+    category,
+    discipline,
+    schoolRange,
+    progress,
+    deadlineQuick,
+    fresh,
+    projectType,
+    year,
+    sortBy,
+    todayInBeijing
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
   const requestedPage = pageState.filterKey === filterKey ? pageState.page : 1;
   const currentPage = Math.min(requestedPage, totalPages);
   const pagedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const visiblePages = getVisiblePages(currentPage, totalPages);
-  const todayInBeijing = getBeijingDateString();
   const isNoticeLoading = isLoading && projects.length === 0;
   const todayUpdateCount = projects.filter((item) => item.publishDate === todayInBeijing).length;
   const latestPublishDate = projects.reduce((latest, item) => (item.publishDate > latest ? item.publishDate : latest), '');
@@ -720,12 +790,14 @@ function NoticesPageContent() {
   function resetFilters() {
     setKeyword(defaultNoticeListState.keyword);
     setSchoolName(defaultNoticeListState.schoolName);
+    setRegion(defaultNoticeListState.region);
     setMajorKeyword(defaultNoticeListState.majorKeyword);
     setCategory(defaultNoticeListState.category);
     setDiscipline(defaultNoticeListState.discipline);
     setSchoolRange(defaultNoticeListState.schoolRange);
     setProgress(defaultNoticeListState.progress);
     setDeadlineQuick(defaultNoticeListState.deadlineQuick);
+    setFresh(defaultNoticeListState.fresh);
     setProjectType(defaultNoticeListState.projectType);
     setYear(defaultNoticeListState.year);
     setSortBy(defaultNoticeListState.sortBy);
@@ -746,13 +818,26 @@ function NoticesPageContent() {
   }
 
   function applyQuickFilter(filter: (typeof quickFilters)[number]) {
+    if (filter.kind === 'fresh') {
+      if (fresh === filter.value) {
+        setFresh('全部');
+        setSortBy((current) => (current === 'updated' ? defaultNoticeListState.sortBy : current));
+        return;
+      }
+
+      setFresh(filter.value as FreshFilter);
+      setSortBy('updated');
+      return;
+    }
+
     if (filter.kind === 'progress') {
       setProgress((current) => (current === filter.value ? '全部' : (filter.value as ProgressFilter)));
       return;
     }
 
     if (filter.kind === 'deadline') {
-      if (deadlineQuick === 'within7days') {
+      const nextDeadline = filter.value as DeadlineQuickFilter;
+      if (deadlineQuick === nextDeadline) {
         setDeadlineQuick('全部');
         setProgress((current) => (current === '报名中' ? '全部' : current));
         setSortBy((current) => (current === 'deadline' ? defaultNoticeListState.sortBy : current));
@@ -760,7 +845,7 @@ function NoticesPageContent() {
       }
 
       setProgress('报名中');
-      setDeadlineQuick('within7days');
+      setDeadlineQuick(nextDeadline);
       setSortBy('deadline');
       return;
     }
@@ -771,13 +856,14 @@ function NoticesPageContent() {
     }
 
     if (filter.kind === 'type') {
-      setProjectType((current) => (current === filter.value ? '全部' : filter.value));
+      setProjectType((current) => (current === filter.value ? '全部' : (filter.value as NoticeTypeFilter)));
     }
   }
 
   function isQuickFilterActive(filter: (typeof quickFilters)[number]) {
+    if (filter.kind === 'fresh') return fresh === filter.value;
     if (filter.kind === 'progress') return progress === filter.value;
-    if (filter.kind === 'deadline') return deadlineQuick === 'within7days';
+    if (filter.kind === 'deadline') return deadlineQuick === filter.value;
     if (filter.kind === 'range') return schoolRange === filter.value;
     return projectType === filter.value;
   }
@@ -818,7 +904,7 @@ function NoticesPageContent() {
           {projectTypeOptions.map((item) => (
             <button
               key={item}
-              onClick={() => setProjectType(item)}
+              onClick={() => setProjectType((current) => (item === '全部' || current === item ? '全部' : item))}
               className={`relative px-4 py-2 text-sm font-semibold transition ${
                 projectType === item ? 'text-brand' : 'text-slate-500 hover:text-brand'
               }`}
@@ -883,6 +969,13 @@ function NoticesPageContent() {
               <option value="2026">2026</option>
               <option value="全部">全部</option>
             </FilterSelect>
+            <FilterSelect label="通知类型" value={projectType} onChange={setProjectType}>
+              {projectTypeOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </FilterSelect>
             <FilterSelect label="学校层次" value={schoolRange} onChange={(value) => setSchoolRange(value as RangeFilter)}>
               {(['全部', '985', '211', '双一流', '其他'] as RangeFilter[]).map((item) => (
                 <option key={item} value={item}>
@@ -890,7 +983,32 @@ function NoticesPageContent() {
                 </option>
               ))}
             </FilterSelect>
-            <FilterInput label="城市 / 学校" value={schoolName} onChange={setSchoolName} placeholder="全部" />
+            <FilterSelect
+              label="省份 / 地区"
+              value={region}
+              onChange={(value) => {
+                setRegion(value);
+                setSchoolName('');
+              }}
+            >
+              {regionOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </FilterSelect>
+            <FilterSelect
+              label="学校"
+              value={schoolName || '全部'}
+              onChange={(value) => setSchoolName(value === '全部' ? '' : value)}
+            >
+              {schoolName && !schoolOptions.includes(schoolName) ? <option value={schoolName}>{schoolName}</option> : null}
+              {schoolOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </FilterSelect>
             <FilterSelect
               label="学科"
               value={category}
@@ -912,6 +1030,16 @@ function NoticesPageContent() {
                 </option>
               ))}
             </FilterSelect>
+            <FilterSelect label="新增" value={fresh} onChange={(value) => setFresh(value as FreshFilter)}>
+              <option value="全部">不限</option>
+              <option value="today">今日新增</option>
+            </FilterSelect>
+            <FilterSelect label="截止范围" value={deadlineQuick} onChange={(value) => setDeadlineQuick(value as DeadlineQuickFilter)}>
+              <option value="全部">不限</option>
+              <option value="today">今天截止</option>
+              <option value="within3days">3天内截止</option>
+              <option value="within7days">7天内截止</option>
+            </FilterSelect>
             <FilterInput label="专业关键词" value={majorKeyword} onChange={setMajorKeyword} placeholder="例如 人工智能" />
             <FilterSelect label="细分专业" value={discipline} onChange={setDiscipline}>
               {disciplineOptions.map((item) => (
@@ -922,6 +1050,7 @@ function NoticesPageContent() {
             </FilterSelect>
             <FilterSelect label="排序" value={sortBy} onChange={(value) => setSortBy(value as SortOption)}>
               <option value="publish">按发布时间排序</option>
+              <option value="updated">按最新更新排序</option>
               <option value="deadline">按截止时间排序</option>
               <option value="school">按学校名称排序</option>
             </FilterSelect>
@@ -947,6 +1076,12 @@ function NoticesPageContent() {
                 className={sortBy === 'publish' ? 'font-semibold text-brand' : 'text-slate-500 hover:text-brand'}
               >
                 按发布时间排序
+              </button>
+              <button
+                onClick={() => setSortBy('updated')}
+                className={sortBy === 'updated' ? 'font-semibold text-brand' : 'text-slate-500 hover:text-brand'}
+              >
+                按最新更新排序
               </button>
               <button
                 onClick={() => setSortBy('deadline')}

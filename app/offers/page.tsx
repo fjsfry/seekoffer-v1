@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { SiteShell } from '@/components/site-shell';
 import {
+  curatedOfferSamples,
   fetchPublicOffers,
   formatOfferTime,
   getOfferAuthorLabel,
@@ -60,19 +61,27 @@ export default function OffersPage() {
     try {
       const data = await fetchPublicOffers();
       setOffers(data);
-      setMessage(data.length ? `已展示 ${data.length} 条审核通过的 Offer 动态。` : '当前还没有审核通过的 Offer 动态。');
+      setMessage(
+        data.length
+          ? `已展示 ${data.length} 条审核通过的 Offer 动态。`
+          : '真实投稿正在审核中，先展示一批已整理样本帮助你判断参考口径。'
+      );
     } catch (error) {
       setOffers([]);
-      setMessage(error instanceof Error ? error.message : 'Offer 池读取失败，请稍后重试。');
+      const reason = error instanceof Error ? error.message : 'Offer 池读取失败';
+      setMessage(`${reason}，当前先展示已整理样本。`);
     } finally {
       setLoading(false);
     }
   }
 
+  const displayOffers = offers.length ? offers : curatedOfferSamples;
+  const isUsingCuratedSamples = !offers.length;
+
   const filteredOffers = useMemo(() => {
     const query = keyword.trim().toLowerCase();
 
-    return offers.filter((item) => {
+    return displayOffers.filter((item) => {
       const matchesQuery = query
         ? [item.authorName, item.schoolName, item.major, item.projectType, item.result, item.undergraduateBackground, item.content]
             .join(' ')
@@ -83,12 +92,12 @@ export default function OffersPage() {
 
       return matchesQuery && matchesTab;
     });
-  }, [keyword, offers, tab]);
+  }, [keyword, displayOffers, tab]);
 
   const hotSchools = useMemo(() => {
     const counter = new Map<string, number>();
 
-    offers.forEach((item) => {
+    displayOffers.forEach((item) => {
       if (item.schoolName) {
         counter.set(item.schoolName, (counter.get(item.schoolName) || 0) + 1);
       }
@@ -98,31 +107,41 @@ export default function OffersPage() {
       .map(([school, count]) => ({ school, count }))
       .sort((left, right) => right.count - left.count)
       .slice(0, 5);
-  }, [offers]);
+  }, [displayOffers]);
 
   const hotKeywords = useMemo(() => {
     const words = new Set<string>();
 
-    offers.slice(0, 20).forEach((item) => {
+    displayOffers.slice(0, 20).forEach((item) => {
       if (item.schoolName) words.add(item.schoolName);
       if (item.major) words.add(item.major);
       if (item.projectType) words.add(item.projectType);
     });
 
     return Array.from(words).slice(0, 8);
-  }, [offers]);
+  }, [displayOffers]);
 
   const metrics = useMemo(() => {
     const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const recentCount = offers.filter((item) => new Date(item.createdAt).getTime() >= weekAgo).length;
-    const schoolCount = new Set(offers.map((item) => item.schoolName).filter(Boolean)).size;
+    const recentCount = displayOffers.filter((item) => new Date(item.createdAt).getTime() >= weekAgo).length;
+    const schoolCount = new Set(displayOffers.map((item) => item.schoolName).filter(Boolean)).size;
 
     return [
-      { label: '公开动态', value: String(offers.length), hint: '仅展示后台审核通过内容', icon: FileText },
+      {
+        label: offers.length ? '公开动态' : '样本动态',
+        value: String(displayOffers.length),
+        hint: offers.length ? '仅展示后台审核通过内容' : '已整理样本，不冒充投稿',
+        icon: FileText
+      },
       { label: '近 7 天新增', value: String(recentCount), hint: '按发布时间统计', icon: Flame },
-      { label: '覆盖院校', value: String(schoolCount), hint: '来自用户真实提交', icon: University }
+      {
+        label: '覆盖院校',
+        value: String(schoolCount),
+        hint: offers.length ? '来自用户真实提交' : '覆盖常见目标院校',
+        icon: University
+      }
     ];
-  }, [offers]);
+  }, [displayOffers, offers.length]);
 
   async function handleReport(offer: PublicOffer) {
     const reason = window.prompt('请说明举报原因，例如：疑似虚假、泄露隐私、联系方式引流或内容误导。');
@@ -229,7 +248,12 @@ export default function OffersPage() {
             </button>
           </div>
 
-          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-500">{message}</div>
+          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-500">
+            {message}
+            {isUsingCuratedSamples ? (
+              <span className="mt-1 block text-xs font-semibold text-brand">样本仅用于展示参考口径，真实投稿通过审核后会优先展示。</span>
+            ) : null}
+          </div>
 
           <div className="mt-5 grid gap-4">
             {loading ? <OfferListSkeleton /> : null}
@@ -324,7 +348,7 @@ function OfferCard({ offer, reportingId, onReport }: { offer: PublicOffer; repor
                 <span className="font-semibold text-ink">{authorLabel}</span>
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-brand">
                   <BadgeCheck className="h-3.5 w-3.5" />
-                  已审核
+                  {offer.isCuratedSample ? offer.sourceLabel || '已整理样本' : '已审核'}
                 </span>
                 {offer.isAnonymous ? (
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">匿名展示</span>
@@ -334,14 +358,21 @@ function OfferCard({ offer, reportingId, onReport }: { offer: PublicOffer; repor
                 {offer.major} · {offer.projectType}
               </div>
             </div>
-            <button
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 transition hover:border-rose-200 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={reportingId === offer.id}
-              onClick={() => onReport(offer)}
-            >
-              {reportingId === offer.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
-              举报
-            </button>
+            {offer.isCuratedSample ? (
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-brand/15 bg-brand/5 px-3 py-2 text-xs font-semibold text-brand">
+                <ShieldCheck className="h-4 w-4" />
+                样本库
+              </span>
+            ) : (
+              <button
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 transition hover:border-rose-200 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={reportingId === offer.id}
+                onClick={() => onReport(offer)}
+              >
+                {reportingId === offer.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
+                举报
+              </button>
+            )}
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -363,12 +394,14 @@ function OfferCard({ offer, reportingId, onReport }: { offer: PublicOffer; repor
             <div className="flex items-center gap-4">
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400">
                 <ShieldCheck className="h-4 w-4 text-brand" />
-                后台审核后公开
+                {offer.isCuratedSample ? '整理样本，非用户投稿' : '后台审核后公开'}
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 font-semibold text-brand">
-                <Heart className="h-4 w-4" />
-                {offer.reportsCount ? `举报 ${offer.reportsCount}` : '可纠错'}
-              </span>
+              {offer.isCuratedSample ? null : (
+                <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 font-semibold text-brand">
+                  <Heart className="h-4 w-4" />
+                  {offer.reportsCount ? `举报 ${offer.reportsCount}` : '可纠错'}
+                </span>
+              )}
             </div>
           </div>
         </div>

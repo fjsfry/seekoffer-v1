@@ -1,4 +1,4 @@
-export type ProjectType = '夏令营' | '预推免' | '正式推免';
+export type ProjectType = '夏令营' | '预推免' | '正式推免' | '宣讲会' | '入营名单' | '推免' | '九推';
 
 export type PublicProjectStatus =
   | '未开始'
@@ -124,7 +124,11 @@ export const projectTypeOptions: Array<'全部类型' | ProjectType> = [
   '全部类型',
   '夏令营',
   '预推免',
-  '正式推免'
+  '正式推免',
+  '宣讲会',
+  '入营名单',
+  '推免',
+  '九推'
 ];
 
 export const publicStatusOptions: Array<'全部状态' | PublicProjectStatus> = [
