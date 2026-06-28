@@ -19,25 +19,32 @@ const sectionIcons = {
   官方入口: Landmark,
   常用服务: Wrench
 } as const;
+const taobaoTemplatePackHref = 'https://e.tb.cn/h.RuTikxEqdC7CNz0?tk=2FLBgjWMqm0';
 
 const applicationKits = [
   {
-    title: '夏令营材料清单',
-    description: '简历、成绩单、排名证明、推荐信请求和个人陈述，一次性检查。',
-    items: ['材料 Checklist', '命名规范', '提交前自查'],
-    icon: ClipboardList
+    title: '简历模板',
+    description: '适合夏令营、预推免和正式推免投递，突出成绩、科研、竞赛和项目经历。',
+    items: ['一页简历', '科研经历', '项目表达'],
+    icon: FileText,
+    href: taobaoTemplatePackHref,
+    external: true
   },
   {
     title: '个人陈述模板',
-    description: '按科研经历、项目经历、目标方向和未来规划组织内容。',
+    description: '按个人背景、科研经历、目标方向和未来规划组织内容，减少空泛表达。',
     items: ['结构模板', '常见问题', '修改提示'],
-    icon: FileText
+    icon: BookOpenText,
+    href: taobaoTemplatePackHref,
+    external: true
   },
   {
-    title: '导师邮件模板',
-    description: '覆盖初次联系、补充材料、礼貌跟进和面试后感谢。',
-    items: ['首封邮件', '跟进邮件', '附件清单'],
-    icon: Mail
+    title: '推荐信模板',
+    description: '整理推荐信写作结构、常见表述和提交注意事项，方便提前沟通老师。',
+    items: ['推荐信结构', '老师沟通', '提交提醒'],
+    icon: Mail,
+    href: taobaoTemplatePackHref,
+    external: true
   },
   {
     title: 'GPA 与材料工具',
@@ -108,12 +115,10 @@ export default function ResourcesPage() {
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {applicationKits.map((item, index) => {
             const Icon = item.icon;
-
-            return (
-              <article
-                key={item.title}
-                className="group rounded-[26px] border border-slate-100 bg-white/95 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft"
-              >
+            const cardClassName =
+              'group rounded-[26px] border border-slate-100 bg-white/95 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft';
+            const cardContent = (
+              <>
                 <div
                   className={`inline-flex h-16 w-16 items-center justify-center rounded-[22px] ${
                     index === 0
@@ -137,11 +142,33 @@ export default function ResourcesPage() {
                   ))}
                 </div>
                 {item.href ? (
-                  <Link href={item.href} className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand">
-                    打开工具
+                  <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand">
+                    {item.external ? '打开淘宝资料包' : '打开工具'}
                     <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                  </Link>
+                  </span>
                 ) : null}
+              </>
+            );
+
+            if (item.external && item.href) {
+              return (
+                <a key={item.title} href={item.href} target="_blank" rel="noreferrer" className={cardClassName}>
+                  {cardContent}
+                </a>
+              );
+            }
+
+            if (item.href) {
+              return (
+                <Link key={item.title} href={item.href} className={cardClassName}>
+                  {cardContent}
+                </Link>
+              );
+            }
+
+            return (
+              <article key={item.title} className={cardClassName}>
+                {cardContent}
               </article>
             );
           })}
