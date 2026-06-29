@@ -80,7 +80,10 @@ export function matchesSchoolRange(project: Pick<PublicNoticeProject, 'schoolNam
   if (range === '全部') return true;
   const ranges = getSchoolRangeMatches(project);
   if (range === '其他') return ranges.size === 0;
-  return ranges.has(range);
+  if (range === '985') return ranges.has('985');
+  if (range === '211') return !ranges.has('985') && ranges.has('211');
+  if (range === '双一流') return !ranges.has('985') && !ranges.has('211') && ranges.has('双一流');
+  return false;
 }
 
 export function inferSchoolRange(project: Pick<PublicNoticeProject, 'schoolName' | 'tags'>) {
