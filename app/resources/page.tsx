@@ -27,12 +27,6 @@ const sectionIcons = {
 
 const resourcePathways = [
   {
-    title: '专业找营',
-    description: '按专业方向推荐相关学院通知，再进入通知库继续细筛。',
-    href: '/majors',
-    icon: Compass
-  },
-  {
     title: '竞赛库',
     description: '按 A 类、B 类、热门和专业类别整理背景提升入口。',
     href: '/competitions',
@@ -220,7 +214,7 @@ export default function ResourcesPage() {
             <div>
               <h2 className="text-2xl font-semibold tracking-tight text-ink md:text-3xl">继续完善申请路径</h2>
               <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-500">
-                资料只是准备的一部分。把专业找营、竞赛背景、知识内容和人工复核串起来，申请才更像一套完整工作流。
+                资料只是准备的一部分。把竞赛背景、知识内容和人工复核串起来，申请才更像一套完整工作流。
               </p>
             </div>
           </div>

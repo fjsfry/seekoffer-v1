@@ -9,7 +9,6 @@ export const dynamic = 'force-static';
 const staticRoutes = [
   '/',
   '/notices',
-  '/majors',
   '/colleges',
   '/resources',
   '/competitions',

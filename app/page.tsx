@@ -219,16 +219,8 @@ export default function HomePage() {
 
   const growthEntryCards = [
     {
-      title: '专业找营',
-      description: '选择专业或方向，直接看到相关学院通知，再进入通知库继续细筛。',
-      href: '/majors',
-      action: '选择方向',
-      icon: Target,
-      tone: 'bg-emerald-50 text-brand'
-    },
-    {
       title: '竞赛库',
-      description: '按 A 类、B 类、热门和专业类别整理背景提升入口。',
+      description: '覆盖 A 类、B 类和热门竞赛，按专业类别、节点和官网入口快速筛选。',
       href: '/competitions',
       action: '查看竞赛',
       icon: Trophy,
@@ -445,7 +437,7 @@ export default function HomePage() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight text-ink">从信息查询到申请准备</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">把专业方向、竞赛背景、知识内容和人工复核串成后续路径。</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500">把竞赛背景、知识内容、AI 定位和人工复核串成后续路径。</p>
             </div>
             <Link href="/resources" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
               查看资源库

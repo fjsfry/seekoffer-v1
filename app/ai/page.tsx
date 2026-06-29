@@ -12,7 +12,6 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
-  Compass,
   Crown,
   FileCheck2,
   Flag,
@@ -28,6 +27,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   TrendingUp,
+  Trophy,
   UserRoundCheck
 } from 'lucide-react';
 import { ApplicationActionButton } from '@/components/application-action-button';
@@ -294,11 +294,11 @@ export default function AiPage() {
               <ChevronDown className="h-4 w-4" />
             </Link>
             <Link
-              href="/majors"
+              href="/competitions"
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-brand/20 bg-white px-5 py-3 text-sm font-semibold text-brand shadow-sm transition hover:border-brand/40"
             >
-              按专业找营
-              <Compass className="h-4 w-4" />
+              看竞赛库
+              <Trophy className="h-4 w-4" />
             </Link>
           </div>
         </div>
@@ -911,7 +911,6 @@ function NextActionCards({
 function ActionHub({ report, loggedIn }: { report: AiPositioningReport | null; loggedIn: boolean }) {
   const topProject = report?.recommendedProjects[0];
   const topSchool = topProject ? getDisplaySchoolName(topProject.schoolName) : '';
-  const majorKeyword = topProject?.discipline || topProject?.departmentName || '';
   const actions = [
     {
       title: '收藏目标院校',
@@ -938,11 +937,11 @@ function ActionHub({ report, loggedIn }: { report: AiPositioningReport | null; l
       external: true
     },
     {
-      title: '按专业继续找营',
-      detail: majorKeyword ? `用 ${majorKeyword} 继续扩展相关学院通知。` : '按专业方向继续扩展相关学院通知。',
-      href: `/majors${majorKeyword ? `?q=${encodeURIComponent(majorKeyword)}` : ''}`,
-      label: '继续找营',
-      icon: Compass,
+      title: '补竞赛背景',
+      detail: '按 A 类、B 类和热门赛事筛选可沉淀进简历的背景提升机会。',
+      href: '/competitions',
+      label: '打开竞赛库',
+      icon: Trophy,
       external: false
     },
     {

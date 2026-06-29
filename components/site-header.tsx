@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, Brain, Building2, Compass, Heart, House, Newspaper, Search } from 'lucide-react';
+import { BookOpen, Brain, Building2, Heart, House, Newspaper, Search, Trophy } from 'lucide-react';
 import { SeekofferLogo } from './seekoffer-logo';
 import { UserSessionEntry } from './user-session-entry';
 
 const navItems = [
   { href: '/', label: '首页', icon: House },
   { href: '/notices', label: '通知库', icon: Newspaper },
-  { href: '/majors', label: '专业找营', icon: Compass },
+  { href: '/competitions', label: '竞赛库', icon: Trophy },
   { href: '/colleges', label: '院校库', icon: Building2 },
   { href: '/resources', label: '资源库', icon: BookOpen },
   { href: '/offers', label: 'Offer 池', icon: Heart },
