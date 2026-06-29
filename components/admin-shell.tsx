@@ -6,7 +6,6 @@ import type React from 'react';
 import { useEffect, useState } from 'react';
 import {
   Bell,
-  BrainCircuit,
   ChevronDown,
   ClipboardList,
   Download,
@@ -32,7 +31,6 @@ const adminNavItems = [
   { href: '/admin/dashboard', label: '数据概览', icon: LayoutDashboard },
   { href: '/admin/notices', label: '通知管理', icon: Bell },
   { href: '/admin/offers', label: 'Offer池管理', icon: ClipboardList },
-  { href: '/admin/ai-leads', label: 'AI内测管理', icon: BrainCircuit },
   { href: '/admin/users', label: '用户管理', icon: UsersRound },
   { href: '/admin/feedback', label: '反馈举报', icon: Flag },
   { href: '/admin/logs', label: '操作日志', icon: ShieldCheck },
@@ -43,7 +41,6 @@ const quickActions = [
   { href: '/admin/notices/new', label: '新建通知', icon: Plus },
   { href: '/admin/notices', label: '审核通知', icon: Bell },
   { href: '/admin/offers', label: '审核 Offer', icon: ClipboardList },
-  { href: '/admin/ai-leads', label: '查看 AI 内测', icon: BrainCircuit },
   { href: '/admin/logs', label: '查看操作记录', icon: Download }
 ];
 

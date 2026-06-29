@@ -14,8 +14,7 @@ export default function PrivacyPage() {
       <section className="surface-card rounded-[34px] p-7 text-sm leading-8 text-slate-600">
         <div className="grid gap-5">
           <p>
-            寻鹿 Seekoffer 当前会在你使用申请表、待办、AI 内测登记等功能时，记录你主动提交的资料，例如昵称、院校信息、申请状态、备注、提醒设置和 AI
-            需求登记信息。
+            寻鹿 Seekoffer 当前会在你使用申请表、待办、Offer 发布和反馈等功能时，记录你主动提交的资料，例如昵称、院校信息、申请状态、备注和提醒设置。
           </p>
           <p>
             这些信息的目的只有一个：帮助你更高效地获取通知、更清晰地管理申请进度，并在你需要时提供待办与风险提醒。我们不会为了无关用途额外索取与你申请无关的隐私数据。
@@ -29,7 +28,7 @@ export default function PrivacyPage() {
           <div className="rounded-[26px] bg-slate-50 px-5 py-5">
             <div className="font-semibold text-ink">我们当前会处理的信息</div>
             <p className="mt-3">
-              邮箱账号、个人资料、申请状态、工作台待办、收藏项目、手动录入项目、AI 内测需求、Offer 发布内容和必要的操作日志。Offer 动态支持匿名展示，但后台会保留账号与审核记录用于纠错和风控。
+              邮箱账号、个人资料、申请状态、工作台待办、收藏项目、手动录入项目、Offer 发布内容、反馈信息和必要的操作日志。Offer 动态支持匿名展示，但后台会保留账号与审核记录用于纠错和风控。
             </p>
           </div>
           <div className="rounded-[26px] bg-slate-50 px-5 py-5">

@@ -12,6 +12,7 @@ import {
   Clock3,
   ExternalLink,
   FileCheck2,
+  FileText,
   GraduationCap,
   ListChecks,
   MoreHorizontal,
@@ -20,6 +21,7 @@ import {
   Save,
   Search,
   Settings2,
+  ShieldCheck,
   Sparkles,
   Square,
   Trash2
@@ -527,11 +529,11 @@ export default function MePage() {
               从通知库添加项目
             </Link>
             <Link
-              href="/ai"
+              href="/consulting"
               className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:border-brand/30 hover:text-brand"
             >
-              <Sparkles className="h-4 w-4" />
-              AI 帮我定位
+              <ShieldCheck className="h-4 w-4" />
+              人工复核
             </Link>
             <Link
               href="/deadlines"
@@ -743,21 +745,21 @@ export default function MePage() {
 
           <section className="surface-card rounded-[30px] p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-ink">AI 提醒</h2>
-              <Link href="/ai" className="text-sm font-semibold text-slate-400 hover:text-brand">
+              <h2 className="text-xl font-semibold text-ink">申请提醒</h2>
+              <Link href="/deadlines" className="text-sm font-semibold text-slate-400 hover:text-brand">
                 更多
               </Link>
             </div>
             <div className="grid gap-3">
-              <Link href="/ai" className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
+              <Link href="/resources" className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-brand shadow-sm">
-                  <Sparkles className="h-5 w-5" />
+                  <FileText className="h-5 w-5" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold text-ink">
-                    你的背景与 {applicationPreview[0]?.project.schoolName || '目标院校'} 匹配度较高
+                    检查 {applicationPreview[0]?.project.schoolName || '目标院校'} 的材料准备
                   </span>
-                  <span className="mt-1 block text-xs text-slate-500">建议优先补充科研经历与竞赛奖项材料</span>
+                  <span className="mt-1 block text-xs text-slate-500">建议优先补齐简历、个人陈述和证明材料</span>
                 </span>
                 <ChevronRight className="h-4 w-4 text-slate-400" />
               </Link>
@@ -767,7 +769,7 @@ export default function MePage() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold text-ink">发现 {Math.max(3, stats.materialPending)} 个与你背景高度匹配的新增项目</span>
-                  <span className="mt-1 block text-xs text-slate-500">来自 985 高校 AI 方向</span>
+                  <span className="mt-1 block text-xs text-slate-500">可按学校、学院和专业关键词继续筛选</span>
                 </span>
                 <ChevronRight className="h-4 w-4 text-slate-400" />
               </Link>

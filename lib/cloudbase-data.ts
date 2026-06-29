@@ -15,11 +15,9 @@ import {
 import { filterMainNoticeProjects } from './notice-quality';
 import { baseNoticeProjects } from './notice-source';
 import { canCreateMoreApplications } from './billing-api';
-import type { AiPositioningInput, AiPositioningReport } from './ai-positioning';
 
 const APPLICATION_STORAGE_KEY = 'seekoffer-my-application-table';
 const MANUAL_PROJECT_STORAGE_KEY = 'seekoffer-manual-projects';
-const AI_POSITIONING_REPORT_STORAGE_KEY = 'seekoffer-ai-positioning-report';
 const APPLICATION_EVENT_NAME = 'seekoffer-applications-updated';
 const NOTICE_TARGET_YEAR = 2026;
 const PUBLIC_NOTICE_QUERY_LIMIT = 5000;
@@ -28,16 +26,6 @@ const PUBLIC_NOTICE_QUERY_PAGE_SIZE = 1000;
 type StoredPayload<T> = {
   updatedAt: string;
   items: T[];
-};
-
-export type AiWaitlistNeed = '申请风险评估' | '材料短板提示' | '提炼简章要求';
-
-export type AiWaitlistLead = {
-  wechatId: string;
-  primaryNeed: AiWaitlistNeed;
-  details: string;
-  submittedAt: string;
-  source: string;
 };
 
 export type ApplicationRow = {
@@ -941,114 +929,6 @@ export async function saveUserProfileToWorkspace(profile: UserProfile) {
 
   await upsertRemoteProfile(profile);
   return true;
-}
-
-export async function submitAiWaitlistLead(input: {
-  wechatId: string;
-  primaryNeed: AiWaitlistNeed;
-  details?: string;
-}) {
-  const lead: AiWaitlistLead = {
-    wechatId: input.wechatId.trim(),
-    primaryNeed: input.primaryNeed,
-    details: input.details?.trim() || '',
-    submittedAt: nowText(),
-    source: 'ai-page'
-  };
-
-  let ok = false;
-
-  try {
-    const supabase = getSupabaseBrowserClient();
-    const session = getUserSession();
-    const { error } = await supabase.from('ai_waitlist_leads').insert({
-      user_id: session?.authProvider === 'anonymous' ? null : session?.userId || null,
-      wechat_id: lead.wechatId,
-      primary_need: lead.primaryNeed,
-      details: lead.details,
-      submitted_at_text: lead.submittedAt,
-      source: lead.source
-    });
-
-    if (!error) {
-      ok = true;
-    }
-  } catch {
-    ok = false;
-  }
-
-  if (canUseBrowserStorage()) {
-    window.localStorage.setItem('seekoffer-ai-waitlist-lead', JSON.stringify(lead));
-  }
-
-  return {
-    ok,
-    lead
-  };
-}
-
-export function readStoredAiPositioningReport() {
-  if (!canUseBrowserStorage()) {
-    return null;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(AI_POSITIONING_REPORT_STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as AiPositioningReport;
-    return parsed?.generatedAt && parsed?.summary ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-export async function saveAiPositioningReport(report: AiPositioningReport, input: AiPositioningInput) {
-  if (canUseBrowserStorage()) {
-    window.localStorage.setItem(AI_POSITIONING_REPORT_STORAGE_KEY, JSON.stringify(report));
-  }
-
-  const context = getSupabaseMemberContext();
-  if (!context) {
-    return {
-      ok: false,
-      reason: 'local-only'
-    };
-  }
-
-  try {
-    const supabase = getSupabaseBrowserClient();
-    const { error } = await supabase.from('ai_positioning_reports').insert({
-      user_id: context.userId,
-      profile_snapshot: {
-        undergraduateSchool: input.undergraduateSchool,
-        major: input.major,
-        grade: input.grade,
-        targetMajor: input.targetMajor,
-        targetRegion: input.targetRegion
-      },
-      input_snapshot: input,
-      report,
-      source: 'ai-page'
-    });
-
-    if (error) {
-      throw error;
-    }
-
-    return {
-      ok: true,
-      reason: 'remote-saved'
-    };
-  } catch (error) {
-    logWorkspaceSyncWarning('ai-positioning-report-save', error);
-    return {
-      ok: false,
-      reason: 'remote-failed'
-    };
-  }
 }
 
 export async function updateUserProject(userProjectId: string, patch: Partial<UserProjectRecord>) {

@@ -14,7 +14,6 @@ const staticRoutes = [
   '/competitions',
   '/knowledge',
   '/offers',
-  '/ai',
   '/consulting',
   '/me',
   '/guide',

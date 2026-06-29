@@ -7,7 +7,6 @@ import {
   ArrowRight,
   BellRing,
   BookOpen,
-  Brain,
   Building2,
   CalendarDays,
   ClipboardList,
@@ -192,7 +191,7 @@ export default function HomePage() {
     { title: '材料管理', description: '材料清单和时间线，进度透明不遗漏', icon: FolderOpen },
     { title: '申请决策', description: '多维筛选院校，科学定位更高效', icon: Target },
     { title: '截止提醒', description: '关键节点提前预警，重要截止不再错过', icon: CalendarDays },
-    { title: 'AI 辅助定位', description: '智能分析匹配院校，提升申请成功率', icon: Brain },
+    { title: '背景提升', description: '竞赛库和资源中心，沉淀可写进材料的经历', icon: Trophy },
     { title: '工作台跟进', description: '一站式管理进度，让申请事务不再杂乱', icon: Monitor }
   ];
 
@@ -236,10 +235,10 @@ export default function HomePage() {
     },
     {
       title: '人工复核',
-      description: '在 AI 定位后检查申请组合、材料短板和下一步动作。',
+      description: '人工检查申请组合、材料短板和下一步动作。',
       href: '/consulting',
       action: '了解流程',
-      icon: Brain,
+      icon: ShieldCheck,
       tone: 'bg-rose-50 text-rose-500'
     }
   ];
@@ -437,7 +436,7 @@ export default function HomePage() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight text-ink">从信息查询到申请准备</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">把竞赛背景、知识内容、AI 定位和人工复核串成后续路径。</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500">把竞赛背景、知识内容和人工复核串成后续路径。</p>
             </div>
             <Link href="/resources" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
               查看资源库

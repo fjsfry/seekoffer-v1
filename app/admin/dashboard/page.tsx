@@ -11,7 +11,6 @@ import {
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   UsersRound
 } from 'lucide-react';
 import Link from 'next/link';
@@ -72,18 +71,9 @@ const emptyAnalytics: AdminAnalyticsPayload = {
   recentVisitors: []
 };
 
-const emptyAiWaitlistMetrics: AiWaitlistMetricsPayload = {
-  totalLeads: 0,
-  todayLeads: 0,
-  riskLeads: 0,
-  materialLeads: 0,
-  briefLeads: 0
-};
-
 export default function AdminDashboardPage() {
   const [overviewMetrics, setOverviewMetrics] = useState<AdminOverviewMetrics>(emptyOverview);
   const [analytics, setAnalytics] = useState<AdminAnalyticsPayload>(emptyAnalytics);
-  const [aiWaitlistMetrics, setAiWaitlistMetrics] = useState<AiWaitlistMetricsPayload>(emptyAiWaitlistMetrics);
   const [metrics, setMetrics] = useState<AdminMetric[]>(buildLiveMetrics(emptyOverview, emptyAnalytics.metrics));
   const [trends, setTrends] = useState<TrendPoint[]>(buildEmptyTrends());
   const [pendingNotices, setPendingNotices] = useState<AdminNoticeRow[]>([]);
@@ -95,7 +85,7 @@ export default function AdminDashboardPage() {
 
   async function loadDashboard() {
     try {
-      const [overview, analyticsData, notices, offers, feedback, aiWaitlist] = await Promise.all([
+      const [overview, analyticsData, notices, offers, feedback] = await Promise.all([
         invokeAdminApi<{ metrics: AdminOverviewMetrics; trends: TrendPoint[] }>({ resource: 'overview', action: 'get' }),
         invokeAdminApi<AdminAnalyticsPayload>({ resource: 'analytics', action: 'overview' }),
         invokeAdminApi<{ notices: NoticeApiRow[] }>({
@@ -107,13 +97,11 @@ export default function AdminDashboardPage() {
           sort: 'updated_desc'
         }),
         invokeAdminApi<{ offers: OfferApiRow[] }>({ resource: 'offers', action: 'list', page: 1, pageSize: 20 }),
-        invokeAdminApi<{ feedback: FeedbackApiRow[] }>({ resource: 'feedback', action: 'list', page: 1, pageSize: 5 }),
-        invokeAdminApi<AiWaitlistResponse>({ resource: 'ai_waitlist', action: 'list', page: 1, pageSize: 1 })
+        invokeAdminApi<{ feedback: FeedbackApiRow[] }>({ resource: 'feedback', action: 'list', page: 1, pageSize: 5 })
       ]);
 
       setOverviewMetrics(overview.metrics);
       setAnalytics(analyticsData);
-      setAiWaitlistMetrics(aiWaitlist.metrics || emptyAiWaitlistMetrics);
       setMetrics(buildLiveMetrics(overview.metrics, analyticsData.metrics));
       setTrends(overview.trends?.length ? overview.trends : buildEmptyTrends());
       setPendingNotices(notices.notices.map(mapNoticeApiRow));
@@ -126,7 +114,6 @@ export default function AdminDashboardPage() {
       const errorMessage = getAdminErrorMessage(error, '数据暂时无法更新，请稍后重试。');
       setOverviewMetrics(emptyOverview);
       setAnalytics(emptyAnalytics);
-      setAiWaitlistMetrics(emptyAiWaitlistMetrics);
       setMetrics(buildLiveMetrics(emptyOverview, emptyAnalytics.metrics));
       setTrends(buildEmptyTrends());
       setPendingNotices([]);
@@ -156,7 +143,6 @@ export default function AdminDashboardPage() {
   const dataHealthy = !dataError;
   const todoCards = [
     { href: '/admin/notices', label: '通知审核', value: overviewMetrics.pendingNotices, hint: '待发布通知', tone: 'bg-amber-50 text-amber-700' },
-    { href: '/admin/ai-leads', label: 'AI线索待查看', value: aiWaitlistMetrics.totalLeads, hint: `今日新增 ${formatNumber(aiWaitlistMetrics.todayLeads)}`, tone: 'bg-cyan-50 text-cyan-700' },
     { href: '/admin/feedback', label: '反馈工单', value: overviewMetrics.pendingFeedback, hint: '待处理举报', tone: 'bg-rose-50 text-rose-700' },
     { href: '/admin/offers', label: '高风险操作', value: overviewMetrics.pendingOffers, hint: 'Offer 审核', tone: 'bg-violet-50 text-violet-700' }
   ];
@@ -190,7 +176,6 @@ export default function AdminDashboardPage() {
   const quickLinks: Array<{ href: string; label: string; hint: string; icon: typeof Bell }> = [
     { href: '/admin/notices', label: '通知管理', hint: '审核与发布通知', icon: Bell },
     { href: '/admin/offers', label: 'Offer池管理', hint: '处理社区动态', icon: ClipboardList },
-    { href: '/admin/ai-leads', label: 'AI内测管理', hint: '查看内测需求', icon: Sparkles },
     { href: '/admin/settings', label: '系统设置', hint: '配置安全策略', icon: ShieldCheck }
   ];
 
@@ -265,7 +250,7 @@ export default function AdminDashboardPage() {
                 <Link key={item.label} href={item.href} className="group rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-blue-200 hover:bg-blue-50/40">
                   <div className="flex items-center justify-between gap-3">
                     <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${item.tone}`}>
-                      <Sparkles className="h-5 w-5" />
+                      <CheckCircle2 className="h-5 w-5" />
                     </div>
                     <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-600" />
                   </div>
@@ -493,18 +478,6 @@ type AdminAnalyticsPayload = {
   metrics: AdminAnalyticsMetrics;
   onlineVisitors: AdminVisitorRow[];
   recentVisitors: AdminVisitorRow[];
-};
-
-type AiWaitlistMetricsPayload = {
-  totalLeads: number;
-  todayLeads: number;
-  riskLeads: number;
-  materialLeads: number;
-  briefLeads: number;
-};
-
-type AiWaitlistResponse = {
-  metrics: AiWaitlistMetricsPayload;
 };
 
 function buildLiveMetrics(metrics: AdminOverviewMetrics, analytics: AdminAnalyticsMetrics): AdminMetric[] {

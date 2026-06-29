@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Bell,
-  BrainCircuit,
   ClipboardList,
   Flag,
   LayoutDashboard,
@@ -93,7 +92,6 @@ const adminChannels = [
   { href: '/admin/dashboard', label: '数据概览', hint: '指标、趋势与运营总览', icon: LayoutDashboard },
   { href: '/admin/notices', label: '通知管理', hint: '通知审核、发布与下架', icon: Bell },
   { href: '/admin/offers', label: 'Offer 池管理', hint: 'Offer 审核与风险处理', icon: ClipboardList },
-  { href: '/admin/ai-leads', label: 'AI 内测管理', hint: '内测登记、需求方向与用户补充说明', icon: BrainCircuit },
   { href: '/admin/users', label: '用户管理', hint: '账号状态、限制与备注', icon: UsersRound },
   { href: '/admin/feedback', label: '反馈举报', hint: '反馈闭环与举报处置', icon: Flag },
   { href: '/admin/logs', label: '操作日志', hint: '审计、导出与追踪', icon: ShieldCheck },

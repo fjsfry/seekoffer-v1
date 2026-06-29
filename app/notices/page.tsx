@@ -1334,7 +1334,7 @@ function NoticesPageContent() {
       <section className="grid gap-4 lg:grid-cols-3">
         <PromoCard title="院校库" description="院校信息、专业设置及推免政策查询" href="/colleges" icon={GraduationCap} />
         <PromoCard title="资源库" description="汇集面试经验与文书模板，助力申请" href="/resources" icon={BookOpenText} />
-        <PromoCard title="AI定位" description="智能评估背景竞争力，辅助精准定位" href="/ai" icon={Sparkles} />
+        <PromoCard title="竞赛库" description="按 A/B/热门赛事整理背景提升机会" href="/competitions" icon={Sparkles} />
       </section>
     </SiteShell>
   );

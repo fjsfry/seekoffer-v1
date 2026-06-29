@@ -40,7 +40,7 @@ const resourcePathways = [
   },
   {
     title: '人工复核',
-    description: '在 AI 定位后检查申请组合、材料短板和下一步动作。',
+    description: '人工检查申请组合、材料短板和下一步动作。',
     href: '/consulting',
     icon: ShieldCheck
   }

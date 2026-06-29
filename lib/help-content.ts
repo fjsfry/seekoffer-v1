@@ -19,7 +19,7 @@ export const faqGroups = [
       {
         question: '为什么有些功能看起来还不能直接用？',
         answer:
-          'Seekoffer 当前处于公开内测阶段。通知库、院校库、资源库和基础工作台已可用；Offer 池和 AI 定位仍在内测，会明确标注状态，避免误导。'
+          'Seekoffer 当前处于公开内测阶段。通知库、院校库、资源库、竞赛库和基础工作台已可用；Offer 池仍会通过审核和状态标注避免误导。'
       }
     ]
   },
@@ -69,7 +69,7 @@ export const faqGroups = [
   {
     id: 'beta-feedback',
     title: '内测功能与反馈',
-    description: '关于 Offer 池、AI 定位和反馈渠道的说明。',
+    description: '关于 Offer 池、审核机制和反馈渠道的说明。',
     items: [
       {
         question: 'Offer 池里的内容都是真实的吗？',
@@ -77,9 +77,9 @@ export const faqGroups = [
           'Offer 池只公开展示后台审核通过的用户提交内容，并支持举报纠错。它能帮助你观察动态变化，但仍不能替代院校官网、邮件或电话确认。'
       },
       {
-        question: 'AI 定位会给出录取保证吗？',
+        question: '人工复核会给出录取保证吗？',
         answer:
-          '不会。AI 定位当前用于收集真实申请问题和内测需求，只能作为申请规划参考，不构成录取承诺，也不能替代院校官方要求。'
+          '不会。人工复核只提供信息整理、清单检查和行动建议，不构成录取承诺，也不能替代院校官方要求。'
       },
       {
         question: '我想反馈功能建议，应该去哪儿？',

@@ -14,7 +14,7 @@ export default function TermsPage() {
       <section className="surface-card rounded-[34px] p-7 text-sm leading-8 text-slate-600">
         <div className="grid gap-5">
           <p>
-            Seekoffer 当前处于公开内测阶段，提供保研通知聚合、院校与资源入口、个人申请工作台、Offer 池演示和 AI 内测登记等功能。
+            Seekoffer 当前处于公开内测阶段，提供保研通知聚合、院校与资源入口、竞赛库、个人申请工作台和 Offer 池等功能。
           </p>
           <p>
             你应保证账号信息和主动发布内容真实、合法，不得冒充他人、编造 Offer 流向、发布侵犯他人隐私或误导申请决策的信息。

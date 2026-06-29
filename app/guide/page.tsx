@@ -13,7 +13,7 @@ import {
   MessageCircle,
   Search,
   ShieldCheck,
-  Sparkles
+  Trophy
 } from 'lucide-react';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
@@ -111,12 +111,12 @@ const pageGuides = [
     icon: BookOpen
   },
   {
-    title: 'AI 定位',
-    status: '内测登记',
-    description: '当前用于收集真实申请问题，不直接承诺录取结果，也不替代官方要求。',
-    tips: ['提交需求方向', '留下联系方式', '等待内测反馈'],
-    href: '/ai',
-    icon: Sparkles
+    title: '竞赛库',
+    status: '已上线',
+    description: '按 A 类、B 类、热门和专业类别整理竞赛入口，适合作为背景提升清单。',
+    tips: ['按类别筛选', '核对官网报名', '记录成果材料'],
+    href: '/competitions',
+    icon: Trophy
   }
 ] as const;
 
@@ -125,7 +125,7 @@ const productStatus = [
   ['我的申请表', '登录可用', '支持保存项目、状态管理、优先级和材料进度维护。'],
   ['院校库 / 资源库', '已上线', '作为高频入口和辅助工具，帮助你快速回访官方页面。'],
   ['Offer 池', '审核开放', '登录用户可提交动态，审核通过后公开展示，并支持举报纠错。'],
-  ['AI 定位', '内测登记', '当前收集需求与使用场景，不提供录取保证或确定性判断。'],
+  ['竞赛库', '已上线', '按赛事等级、专业类别和截止节点整理背景提升入口。'],
   ['自动提醒', '逐步完善', '当前先展示截止风险，后续会继续完善更主动的提醒机制。']
 ] as const;
 

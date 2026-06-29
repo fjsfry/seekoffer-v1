@@ -53,7 +53,7 @@ const caseFrames = [
 
 const faqs = [
   ['会不会承诺录取？', '不会。我们只做信息整理、定位复核和行动建议，录取取决于院校要求、竞争环境和个人表现。'],
-  ['和 AI 定位是什么关系？', 'AI 定位适合快速生成初版方案，人工复核负责检查边界、补充上下文和调整执行顺序。'],
+  ['什么时候需要人工复核？', '当你已经有目标清单或材料初稿，但不确定组合、优先级和表达重点时，再做人工复核更有效。'],
   ['需要准备哪些材料？', '一页简历、成绩排名、目标方向、科研竞赛经历、英语成绩和当前申请清单即可开始。'],
   ['适合什么时候做？', '夏令营投递前、夏令营结果后、预推免前都适合，越早做越容易调整组合。']
 ];
@@ -72,8 +72,8 @@ export default function ConsultingPage() {
             我们不做夸张承诺。人工复核只帮助你把背景、目标、材料和申请节奏整理清楚，形成更稳的下一步动作。
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/ai" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:bg-brand-deep">
-              先做 AI 定位
+            <Link href="/notices" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:bg-brand-deep">
+              先看通知库
               <ArrowRight className="h-4 w-4" />
             </Link>
             <a
