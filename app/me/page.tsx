@@ -87,8 +87,8 @@ type ActionTask = {
 type WorkbenchTypeFilter = '全部' | '夏令营' | '预推免' | '正式推免' | '宣讲会' | '入营名单';
 type WorkbenchRangeFilter = '全部' | '985' | '211' | '双一流' | '其他';
 type WorkbenchProgressFilter = '全部' | '报名中' | '未开始' | '已结束';
-type WorkbenchApplicationStatusFilter = '全部' | '未申请' | '准备中' | '已提交' | '待考核';
-type WorkbenchResultFilter = '全部' | '未出结果' | '已通过' | '未通过';
+type WorkbenchApplicationStatusFilter = '全部' | '未申请' | '已申请';
+type WorkbenchResultFilter = '全部' | '未出结果' | '未入营' | '已入营' | '已优营';
 type WorkbenchSortOption = 'deadline' | 'school' | 'status';
 type WorkbenchSection = 'applications' | 'schedule' | 'contacts';
 type ScheduleTypeFilter = '全部' | '申请截止' | '材料准备' | '套磁' | '笔试' | '面试' | '其他';
@@ -126,11 +126,11 @@ type MentorContact = {
   updatedAt: string;
 };
 
-const workbenchTypeFilters: WorkbenchTypeFilter[] = ['全部', '夏令营', '预推免', '正式推免', '宣讲会', '入营名单'];
+const workbenchTypeFilters: WorkbenchTypeFilter[] = ['全部', '夏令营', '预推免', '正式推免'];
 const workbenchRangeFilters: WorkbenchRangeFilter[] = ['全部', '985', '211', '双一流', '其他'];
 const workbenchProgressFilters: WorkbenchProgressFilter[] = ['全部', '报名中', '未开始', '已结束'];
-const workbenchApplicationStatusFilters: WorkbenchApplicationStatusFilter[] = ['全部', '未申请', '准备中', '已提交', '待考核'];
-const workbenchResultFilters: WorkbenchResultFilter[] = ['全部', '未出结果', '已通过', '未通过'];
+const workbenchApplicationStatusFilters: WorkbenchApplicationStatusFilter[] = ['全部', '未申请', '已申请'];
+const workbenchResultFilters: WorkbenchResultFilter[] = ['全部', '未出结果', '未入营', '已入营', '已优营'];
 const scheduleTypeFilters: ScheduleTypeFilter[] = ['全部', '申请截止', '材料准备', '套磁', '笔试', '面试', '其他'];
 const scheduleDoneFilters: ScheduleDoneFilter[] = ['全部', '未完成', '已完成'];
 const contactRangeFilters: ContactRangeFilter[] = ['全部', 'C9', '985', '211', '双一流', '普通高校', '科研院所', '其它'];
@@ -339,15 +339,14 @@ function getWorkbenchProgressBucket(row: ApplicationRow): Exclude<WorkbenchProgr
 }
 
 function getWorkbenchApplicationStatusBucket(row: ApplicationRow): Exclude<WorkbenchApplicationStatusFilter, '全部'> {
-  if (row.item.myStatus === '已收藏') return '未申请';
-  if (row.item.myStatus === '准备材料中') return '准备中';
-  if (row.item.myStatus === '待考核') return '待考核';
-  return '已提交';
+  return row.item.myStatus === '已收藏' ? '未申请' : '已申请';
 }
 
 function getWorkbenchResultBucket(row: ApplicationRow): Exclude<WorkbenchResultFilter, '全部'> {
-  if (row.item.resultStatus === '已通过' || row.item.myStatus === '已通过') return '已通过';
-  if (row.item.resultStatus === '未通过' || row.item.myStatus === '未通过' || row.item.myStatus === '已放弃') return '未通过';
+  const resultText = `${row.item.resultStatus} ${row.item.myStatus} ${row.item.myNotes}`.toLowerCase();
+  if (/优营|优秀营员/.test(resultText)) return '已优营';
+  if (row.item.resultStatus === '已通过' || row.item.myStatus === '已通过') return '已入营';
+  if (row.item.resultStatus === '未通过' || row.item.myStatus === '未通过' || row.item.myStatus === '已放弃') return '未入营';
   return '未出结果';
 }
 
@@ -358,14 +357,7 @@ function matchesWorkbenchType(filter: WorkbenchTypeFilter, row: ApplicationRow) 
 }
 
 function getWorkbenchSearchText(row: ApplicationRow) {
-  return [
-    row.project.schoolName,
-    row.project.departmentName,
-    row.project.projectName,
-    row.project.discipline,
-    row.item.myNotes,
-    ...(row.project.tags || [])
-  ]
+  return [row.project.schoolName, getDisplaySchoolName(row.project.schoolName)]
     .join(' ')
     .toLowerCase();
 }
@@ -1106,105 +1098,88 @@ export default function MePage() {
               ))}
             </div>
 
-            <div className="mt-5 grid gap-3 text-sm">
-              <div className="grid gap-2 lg:grid-cols-[84px_minmax(0,1fr)] lg:items-center">
-                <div className="font-semibold text-slate-500">学院层次</div>
-                <div className="flex flex-wrap gap-2">
-                  {workbenchRangeFilters.map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => setSchoolRangeFilter((current) => (item === '全部' || current === item ? '全部' : item))}
-                      className={`rounded-full px-3 py-1.5 font-semibold transition ${
-                        schoolRangeFilter === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-500 hover:bg-brand/8 hover:text-brand'
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-2 lg:grid-cols-[84px_minmax(0,1fr)] lg:items-center">
-                <div className="font-semibold text-slate-500">进行状态</div>
-                <div className="flex flex-wrap gap-2">
-                  {workbenchProgressFilters.map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => setProgressFilter((current) => (item === '全部' || current === item ? '全部' : item))}
-                      className={`rounded-full px-3 py-1.5 font-semibold transition ${
-                        progressFilter === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-500 hover:bg-brand/8 hover:text-brand'
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-2 lg:grid-cols-[84px_minmax(0,1fr)] lg:items-center">
-                <div className="font-semibold text-slate-500">申请状态</div>
-                <div className="flex flex-wrap gap-2">
-                  {workbenchApplicationStatusFilters.map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => setApplicationStatusFilter((current) => (item === '全部' || current === item ? '全部' : item))}
-                      className={`rounded-full px-3 py-1.5 font-semibold transition ${
-                        applicationStatusFilter === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-500 hover:bg-brand/8 hover:text-brand'
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-2 lg:grid-cols-[84px_minmax(0,1fr)] lg:items-center">
-                <div className="font-semibold text-slate-500">申请结果</div>
-                <div className="flex flex-wrap gap-2">
-                  {workbenchResultFilters.map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => setResultFilter((current) => (item === '全部' || current === item ? '全部' : item))}
-                      className={`rounded-full px-3 py-1.5 font-semibold transition ${
-                        resultFilter === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-500 hover:bg-brand/8 hover:text-brand'
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div className="mt-5 grid gap-4 text-sm">
+              <ApplicationFilterRow
+                label="学校范围"
+                values={workbenchRangeFilters}
+                active={schoolRangeFilter}
+                onChange={(item) => setSchoolRangeFilter((current) => (item === '全部' || current === item ? '全部' : item))}
+                trailing={
+                  <div className="grid gap-2 sm:grid-cols-[72px_260px] sm:items-center">
+                    <span className="font-semibold text-slate-500">学校名称</span>
+                    <input
+                      value={applicationKeyword}
+                      onChange={(event) => setApplicationKeyword(event.target.value)}
+                      placeholder="请输入学校名称"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-brand/40"
+                    />
+                  </div>
+                }
+              />
+              <ApplicationFilterRow
+                label="进行状态"
+                values={workbenchProgressFilters}
+                active={progressFilter}
+                onChange={(item) => setProgressFilter((current) => (item === '全部' || current === item ? '全部' : item))}
+              />
+              <ApplicationFilterRow
+                label="申请状态"
+                values={workbenchApplicationStatusFilters}
+                active={applicationStatusFilter}
+                onChange={(item) => setApplicationStatusFilter((current) => (item === '全部' || current === item ? '全部' : item))}
+              />
+              <ApplicationFilterRow
+                label="申请结果"
+                values={workbenchResultFilters}
+                active={resultFilter}
+                onChange={(item) => setResultFilter((current) => (item === '全部' || current === item ? '全部' : item))}
+              />
             </div>
 
-            <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_170px_150px]">
-              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <Search className="h-4 w-4 shrink-0 text-slate-400" />
-                <input
-                  value={applicationKeyword}
-                  onChange={(event) => setApplicationKeyword(event.target.value)}
-                  placeholder="搜索高校、学院、导师、方向或备注"
-                  className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                />
-              </label>
-              <select
-                value={applicationSort}
-                onChange={(event) => setApplicationSort(event.target.value as WorkbenchSortOption)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 shadow-sm outline-none"
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setApplicationKeyword((current) => current.trim())}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep"
               >
-                <option value="deadline">按截止时间</option>
-                <option value="school">按学校排序</option>
-                <option value="status">按状态排序</option>
-              </select>
-              <Link href="/notices" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep">
-                <PlusCircle className="h-4 w-4" />
-                添加项目
-              </Link>
-            </div>
-
-            <div id="manual-entry" className="mt-4">
-              <ManualProjectEntryCard compact onCreated={refreshApplicationRows} />
+                <Search className="h-4 w-4" />
+                搜索
+              </button>
             </div>
           </section>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {[
+                ['deadline', '按截止日期排序'],
+                ['school', '按学校排序']
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setApplicationSort(value as WorkbenchSortOption)}
+                  className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                    applicationSort === value ? 'bg-brand/8 text-brand' : 'bg-white/85 text-slate-600 shadow-sm hover:text-brand'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <Link href="/notices" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep">
+              <PlusCircle className="h-4 w-4" />
+              添加项目
+            </Link>
+          </div>
+
+          <details id="manual-entry" className="surface-card rounded-[24px] p-4">
+            <summary className="cursor-pointer list-none text-sm font-semibold text-brand">
+              手动新增项目
+            </summary>
+            <div className="mt-4">
+              <ManualProjectEntryCard compact onCreated={refreshApplicationRows} />
+            </div>
+          </details>
 
           <section className="surface-card rounded-[30px] p-5">
             <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1529,6 +1504,54 @@ export default function MePage() {
       ) : null}
 
     </SiteShell>
+  );
+}
+
+function ApplicationFilterRow<T extends string>({
+  label,
+  values,
+  active,
+  onChange,
+  trailing
+}: {
+  label: string;
+  values: readonly T[];
+  active: T;
+  onChange: (value: T) => void;
+  trailing?: ReactNode;
+}) {
+  return (
+    <div className="grid gap-3 xl:grid-cols-[104px_minmax(0,1fr)_minmax(0,360px)] xl:items-center">
+      <div className="inline-flex w-fit items-center whitespace-nowrap rounded-xl bg-brand/8 px-3 py-2 font-semibold text-brand">
+        {label}
+      </div>
+      <div className="flex flex-wrap gap-x-7 gap-y-3">
+        {values.map((item) => {
+          const selected = active === item;
+
+          return (
+            <button
+              key={item}
+              type="button"
+              onClick={() => onChange(item)}
+              className={`inline-flex items-center gap-2 text-sm font-medium transition ${
+                selected ? 'text-brand' : 'text-slate-600 hover:text-brand'
+              }`}
+            >
+              <span
+                className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border ${
+                  selected ? 'border-brand' : 'border-slate-400'
+                }`}
+              >
+                {selected ? <span className="h-2 w-2 rounded-full bg-brand" /> : null}
+              </span>
+              {item}
+            </button>
+          );
+        })}
+      </div>
+      {trailing ? <div className="xl:justify-self-start">{trailing}</div> : null}
+    </div>
   );
 }
 
