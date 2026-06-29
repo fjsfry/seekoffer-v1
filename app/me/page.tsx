@@ -47,7 +47,7 @@ import {
   normalizeNoticeTitle
 } from '@/lib/notice-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
-import { inferSchoolRange } from '@/lib/notice-source';
+import { matchesSchoolRange } from '@/lib/notice-source';
 import {
   hydrateWorkbenchState,
   saveWorkbenchState,
@@ -648,7 +648,7 @@ export default function MePage() {
     const keyword = applicationKeyword.trim().toLowerCase();
     const filtered = rows.filter((row) => {
       if (!matchesWorkbenchType(applicationTypeFilter, row)) return false;
-      if (schoolRangeFilter !== '全部' && inferSchoolRange(row.project) !== schoolRangeFilter) return false;
+      if (schoolRangeFilter !== '全部' && !matchesSchoolRange(row.project, schoolRangeFilter)) return false;
       if (progressFilter !== '全部' && getWorkbenchProgressBucket(row) !== progressFilter) return false;
       if (applicationStatusFilter !== '全部' && getWorkbenchApplicationStatusBucket(row) !== applicationStatusFilter) return false;
       if (resultFilter !== '全部' && getWorkbenchResultBucket(row) !== resultFilter) return false;

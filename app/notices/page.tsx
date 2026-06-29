@@ -49,7 +49,7 @@ import {
   type NoticeTypeFilter
 } from '@/lib/notice-analytics';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
-import { baseNoticeProjects, inferDisciplineCategory, inferSchoolRange } from '@/lib/notice-source';
+import { baseNoticeProjects, inferDisciplineCategory, inferSchoolRange, matchesSchoolRange } from '@/lib/notice-source';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
 
@@ -581,7 +581,7 @@ function NoticesPageContent() {
         .toLowerCase();
       const canUseBroadKeyword = noticeKeyword.length >= 4 || /[a-z0-9]/i.test(noticeKeyword);
       const matchesType = matchesNoticeType(item, projectType);
-      const matchesRange = schoolRange === '全部' ? true : inferSchoolRange(item) === schoolRange;
+      const matchesRange = matchesSchoolRange(item, schoolRange);
       const matchesRegion = region === '全部' ? true : getNoticeRegion(item) === region || (item.tags || []).includes(region);
       const matchesSchool =
         schoolName === '全部' ||

@@ -5,11 +5,89 @@ const generatedProjects = (generatedNoticeProjects as PublicNoticeProject[]).fil
 
 export const baseNoticeProjects: PublicNoticeProject[] = generatedProjects.length ? generatedProjects : noticeProjects;
 
-export function inferSchoolRange(project: Pick<PublicNoticeProject, 'tags'>) {
-  const tags = project.tags || [];
-  if (tags.includes('985')) return '985';
-  if (tags.includes('211')) return '211';
-  if (tags.includes('双一流')) return '双一流';
+export type SchoolRangeFilter = '全部' | '985' | '211' | '双一流' | '其他';
+
+const C9_SCHOOLS = [
+  '北京大学',
+  '清华大学',
+  '复旦大学',
+  '上海交通大学',
+  '南京大学',
+  '浙江大学',
+  '中国科学技术大学',
+  '哈尔滨工业大学',
+  '西安交通大学'
+];
+
+const KNOWN_985_SCHOOLS = [
+  ...C9_SCHOOLS,
+  '中国人民大学',
+  '北京航空航天大学',
+  '北京理工大学',
+  '北京师范大学',
+  '中国农业大学',
+  '中央民族大学',
+  '南开大学',
+  '天津大学',
+  '大连理工大学',
+  '东北大学',
+  '吉林大学',
+  '同济大学',
+  '华东师范大学',
+  '东南大学',
+  '厦门大学',
+  '山东大学',
+  '中国海洋大学',
+  '武汉大学',
+  '华中科技大学',
+  '湖南大学',
+  '中南大学',
+  '中山大学',
+  '华南理工大学',
+  '四川大学',
+  '电子科技大学',
+  '重庆大学',
+  '西北工业大学',
+  '兰州大学',
+  '国防科技大学'
+];
+
+function getSchoolRangeText(project: Pick<PublicNoticeProject, 'schoolName' | 'tags'>) {
+  return [project.schoolName, ...(project.tags || [])].join(' ');
+}
+
+export function getSchoolRangeMatches(project: Pick<PublicNoticeProject, 'schoolName' | 'tags'>) {
+  const text = getSchoolRangeText(project);
+  const schoolName = project.schoolName || '';
+  const ranges = new Set<Exclude<SchoolRangeFilter, '全部' | '其他'>>();
+
+  if (/985|985工程/.test(text) || KNOWN_985_SCHOOLS.some((name) => schoolName.includes(name))) {
+    ranges.add('985');
+  }
+
+  if (/211|211工程/.test(text) || ranges.has('985')) {
+    ranges.add('211');
+  }
+
+  if (/双一流|一流大学|一流学科/.test(text) || ranges.has('985') || ranges.has('211')) {
+    ranges.add('双一流');
+  }
+
+  return ranges;
+}
+
+export function matchesSchoolRange(project: Pick<PublicNoticeProject, 'schoolName' | 'tags'>, range: SchoolRangeFilter) {
+  if (range === '全部') return true;
+  const ranges = getSchoolRangeMatches(project);
+  if (range === '其他') return ranges.size === 0;
+  return ranges.has(range);
+}
+
+export function inferSchoolRange(project: Pick<PublicNoticeProject, 'schoolName' | 'tags'>) {
+  const ranges = getSchoolRangeMatches(project);
+  if (ranges.has('985')) return '985';
+  if (ranges.has('211')) return '211';
+  if (ranges.has('双一流')) return '双一流';
   return '其他';
 }
 
