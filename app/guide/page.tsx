@@ -87,7 +87,7 @@ const pageGuides = [
     icon: FileCheck2
   },
   {
-    title: '我的申请表',
+    title: '申请工作台',
     status: '登录可用',
     description: '用来保存目标项目、记录状态、材料进度和优先级，替代零散 Excel 与备忘录。',
     tips: ['统一状态口径', '材料拆项勾选', '按截止时间推进'],
@@ -121,8 +121,8 @@ const pageGuides = [
 ] as const;
 
 const productStatus = [
-  ['通知库', '已上线', '支持搜索、筛选、详情页、原文核对和加入申请表。'],
-  ['我的申请表', '登录可用', '支持保存项目、状态管理、优先级和材料进度维护。'],
+  ['通知库', '已上线', '支持搜索、筛选、详情页、原文核对和加入工作台。'],
+  ['申请工作台', '登录可用', '支持保存项目、状态管理、优先级和材料进度维护。'],
   ['院校库 / 资源库', '已上线', '作为高频入口和辅助工具，帮助你快速回访官方页面。'],
   ['Offer 池', '审核开放', '登录用户可提交动态，审核通过后公开展示，并支持举报纠错。'],
   ['竞赛库', '已上线', '按赛事等级、专业类别和截止节点整理背景提升入口。'],
@@ -140,7 +140,7 @@ export default function GuidePage() {
               5 分钟上手 Seekoffer
             </h1>
             <p className="mt-5 max-w-3xl text-base leading-9 text-slate-600">
-              推荐路径很简单：先在通知库找到目标项目，打开详情核对原文，再加入申请表，最后在工作台持续跟进截止时间、材料和申请状态。
+              推荐路径很简单：先在通知库找到目标项目，打开详情核对原文，再加入工作台，最后在同一个页面持续跟进截止时间、材料和申请状态。
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
@@ -154,7 +154,7 @@ export default function GuidePage() {
                 href="/me"
                 className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5"
               >
-                查看我的申请表
+                打开申请工作台
               </Link>
             </div>
           </div>

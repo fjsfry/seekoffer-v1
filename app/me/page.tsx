@@ -20,6 +20,7 @@ import {
   Save,
   Search,
   Settings2,
+  ShieldCheck,
   Sparkles,
   Square,
   Trash2
@@ -33,6 +34,7 @@ import {
   deleteUserProject,
   fetchApplicationRows,
   saveUserProfileToWorkspace,
+  updateUserProject,
   watchApplicationTable,
   type ApplicationRow
 } from '@/lib/cloudbase-data';
@@ -40,6 +42,7 @@ import {
   formatNoticeDateOnly,
   getDisplayDiscipline,
   getDisplayNoticeDepartment,
+  getDisplayProjectType,
   getDisplaySchoolName,
   normalizeNoticeTitle
 } from '@/lib/notice-display';
@@ -50,7 +53,13 @@ import {
   saveWorkbenchState,
   type WorkbenchCustomTodo
 } from '@/lib/workbench-state';
-import { materialChecklistDefinitions } from '@/lib/mock-data';
+import {
+  materialChecklistDefinitions,
+  priorityOptions,
+  userStatusOptions,
+  type MaterialChecklistKey,
+  type UserProjectRecord
+} from '@/lib/mock-data';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import { updateUserProfile, type UserProfile } from '@/lib/user-session';
 
@@ -86,6 +95,8 @@ const workbenchRangeFilters: WorkbenchRangeFilter[] = ['全部', '985', '211', '
 const workbenchProgressFilters: WorkbenchProgressFilter[] = ['全部', '报名中', '未开始', '已结束'];
 const workbenchApplicationStatusFilters: WorkbenchApplicationStatusFilter[] = ['全部', '未申请', '准备中', '已提交', '待考核'];
 const workbenchResultFilters: WorkbenchResultFilter[] = ['全部', '未出结果', '已通过', '未通过'];
+const BAOYAN_DATE_MONTH = 9;
+const BAOYAN_DATE_DAY = 22;
 
 function isProfileComplete(profile: UserProfile) {
   return Boolean(profile.undergraduateSchool && profile.major && profile.targetMajor && profile.targetRegion);
@@ -147,6 +158,17 @@ function getDaysLeft(deadlineDate: string) {
   }
 
   return Math.ceil((timestamp - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function getAnnualCountdownDays(month: number, day: number) {
+  const now = new Date();
+  let target = new Date(now.getFullYear(), month - 1, day, 0, 0, 0, 0);
+
+  if (target.getTime() < now.getTime()) {
+    target = new Date(now.getFullYear() + 1, month - 1, day, 0, 0, 0, 0);
+  }
+
+  return Math.max(0, Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
 }
 
 function getMaterialCompletedCount(progress: number) {
@@ -262,6 +284,7 @@ export default function MePage() {
   const [resultFilter, setResultFilter] = useState<WorkbenchResultFilter>('全部');
   const [applicationKeyword, setApplicationKeyword] = useState('');
   const [applicationSort, setApplicationSort] = useState<WorkbenchSortOption>('deadline');
+  const [openChecklistId, setOpenChecklistId] = useState('');
   const form = draftFormState.ownerId === profileOwnerId ? draftFormState.value : sessionProfile;
   const saveMessage = saveMessageState.ownerId === profileOwnerId ? saveMessageState.value : '';
   const profileExpanded =
@@ -426,7 +449,7 @@ export default function MePage() {
           id: `today-${item.userProjectId}`,
           title: `今天处理 ${project.schoolName}`,
           detail: `${project.projectName} 今天截止，优先检查材料并完成提交。`,
-          href: project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id)
+          href: project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(project.id)
         });
       });
 
@@ -442,7 +465,7 @@ export default function MePage() {
           id: `deadline-${item.userProjectId}`,
           title: `本周推进 ${project.schoolName}`,
           detail: `${project.projectName} 即将截止，建议尽快补齐关键材料。`,
-          href: project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id)
+          href: project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(project.id)
         });
       });
 
@@ -454,7 +477,7 @@ export default function MePage() {
           id: `material-${item.userProjectId}`,
           title: `补齐 ${project.schoolName} 的材料`,
           detail: `当前材料完成度 ${item.materialsProgress}%，还需要继续推进。`,
-          href: project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id)
+          href: project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(project.id)
         });
       });
 
@@ -506,7 +529,7 @@ export default function MePage() {
     rows,
     schoolRangeFilter
   ]);
-  const applicationPreview = filteredApplicationRows.slice(0, 6);
+  const applicationPreview = filteredApplicationRows;
   const urgentRows = sortedRows
     .filter((row) => ['today', 'within3days', 'within7days'].includes(row.project.deadlineLevel))
     .slice(0, 3);
@@ -588,12 +611,25 @@ export default function MePage() {
     try {
       await deleteUserProject(row.item.userProjectId);
       await refreshApplicationRows();
+      if (openChecklistId === row.item.userProjectId) {
+        setOpenChecklistId('');
+      }
     } finally {
       setDeletingProjectId('');
     }
   }
 
   const nearestDeadlineDays = nearestDeadlineRow ? getDaysLeft(nearestDeadlineRow.project.deadlineDate) : null;
+  const baoYanCountdownDays = getAnnualCountdownDays(BAOYAN_DATE_MONTH, BAOYAN_DATE_DAY);
+
+  async function handleRecordChange(userProjectId: string, patch: Partial<UserProjectRecord>) {
+    await updateUserProject(userProjectId, patch);
+    await refreshApplicationRows();
+  }
+
+  async function handleToggleChecklist(userProjectId: string, field: MaterialChecklistKey, currentValue: boolean) {
+    await handleRecordChange(userProjectId, { [field]: !currentValue } as Partial<UserProjectRecord>);
+  }
 
   if (!loggedIn) {
     return (
@@ -642,38 +678,54 @@ export default function MePage() {
       </section>
 
       <section className="product-card rounded-[30px] p-5 lg:p-6">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_290px] lg:items-center">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px_240px] lg:items-center">
           <div className="flex items-start gap-4">
             <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
               <CalendarDays className="h-6 w-6" />
             </span>
             <div>
               <div className="text-lg font-semibold text-ink">
-                {nearestDeadlineRow ? `最近截止：${getDisplaySchoolName(nearestDeadlineRow.project.schoolName)}` : '最近截止：暂无项目'}
+                关键时间轴
               </div>
               <p className="mt-1 text-sm leading-6 text-slate-500">
                 {nearestDeadlineRow
-                  ? `${nearestDeadlineRow.project.projectName}，${formatNoticeDateOnly(nearestDeadlineRow.project.deadlineDate)} 截止。`
-                  : '从通知库添加项目或手动录入后，这里会自动显示最近需要处理的截止事项。'}
+                  ? `最近项目：${getDisplaySchoolName(nearestDeadlineRow.project.schoolName)}，${formatNoticeDateOnly(nearestDeadlineRow.project.deadlineDate)} 截止。`
+                  : '先添加目标项目，工作台会把项目截止、材料进度和保研关键节点统一排好。'}
               </p>
             </div>
           </div>
 
           <Link
-            href={nearestDeadlineRow ? (nearestDeadlineRow.project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(nearestDeadlineRow.project.id)) : '/notices'}
-            className="flex items-center justify-between rounded-[24px] bg-brand px-5 py-4 text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
+            href={nearestDeadlineRow ? (nearestDeadlineRow.project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(nearestDeadlineRow.project.id)) : '/notices'}
+            className="flex items-center justify-between rounded-[24px] border border-brand/10 bg-white px-5 py-4 text-brand shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft"
           >
             <span>
-              <span className="block text-xs opacity-80">倒计时</span>
-              <span className="mt-1 block text-3xl font-semibold">
+              <span className="block text-xs text-slate-500">最近截止</span>
+              <span className="mt-1 block text-3xl font-semibold text-ink">
                 {nearestDeadlineDays === null ? '-' : Math.max(0, nearestDeadlineDays)}
                 <span className="ml-1 text-base font-semibold">天</span>
               </span>
             </span>
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/15">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8">
               <ChevronRight className="h-5 w-5" />
             </span>
           </Link>
+
+          <a
+            href="#application-board"
+            className="flex items-center justify-between rounded-[24px] bg-brand px-5 py-4 text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
+          >
+            <span>
+              <span className="block text-xs opacity-80">保研倒计时 9.22</span>
+              <span className="mt-1 block text-3xl font-semibold">
+                {baoYanCountdownDays}
+                <span className="ml-1 text-base font-semibold">天</span>
+              </span>
+            </span>
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/15">
+              <Clock3 className="h-5 w-5" />
+            </span>
+          </a>
         </div>
       </section>
 
@@ -690,10 +742,10 @@ export default function MePage() {
                 <CalendarDays className="h-4 w-4" />
                 我的日程
               </a>
-              <Link href="/applications" className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-brand">
+              <a href="#profile-form" className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-brand">
                 <ListChecks className="h-4 w-4" />
-                完整表格
-              </Link>
+                背景档案
+              </a>
             </div>
           </section>
 
@@ -844,12 +896,12 @@ export default function MePage() {
             <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-ink">申请进度</h2>
-                <p className="mt-1 text-sm text-slate-500">当前筛选出 {filteredApplicationRows.length} 个项目，优先展示最近截止。</p>
+                <p className="mt-1 text-sm text-slate-500">当前筛选出 {filteredApplicationRows.length} 个项目，可直接维护状态、优先级、材料和备注。</p>
               </div>
-              <Link href="/applications" className="inline-flex items-center gap-2 rounded-2xl border border-brand/20 bg-white px-4 py-2.5 text-sm font-semibold text-brand shadow-sm">
-                打开完整表格
-                <ChevronRight className="h-4 w-4" />
-              </Link>
+              <a href="#manual-entry" className="inline-flex items-center gap-2 rounded-2xl border border-brand/20 bg-white px-4 py-2.5 text-sm font-semibold text-brand shadow-sm">
+                手动新增项目
+                <PlusCircle className="h-4 w-4" />
+              </a>
             </div>
 
             <div className="mt-5 grid gap-3">
@@ -858,7 +910,11 @@ export default function MePage() {
                   <ApplicationProgressCard
                     key={row.item.userProjectId}
                     row={row}
+                    openChecklistId={openChecklistId}
+                    setOpenChecklistId={setOpenChecklistId}
                     isDeleting={deletingProjectId === row.item.userProjectId}
+                    onChange={handleRecordChange}
+                    onToggleChecklist={handleToggleChecklist}
                     onDelete={handleDeleteApplication}
                   />
                 ))
@@ -867,7 +923,7 @@ export default function MePage() {
                   <div className="text-lg font-semibold text-ink">{rows.length ? '没有匹配的申请项目' : '你的申请表还是空的'}</div>
                   <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
                     {rows.length
-                      ? '调整筛选条件或关键词后再试，也可以直接打开完整表格维护全部项目。'
+                      ? '调整筛选条件或关键词后再试，所有项目都在当前工作台内维护。'
                       : '从通知库加入一个目标项目，或手动录入正在跟进的院校，工作台会立刻开始生成提醒和行动清单。'}
                   </p>
                   <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
@@ -882,12 +938,9 @@ export default function MePage() {
               )}
             </div>
 
-            {filteredApplicationRows.length > applicationPreview.length ? (
-              <div className="mt-5 text-center">
-                <Link href="/applications" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
-                  查看剩余 {filteredApplicationRows.length - applicationPreview.length} 个项目
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
+            {filteredApplicationRows.length ? (
+              <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                共 {filteredApplicationRows.length} 个项目。状态、优先级、材料清单和备注修改后会自动同步到你的工作区。
               </div>
             ) : null}
           </section>
@@ -970,7 +1023,7 @@ export default function MePage() {
               urgentRows.map(({ item, project }) => (
                 <Link
                   key={item.userProjectId}
-                  href={project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id)}
+                  href={project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(project.id)}
                   className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm"
                 >
                   <span className="rounded-2xl bg-rose-50 px-2 py-2 text-center text-xs font-semibold text-rose-500">
@@ -1123,23 +1176,33 @@ export default function MePage() {
 
 function ApplicationProgressCard({
   row,
+  openChecklistId,
+  setOpenChecklistId,
   isDeleting,
+  onChange,
+  onToggleChecklist,
   onDelete
 }: {
   row: ApplicationRow;
+  openChecklistId: string;
+  setOpenChecklistId: (id: string) => void;
   isDeleting: boolean;
+  onChange: (userProjectId: string, patch: Partial<UserProjectRecord>) => Promise<void>;
+  onToggleChecklist: (userProjectId: string, field: MaterialChecklistKey, currentValue: boolean) => Promise<void>;
   onDelete: (row: ApplicationRow) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { item, project } = row;
+  const checklistOpen = openChecklistId === item.userProjectId;
   const completed = getMaterialCompletedCount(item.materialsProgress);
   const total = materialChecklistDefinitions.length;
+  const missing = total - completed;
   const daysLeft = getDaysLeft(project.deadlineDate);
-  const href = project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id);
+  const href = project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(project.id);
 
   return (
     <article className="rounded-[28px] border border-slate-100 bg-white px-5 py-5 shadow-sm transition hover:border-brand/20 hover:shadow-soft md:px-7">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.85fr)_140px_170px_104px_112px] xl:items-center">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.9fr)_130px_150px_150px_150px] xl:items-center">
         <div className="flex min-w-0 items-start gap-5">
           <WorkbenchApplicationMark project={project} />
           <div className="min-w-0 flex-1 pt-1">
@@ -1149,8 +1212,11 @@ function ApplicationProgressCard({
             </div>
             <p className="mt-2 line-clamp-2 max-w-2xl text-base leading-7 text-slate-600">{normalizeNoticeTitle(project.projectName, 72)}</p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-brand">{getDisplayProjectType(project.projectType)}</span>
               <span className="rounded-full bg-slate-100 px-2.5 py-1">{getDisplayDiscipline(project.discipline)}</span>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1">{getDisplaySchoolName(project.schoolName).includes('大学') ? '高校项目' : '目标项目'}</span>
+              {project.tags.slice(0, 2).map((tag) => (
+                <span key={tag} className="rounded-full bg-slate-100 px-2.5 py-1">{tag}</span>
+              ))}
             </div>
           </div>
         </div>
@@ -1166,41 +1232,76 @@ function ApplicationProgressCard({
         <div className="rounded-2xl bg-slate-50/70 px-4 py-3 xl:bg-transparent xl:px-0 xl:py-0">
           <div className="mb-2 flex items-center justify-between text-xs">
             <span className="font-semibold text-slate-400">材料进度</span>
-            <span className="font-semibold text-ink">{completed} / {total}</span>
+            <span className={missing ? 'font-semibold text-orange-500' : 'font-semibold text-brand'}>
+              {missing ? `待补 ${missing}` : '已完成'}
+            </span>
           </div>
           <div className="h-2 rounded-full bg-slate-100">
             <div className="h-full rounded-full bg-brand" style={{ width: `${item.materialsProgress}%` }} />
           </div>
+          <div className="mt-1 text-xs font-semibold text-ink">{completed} / {total}</div>
         </div>
 
         <div className="rounded-2xl bg-slate-50/70 px-4 py-3 xl:bg-transparent xl:px-0 xl:py-0">
           <div className="mb-2 text-xs font-semibold text-slate-400">优先级</div>
-          <span className={`rounded-xl px-3 py-2 text-xs font-semibold ${getPriorityTone(item.priorityLevel)}`}>
-            {item.priorityLevel}
-          </span>
+          <select
+            value={item.priorityLevel}
+            onChange={(event) =>
+              onChange(item.userProjectId, {
+                priorityLevel: event.target.value as UserProjectRecord['priorityLevel']
+              })
+            }
+            className={`w-full rounded-xl border border-transparent px-3 py-2 text-xs font-semibold outline-none ${getPriorityTone(item.priorityLevel)}`}
+          >
+            {priorityOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="rounded-2xl bg-slate-50/70 px-4 py-3 xl:bg-transparent xl:px-0 xl:py-0">
           <div className="mb-2 text-xs font-semibold text-slate-400">状态</div>
-          <span className={`rounded-xl px-3 py-2 text-xs font-semibold ${getWorkbenchStatusTone(item.myStatus)}`}>
-            {item.myStatus}
-          </span>
+          <select
+            value={item.myStatus}
+            onChange={(event) =>
+              onChange(item.userProjectId, {
+                myStatus: event.target.value as UserProjectRecord['myStatus']
+              })
+            }
+            className={`w-full rounded-xl border border-transparent px-3 py-2 text-xs font-semibold outline-none ${getWorkbenchStatusTone(item.myStatus)}`}
+          >
+            {userStatusOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-end gap-4 border-t border-slate-100 pt-4 text-xs font-semibold text-slate-500">
         <Link href={href} className="inline-flex items-center gap-1 hover:text-brand">
           <ExternalLink className="h-3.5 w-3.5" />
-          查看通知
+          {project.sourceSite === '用户手动录入' ? '查看录入' : '查看通知'}
         </Link>
-        <Link href="/applications" className="inline-flex items-center gap-1 hover:text-brand">
-          <Clock3 className="h-3.5 w-3.5" />
-          更新状态
-        </Link>
-        <Link href="/applications" className="inline-flex items-center gap-1 hover:text-brand">
+        <button
+          type="button"
+          onClick={() => setOpenChecklistId(checklistOpen ? '' : item.userProjectId)}
+          className="inline-flex items-center gap-1 hover:text-brand"
+        >
           <ListChecks className="h-3.5 w-3.5" />
-          材料清单
-        </Link>
+          {checklistOpen ? '收起材料' : '材料清单'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpenChecklistId(item.userProjectId)}
+          className="inline-flex items-center gap-1 hover:text-brand"
+        >
+          <ShieldCheck className="h-3.5 w-3.5" />
+          编辑备注
+        </button>
         <div className="relative">
           <button
             type="button"
@@ -1228,6 +1329,38 @@ function ApplicationProgressCard({
           ) : null}
         </div>
       </div>
+
+      {checklistOpen ? (
+        <div className="mt-4 rounded-[24px] border border-slate-100 bg-slate-50/75 p-4">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {materialChecklistDefinitions.map((field) => (
+                <button
+                  key={field.key}
+                  type="button"
+                  onClick={() => onToggleChecklist(item.userProjectId, field.key, item[field.key])}
+                  className={`rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
+                    item[field.key] ? 'bg-emerald-50 text-emerald-700' : 'bg-white text-slate-500 shadow-sm'
+                  }`}
+                >
+                  {item[field.key] ? '已完成' : '待完成'} · {field.label}
+                </button>
+              ))}
+            </div>
+            <textarea
+              rows={4}
+              defaultValue={item.myNotes}
+              onBlur={(event) => {
+                if (event.currentTarget.value !== item.myNotes) {
+                  void onChange(item.userProjectId, { myNotes: event.currentTarget.value });
+                }
+              }}
+              placeholder="记录导师反馈、材料缺口、投递账号或提交备注..."
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40"
+            />
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 }

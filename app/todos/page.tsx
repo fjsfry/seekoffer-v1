@@ -68,7 +68,7 @@ export default function TodosPage() {
             deadlineLevel === 'today'
               ? `24 小时内截止，当前状态是“${item.myStatus}”，请优先完成提交或确认动作。`
               : `今天有面试或确认安排：${item.interviewTime}。`,
-          href: project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id)
+          href: project.sourceSite === '用户手动录入' ? '/me#manual-entry' : buildNoticeDetailHref(project.id)
         };
       });
 
@@ -87,7 +87,7 @@ export default function TodosPage() {
           item.resultStatus === '待确认'
             ? '项目已进入待确认阶段，请尽快处理后续动作。'
             : `本周有明确时间风险，截止时间是 ${project.deadlineDate}。`,
-        href: project.sourceSite === '用户手动录入' ? '/applications#manual-entry' : buildNoticeDetailHref(project.id)
+        href: project.sourceSite === '用户手动录入' ? '/me#manual-entry' : buildNoticeDetailHref(project.id)
       }));
 
     const later = rows
@@ -102,7 +102,7 @@ export default function TodosPage() {
         id: `${item.userProjectId}-later`,
         title: `${project.schoolName} · 材料待补齐`,
         description: `当前材料完成度 ${item.materialsProgress}%，建议提前补齐简历、成绩单与推荐信。`,
-        href: '/applications'
+        href: '/me#application-board'
       }));
 
     return [
@@ -232,10 +232,10 @@ export default function TodosPage() {
 
         <div className="mt-6">
           <Link
-            href="/applications"
+            href="/me#application-board"
             className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white"
           >
-            去调整申请表
+            去工作台调整
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

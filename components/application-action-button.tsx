@@ -24,13 +24,13 @@ function getActionErrorMessage(error: unknown) {
     return error;
   }
 
-  return '加入申请表失败，请刷新后重试；如果仍然失败，请通过右下角反馈入口告诉我们。';
+  return '加入工作台失败，请刷新后重试；如果仍然失败，请通过右下角反馈入口告诉我们。';
 }
 
 export function ApplicationActionButton({
   projectId,
   variant = 'primary',
-  label = '加入我的申请表',
+  label = '加入工作台',
   addedLabel
 }: {
   projectId: string;
@@ -117,7 +117,7 @@ export function ApplicationActionButton({
           ) : (
             <Plus className="h-4 w-4" />
           )}
-          {added ? addedLabel || (variant === 'secondary' ? '已加入' : '已加入我的申请表') : pending ? '加入中...' : label}
+          {added ? addedLabel || (variant === 'secondary' ? '已加入' : '已加入工作台') : pending ? '加入中...' : label}
         </span>
       </button>
       {message ? <div className="text-xs leading-5 text-rose-600">{message}</div> : null}

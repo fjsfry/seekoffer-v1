@@ -159,7 +159,7 @@ function DashboardHeroVisual({ compact = false }: { compact?: boolean }) {
         </div>
 
         <div className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float">
-          加入我的申请表
+          加入工作台
           <ArrowRight className="h-4 w-4" />
         </div>
       </div>

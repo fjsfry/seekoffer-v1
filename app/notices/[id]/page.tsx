@@ -97,7 +97,7 @@ export default async function NoticeDetailPage({
       <PageSectionTitle
         eyebrow="Project Detail"
         title={`${getDisplaySchoolName(project.schoolName)} · ${normalizeNoticeTitle(project.projectName, 80)}`}
-        subtitle="查看项目详情、截止时间、材料要求与原文入口，并可一键加入我的申请表。"
+        subtitle="查看项目详情、截止时间、材料要求与原文入口，并可一键加入工作台。"
       />
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">

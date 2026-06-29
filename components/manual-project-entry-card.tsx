@@ -60,7 +60,7 @@ export function ManualProjectEntryCard({
 
       setForm(initialForm);
       setShowMore(false);
-      setMessage('项目已加入我的申请表，后续可以继续补充材料和备注。');
+      setMessage('项目已加入工作台，后续可以继续补充材料和备注。');
       onCreated?.();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '项目保存失败，请稍后重试。');
@@ -80,7 +80,7 @@ export function ManualProjectEntryCard({
             手动新增项目
           </div>
           <div className="mt-2 text-sm leading-7 text-slate-600">
-            如果通知库暂时还没有收录某个项目，也可以先手动录入，先把目标院校和关键时间放进申请表。
+            如果通知库暂时还没有收录某个项目，也可以先手动录入，先把目标院校和关键时间放进工作台。
           </div>
         </div>
         {compact ? (
@@ -204,7 +204,7 @@ export function ManualProjectEntryCard({
               className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:bg-brand-deep disabled:opacity-60"
             >
               <Save className="h-4 w-4" />
-              {submitting ? '保存中...' : '加入我的申请表'}
+              {submitting ? '保存中...' : '加入工作台'}
             </button>
             <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
               <CalendarDays className="h-4 w-4 text-brand/70" />
