@@ -4,14 +4,19 @@ import {
   Calculator,
   CheckCircle2,
   ClipboardList,
+  Compass,
   FileText,
+  GraduationCap,
   Landmark,
   Mail,
+  ShieldCheck,
+  Trophy,
   Wrench
 } from 'lucide-react';
 import Link from 'next/link';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
+import { taobaoTemplatePackHref } from '@/lib/external-links';
 import { officialResourceSections } from '@/lib/portal-data';
 
 const sectionIcons = {
@@ -19,7 +24,33 @@ const sectionIcons = {
   官方入口: Landmark,
   常用服务: Wrench
 } as const;
-const taobaoTemplatePackHref = 'https://e.tb.cn/h.RuTikxEqdC7CNz0?tk=2FLBgjWMqm0';
+
+const resourcePathways = [
+  {
+    title: '专业找营',
+    description: '按专业方向推荐相关学院通知，再进入通知库继续细筛。',
+    href: '/majors',
+    icon: Compass
+  },
+  {
+    title: '竞赛库',
+    description: '按 A 类、B 类、热门和专业类别整理背景提升入口。',
+    href: '/competitions',
+    icon: Trophy
+  },
+  {
+    title: '知识/经验中心',
+    description: '系统了解时间线、黑话、材料指南和面试题框架。',
+    href: '/knowledge',
+    icon: GraduationCap
+  },
+  {
+    title: '人工复核',
+    description: '在 AI 定位后检查申请组合、材料短板和下一步动作。',
+    href: '/consulting',
+    icon: ShieldCheck
+  }
+];
 
 const applicationKits = [
   {
@@ -175,6 +206,46 @@ export default function ResourcesPage() {
               <article key={item.title} className={cardClassName}>
                 {cardContent}
               </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="surface-card rounded-[34px] p-6 lg:p-8">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
+              <Compass className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-ink md:text-3xl">继续完善申请路径</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-500">
+                资料只是准备的一部分。把专业找营、竞赛背景、知识内容和人工复核串起来，申请才更像一套完整工作流。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {resourcePathways.map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.title}
+                href={item.href}
+                className="group rounded-[26px] border border-slate-100 bg-white/95 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft"
+              >
+                <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] bg-brand/8 text-brand transition group-hover:bg-brand group-hover:text-white">
+                  <Icon className="h-7 w-7" />
+                </span>
+                <h3 className="mt-5 text-lg font-semibold text-ink">{item.title}</h3>
+                <p className="mt-3 min-h-[4.5rem] text-sm leading-7 text-slate-500">{item.description}</p>
+                <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand">
+                  打开
+                  <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                </span>
+              </Link>
             );
           })}
         </div>

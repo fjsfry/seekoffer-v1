@@ -5,18 +5,23 @@ import Link from 'next/link';
 import {
   AlertTriangle,
   ArrowRight,
+  BookmarkPlus,
   BookOpenCheck,
   BrainCircuit,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  Compass,
   Crown,
   FileCheck2,
   Flag,
   Info,
   Layers3,
+  ListChecks,
   LoaderCircle,
+  MessageCircle,
+  PackageOpen,
   RefreshCw,
   RotateCw,
   ShieldCheck,
@@ -37,6 +42,8 @@ import {
   type AiWaitlistNeed,
   type ApplicationRow
 } from '@/lib/cloudbase-data';
+import { QQ_GROUP_URL } from '@/lib/contact';
+import { taobaoTemplatePackHref } from '@/lib/external-links';
 import {
   buildAiPositioningReport,
   createDefaultAiPositioningInput,
@@ -88,6 +95,26 @@ export default function AiPage() {
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [showAdvancedInput, setShowAdvancedInput] = useState(false);
   const inputPanelRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const targetMajor = params.get('major');
+
+    if (!targetMajor) {
+      return;
+    }
+
+    let active = true;
+    queueMicrotask(() => {
+      if (active) {
+        setInput((current) => (current.targetMajor ? current : { ...current, targetMajor }));
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const profileKey = session?.userId || session?.email || session?.phone || 'guest';
@@ -265,6 +292,13 @@ export default function AiPage() {
             >
               {report ? '查看已保存方案' : '先看需要填写什么'}
               <ChevronDown className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/majors"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-brand/20 bg-white px-5 py-3 text-sm font-semibold text-brand shadow-sm transition hover:border-brand/40"
+            >
+              按专业找营
+              <Compass className="h-4 w-4" />
             </Link>
           </div>
         </div>
@@ -755,31 +789,36 @@ function NextActionCards({
   const explanationPlan = buildAdaptiveExplanationPlan(report, trackedProjectCount);
 
   return (
-    <section className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(380px,1.08fr)]">
-      <ActionSummaryCard
-        icon={Flag}
-        eyebrow="申请推进"
-        title="下一步怎么做"
-        description={nextStepPlan.description}
-        tone="green"
-        items={nextStepPlan.items}
-        footerLabel={nextStepPlan.footerLabel}
-        footerValue={nextStepPlan.footerValue}
-        actionLabel="查看申请全流程指南"
-        href="/guide"
-      />
-      <ActionSummaryCard
-        icon={Info}
-        eyebrow="可信边界"
-        title="结果说明"
-        description={explanationPlan.description}
-        tone="blue"
-        items={explanationPlan.items}
-        footerLabel={explanationPlan.footerLabel}
-        footerValue={explanationPlan.footerValue}
-        actionLabel="了解定位模型与算法"
-        href="/disclaimer"
-      />
+    <section className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)]">
+      <div className="grid gap-5">
+        <div className="grid gap-5 lg:grid-cols-2">
+          <ActionSummaryCard
+            icon={Flag}
+            eyebrow="申请推进"
+            title="下一步怎么做"
+            description={nextStepPlan.description}
+            tone="green"
+            items={nextStepPlan.items}
+            footerLabel={nextStepPlan.footerLabel}
+            footerValue={nextStepPlan.footerValue}
+            actionLabel="查看申请全流程指南"
+            href="/guide"
+          />
+          <ActionSummaryCard
+            icon={Info}
+            eyebrow="可信边界"
+            title="结果说明"
+            description={explanationPlan.description}
+            tone="blue"
+            items={explanationPlan.items}
+            footerLabel={explanationPlan.footerLabel}
+            footerValue={explanationPlan.footerValue}
+            actionLabel="了解定位模型与算法"
+            href="/disclaimer"
+          />
+        </div>
+        <ActionHub report={report} loggedIn={loggedIn} />
+      </div>
       <section className="relative flex h-full flex-col overflow-hidden rounded-[32px] border border-orange-200/80 bg-white shadow-soft">
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-orange-400 via-orange-500 to-amber-400" />
         <div className="bg-gradient-to-br from-orange-50 via-white to-white px-5 pb-4 pt-6">
@@ -865,6 +904,101 @@ function NextActionCards({
           </div>
         </div>
       </section>
+    </section>
+  );
+}
+
+function ActionHub({ report, loggedIn }: { report: AiPositioningReport | null; loggedIn: boolean }) {
+  const topProject = report?.recommendedProjects[0];
+  const topSchool = topProject ? getDisplaySchoolName(topProject.schoolName) : '';
+  const majorKeyword = topProject?.discipline || topProject?.departmentName || '';
+  const actions = [
+    {
+      title: '收藏目标院校',
+      detail: topProject ? `先核对 ${topSchool}，确认原通知、截止时间和材料要求。` : '先从通知库挑选 3-5 个候选项目。',
+      href: topProject ? buildNoticeDetailHref(topProject.id) : '/notices',
+      label: topProject ? '查看首个项目' : '去通知库',
+      icon: BookmarkPlus,
+      external: false
+    },
+    {
+      title: '生成申请清单',
+      detail: loggedIn ? '进入工作台，把候选项目按冲刺、稳妥、保底拆开推进。' : '登录后可保存项目、材料状态和截止提醒。',
+      href: '/me',
+      label: loggedIn ? '进入工作台' : '登录后使用',
+      icon: ListChecks,
+      external: false
+    },
+    {
+      title: '打开资料包',
+      detail: '需要简历、个人陈述和推荐信模板时，直接打开资料包。',
+      href: taobaoTemplatePackHref,
+      label: '打开资料包',
+      icon: PackageOpen,
+      external: true
+    },
+    {
+      title: '按专业继续找营',
+      detail: majorKeyword ? `用 ${majorKeyword} 继续扩展相关学院通知。` : '按专业方向继续扩展相关学院通知。',
+      href: `/majors${majorKeyword ? `?q=${encodeURIComponent(majorKeyword)}` : ''}`,
+      label: '继续找营',
+      icon: Compass,
+      external: false
+    },
+    {
+      title: '加入社群',
+      detail: '遇到通知错误、链接失效或申请节奏问题，可以先在社群反馈。',
+      href: QQ_GROUP_URL,
+      label: '加入 QQ 群',
+      icon: MessageCircle,
+      external: true
+    }
+  ];
+
+  return (
+    <section className="rounded-[32px] border border-black/5 bg-white/96 p-5 shadow-soft backdrop-blur">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="inline-flex rounded-full bg-brand/8 px-3 py-1 text-xs font-semibold text-brand">行动中心</div>
+          <h3 className="mt-3 text-2xl font-semibold tracking-tight text-ink">拿到结果后先做这 5 件事</h3>
+          <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-500">这些入口不替代判断，只帮助你把定位结果转成可执行的申请动作。</p>
+        </div>
+        <Link href="/consulting" className="inline-flex w-fit items-center gap-2 rounded-2xl border border-brand/20 bg-white px-4 py-2.5 text-sm font-semibold text-brand transition hover:border-brand/40">
+          人工复核说明
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {actions.map((action) => {
+          const Icon = action.icon;
+          const className =
+            'group flex min-h-[190px] flex-col rounded-[24px] border border-slate-100 bg-slate-50/70 p-4 transition hover:-translate-y-0.5 hover:border-brand/15 hover:bg-white hover:shadow-sm';
+          const content = (
+            <>
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-brand shadow-sm transition group-hover:bg-brand group-hover:text-white">
+                <Icon className="h-5 w-5" />
+              </span>
+              <h4 className="mt-4 text-base font-semibold text-ink">{action.title}</h4>
+              <p className="mt-2 flex-1 text-xs leading-6 text-slate-500">{action.detail}</p>
+              <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand">
+                {action.label}
+                <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+              </span>
+            </>
+          );
+
+          return action.external ? (
+            <a key={action.title} href={action.href} target="_blank" rel="noreferrer" className={className}>
+              {content}
+            </a>
+          ) : (
+            <Link key={action.title} href={action.href} className={className}>
+              {content}
+            </Link>
+          );
+        })}
+      </div>
     </section>
   );
 }

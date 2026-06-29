@@ -217,6 +217,41 @@ export default function HomePage() {
     }
   ];
 
+  const growthEntryCards = [
+    {
+      title: '专业找营',
+      description: '选择专业或方向，直接看到相关学院通知，再进入通知库继续细筛。',
+      href: '/majors',
+      action: '选择方向',
+      icon: Target,
+      tone: 'bg-emerald-50 text-brand'
+    },
+    {
+      title: '竞赛库',
+      description: '按 A 类、B 类、热门和专业类别整理背景提升入口。',
+      href: '/competitions',
+      action: '查看竞赛',
+      icon: Trophy,
+      tone: 'bg-amber-50 text-amber-600'
+    },
+    {
+      title: '知识/经验中心',
+      description: '系统了解时间线、黑话词典、材料指南和面试题。',
+      href: '/knowledge',
+      action: '开始学习',
+      icon: BookOpen,
+      tone: 'bg-sky-50 text-sky-600'
+    },
+    {
+      title: '人工复核',
+      description: '在 AI 定位后检查申请组合、材料短板和下一步动作。',
+      href: '/consulting',
+      action: '了解流程',
+      icon: Brain,
+      tone: 'bg-rose-50 text-rose-500'
+    }
+  ];
+
   return (
     <SiteShell>
       <section className="relative overflow-hidden rounded-[42px] px-3 pb-8 pt-8 sm:px-8 lg:px-14 lg:pb-12 lg:pt-14">
@@ -401,6 +436,44 @@ export default function HomePage() {
                 </div>
               </Link>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="px-1 lg:px-12">
+        <div className="product-card rounded-[28px] p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-ink">从信息查询到申请准备</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">把专业方向、竞赛背景、知识内容和人工复核串成后续路径。</p>
+            </div>
+            <Link href="/resources" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
+              查看资源库
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {growthEntryCards.map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <Link
+                  key={item.title}
+                  href={item.href}
+                  className="group rounded-[24px] border border-slate-100 bg-white/88 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/20 hover:shadow-soft"
+                >
+                  <span className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl ${item.tone}`}>
+                    <Icon className="h-7 w-7" />
+                  </span>
+                  <h3 className="mt-5 text-lg font-semibold text-ink">{item.title}</h3>
+                  <p className="mt-3 min-h-[4.2rem] text-sm leading-7 text-slate-500">{item.description}</p>
+                  <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand">
+                    {item.action}
+                    <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>

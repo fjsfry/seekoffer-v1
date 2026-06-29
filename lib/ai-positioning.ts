@@ -1,4 +1,5 @@
 import type { ApplicationRow } from './cloudbase-data';
+import { majorDirections } from './major-taxonomy';
 import { materialChecklistDefinitions, type ProjectType, type PublicNoticeProject } from './mock-data';
 import { inferSchoolRange } from './notice-source';
 import type { UserProfile } from './user-session';
@@ -86,28 +87,10 @@ const strongSchoolPattern = /(985|双一流|哈尔滨工业|西安交通|同济|
 const goodSchoolPattern = /(211|双一流|华东师范|北京邮电|西安电子|南京航空|南京理工|苏州大学|暨南大学|郑州大学|上海大学)/;
 const technicalMajorPattern = /(计算机|软件|人工智能|机器学习|数据|网安|电子|通信|自动化|控制|信息|数学|统计|材料|机械|能源|化工|生物|医学|药学|金融|经济|管理|法学|教育|新闻|中文|外语)/g;
 const researchInstitutePattern = /(科学院|社科院|协和|实验室|研究院|研究所|医学院|脑科学|类脑)/;
-const directionGroups = [
-  {
-    label: '人工智能/计算机',
-    keywords: ['人工智能', 'ai', '大模型', '机器学习', '深度学习', '算法', '计算机', '软件', '数据', '智能', '网安', '电子', '信息', '自动化', '控制']
-  },
-  {
-    label: '金融/管理',
-    keywords: ['金融', '经济', '管理', '会计', '商业', '市场', '运营', '工商', '公共管理']
-  },
-  {
-    label: '生命医学',
-    keywords: ['生物', '医学', '药学', '临床', '公共卫生', '脑科学', '类脑', '神经', '生命']
-  },
-  {
-    label: '材料/能源',
-    keywords: ['材料', '化工', '能源', '环境', '机械', '制造', '物理']
-  },
-  {
-    label: '人文社科',
-    keywords: ['法学', '教育', '新闻', '传播', '中文', '外语', '历史', '哲学', '社会']
-  }
-];
+const directionGroups = majorDirections.map((direction) => ({
+  label: direction.label,
+  keywords: direction.keywords
+}));
 
 export function createDefaultAiPositioningInput(profile?: UserProfile | null): AiPositioningInput {
   return {
