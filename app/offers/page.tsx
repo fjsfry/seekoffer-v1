@@ -16,12 +16,15 @@ import {
   ListChecks,
   Loader2,
   MessageCircle,
+  Pin,
   RefreshCw,
   Search,
+  Send,
   ShieldCheck,
   Sparkles,
   TrendingUp,
-  University
+  University,
+  X
 } from 'lucide-react';
 import { SiteShell } from '@/components/site-shell';
 import {
@@ -84,6 +87,18 @@ type WaitlistUpdate = {
   time: string;
   detail: string;
 };
+
+type PinnedItem =
+  | { kind: 'offer'; id: string }
+  | { kind: 'discussion'; id: string }
+  | { kind: 'decision'; id: string }
+  | { kind: 'waitlist'; id: string };
+
+type PinnedDetail =
+  | { kind: 'offer'; offer: PublicOffer }
+  | { kind: 'discussion'; post: DiscussionPost }
+  | { kind: 'decision'; thread: DecisionThread }
+  | { kind: 'waitlist'; update: WaitlistUpdate };
 
 const resultTone: Record<OfferResultType, string> = {
   录取: 'bg-emerald-50 text-brand',
@@ -238,6 +253,9 @@ export default function OffersPage() {
   const [reportingId, setReportingId] = useState<string | null>(null);
   const [followedDiscussionIds, setFollowedDiscussionIds] = useState<string[]>([]);
   const [decisionVotes, setDecisionVotes] = useState<Record<string, string>>({});
+  const [pinnedItem, setPinnedItem] = useState<PinnedItem | null>(null);
+  const [replyDraft, setReplyDraft] = useState('');
+  const [localReplies, setLocalReplies] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     void loadOffers();
@@ -322,6 +340,30 @@ export default function OffersPage() {
     );
   }, [keyword]);
 
+  const pinnedDetail = useMemo<PinnedDetail | null>(() => {
+    if (!pinnedItem) {
+      return null;
+    }
+
+    if (pinnedItem.kind === 'offer') {
+      const offer = displayOffers.find((item) => item.id === pinnedItem.id);
+      return offer ? { kind: 'offer', offer } : null;
+    }
+
+    if (pinnedItem.kind === 'discussion') {
+      const post = discussionPosts.find((item) => item.id === pinnedItem.id);
+      return post ? { kind: 'discussion', post } : null;
+    }
+
+    if (pinnedItem.kind === 'decision') {
+      const thread = decisionThreads.find((item) => item.id === pinnedItem.id);
+      return thread ? { kind: 'decision', thread } : null;
+    }
+
+    const update = waitlistUpdates.find((item) => item.id === pinnedItem.id);
+    return update ? { kind: 'waitlist', update } : null;
+  }, [displayOffers, pinnedItem]);
+
   const hotSchools = useMemo(() => {
     const counter = new Map<string, number>();
 
@@ -394,6 +436,33 @@ export default function OffersPage() {
 
   function voteDecision(threadId: string, optionId: string) {
     setDecisionVotes((current) => ({ ...current, [threadId]: optionId }));
+  }
+
+  function openPinnedItem(item: PinnedItem) {
+    setPinnedItem(item);
+    setReplyDraft('');
+    setMessage('已打开置顶详情，可以查看完整上下文，也可以继续回复交流。');
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.getElementById('offer-pinned-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+  }
+
+  function submitPinnedReply() {
+    if (!pinnedDetail) {
+      return;
+    }
+
+    const text = replyDraft.trim();
+    if (!text) {
+      return;
+    }
+
+    const key = getPinnedDetailKey(pinnedDetail);
+    setLocalReplies((current) => ({ ...current, [key]: [...(current[key] || []), text] }));
+    setReplyDraft('');
+    setMessage('回复已添加到当前讨论，可继续补充关键背景或追问。');
   }
 
   return (
@@ -518,6 +587,35 @@ export default function OffersPage() {
 
           <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-500">{message}</div>
 
+          {pinnedDetail ? (
+            <PinnedDetail
+              detail={pinnedDetail}
+              replies={localReplies[getPinnedDetailKey(pinnedDetail)] || []}
+              replyDraft={replyDraft}
+              decisionVotes={decisionVotes}
+              followedIds={followedDiscussionIds}
+              reportingId={reportingId}
+              onReplyDraftChange={setReplyDraft}
+              onSubmitReply={submitPinnedReply}
+              onClose={() => setPinnedItem(null)}
+              onReport={handleReport}
+              onDiscuss={openSchoolDiscussion}
+              onFollow={toggleFollowDiscussion}
+              onVote={voteDecision}
+            />
+          ) : (
+            <div
+              id="offer-pinned-detail"
+              className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-brand/20 bg-brand/5 px-4 py-3 text-sm text-slate-600"
+            >
+              <span className="inline-flex items-center gap-2 font-semibold text-brand">
+                <Pin className="h-4 w-4" />
+                点击任一动态、讨论、选择题或候补消息，可在这里置顶查看并继续交流。
+              </span>
+              <span className="text-xs font-semibold text-slate-400">详情不会打断当前筛选</span>
+            </div>
+          )}
+
           {hubTab === 'offers' ? (
             <OfferFeed
               offers={filteredOffers}
@@ -527,6 +625,7 @@ export default function OffersPage() {
               reportingId={reportingId}
               onReport={handleReport}
               onDiscuss={openSchoolDiscussion}
+              onOpen={(offer) => openPinnedItem({ kind: 'offer', id: offer.id })}
             />
           ) : null}
 
@@ -537,12 +636,20 @@ export default function OffersPage() {
               followedIds={followedDiscussionIds}
               onCategoryChange={setDiscussionCategory}
               onFollow={toggleFollowDiscussion}
+              onOpen={(post) => openPinnedItem({ kind: 'discussion', id: post.id })}
             />
           ) : null}
 
-          {hubTab === 'decisions' ? <DecisionBoard threads={filteredDecisionThreads} votes={decisionVotes} onVote={voteDecision} /> : null}
+          {hubTab === 'decisions' ? (
+            <DecisionBoard
+              threads={filteredDecisionThreads}
+              votes={decisionVotes}
+              onVote={voteDecision}
+              onOpen={(thread) => openPinnedItem({ kind: 'decision', id: thread.id })}
+            />
+          ) : null}
 
-          {hubTab === 'waitlist' ? <WaitlistBoard updates={filteredWaitlistUpdates} /> : null}
+          {hubTab === 'waitlist' ? <WaitlistBoard updates={filteredWaitlistUpdates} onOpen={(update) => openPinnedItem({ kind: 'waitlist', id: update.id })} /> : null}
         </div>
 
         <aside className="grid content-start gap-5">
@@ -575,7 +682,9 @@ export default function OffersPage() {
                   type="button"
                   onClick={() => {
                     setHubTab('discussions');
-                    setKeyword(item.school);
+                    setKeyword('');
+                    setDiscussionCategory('全部');
+                    openPinnedItem({ kind: 'discussion', id: item.id });
                   }}
                   className="rounded-2xl bg-slate-50 px-4 py-3 text-left transition hover:bg-brand/8"
                 >
@@ -617,6 +726,311 @@ export default function OffersPage() {
   );
 }
 
+function PinnedDetail({
+  detail,
+  replies,
+  replyDraft,
+  decisionVotes,
+  followedIds,
+  reportingId,
+  onReplyDraftChange,
+  onSubmitReply,
+  onClose,
+  onReport,
+  onDiscuss,
+  onFollow,
+  onVote
+}: {
+  detail: PinnedDetail;
+  replies: string[];
+  replyDraft: string;
+  decisionVotes: Record<string, string>;
+  followedIds: string[];
+  reportingId: string | null;
+  onReplyDraftChange: (value: string) => void;
+  onSubmitReply: () => void;
+  onClose: () => void;
+  onReport: (offer: PublicOffer) => void;
+  onDiscuss: (school: string) => void;
+  onFollow: (id: string) => void;
+  onVote: (threadId: string, optionId: string) => void;
+}) {
+  const title = getPinnedDetailTitle(detail);
+  const meta = getPinnedDetailMeta(detail);
+  const seededReplies = getPinnedConversation(detail);
+  const isDiscussionFollowed = detail.kind === 'discussion' && followedIds.includes(detail.post.id);
+
+  return (
+    <section id="offer-pinned-detail" className="mt-5 overflow-hidden rounded-[26px] border border-brand/15 bg-white shadow-soft">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-brand/5 px-5 py-4">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-brand ring-1 ring-brand/10">
+            <Pin className="h-3.5 w-3.5" />
+            置顶详情
+          </div>
+          <h2 className="mt-3 text-2xl font-semibold leading-8 text-ink">{title}</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">{meta}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 transition hover:border-brand/20 hover:text-brand"
+          aria-label="关闭置顶详情"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="grid gap-5 p-5">
+        {detail.kind === 'offer' ? (
+          <div className="grid gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${resultTone[detail.offer.result]}`}>{detail.offer.result}</span>
+              <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-600">{detail.offer.projectType}</span>
+              <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-brand">{detail.offer.sourceLabel || '已审核投稿'}</span>
+            </div>
+            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600">
+              <span className="font-semibold text-slate-700">本科背景：</span>
+              {detail.offer.undergraduateBackground}
+            </div>
+            <p className="whitespace-pre-wrap text-sm leading-7 text-slate-600">{detail.offer.content}</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => onDiscuss(detail.offer.schoolName)}
+                className="inline-flex items-center gap-2 rounded-xl border border-brand/15 px-4 py-2 text-xs font-semibold text-brand transition hover:border-brand/30 hover:bg-brand/5"
+              >
+                <MessageCircle className="h-4 w-4" />
+                看同校讨论
+              </button>
+              <button
+                type="button"
+                onClick={() => onReport(detail.offer)}
+                disabled={reportingId === detail.offer.id}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-500 transition hover:border-rose-200 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {reportingId === detail.offer.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
+                举报纠错
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {detail.kind === 'discussion' ? (
+          <div className="grid gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-brand/8 px-3 py-1.5 text-xs font-semibold text-brand">{detail.post.category}</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600">{detail.post.status}</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">{detail.post.replies} 回复</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                {detail.post.follows + (isDiscussionFollowed ? 1 : 0)} 关注
+              </span>
+            </div>
+            <p className="text-sm leading-7 text-slate-600">{detail.post.excerpt}</p>
+            <div className="flex flex-wrap gap-2">
+              {detail.post.tags.map((tag) => (
+                <span key={tag} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">{tag}</span>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => onFollow(detail.post.id)}
+              className={`w-fit inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+                isDiscussionFollowed ? 'bg-brand text-white' : 'border border-brand/15 text-brand hover:border-brand/30 hover:bg-brand/5'
+              }`}
+            >
+              <Heart className="h-4 w-4" />
+              {isDiscussionFollowed ? '已关注这个讨论' : '关注这个讨论'}
+            </button>
+          </div>
+        ) : null}
+
+        {detail.kind === 'decision' ? (
+          <DecisionDetail thread={detail.thread} votes={decisionVotes} onVote={onVote} />
+        ) : null}
+
+        {detail.kind === 'waitlist' ? (
+          <div className="grid gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${resultTone[detail.update.type]}`}>{detail.update.type}</span>
+              <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${sourceTone[detail.update.source]}`}>{detail.update.source}</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">{detail.update.time}</span>
+            </div>
+            <p className="text-sm leading-7 text-slate-600">{detail.update.detail}</p>
+            <button
+              type="button"
+              onClick={() => onDiscuss(detail.update.school)}
+              className="w-fit inline-flex items-center gap-2 rounded-xl border border-brand/15 px-4 py-2 text-xs font-semibold text-brand transition hover:border-brand/30 hover:bg-brand/5"
+            >
+              <MessageCircle className="h-4 w-4" />
+              看同校讨论
+            </button>
+          </div>
+        ) : null}
+
+        <div className="rounded-2xl bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-ink">交流区</h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500">适合补充时间线、导师反馈、材料要求或继续追问。请不要发布个人隐私。</p>
+            </div>
+            <Link href="/publish" className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-brand ring-1 ring-brand/10">
+              发布新动态
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            {seededReplies.map((item) => (
+              <div key={`${item.author}-${item.text}`} className="rounded-2xl bg-white px-4 py-3 ring-1 ring-slate-100">
+                <div className="text-xs font-semibold text-brand">{item.author}</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{item.text}</p>
+              </div>
+            ))}
+            {replies.map((item, index) => (
+              <div key={`${item}-${index}`} className="rounded-2xl border border-brand/10 bg-white px-4 py-3">
+                <div className="text-xs font-semibold text-brand">我的补充</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{item}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+            <textarea
+              value={replyDraft}
+              onChange={(event) => onReplyDraftChange(event.target.value)}
+              rows={3}
+              placeholder="写下补充信息、提问或经验，例如：这个学院材料截止前还会发确认邮件吗？"
+              className="min-h-24 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-slate-400 focus:border-brand/40 focus:ring-4 focus:ring-brand/10"
+            />
+            <button
+              type="button"
+              onClick={onSubmitReply}
+              disabled={!replyDraft.trim()}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+            >
+              <Send className="h-4 w-4" />
+              发布回复
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DecisionDetail({
+  thread,
+  votes,
+  onVote
+}: {
+  thread: DecisionThread;
+  votes: Record<string, string>;
+  onVote: (threadId: string, optionId: string) => void;
+}) {
+  const votedOption = votes[thread.id];
+  const totalVotes = thread.options.reduce((sum, option) => sum + option.votes + (votedOption === option.id ? 1 : 0), 0);
+
+  return (
+    <div className="grid gap-4">
+      <p className="text-sm leading-7 text-slate-600">{thread.background}</p>
+      <div className="grid gap-3">
+        {thread.options.map((option) => {
+          const selected = votedOption === option.id;
+          const votesWithSelection = option.votes + (selected ? 1 : 0);
+          const width = `${Math.round((votesWithSelection / Math.max(totalVotes, 1)) * 100)}%`;
+
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => onVote(thread.id, option.id)}
+              className={`relative overflow-hidden rounded-2xl border px-4 py-3 text-left transition ${
+                selected ? 'border-brand/30 bg-brand/5' : 'border-slate-100 bg-slate-50 hover:border-brand/20'
+              }`}
+            >
+              <span className="absolute inset-y-0 left-0 bg-brand/10" style={{ width }} />
+              <span className="relative flex flex-wrap items-center justify-between gap-3">
+                <span>
+                  <span className="block text-sm font-semibold text-ink">{option.label}</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">{option.detail}</span>
+                </span>
+                <span className="text-sm font-semibold text-brand">{width}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="grid gap-2 rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+        {thread.comments.map((comment) => (
+          <div key={comment} className="flex gap-2 text-sm leading-6 text-slate-600">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+            <span>{comment}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function getPinnedDetailKey(detail: PinnedDetail) {
+  if (detail.kind === 'offer') return `offer:${detail.offer.id}`;
+  if (detail.kind === 'discussion') return `discussion:${detail.post.id}`;
+  if (detail.kind === 'decision') return `decision:${detail.thread.id}`;
+  return `waitlist:${detail.update.id}`;
+}
+
+function getPinnedDetailTitle(detail: PinnedDetail) {
+  if (detail.kind === 'offer') return `${detail.offer.schoolName} · ${detail.offer.major}`;
+  if (detail.kind === 'discussion') return detail.post.title;
+  if (detail.kind === 'decision') return detail.thread.title;
+  return detail.update.status;
+}
+
+function getPinnedDetailMeta(detail: PinnedDetail) {
+  if (detail.kind === 'offer') {
+    return `${getOfferAuthorLabel(detail.offer)} · ${detail.offer.projectType} · ${formatOfferTime(detail.offer.createdAt)}`;
+  }
+
+  if (detail.kind === 'discussion') {
+    return `${detail.post.school} · ${detail.post.major} · ${detail.post.author} · ${detail.post.time}`;
+  }
+
+  if (detail.kind === 'decision') {
+    return `Offer 选择 · ${detail.thread.tags.join(' · ')}`;
+  }
+
+  return `${detail.update.school} · ${detail.update.major} · ${detail.update.time}`;
+}
+
+function getPinnedConversation(detail: PinnedDetail) {
+  if (detail.kind === 'offer') {
+    return [
+      { author: '同校同学', text: '建议补充学院流程、材料节点和导师沟通情况，后来者会更容易判断这条去向的参考价值。' },
+      { author: 'Seekoffer 提醒', text: '录取、候补和放弃信息都可能随学院流程变化，重要决策仍以院校正式通知为准。' }
+    ];
+  }
+
+  if (detail.kind === 'discussion') {
+    return [
+      { author: '匿名同学', text: '如果能补充本科背景、目标导师方向和当前材料进度，大家给建议会更具体。' },
+      { author: 'Seekoffer 提醒', text: '讨论导师或面试时请尽量描述流程和准备方法，不公开导师私人联系方式。' }
+    ];
+  }
+
+  if (detail.kind === 'decision') {
+    return [
+      { author: '同方向同学', text: '建议先把导师匹配、项目确定性、城市机会和读博意愿分别打分，再看哪个选项风险更低。' },
+      { author: 'Seekoffer 提醒', text: '多 Offer 选择里，确定性通常比单纯名气更重要，尤其要注意候补等待时间。' }
+    ];
+  }
+
+  return [
+    { author: '候补同学', text: '可以继续补充是否收到邮件、电话或导师组确认，帮助同一批候补同学判断进度。' },
+    { author: 'Seekoffer 提醒', text: '候补、补录和放弃信息适合作为观察信号，最终仍需等待学院或导师组正式回复。' }
+  ];
+}
+
 function OfferFeed({
   offers,
   loading,
@@ -624,7 +1038,8 @@ function OfferFeed({
   onTabChange,
   reportingId,
   onReport,
-  onDiscuss
+  onDiscuss,
+  onOpen
 }: {
   offers: PublicOffer[];
   loading: boolean;
@@ -633,6 +1048,7 @@ function OfferFeed({
   reportingId: string | null;
   onReport: (offer: PublicOffer) => void;
   onDiscuss: (school: string) => void;
+  onOpen: (offer: PublicOffer) => void;
 }) {
   return (
     <section className="mt-5">
@@ -654,7 +1070,10 @@ function OfferFeed({
       <div className="mt-5 grid gap-4">
         {loading ? <OfferListSkeleton /> : null}
 
-        {!loading && offers.map((offer) => <OfferCard key={offer.id} offer={offer} reportingId={reportingId} onReport={onReport} onDiscuss={onDiscuss} />)}
+        {!loading &&
+          offers.map((offer) => (
+            <OfferCard key={offer.id} offer={offer} reportingId={reportingId} onReport={onReport} onDiscuss={onDiscuss} onOpen={onOpen} />
+          ))}
 
         {!loading && !offers.length ? (
           <div className="rounded-[20px] border border-dashed border-slate-200 px-6 py-12 text-center">
@@ -681,13 +1100,15 @@ function DiscussionBoard({
   category,
   followedIds,
   onCategoryChange,
-  onFollow
+  onFollow,
+  onOpen
 }: {
   posts: DiscussionPost[];
   category: DiscussionCategory;
   followedIds: string[];
   onCategoryChange: (value: DiscussionCategory) => void;
   onFollow: (id: string) => void;
+  onOpen: (post: DiscussionPost) => void;
 }) {
   return (
     <section className="mt-5">
@@ -743,6 +1164,10 @@ function DiscussionBoard({
                 <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
                   <span>{post.replies} 回复</span>
                   <span>{post.follows + (followed ? 1 : 0)} 关注</span>
+                  <button type="button" onClick={() => onOpen(post)} className="inline-flex items-center gap-1 text-brand hover:text-brand-deep">
+                    打开讨论
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
             </article>
@@ -763,11 +1188,13 @@ function DiscussionBoard({
 function DecisionBoard({
   threads,
   votes,
-  onVote
+  onVote,
+  onOpen
 }: {
   threads: DecisionThread[];
   votes: Record<string, string>;
   onVote: (threadId: string, optionId: string) => void;
+  onOpen: (thread: DecisionThread) => void;
 }) {
   return (
     <section className="mt-5 grid gap-4">
@@ -834,6 +1261,17 @@ function DecisionBoard({
                 <span key={tag} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">{tag}</span>
               ))}
             </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => onOpen(thread)}
+                className="inline-flex items-center gap-2 rounded-xl border border-brand/15 px-4 py-2 text-xs font-semibold text-brand transition hover:border-brand/30 hover:bg-brand/5"
+              >
+                打开选择题
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
           </article>
         );
       })}
@@ -848,7 +1286,7 @@ function DecisionBoard({
   );
 }
 
-function WaitlistBoard({ updates }: { updates: WaitlistUpdate[] }) {
+function WaitlistBoard({ updates, onOpen }: { updates: WaitlistUpdate[]; onOpen: (update: WaitlistUpdate) => void }) {
   return (
     <section className="mt-5 grid gap-4">
       {updates.map((item) => (
@@ -865,6 +1303,16 @@ function WaitlistBoard({ updates }: { updates: WaitlistUpdate[] }) {
             <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">{item.time}</div>
           </div>
           <p className="mt-4 text-sm leading-7 text-slate-600">{item.detail}</p>
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={() => onOpen(item)}
+              className="inline-flex items-center gap-2 rounded-xl border border-brand/15 px-4 py-2 text-xs font-semibold text-brand transition hover:border-brand/30 hover:bg-brand/5"
+            >
+              打开动态
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
         </article>
       ))}
 
@@ -882,12 +1330,14 @@ function OfferCard({
   offer,
   reportingId,
   onReport,
-  onDiscuss
+  onDiscuss,
+  onOpen
 }: {
   offer: PublicOffer;
   reportingId: string | null;
   onReport: (offer: PublicOffer) => void;
   onDiscuss: (school: string) => void;
+  onOpen: (offer: PublicOffer) => void;
 }) {
   const authorLabel = getOfferAuthorLabel(offer);
 
@@ -945,6 +1395,14 @@ function OfferCard({
                 <ShieldCheck className="h-4 w-4 text-brand" />
                 审核后公开，支持纠错
               </span>
+              <button
+                type="button"
+                onClick={() => onOpen(offer)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-deep"
+              >
+                <Pin className="h-4 w-4" />
+                打开详情
+              </button>
               <button
                 type="button"
                 onClick={() => onDiscuss(offer.schoolName)}
