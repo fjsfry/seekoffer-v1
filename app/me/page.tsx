@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   ArrowUp,
   BookCheck,
   CalendarDays,
+  ChevronLeft,
   ChevronRight,
   ClipboardList,
   Clock3,
@@ -102,6 +103,7 @@ type ScheduleItem = {
   id: string;
   title: string;
   detail: string;
+  date?: string;
   dateLabel: string;
   type: Exclude<ScheduleTypeFilter, '全部'>;
   done: boolean;
@@ -132,6 +134,7 @@ const workbenchProgressFilters: WorkbenchProgressFilter[] = ['全部', '报名�
 const workbenchApplicationStatusFilters: WorkbenchApplicationStatusFilter[] = ['全部', '未申请', '已申请'];
 const workbenchResultFilters: WorkbenchResultFilter[] = ['全部', '未出结果', '未入营', '已入营', '已优营'];
 const scheduleTypeFilters: ScheduleTypeFilter[] = ['全部', '申请截止', '材料准备', '套磁', '笔试', '面试', '其他'];
+const manualScheduleTypes = scheduleTypeFilters.filter((item): item is Exclude<ScheduleTypeFilter, '全部'> => item !== '全部');
 const scheduleDoneFilters: ScheduleDoneFilter[] = ['全部', '未完成', '已完成'];
 const contactRangeFilters: ContactRangeFilter[] = ['全部', 'C9', '985', '211', '双一流', '普通高校', '科研院所', '其它'];
 const contactFeedbackFilters: ('全部' | ContactFeedbackStatus)[] = ['全部', '未联系', '已投递', '已回复', '已offer', '需跟进', '无回复', '不合适'];
@@ -173,7 +176,16 @@ function readCustomTodos() {
 
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed)
-      ? parsed.filter((item): item is WorkbenchCustomTodo => Boolean(item?.id) && Boolean(item?.text))
+      ? parsed
+          .filter((item): item is WorkbenchCustomTodo => Boolean(item?.id) && Boolean(item?.text))
+          .map((item) => ({
+            id: String(item.id),
+            text: String(item.text),
+            ...(item.date ? { date: String(item.date) } : {}),
+            ...(item.type ? { type: String(item.type) } : {}),
+            ...(item.note ? { note: String(item.note) } : {}),
+            ...(item.createdAt ? { createdAt: String(item.createdAt) } : {})
+          }))
       : [];
   } catch {
     return [] as WorkbenchCustomTodo[];
@@ -301,6 +313,55 @@ function getAnnualCountdownDays(month: number, day: number) {
   return Math.max(0, Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
 }
 
+function getTodayDateString() {
+  return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function getMonthKey(dateString = getTodayDateString()) {
+  return dateString.slice(0, 7);
+}
+
+function shiftMonth(monthKey: string, offset: number) {
+  const [year, month] = monthKey.split('-').map(Number);
+  const next = new Date(year, month - 1 + offset, 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatMonthTitle(monthKey: string) {
+  const [year, month] = monthKey.split('-').map(Number);
+  return `${year}年${month}月`;
+}
+
+function formatManualScheduleDate(date?: string) {
+  return date || '待安排';
+}
+
+function getManualScheduleType(value?: string): Exclude<ScheduleTypeFilter, '全部'> {
+  return manualScheduleTypes.includes(value as Exclude<ScheduleTypeFilter, '全部'>)
+    ? (value as Exclude<ScheduleTypeFilter, '全部'>)
+    : '其他';
+}
+
+function getCalendarCells(monthKey: string) {
+  const [year, month] = monthKey.split('-').map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const leadingEmptyDays = (firstDay + 6) % 7;
+  const totalCells = Math.ceil((leadingEmptyDays + daysInMonth) / 7) * 7;
+
+  return Array.from({ length: totalCells }, (_, index) => {
+    const day = index - leadingEmptyDays + 1;
+    if (day < 1 || day > daysInMonth) {
+      return null;
+    }
+
+    return {
+      day,
+      date: `${monthKey}-${String(day).padStart(2, '0')}`
+    };
+  });
+}
+
 function getMaterialCompletedCount(progress: number) {
   const total = materialChecklistDefinitions.length;
   return Math.min(total, Math.max(0, Math.round((progress / 100) * total)));
@@ -411,6 +472,7 @@ export default function MePage() {
   const [scheduleTypeFilter, setScheduleTypeFilter] = useState<ScheduleTypeFilter>('全部');
   const [scheduleDoneFilter, setScheduleDoneFilter] = useState<ScheduleDoneFilter>('全部');
   const [scheduleKeyword, setScheduleKeyword] = useState('');
+  const [calendarMonth, setCalendarMonth] = useState(() => getMonthKey());
   const [contacts, setContacts] = useState<MentorContact[]>(() => readStoredContacts());
   const [contactRangeFilter, setContactRangeFilter] = useState<ContactRangeFilter>('全部');
   const [contactFeedbackFilter, setContactFeedbackFilter] = useState<'全部' | ContactFeedbackStatus>('全部');
@@ -625,7 +687,7 @@ export default function MePage() {
   const todoItems = useMemo(
     () => [
       ...actionTasks.map((task) => ({ id: task.id, text: task.title, detail: task.detail, href: task.href, source: 'system' as const })),
-      ...customTodos.map((task) => ({ id: task.id, text: task.text, source: 'custom' as const }))
+      ...customTodos.map((task) => ({ id: task.id, text: task.text, detail: task.note, source: 'custom' as const }))
     ],
     [actionTasks, customTodos]
   );
@@ -673,70 +735,22 @@ export default function MePage() {
     .slice(0, 3);
   const todayActionItems = visibleTodoItems.slice(0, 3);
   const scheduleItems = useMemo<ScheduleItem[]>(() => {
-    const generated: ScheduleItem[] = [];
-
-    sortedRows.forEach(({ item, project }) => {
-      const href = project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(project.id);
-      generated.push({
-        id: `deadline-${item.userProjectId}`,
-        title: `${getDisplaySchoolName(project.schoolName)} 截止`,
-        detail: normalizeNoticeTitle(project.projectName, 56),
-        dateLabel: formatNoticeDateOnly(project.deadlineDate),
-        type: '申请截止',
-        done: ['已提交', '已通过', '未通过', '已放弃'].includes(item.myStatus),
-        href
-      });
-
-      if (item.materialsProgress < 100) {
-        generated.push({
-          id: `material-${item.userProjectId}`,
-          title: `补齐 ${getDisplaySchoolName(project.schoolName)} 材料`,
-          detail: `材料完成度 ${item.materialsProgress}%，建议优先检查简历、个人陈述和证明材料。`,
-          dateLabel: formatNoticeDateOnly(project.deadlineDate),
-          type: '材料准备',
-          done: false,
-          href
-        });
-      }
-
-      if (item.interviewTime) {
-        generated.push({
-          id: `interview-${item.userProjectId}`,
-          title: `${getDisplaySchoolName(project.schoolName)} 考核安排`,
-          detail: item.interviewTime,
-          dateLabel: item.interviewTime,
-          type: '面试',
-          done: item.resultStatus !== '未出结果',
-          href
-        });
-      }
-
-      if (item.contactSupervisorDone) {
-        generated.push({
-          id: `contact-${item.userProjectId}`,
-          title: `${getDisplaySchoolName(project.schoolName)} 导师联系`,
-          detail: getDisplayNoticeDepartment(project),
-          dateLabel: formatNoticeDateOnly(project.deadlineDate),
-          type: '套磁',
-          done: true,
-          href
-        });
-      }
-    });
-
-    customTodos.forEach((task) => {
-      generated.push({
+    return customTodos
+      .map((task) => ({
         id: task.id,
         title: task.text,
-        detail: '手动添加的工作台事项',
-        dateLabel: '待安排',
-        type: '其他',
+        detail: task.note || '手动添加的工作台事项',
+        date: task.date,
+        dateLabel: formatManualScheduleDate(task.date),
+        type: getManualScheduleType(task.type),
         done: completedTodoIds.includes(task.id)
+      }))
+      .sort((left, right) => {
+        const dateCompare = (left.date || '9999-12-31').localeCompare(right.date || '9999-12-31');
+        if (dateCompare !== 0) return dateCompare;
+        return left.title.localeCompare(right.title, 'zh-CN');
       });
-    });
-
-    return generated;
-  }, [completedTodoIds, customTodos, sortedRows]);
+  }, [completedTodoIds, customTodos]);
 
   const filteredScheduleItems = useMemo(() => {
     const keyword = scheduleKeyword.trim().toLowerCase();
@@ -806,8 +820,8 @@ export default function MePage() {
     setCompletedTodoIds((current) => current.filter((id) => !customTodoIds.has(id)));
   }
 
-  function handleCreateCustomTodo() {
-    const nextText = todoDraft.trim();
+  function createCustomTodo(payload: Pick<WorkbenchCustomTodo, 'text'> & Partial<Omit<WorkbenchCustomTodo, 'id' | 'text'>>) {
+    const nextText = payload.text.trim();
     if (!nextText) {
       return;
     }
@@ -816,10 +830,24 @@ export default function MePage() {
       ...current,
       {
         id: `custom-${Date.now()}`,
-        text: nextText
+        text: nextText,
+        ...(payload.date ? { date: payload.date } : {}),
+        ...(payload.type ? { type: payload.type } : {}),
+        ...(payload.note ? { note: payload.note } : {}),
+        createdAt: new Date().toISOString()
       }
     ]);
+  }
+
+  function handleCreateQuickTodo() {
+    createCustomTodo({
+      text: todoDraft
+    });
     setTodoDraft('');
+  }
+
+  function handleCreateScheduleTodo(payload: Pick<WorkbenchCustomTodo, 'text'> & Partial<Omit<WorkbenchCustomTodo, 'id' | 'text'>>) {
+    createCustomTodo(payload);
   }
 
   function handleAddContact() {
@@ -1027,7 +1055,7 @@ export default function MePage() {
                 {activeSection === 'contacts' ? '联系摘要' : activeSection === 'schedule' ? '日程摘要' : '申请摘要'}
               </div>
               <span className="rounded-full bg-brand/8 px-2.5 py-1 text-xs font-semibold text-brand">
-                {activeSection === 'contacts' ? '导师' : activeSection === 'schedule' ? '待办' : '进度'}
+                {activeSection === 'contacts' ? '导师' : activeSection === 'schedule' ? '日程' : '进度'}
               </span>
             </div>
             <div className="mt-4 text-3xl font-semibold text-ink">
@@ -1246,9 +1274,9 @@ export default function MePage() {
             onTypeFilterChange={setScheduleTypeFilter}
             onDoneFilterChange={setScheduleDoneFilter}
             onKeywordChange={setScheduleKeyword}
-            todoDraft={todoDraft}
-            onTodoDraftChange={setTodoDraft}
-            onCreateTodo={handleCreateCustomTodo}
+            calendarMonth={calendarMonth}
+            onCalendarMonthChange={setCalendarMonth}
+            onCreateTodo={handleCreateScheduleTodo}
             onCompleteTodo={handleCompleteTodo}
             onClearCompleted={handleClearCompleted}
           />
@@ -1326,14 +1354,14 @@ export default function MePage() {
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();
-                  handleCreateCustomTodo();
+                  handleCreateQuickTodo();
                 }
               }}
               placeholder="添加碎片备注，回车保存..."
               className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400"
             />
             <button
-              onClick={handleCreateCustomTodo}
+              onClick={handleCreateQuickTodo}
               className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-brand shadow-sm"
               aria-label="添加任务"
             >
@@ -1564,8 +1592,8 @@ function ScheduleWorkspace({
   onTypeFilterChange,
   onDoneFilterChange,
   onKeywordChange,
-  todoDraft,
-  onTodoDraftChange,
+  calendarMonth,
+  onCalendarMonthChange,
   onCreateTodo,
   onCompleteTodo,
   onClearCompleted
@@ -1578,12 +1606,41 @@ function ScheduleWorkspace({
   onTypeFilterChange: (value: ScheduleTypeFilter) => void;
   onDoneFilterChange: (value: ScheduleDoneFilter) => void;
   onKeywordChange: (value: string) => void;
-  todoDraft: string;
-  onTodoDraftChange: (value: string) => void;
-  onCreateTodo: () => void;
+  calendarMonth: string;
+  onCalendarMonthChange: (value: string) => void;
+  onCreateTodo: (payload: Pick<WorkbenchCustomTodo, 'text'> & Partial<Omit<WorkbenchCustomTodo, 'id' | 'text'>>) => void;
   onCompleteTodo: (id: string) => void;
   onClearCompleted: () => void;
 }) {
+  const calendarCells = getCalendarCells(calendarMonth);
+  const itemsByDate = items.reduce<Record<string, ScheduleItem[]>>((grouped, item) => {
+    if (!item.date) {
+      return grouped;
+    }
+
+    grouped[item.date] = [...(grouped[item.date] || []), item];
+    return grouped;
+  }, {});
+  const today = getTodayDateString();
+
+  function handleSubmitSchedule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const text = String(formData.get('title') || '').trim();
+    if (!text) {
+      return;
+    }
+
+    onCreateTodo({
+      text,
+      date: String(formData.get('date') || '').trim(),
+      type: getManualScheduleType(String(formData.get('type') || '')),
+      note: String(formData.get('note') || '').trim()
+    });
+    form.reset();
+  }
+
   return (
     <section id="schedule-board" className="grid gap-4">
       <section className="product-card rounded-[30px] p-5 lg:p-6">
@@ -1591,12 +1648,87 @@ function ScheduleWorkspace({
           <div>
             <h2 className="text-2xl font-semibold text-ink">我的日程</h2>
             <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-500">
-              把申请截止、材料准备、导师联系和面试安排收在同一个日程里，优先处理真正会影响申请节奏的事项。
+              日程由你自己维护。把申请截止、材料准备、导师联系、笔试面试等关键安排放进月历里。
             </p>
           </div>
           <button onClick={onClearCompleted} className="inline-flex items-center justify-center rounded-2xl border border-brand/20 bg-white px-4 py-2.5 text-sm font-semibold text-brand shadow-sm">
             清理已完成
           </button>
+        </div>
+
+        <div className="mt-5 rounded-[28px] bg-slate-50/80 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="inline-flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onCalendarMonthChange(shiftMonth(calendarMonth, -1))}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition hover:text-brand"
+                aria-label="上个月"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="min-w-[8rem] rounded-full bg-white px-4 py-2 text-center text-sm font-semibold text-brand shadow-sm">
+                {formatMonthTitle(calendarMonth)}
+              </div>
+              <button
+                type="button"
+                onClick={() => onCalendarMonthChange(shiftMonth(calendarMonth, 1))}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition hover:text-brand"
+                aria-label="下个月"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => onCalendarMonthChange(getMonthKey())}
+              className="w-fit rounded-full bg-white px-4 py-2 text-xs font-semibold text-slate-500 shadow-sm transition hover:text-brand"
+            >
+              回到本月
+            </button>
+          </div>
+
+          <div className="mt-5 grid grid-cols-7 gap-2 text-center text-xs font-semibold text-slate-400">
+            {['一', '二', '三', '四', '五', '六', '日'].map((day) => (
+              <div key={day}>{day}</div>
+            ))}
+          </div>
+
+          <div className="mt-2 grid grid-cols-7 gap-2">
+            {calendarCells.map((cell, index) => {
+              const dayItems = cell ? itemsByDate[cell.date] || [] : [];
+              const isToday = cell?.date === today;
+
+              return (
+                <div
+                  key={cell?.date || `blank-${index}`}
+                  className={`min-h-[86px] rounded-2xl border p-2 transition ${
+                    cell
+                      ? isToday
+                        ? 'border-brand/25 bg-white shadow-sm'
+                        : 'border-white bg-white/75'
+                      : 'border-transparent bg-transparent'
+                  }`}
+                >
+                  {cell ? (
+                    <>
+                      <div className={`text-sm font-semibold ${isToday ? 'text-brand' : 'text-slate-600'}`}>{cell.day}</div>
+                      <div className="mt-2 grid gap-1">
+                        {dayItems.slice(0, 2).map((item) => (
+                          <div key={item.id} className="truncate rounded-full bg-brand/8 px-2 py-1 text-[11px] font-semibold text-brand">
+                            {item.title}
+                          </div>
+                        ))}
+                        {dayItems.length > 2 ? (
+                          <div className="px-2 text-[11px] font-semibold text-slate-400">+{dayItems.length - 2}</div>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <div className="mt-5 grid gap-3 text-sm">
@@ -1637,34 +1769,55 @@ function ScheduleWorkspace({
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="mt-5 grid gap-3">
           <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <Search className="h-4 w-4 shrink-0 text-slate-400" />
             <input
               value={keyword}
               onChange={(event) => onKeywordChange(event.target.value)}
-              placeholder="搜索学校、项目或日程备注"
+              placeholder="搜索日程标题或备注"
               className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
             />
           </label>
-          <div className="flex items-center gap-2 rounded-2xl border border-black/5 bg-slate-50 px-3 py-2">
+        </div>
+
+        <form onSubmit={handleSubmitSchedule} className="mt-3 grid gap-3">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,0.85fr)_180px_150px]">
             <input
-              value={todoDraft}
-              onChange={(event) => onTodoDraftChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  onCreateTodo();
-                }
-              }}
-              placeholder="新增一个自定义日程"
-              className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+              name="title"
+              placeholder="日程标题，例如 北大材料提交"
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand/30"
             />
-            <button onClick={onCreateTodo} className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-brand shadow-sm" aria-label="新增日程">
+            <input
+              name="date"
+              type="date"
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm outline-none transition focus:border-brand/30"
+            />
+            <select
+              name="type"
+              defaultValue="其他"
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 shadow-sm outline-none transition focus:border-brand/30"
+            >
+              {manualScheduleTypes.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+            <input
+              name="note"
+              placeholder="备注，例如 个人陈述、成绩单、推荐信"
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand/30"
+            />
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"
+            >
               <PlusCircle className="h-4 w-4" />
+              新增日程
             </button>
           </div>
-        </div>
+        </form>
       </section>
 
       <section className="surface-card rounded-[30px] p-5">
@@ -1726,7 +1879,7 @@ function ScheduleWorkspace({
             <div className="rounded-[28px] border border-dashed border-slate-200 px-5 py-14 text-center">
               <div className="text-lg font-semibold text-ink">当前条件下暂无日程</div>
               <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
-                调整筛选条件，或先在申请清单中加入目标项目，系统会自动同步截止时间和材料事项。
+                调整筛选条件，或在上方手动新增一条日程，日期、类型和备注都由你自己填写。
               </p>
             </div>
           )}

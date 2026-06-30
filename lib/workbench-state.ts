@@ -3,6 +3,10 @@ import { getSupabaseBrowserClient } from './supabase-browser';
 export type WorkbenchCustomTodo = {
   id: string;
   text: string;
+  date?: string;
+  type?: string;
+  note?: string;
+  createdAt?: string;
 };
 
 type WorkbenchState = {
@@ -36,7 +40,19 @@ function normalizeCustomTodos(value: unknown) {
       return;
     }
 
-    todoMap.set(id, { id, text });
+    const date = String((item as { date?: unknown }).date || '').trim();
+    const type = String((item as { type?: unknown }).type || '').trim();
+    const note = String((item as { note?: unknown }).note || '').trim();
+    const createdAt = String((item as { createdAt?: unknown }).createdAt || '').trim();
+
+    todoMap.set(id, {
+      id,
+      text,
+      ...(date ? { date } : {}),
+      ...(type ? { type } : {}),
+      ...(note ? { note } : {}),
+      ...(createdAt ? { createdAt } : {})
+    });
   });
 
   return [...todoMap.values()];
