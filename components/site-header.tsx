@@ -12,7 +12,7 @@ const navItems = [
   { href: '/competitions', label: '竞赛库', icon: Trophy },
   { href: '/colleges', label: '院校库', icon: Building2 },
   { href: '/resources', label: '资源库', icon: BookOpen },
-  { href: '/offers', label: 'Offer 池', icon: Heart }
+  { href: '/offers', label: 'Offer 圈', icon: Heart }
 ];
 
 export function SiteHeader() {

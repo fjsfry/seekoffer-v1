@@ -56,7 +56,7 @@ export const footerColumns = [
       { label: '通知库', href: '/notices' },
       { label: '院校库', href: '/colleges' },
       { label: '资源库', href: '/resources' },
-      { label: 'Offer 池', href: '/offers' },
+      { label: 'Offer 圈', href: '/offers' },
       { label: '竞赛库', href: '/competitions' },
       { label: '工作台', href: '/me' }
     ]

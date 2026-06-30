@@ -37,7 +37,7 @@ export default function PublishPage() {
     isAnonymous: true
   });
   const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState('提交后会进入后台审核，通过后才会展示到 Offer 池。');
+  const [message, setMessage] = useState('提交后会进入后台审核，通过后才会展示到 Offer 圈。');
   const [submitted, setSubmitted] = useState(false);
 
   function updateForm<K extends keyof OfferFormState>(key: K, value: OfferFormState[K]) {
@@ -63,7 +63,7 @@ export default function PublishPage() {
         authorName: form.authorName || defaultAuthorName
       });
       setSubmitted(true);
-      setMessage('提交成功，已进入后台待审核队列。审核通过后会公开展示在 Offer 池。');
+      setMessage('提交成功，已进入后台待审核队列。审核通过后会公开展示在 Offer 圈。');
       setForm((current) => ({
         ...current,
         schoolName: '',
@@ -260,7 +260,7 @@ export default function PublishPage() {
               href="/offers"
               className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-brand/25 hover:text-brand"
             >
-              返回 Offer 池
+              返回 Offer 圈
             </Link>
           </div>
         </form>
@@ -287,7 +287,7 @@ export default function PublishPage() {
             <h2 className="text-lg font-semibold text-ink">审核流转</h2>
             <div className="mt-5 grid gap-3 text-sm leading-7 text-slate-600">
               <p>1. 提交后写入 Supabase 的 `offer_posts` 表，状态为 pending。</p>
-              <p>2. 管理员在后台 Offer 池管理中审核、隐藏或删除。</p>
+              <p>2. 管理员在后台 Offer 审核工作台中审核、隐藏或删除。</p>
               <p>3. 只有 approved 且未隐藏、未删除的内容会出现在前台。</p>
             </div>
             <Link href="/community" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand">

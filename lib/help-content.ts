@@ -19,7 +19,7 @@ export const faqGroups = [
       {
         question: '为什么有些功能看起来还不能直接用？',
         answer:
-          'Seekoffer 当前处于公开内测阶段。通知库、院校库、资源库、竞赛库和基础工作台已可用；Offer 池仍会通过审核和状态标注避免误导。'
+          'Seekoffer 当前处于公开内测阶段。通知库、院校库、资源库、竞赛库和基础工作台已可用；Offer 圈仍会通过审核和状态标注避免误导。'
       }
     ]
   },
@@ -69,12 +69,12 @@ export const faqGroups = [
   {
     id: 'beta-feedback',
     title: '内测功能与反馈',
-    description: '关于 Offer 池、审核机制和反馈渠道的说明。',
+    description: '关于 Offer 圈、审核机制和反馈渠道的说明。',
     items: [
       {
-        question: 'Offer 池里的内容都是真实的吗？',
+        question: 'Offer 圈里的内容都是真实的吗？',
         answer:
-          'Offer 池只公开展示后台审核通过的用户提交内容，并支持举报纠错。它能帮助你观察动态变化，但仍不能替代院校官网、邮件或电话确认。'
+          'Offer 圈只公开展示后台审核通过的用户提交内容，并支持举报纠错。它能帮助你观察动态变化和申请讨论，但仍不能替代院校官网、邮件或电话确认。'
       },
       {
         question: '人工复核会给出录取保证吗？',

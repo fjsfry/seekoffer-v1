@@ -7,7 +7,7 @@ export default function CommunityPage() {
     <SiteShell>
       <PageSectionTitle
         eyebrow="Community Rules"
-        title="Offer 池社区规范"
+        title="Offer 圈社区规范"
         subtitle="Offer 流动信息会影响他人判断，所以真实、克制和可纠错比热闹更重要。"
       />
 
