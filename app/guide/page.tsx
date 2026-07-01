@@ -225,7 +225,7 @@ export default function GuidePage() {
           <PageSectionTitle
             eyebrow="页面说明"
             title="每个页面应该怎么用"
-            subtitle="如果你不确定一个入口的作用，可以先看这里。已上线、登录可用和内测功能会分开说明。"
+            subtitle="如果你不确定一个入口的作用，可以先看这里。已上线、登录可用和规划中的功能会分开说明。"
           />
           <div className="grid gap-4 md:grid-cols-2">
             {pageGuides.map((item) => {
@@ -295,7 +295,7 @@ export default function GuidePage() {
         <PageSectionTitle
           eyebrow="功能状态"
           title="功能状态说明"
-          subtitle="哪些已经可以用，哪些仍在内测，这里直接说明，避免你误以为功能坏了。"
+          subtitle="哪些已经可以用，哪些需要登录或继续完善，这里直接说明，避免你误以为功能坏了。"
         />
         <div className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white">
           <div className="grid grid-cols-[1fr_0.8fr_2fr] gap-4 border-b border-slate-100 bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-500">

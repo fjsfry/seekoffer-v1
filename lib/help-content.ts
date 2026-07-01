@@ -19,7 +19,7 @@ export const faqGroups = [
       {
         question: '为什么有些功能看起来还不能直接用？',
         answer:
-          'Seekoffer 当前处于公开内测阶段。通知库、院校库、资源库、竞赛库和基础工作台已可用；Offer 圈仍会通过审核和状态标注避免误导。'
+          'Seekoffer 会持续更新功能。通知库、院校库、资源库、竞赛库和基础工作台已可用；Offer 圈会通过审核和状态标注避免误导。'
       }
     ]
   },
@@ -68,7 +68,7 @@ export const faqGroups = [
   },
   {
     id: 'beta-feedback',
-    title: '内测功能与反馈',
+    title: '功能说明与反馈',
     description: '关于 Offer 圈、审核机制和反馈渠道的说明。',
     items: [
       {

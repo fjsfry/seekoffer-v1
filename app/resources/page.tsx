@@ -2,7 +2,6 @@ import {
   ArrowUpRight,
   BookOpenText,
   Calculator,
-  CheckCircle2,
   ClipboardList,
   FileText,
   Landmark,
@@ -63,9 +62,7 @@ export default function ResourcesPage() {
       <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">资源库</h1>
-          <p className="mt-4 text-base leading-8 text-slate-600">
-            常用学术工具、官方入口和申请服务，一页直达，减少重复搜索，把时间留给真正的申请准备。
-          </p>
+          <p className="mt-4 text-base leading-8 text-slate-600">申请材料、学术工具和官方入口，一页直达。</p>
         </div>
 
         <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
@@ -94,34 +91,23 @@ export default function ResourcesPage() {
       </section>
 
       <section className="surface-card rounded-[34px] p-6 lg:p-8">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex items-start gap-3">
-            <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
-              <ClipboardList className="h-5 w-5" />
-            </span>
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-ink md:text-3xl">申请资料中心</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-500">
-                资源库不只做网址导航，也会逐步沉淀模板、清单和工具，让每次准备材料都少走一步弯路。
-              </p>
-            </div>
-          </div>
-          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-brand-cream px-4 py-2 text-xs font-semibold text-brand shadow-sm">
-            <CheckCircle2 className="h-4 w-4" />
-            内测中，持续补齐
+        <div className="flex items-start gap-3">
+          <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
+            <ClipboardList className="h-5 w-5" />
           </span>
+          <h2 className="text-2xl font-semibold tracking-tight text-ink md:text-3xl">申请资料中心</h2>
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {applicationKits.map((item, index) => {
             const Icon = item.icon;
             const cardClassName =
-              'group rounded-[26px] border border-slate-100 bg-white/95 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15';
+              'group rounded-[24px] border border-slate-100 bg-white/95 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15';
             const cardContent = (
-              <div className="flex h-full min-h-[19.5rem] flex-col">
+              <div className="flex h-full min-h-[15rem] flex-col">
                 <div className="flex items-start justify-between gap-4">
                   <div
-                    className={`inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-[22px] ${
+                    className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] ${
                       index === 0
                         ? 'bg-emerald-50 text-brand'
                         : index === 1
@@ -129,17 +115,16 @@ export default function ResourcesPage() {
                           : index === 2
                             ? 'bg-cyan-50 text-cyan-500'
                             : 'bg-teal-50 text-brand'
-                    }`}
+                      }`}
                   >
-                    <Icon className="h-8 w-8 transition group-hover:scale-105" />
+                    <Icon className="h-7 w-7 transition group-hover:scale-105" />
                   </div>
                   <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-400">
                     {index < 3 ? '模板' : '工具'}
                   </span>
                 </div>
                 <h3 className="mt-5 text-lg font-semibold text-ink">{item.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-slate-500">{item.description}</p>
-                <div className="mt-5 flex min-h-[4.4rem] flex-wrap content-start gap-2">
+                <div className="mt-5 flex min-h-[3rem] flex-wrap content-start gap-2">
                   {item.items.map((entry) => (
                     <span key={entry} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500 transition group-hover:bg-brand/8 group-hover:text-brand">
                       {entry}
@@ -192,7 +177,6 @@ export default function ResourcesPage() {
                 </span>
                 <div>
                   <h2 className="text-2xl font-semibold tracking-tight text-ink md:text-3xl">{section.title}</h2>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{section.description}</p>
                 </div>
               </div>
 
@@ -216,7 +200,6 @@ export default function ResourcesPage() {
                       </span>
                       <div className="min-w-0">
                         <div className="truncate text-base font-semibold text-ink">{item.title}</div>
-                        <p className="mt-1 line-clamp-1 text-sm text-slate-500">{item.description}</p>
                         <div className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-brand">
                           打开入口
                           <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />

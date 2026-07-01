@@ -179,7 +179,7 @@ export const officialResourceSections: ResourceSection[] = [
 ];
 
 export const offerMetrics = [
-  { label: '内测演示动态', value: '4', hint: '用于展示信息结构，不代表真实补录' },
+  { label: '公开动态', value: '4', hint: '用于展示信息结构，不代表真实补录' },
   { label: '发布机制', value: '审核中', hint: '正式发布前会接入举报和删除入口' },
   { label: '关注方向', value: '计算机 / 电院 / 电子信息', hint: '仅作为演示标签，真实数据以审核后为准' }
 ];
@@ -192,7 +192,7 @@ export const offerFeedItems: OfferFeedItem[] = [
     author: '小鹿同学',
     avatar: '鹿',
     verified: true,
-    time: '内测结构样例',
+    time: '结构样例',
     type: '录取',
     major: '计算机科学',
     field: '人工智能',
@@ -210,7 +210,7 @@ export const offerFeedItems: OfferFeedItem[] = [
     author: 'AI 冲刺党',
     avatar: 'A',
     verified: true,
-    time: '内测结构样例',
+    time: '结构样例',
     type: '放弃',
     major: '电子信息',
     field: '自动化',
@@ -228,7 +228,7 @@ export const offerFeedItems: OfferFeedItem[] = [
     author: '保研打工人',
     avatar: '研',
     verified: false,
-    time: '内测结构样例',
+    time: '结构样例',
     type: '候补',
     major: '网络空间安全',
     field: '系统安全',
@@ -246,7 +246,7 @@ export const offerFeedItems: OfferFeedItem[] = [
     author: '候补观察员',
     avatar: '补',
     verified: true,
-    time: '内测结构样例',
+    time: '结构样例',
     type: '补录传闻',
     major: '计算机科学',
     field: '机器学习',

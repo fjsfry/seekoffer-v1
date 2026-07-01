@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { SiteShell } from '@/components/site-shell';
 import {
-  competitionDeadlineOptions,
   competitionItems,
   competitionLevelOptions,
   getCompetitionCategories,
@@ -25,35 +24,24 @@ import {
 } from '@/lib/competitions';
 
 type LevelFilter = (typeof competitionLevelOptions)[number];
-type DeadlineFilter = (typeof competitionDeadlineOptions)[number];
 
 type CompetitionFilters = {
   level: LevelFilter;
   category: string;
-  deadline: DeadlineFilter;
   keyword: string;
 };
 
 const CATEGORY_PREVIEW_LIMIT = 18;
 
-const deadlineLabels: Record<DeadlineFilter, string> = {
-  全部: '全部',
-  有截止时间: '有截止',
-  '30天内': '30天内',
-  已过期: '已过期',
-  长期准备: '长期准备'
-};
-
 export default function CompetitionsPage() {
   const [level, setLevel] = useState<LevelFilter>('全部');
   const [category, setCategory] = useState('全部');
-  const [deadline, setDeadline] = useState<DeadlineFilter>('全部');
   const [keyword, setKeyword] = useState('');
   const [showAllCategories, setShowAllCategories] = useState(false);
   const categories = useMemo(() => getCompetitionCategories(), []);
   const filters = useMemo<CompetitionFilters>(
-    () => ({ level, category, deadline, keyword }),
-    [category, deadline, keyword, level]
+    () => ({ level, category, keyword }),
+    [category, keyword, level]
   );
   const pageStats = useMemo(
     () => [
@@ -69,10 +57,6 @@ export default function CompetitionsPage() {
   );
   const levelCounts = useMemo(
     () => buildFilterCounts(competitionLevelOptions, filters, 'level'),
-    [filters]
-  );
-  const deadlineCounts = useMemo(
-    () => buildFilterCounts(competitionDeadlineOptions, filters, 'deadline'),
     [filters]
   );
   const categoryCounts = useMemo(
@@ -105,10 +89,9 @@ export default function CompetitionsPage() {
       [
         level !== '全部' ? `级别：${level}` : '',
         category !== '全部' ? `类别：${category}` : '',
-        deadline !== '全部' ? `节点：${deadlineLabels[deadline]}` : '',
         keyword.trim() ? `关键词：${keyword.trim()}` : ''
       ].filter(Boolean),
-    [category, deadline, keyword, level]
+    [category, keyword, level]
   );
   const hasActiveFilters = activeFilterLabels.length > 0;
   const hiddenCategoryCount = Math.max(orderedCategories.length - CATEGORY_PREVIEW_LIMIT, 0);
@@ -116,7 +99,6 @@ export default function CompetitionsPage() {
   const resetFilters = () => {
     setLevel('全部');
     setCategory('全部');
-    setDeadline('全部');
     setKeyword('');
     setShowAllCategories(false);
   };
@@ -129,7 +111,7 @@ export default function CompetitionsPage() {
             全国大学生赛事一览
           </h1>
           <p className="mt-4 text-base leading-8 text-slate-600">
-            覆盖 CAHE A 类、B 类和热门高人气赛事，按级别、类别和报名节点快速筛选。
+            覆盖 CAHE A 类、B 类和热门高人气赛事，按级别、类别和关键词快速筛选。
           </p>
         </div>
 
@@ -162,7 +144,7 @@ export default function CompetitionsPage() {
             </span>
             <div>
               <h2 className="text-xl font-semibold text-ink">筛选竞赛</h2>
-              <p className="mt-1 text-sm text-slate-500">支持赛事级别、专业类别、报名节点和关键词搜索。</p>
+              <p className="mt-1 text-sm text-slate-500">支持赛事级别、专业类别和关键词搜索。</p>
             </div>
           </div>
           <button
@@ -195,25 +177,13 @@ export default function CompetitionsPage() {
 
         <div className="mt-5 rounded-[24px] border border-slate-100 bg-slate-50/60 p-4">
           <div className="grid gap-4">
-          <FilterChips
-            label="级别"
-            options={competitionLevelOptions}
-            value={level}
+            <FilterChips
+              label="级别"
+              options={competitionLevelOptions}
+              value={level}
               counts={levelCounts}
               onChange={(value) =>
                 setLevel((current) => (current === value && value !== '全部' ? '全部' : (value as LevelFilter)))
-              }
-          />
-            <FilterChips
-              label="报名节点"
-              options={competitionDeadlineOptions}
-              value={deadline}
-              counts={deadlineCounts}
-              getLabel={(option) => deadlineLabels[option as DeadlineFilter] ?? option}
-              onChange={(value) =>
-                setDeadline((current) =>
-                  current === value && value !== '全部' ? '全部' : (value as DeadlineFilter)
-                )
               }
             />
             <FilterChips
@@ -268,7 +238,7 @@ export default function CompetitionsPage() {
           <div className="surface-card rounded-[28px] px-6 py-12 text-center md:col-span-2 xl:col-span-3">
             <Trophy className="mx-auto h-9 w-9 text-slate-300" />
             <h3 className="mt-4 text-lg font-semibold text-ink">没有匹配的竞赛</h3>
-            <p className="mt-2 text-sm leading-7 text-slate-500">可以清空关键词，或放宽级别、类别和截止时间筛选。</p>
+            <p className="mt-2 text-sm leading-7 text-slate-500">可以清空关键词，或放宽级别、类别筛选。</p>
           </div>
         )}
       </section>
@@ -356,9 +326,8 @@ function matchesCompetitionFilters(item: CompetitionItem, filters: CompetitionFi
       .includes(normalizedKeyword);
   const matchesLevel = filters.level === '全部' || item.level === filters.level;
   const matchesCategory = filters.category === '全部' || getItemCategories(item).includes(filters.category);
-  const matchesDeadline = matchesDeadlineFilter(item, filters.deadline);
 
-  return matchesKeyword && matchesLevel && matchesCategory && matchesDeadline;
+  return matchesKeyword && matchesLevel && matchesCategory;
 }
 
 function getItemCategories(item: CompetitionItem) {
@@ -418,15 +387,6 @@ function CompetitionCard({ item }: { item: CompetitionItem }) {
       </a>
     </article>
   );
-}
-
-function matchesDeadlineFilter(item: CompetitionItem, filter: DeadlineFilter) {
-  const days = getDaysUntil(item.signupEnd);
-  if (filter === '全部') return true;
-  if (filter === '有截止时间') return Boolean(item.signupEnd);
-  if (filter === '长期准备') return !item.signupEnd && !item.eventStart && !item.eventEnd;
-  if (filter === '已过期') return days !== null && days < 0;
-  return days !== null && days >= 0 && days <= 30;
 }
 
 function getDateMeta(item: CompetitionItem) {

@@ -8,7 +8,7 @@ import { faqGroups } from '@/lib/help-content';
 
 export const metadata: Metadata = {
   title: '常见问题 - Seekoffer',
-  description: 'Seekoffer 常见问题：新手使用、通知数据、账号工作台、内测功能与反馈渠道说明。'
+  description: 'Seekoffer 常见问题：新手使用、通知数据、账号工作台、功能说明与反馈渠道说明。'
 };
 
 export default function FaqPage() {
@@ -22,7 +22,7 @@ export default function FaqPage() {
               使用中遇到疑问，先看这里
             </h1>
             <p className="mt-5 max-w-3xl text-base leading-9 text-slate-600">
-              这里把新用户最容易困惑的问题集中说明，包括通知来源、报名入口、工作台保存、内测功能和反馈方式。
+              这里把新用户最容易困惑的问题集中说明，包括通知来源、报名入口、工作台保存、功能说明和反馈方式。
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
