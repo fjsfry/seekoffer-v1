@@ -24,7 +24,7 @@ export default function AiPage() {
       highlights={[
         '后续更适合做院校分层建议、材料建议和提醒策略。',
         '当前先用一页清楚说明未来规划，不做空心能力展示。',
-        '保留收集需求和内测报名入口，为下一阶段做准备。'
+        '保留需求登记入口，为下一阶段做准备。'
       ]}
     >
       <PageSectionTitle
@@ -55,7 +55,7 @@ export default function AiPage() {
             onClick={() => setRegistered(true)}
             className="rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white"
           >
-            {registered ? '已登记内测需求' : '登记内测需求'}
+            {registered ? '已登记需求' : '登记需求'}
           </button>
           <Link href="/notices" className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-700">
             先去通知库
@@ -65,7 +65,7 @@ export default function AiPage() {
 
         <div className="mt-4 text-sm text-slate-500">
           {registered
-            ? '已收到你的内测意向。下一阶段我们会优先围绕申请管理和提醒场景来设计 AI。'
+            ? '已收到你的需求登记。下一阶段我们会优先围绕申请管理和提醒场景来设计 AI。'
             : '当前页面先不承诺过多能力，保持专业感和克制感。'}
         </div>
       </section>

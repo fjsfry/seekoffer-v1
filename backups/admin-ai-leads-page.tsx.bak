@@ -59,7 +59,7 @@ function buildAiMetrics(metrics?: AiWaitlistMetricsPayload): AdminMetric[] {
   };
 
   return [
-    { label: '总提交数', value: formatNumber(data.totalLeads), hint: '累计内测登记', tone: 'blue' },
+    { label: '总提交数', value: formatNumber(data.totalLeads), hint: '累计需求登记', tone: 'blue' },
     { label: '今日新增', value: formatNumber(data.todayLeads), hint: '北京时间今日', tone: 'green' },
     { label: '风险评估', value: formatNumber(data.riskLeads), hint: '目标层级与优先级', tone: 'amber' },
     { label: '材料短板', value: formatNumber(data.materialLeads + data.briefLeads), hint: `简章提炼 ${formatNumber(data.briefLeads)} 条`, tone: 'purple' }
@@ -112,7 +112,7 @@ export default function AdminAiLeadsPage() {
   const [query, setQuery] = useState('');
   const [primaryNeed, setPrimaryNeed] = useState('全部需求');
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('正在读取 AI 内测登记数据...');
+  const [message, setMessage] = useState('正在读取 AI 需求登记数据...');
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
   const selectedLead = useMemo(
@@ -153,12 +153,12 @@ export default function AdminAiLeadsPage() {
         if (current && response.aiWaitlistLeads?.some((item) => item.id === current)) return current;
         return response.aiWaitlistLeads?.[0]?.id || null;
       });
-      setMessage('AI 内测登记已更新，当前列表展示最新提交记录。');
+      setMessage('AI 需求登记已更新，当前列表展示最新提交记录。');
     } catch (error) {
       setLeads([]);
       setTotal(0);
       setMetrics(buildAiMetrics());
-      setMessage(`AI 内测数据读取失败：${getAdminErrorMessage(error)}`);
+      setMessage(`AI 需求数据读取失败：${getAdminErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }
@@ -171,7 +171,7 @@ export default function AdminAiLeadsPage() {
   }
 
   return (
-    <AdminShell title="AI 内测管理" description="查看 AI 申请定位助手的内测登记、需求方向和用户补充说明。">
+    <AdminShell title="AI 需求管理" description="查看 AI 申请定位助手的需求登记、方向和用户补充说明。">
       <div className="space-y-8">
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {metrics.map((metric, index) => {
@@ -221,7 +221,7 @@ export default function AdminAiLeadsPage() {
 
         <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_340px]">
           <AdminPanel
-            title="内测提交列表"
+            title="需求提交列表"
             action={
               <button
                 type="button"
@@ -273,8 +273,8 @@ export default function AdminAiLeadsPage() {
             {!leads.length ? (
               <AdminEmptyState
                 icon={FileSearch}
-                title={loading ? '正在加载内测登记' : '没有匹配的内测登记'}
-                description={loading ? '系统正在读取 AI 内测提交记录，请稍候。' : '可以清空搜索条件，或确认前台表单是否已成功提交。'}
+                title={loading ? '正在加载需求登记' : '没有匹配的需求登记'}
+                description={loading ? '系统正在读取 AI 需求提交记录，请稍候。' : '可以清空搜索条件，或确认前台表单是否已成功提交。'}
               />
             ) : null}
             <AdminPagination

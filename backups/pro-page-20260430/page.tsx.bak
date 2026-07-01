@@ -109,7 +109,7 @@ const compliancePaths = [
     tone: 'green'
   },
   {
-    title: '过渡路径：小范围内测人工开通',
+    title: '过渡路径：小范围人工开通',
     body: `当前可以先生成 Pro 意向单，通过 ${CONTACT_EMAIL} 或 QQ 群 ${QQ_GROUP} 人工核对后开通，适合灰度验证价格和需求。`,
     tone: 'blue'
   },
@@ -132,7 +132,7 @@ function formatDateTime(value: string | null | undefined) {
 }
 
 function buildManualMailHref(checkout: CreateBillingOrderResponse | null, plan: BillingPlan) {
-  const subject = encodeURIComponent('Seekoffer Pro 内测开通');
+  const subject = encodeURIComponent('Seekoffer Pro 人工开通');
   const body = encodeURIComponent(
     [
       '你好，我想开通 Seekoffer Pro。',
@@ -214,7 +214,7 @@ export default function ProPage() {
       setMessage(
         response.payment.configured
           ? response.payment.message
-          : '当前自动支付通道还在资质接入中，已为你生成内测开通意向单。请通过邮箱或 QQ 群联系运营核对后开通。'
+          : '当前自动支付通道还在资质接入中，已为你生成开通意向单。请通过邮箱或 QQ 群联系运营核对后开通。'
       );
       await entitlement.refresh();
     } catch (error) {
@@ -364,7 +364,7 @@ export default function ProPage() {
         <aside className="rounded-[34px] border border-slate-200/80 bg-white p-6 shadow-soft lg:p-7">
           <div className="text-sm font-semibold text-brand">支付与开通</div>
           <div className="mt-3 rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
-            正式微信/支付宝支付需要商户资质。当前可以先生成内测意向单，由运营人工核对并开通；正式商户号配置完成后，会自动切换为扫码支付。
+            正式微信/支付宝支付需要商户资质。当前可以先生成开通意向单，由运营人工核对并开通；正式商户号配置完成后，会自动切换为扫码支付。
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-3">
