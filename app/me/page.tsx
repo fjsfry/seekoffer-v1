@@ -9,7 +9,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
-  Clock3,
   ExternalLink,
   FileCheck2,
   FileText,
@@ -265,6 +264,12 @@ function getContactSearchText(contact: MentorContact) {
   ]
     .join(' ')
     .toLowerCase();
+}
+
+function matchesContactRange(contactRange: MentorContact['schoolRange'], filter: ContactRangeFilter) {
+  if (filter === '全部') return true;
+  if (filter === '985') return contactRange === '985' || contactRange === 'C9';
+  return contactRange === filter;
 }
 
 function sortContacts(contacts: MentorContact[], sortBy: ContactSortOption) {
@@ -777,7 +782,7 @@ export default function MePage() {
   const filteredContacts = useMemo(() => {
     const keyword = contactKeyword.trim().toLowerCase();
     const filtered = contacts.filter((contact) => {
-      if (contactRangeFilter !== '全部' && contact.schoolRange !== contactRangeFilter) return false;
+      if (!matchesContactRange(contact.schoolRange, contactRangeFilter)) return false;
       if (contactFeedbackFilter !== '全部' && contact.feedbackStatus !== contactFeedbackFilter) return false;
       if (contactDeliveryFilter !== '全部' && contact.deliveryStatus !== contactDeliveryFilter) return false;
       if (keyword && !getContactSearchText(contact).includes(keyword)) return false;
@@ -814,6 +819,16 @@ export default function MePage() {
     setCompletedTodoIds((current) => (current.includes(id) ? current : [...current, id]));
   }
 
+  function handleScheduleDoneChange(id: string, done: boolean) {
+    setCompletedTodoIds((current) => {
+      if (done) {
+        return current.includes(id) ? current : [...current, id];
+      }
+
+      return current.filter((item) => item !== id);
+    });
+  }
+
   function handleClearCompleted() {
     const customTodoIds = new Set(customTodos.map((item) => item.id));
     setCustomTodos((current) => current.filter((item) => !completedTodoIds.includes(item.id)));
@@ -823,13 +838,14 @@ export default function MePage() {
   function createCustomTodo(payload: Pick<WorkbenchCustomTodo, 'text'> & Partial<Omit<WorkbenchCustomTodo, 'id' | 'text'>>) {
     const nextText = payload.text.trim();
     if (!nextText) {
-      return;
+      return '';
     }
 
+    const nextId = `custom-${Date.now()}`;
     setCustomTodos((current) => [
       ...current,
       {
-        id: `custom-${Date.now()}`,
+        id: nextId,
         text: nextText,
         ...(payload.date ? { date: payload.date } : {}),
         ...(payload.type ? { type: payload.type } : {}),
@@ -837,6 +853,8 @@ export default function MePage() {
         createdAt: new Date().toISOString()
       }
     ]);
+
+    return nextId;
   }
 
   function handleCreateQuickTodo() {
@@ -847,7 +865,52 @@ export default function MePage() {
   }
 
   function handleCreateScheduleTodo(payload: Pick<WorkbenchCustomTodo, 'text'> & Partial<Omit<WorkbenchCustomTodo, 'id' | 'text'>>) {
-    createCustomTodo(payload);
+    return createCustomTodo(payload);
+  }
+
+  function handleUpdateScheduleTodo(id: string, patch: Partial<Omit<WorkbenchCustomTodo, 'id'>>) {
+    setCustomTodos((current) =>
+      current.map((todo) => {
+        if (todo.id !== id) {
+          return todo;
+        }
+
+        const nextTodo: WorkbenchCustomTodo = {
+          ...todo,
+          ...(patch.text !== undefined ? { text: patch.text.trim() || todo.text } : {})
+        };
+
+        if (patch.date !== undefined) {
+          const nextDate = patch.date.trim();
+          if (nextDate) {
+            nextTodo.date = nextDate;
+          } else {
+            delete nextTodo.date;
+          }
+        }
+
+        if (patch.type !== undefined) {
+          const nextType = getManualScheduleType(patch.type);
+          nextTodo.type = nextType;
+        }
+
+        if (patch.note !== undefined) {
+          const nextNote = patch.note.trim();
+          if (nextNote) {
+            nextTodo.note = nextNote;
+          } else {
+            delete nextTodo.note;
+          }
+        }
+
+        return nextTodo;
+      })
+    );
+  }
+
+  function handleDeleteScheduleTodo(id: string) {
+    setCustomTodos((current) => current.filter((todo) => todo.id !== id));
+    setCompletedTodoIds((current) => current.filter((item) => item !== id));
   }
 
   function handleAddContact() {
@@ -940,62 +1003,36 @@ export default function MePage() {
 
   return (
     <SiteShell>
-      <section className="page-hero overflow-hidden px-6 py-7 lg:px-8">
-        <div className="grid gap-7 lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)] lg:items-center">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-brand/8 px-3 py-1.5 text-xs font-semibold text-brand">
-              <Sparkles className="h-3.5 w-3.5" />
-              申请工作台
-            </div>
-            <h1 className="mt-4 text-4xl font-semibold text-ink md:text-5xl">把申请推进到下一步</h1>
-            <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
-              这里不是简单的项目列表，而是围绕目标、截止、材料和沟通进展搭起来的个人申请控制台。
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="/notices" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep">
-                <PlusCircle className="h-4 w-4" />
-                添加目标项目
-              </Link>
-              <button
-                type="button"
-                onClick={() => setActiveSection('schedule')}
-                className="inline-flex items-center gap-2 rounded-2xl border border-brand/15 bg-white px-5 py-3 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5"
-              >
-                <CalendarDays className="h-4 w-4" />
-                管理日程
-              </button>
-            </div>
-          </div>
+      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
+        <div>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">我的申请</h1>
+          <p className="mt-4 text-base leading-8 text-slate-600">
+            集中管理申请清单、日程和导师联系，把每个目标项目推进到下一步。
+          </p>
+        </div>
 
-          <div className="rounded-[30px] bg-white/88 p-4 shadow-soft ring-1 ring-black/5">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                { label: '申请项目', value: stats.total.toString(), hint: '目标总数', icon: ClipboardList },
-                { label: '7天内截止', value: stats.upcoming7.toString(), hint: '需要优先处理', icon: Clock3 },
-                { label: '待补材料', value: stats.materialPending.toString(), hint: '仍有缺口', icon: BookCheck },
-                { label: '保研倒计时', value: baoYanCountdownDays.toString(), hint: '距离 9.22', icon: CalendarDays }
-              ].map((item, index) => {
-                const Icon = item.icon;
-                const strong = index === 3;
+        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+          {[
+            { label: '申请项目', value: stats.total.toString(), icon: ClipboardList },
+            { label: '待补材料', value: stats.materialPending.toString(), icon: BookCheck },
+            { label: '保研倒计时', value: `${baoYanCountdownDays}天`, icon: CalendarDays }
+          ].map((item) => {
+            const Icon = item.icon;
 
-                return (
-                  <div key={item.label} className={`rounded-[24px] px-4 py-4 ${strong ? 'bg-brand text-white' : 'bg-slate-50 text-ink'}`}>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ${strong ? 'bg-white/15 text-white' : 'bg-white text-brand shadow-sm'}`}>
-                        <Icon className="h-5 w-5" />
-                      </span>
-                      <span className={`text-xs font-semibold ${strong ? 'text-white/75' : 'text-slate-500'}`}>{item.hint}</span>
-                    </div>
-                    <div className="mt-4 text-sm font-semibold">{item.label}</div>
-                    <div className="mt-1 text-3xl font-semibold">
-                      {item.value}
-                      <span className="ml-1 text-sm font-semibold">{item.label === '保研倒计时' ? '天' : ''}</span>
-                    </div>
+            return (
+              <div key={item.label} className="soft-stat-pill rounded-[28px] px-4 py-4">
+                <div className="flex items-center justify-center gap-3 text-center">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="whitespace-nowrap text-xs text-slate-500">{item.label}</div>
+                    <div className="whitespace-nowrap text-xl font-semibold text-ink">{item.value}</div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -1357,7 +1394,9 @@ export default function MePage() {
           calendarMonth={calendarMonth}
           onCalendarMonthChange={setCalendarMonth}
           onCreateTodo={handleCreateScheduleTodo}
-          onCompleteTodo={handleCompleteTodo}
+          onUpdateTodo={handleUpdateScheduleTodo}
+          onDeleteTodo={handleDeleteScheduleTodo}
+          onDoneChange={handleScheduleDoneChange}
           onClearCompleted={handleClearCompleted}
         />
       ) : null}
@@ -1377,6 +1416,13 @@ export default function MePage() {
           onDeliveryFilterChange={setContactDeliveryFilter}
           onKeywordChange={setContactKeyword}
           onSortChange={setContactSort}
+          onResetFilters={() => {
+            setContactRangeFilter('全部');
+            setContactFeedbackFilter('全部');
+            setContactDeliveryFilter('全部');
+            setContactKeyword('');
+            setContactSort('updated');
+          }}
           onAddContact={handleAddContact}
           onContactChange={handleContactChange}
           onDeleteContact={handleDeleteContact}
@@ -1537,7 +1583,9 @@ function ScheduleWorkspace({
   calendarMonth,
   onCalendarMonthChange,
   onCreateTodo,
-  onCompleteTodo,
+  onUpdateTodo,
+  onDeleteTodo,
+  onDoneChange,
   onClearCompleted
 }: {
   items: ScheduleItem[];
@@ -1550,10 +1598,13 @@ function ScheduleWorkspace({
   onKeywordChange: (value: string) => void;
   calendarMonth: string;
   onCalendarMonthChange: (value: string) => void;
-  onCreateTodo: (payload: Pick<WorkbenchCustomTodo, 'text'> & Partial<Omit<WorkbenchCustomTodo, 'id' | 'text'>>) => void;
-  onCompleteTodo: (id: string) => void;
+  onCreateTodo: (payload: Pick<WorkbenchCustomTodo, 'text'> & Partial<Omit<WorkbenchCustomTodo, 'id' | 'text'>>) => string;
+  onUpdateTodo: (id: string, patch: Partial<Omit<WorkbenchCustomTodo, 'id'>>) => void;
+  onDeleteTodo: (id: string) => void;
+  onDoneChange: (id: string, done: boolean) => void;
   onClearCompleted: () => void;
 }) {
+  const [expandedScheduleId, setExpandedScheduleId] = useState('');
   const calendarCells = getCalendarCells(calendarMonth);
   const itemsByDate = items.reduce<Record<string, ScheduleItem[]>>((grouped, item) => {
     if (!item.date) {
@@ -1574,12 +1625,15 @@ function ScheduleWorkspace({
       return;
     }
 
-    onCreateTodo({
+    const nextId = onCreateTodo({
       text,
       date: String(formData.get('date') || '').trim(),
       type: getManualScheduleType(String(formData.get('type') || '')),
       note: String(formData.get('note') || '').trim()
     });
+    if (nextId) {
+      setExpandedScheduleId(nextId);
+    }
     form.reset();
   }
 
@@ -1778,43 +1832,65 @@ function ScheduleWorkspace({
         <div className="mt-5 grid gap-3">
           {items.length ? (
             items.map((item) => {
-              const body = (
-                <>
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      onCompleteTodo(item.id);
-                    }}
-                    className={`mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
-                      item.done ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-300 hover:border-brand hover:text-brand'
-                    }`}
-                    aria-label={`完成日程：${item.title}`}
-                  >
-                    <Square className="h-3.5 w-3.5" />
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="line-clamp-1 text-base font-semibold text-ink">{item.title}</span>
-                      <span className="rounded-full bg-brand/8 px-2.5 py-1 text-xs font-semibold text-brand">{item.type}</span>
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-500">{item.detail}</p>
-                  </div>
-                  <div className="shrink-0 rounded-2xl bg-slate-50 px-4 py-3 text-right">
-                    <div className="text-xs font-semibold text-slate-400">时间</div>
-                    <div className="mt-1 text-sm font-semibold text-ink">{item.dateLabel}</div>
-                  </div>
-                </>
-              );
+              const expanded = expandedScheduleId === item.id;
 
-              return item.href ? (
-                <Link key={item.id} href={item.href} className="grid gap-4 rounded-[24px] bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft sm:grid-cols-[auto_minmax(0,1fr)_150px] sm:items-start">
-                  {body}
-                </Link>
-              ) : (
-                <div key={item.id} className="grid gap-4 rounded-[24px] bg-white px-4 py-4 shadow-sm sm:grid-cols-[auto_minmax(0,1fr)_150px] sm:items-start">
-                  {body}
-                </div>
+              return (
+                <article key={item.id} className={`rounded-[24px] border bg-white shadow-sm transition ${expanded ? 'border-brand/20 ring-4 ring-brand/5' : 'border-slate-100 hover:border-brand/20'}`}>
+                  <div className="grid gap-3 px-4 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+                    <button
+                      type="button"
+                      onClick={() => onDoneChange(item.id, !item.done)}
+                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
+                        item.done ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-300 hover:border-brand hover:text-brand'
+                      }`}
+                      aria-label={item.done ? `恢复日程：${item.title}` : `完成日程：${item.title}`}
+                    >
+                      <Square className="h-3.5 w-3.5" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setExpandedScheduleId(expanded ? '' : item.id)}
+                      className="min-w-0 text-left"
+                    >
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className={`line-clamp-1 text-base font-semibold ${item.done ? 'text-slate-400 line-through' : 'text-ink'}`}>{item.title}</span>
+                        <span className="rounded-full bg-brand/8 px-2.5 py-1 text-xs font-semibold text-brand">{item.type}</span>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.done ? 'bg-emerald-50 text-brand' : 'bg-amber-50 text-amber-700'}`}>
+                          {item.done ? '已完成' : '未完成'}
+                        </span>
+                      </span>
+                      <span className="mt-1 block line-clamp-2 text-sm leading-6 text-slate-500">{item.detail}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setExpandedScheduleId(expanded ? '' : item.id)}
+                      className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3 text-left sm:min-w-[150px]"
+                    >
+                      <span>
+                        <span className="block text-xs font-semibold text-slate-400">时间</span>
+                        <span className="mt-1 block text-sm font-semibold text-ink">{item.dateLabel}</span>
+                      </span>
+                      <ChevronRight className={`h-4 w-4 text-slate-400 transition ${expanded ? 'rotate-90 text-brand' : ''}`} />
+                    </button>
+                  </div>
+
+                  {expanded ? (
+                    <ScheduleEditor
+                      item={item}
+                      onSave={(patch) => {
+                        onUpdateTodo(item.id, patch);
+                        setExpandedScheduleId('');
+                      }}
+                      onDelete={() => {
+                        onDeleteTodo(item.id);
+                        setExpandedScheduleId('');
+                      }}
+                      onDoneChange={(done) => onDoneChange(item.id, done)}
+                    />
+                  ) : null}
+                </article>
               );
             })
           ) : (
@@ -1828,6 +1904,119 @@ function ScheduleWorkspace({
         </div>
       </section>
     </section>
+  );
+}
+
+function ScheduleEditor({
+  item,
+  onSave,
+  onDelete,
+  onDoneChange
+}: {
+  item: ScheduleItem;
+  onSave: (patch: Pick<WorkbenchCustomTodo, 'text'> & Partial<Omit<WorkbenchCustomTodo, 'id' | 'text'>>) => void;
+  onDelete: () => void;
+  onDoneChange: (done: boolean) => void;
+}) {
+  const [title, setTitle] = useState(item.title);
+  const [date, setDate] = useState(item.date || '');
+  const [type, setType] = useState<Exclude<ScheduleTypeFilter, '全部'>>(item.type);
+  const [note, setNote] = useState(item.detail === '手动添加的工作台事项' ? '' : item.detail);
+  const [done, setDone] = useState(item.done);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextTitle = title.trim();
+    if (!nextTitle) {
+      return;
+    }
+
+    onSave({
+      text: nextTitle,
+      date,
+      type,
+      note
+    });
+    onDoneChange(done);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="border-t border-slate-100 px-4 pb-4 pt-4">
+      <div className="mb-4 flex flex-col gap-3 rounded-[22px] bg-slate-50/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-sm font-semibold text-ink">编辑日程</div>
+          <div className="mt-1 text-xs text-slate-500">修改标题、日期、类型和备注，保存后会回到一行摘要。</div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onDelete}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-500 transition hover:bg-rose-100"
+          >
+            <Trash2 className="h-4 w-4" />
+            删除
+          </button>
+          <button
+            type="submit"
+            className="inline-flex items-center justify-center rounded-2xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep"
+          >
+            保存并收起
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_150px_150px]">
+        <CompactField label="日程标题">
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="例如 北大材料提交"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40"
+          />
+        </CompactField>
+        <CompactField label="日期">
+          <input
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40"
+          />
+        </CompactField>
+        <CompactField label="类型">
+          <select
+            value={type}
+            onChange={(event) => setType(getManualScheduleType(event.target.value))}
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40"
+          >
+            {manualScheduleTypes.map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </select>
+        </CompactField>
+        <CompactField label="完成状态">
+          <select
+            value={done ? '已完成' : '未完成'}
+            onChange={(event) => setDone(event.target.value === '已完成')}
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40"
+          >
+            <option value="未完成">未完成</option>
+            <option value="已完成">已完成</option>
+          </select>
+        </CompactField>
+      </div>
+
+      <div className="mt-3">
+        <CompactField label="备注">
+          <textarea
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            rows={3}
+            placeholder="补充材料、链接、联系人或下一步动作"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40"
+          />
+        </CompactField>
+      </div>
+    </form>
   );
 }
 
@@ -1845,6 +2034,7 @@ function ContactsWorkspace({
   onDeliveryFilterChange,
   onKeywordChange,
   onSortChange,
+  onResetFilters,
   onAddContact,
   onContactChange,
   onDeleteContact
@@ -1862,6 +2052,7 @@ function ContactsWorkspace({
   onDeliveryFilterChange: (value: '全部' | ContactDeliveryStatus) => void;
   onKeywordChange: (value: string) => void;
   onSortChange: (value: ContactSortOption) => void;
+  onResetFilters: () => void;
   onAddContact: () => string;
   onContactChange: <K extends keyof MentorContact>(id: string, key: K, value: MentorContact[K]) => void;
   onDeleteContact: (id: string) => void;
@@ -1914,6 +2105,21 @@ function ContactsWorkspace({
             <option value="lastContact">按最近联系</option>
           </select>
         </div>
+
+        {hasActiveFilters || sort !== 'updated' ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+            <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
+              {rangeFilter !== '全部' ? <span className="rounded-full bg-white px-2.5 py-1">层次：{rangeFilter}</span> : null}
+              {feedbackFilter !== '全部' ? <span className="rounded-full bg-white px-2.5 py-1">反馈：{feedbackFilter}</span> : null}
+              {deliveryFilter !== '全部' ? <span className="rounded-full bg-white px-2.5 py-1">投递：{deliveryFilter}</span> : null}
+              {keyword.trim() ? <span className="rounded-full bg-white px-2.5 py-1">关键词：{keyword.trim()}</span> : null}
+              {sort !== 'updated' ? <span className="rounded-full bg-white px-2.5 py-1">排序：{sort === 'school' ? '按高校' : '按最近联系'}</span> : null}
+            </div>
+            <button type="button" onClick={onResetFilters} className="text-sm font-semibold text-brand hover:text-brand-deep">
+              清空筛选
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <section className="surface-card rounded-[30px] p-5">
