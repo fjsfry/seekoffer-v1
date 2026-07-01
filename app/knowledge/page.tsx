@@ -22,7 +22,19 @@ import {
 
 export const metadata: Metadata = {
   title: '保研知识中心 - 寻鹿 Seekoffer',
-  description: '系统了解保研时间线、夏令营与预推免区别、材料准备、黑话词典和面试题。'
+  description: '系统了解保研时间线、夏令营与预推免区别、材料准备、黑话词典和面试题。',
+  alternates: {
+    canonical: '/knowledge'
+  },
+  openGraph: {
+    title: '保研知识中心 - 寻鹿 Seekoffer',
+    description: '保研时间线、黑话词典、材料指南、面试题和申请阶段区别。',
+    url: '/knowledge',
+    siteName: '寻鹿 Seekoffer',
+    images: ['/logo.png'],
+    locale: 'zh_CN',
+    type: 'website'
+  }
 };
 
 const navCards = [

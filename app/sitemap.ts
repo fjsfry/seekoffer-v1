@@ -1,19 +1,20 @@
 import type { MetadataRoute } from 'next';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { baseNoticeProjects } from '@/lib/notice-source';
-
-const siteUrl = 'https://www.seekoffer.com.cn';
+import { SITE_URL, absoluteUrl } from '@/lib/seo';
 
 export const dynamic = 'force-static';
 
 const staticRoutes = [
   '/',
   '/notices',
+  '/deadlines',
   '/colleges',
   '/resources',
   '/competitions',
   '/knowledge',
   '/offers',
+  '/gpa',
   '/consulting',
   '/me',
   '/guide',
@@ -25,24 +26,26 @@ const staticRoutes = [
   '/disclaimer'
 ];
 
-function toAbsoluteUrl(path: string) {
-  return new URL(path, siteUrl).toString();
+function parseDate(value: string | undefined, fallback: Date) {
+  if (!value) return fallback;
+  const parsed = new Date(value.replace(' ', 'T'));
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed;
 }
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   const staticEntries = staticRoutes.map((route) => ({
-    url: toAbsoluteUrl(route),
+    url: absoluteUrl(route),
     lastModified: now,
     changeFrequency: route === '/' || route === '/notices' ? ('daily' as const) : ('weekly' as const),
-    priority: route === '/' ? 1 : 0.8
+    priority: route === '/' ? 1 : route === '/notices' ? 0.95 : 0.75
   }));
 
-  const noticeEntries = filterMainNoticeProjects(baseNoticeProjects).slice(0, 1000).map((project) => ({
-    url: toAbsoluteUrl(`/notices/${encodeURIComponent(project.id)}`),
-    lastModified: project.updatedAt ? new Date(project.updatedAt.replace(' ', 'T')) : now,
+  const noticeEntries = filterMainNoticeProjects(baseNoticeProjects).slice(0, 50000 - staticEntries.length).map((project) => ({
+    url: new URL(`/notices/${encodeURIComponent(project.id)}`, SITE_URL).toString(),
+    lastModified: parseDate(project.updatedAt || project.collectedAt || project.publishDate, now),
     changeFrequency: 'weekly' as const,
-    priority: 0.65
+    priority: String(project.year) === '2026' ? 0.72 : 0.55
   }));
 
   return [...staticEntries, ...noticeEntries];

@@ -22,7 +22,19 @@ import { applicationColumnPresets, statusDefinitions } from '@/lib/mock-data';
 
 export const metadata: Metadata = {
   title: '使用指南 - Seekoffer',
-  description: '5 分钟上手 Seekoffer：从通知库筛选项目、查看原文、加入申请表到使用工作台管理材料和截止时间。'
+  description: '5 分钟上手 Seekoffer：从通知库筛选项目、查看原文、加入申请表到使用工作台管理材料和截止时间。',
+  alternates: {
+    canonical: '/guide'
+  },
+  openGraph: {
+    title: 'Seekoffer 使用指南',
+    description: '从查保研通知、看原文到加入申请工作台的完整使用路径。',
+    url: '/guide',
+    siteName: '寻鹿 Seekoffer',
+    images: ['/logo.png'],
+    locale: 'zh_CN',
+    type: 'website'
+  }
 };
 
 const onboardingSteps = [

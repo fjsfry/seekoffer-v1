@@ -23,6 +23,7 @@ import {
 import { getNoticeApplicationLink, getNoticeOriginalLink } from '@/lib/notice-links';
 import { baseNoticeProjects } from '@/lib/notice-source';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
+import { SITE_NAME, absoluteUrl, jsonLdScript } from '@/lib/seo';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 
 const visibleNoticeProjects = filterMainNoticeProjects(baseNoticeProjects);
@@ -91,12 +92,67 @@ export default async function NoticeDetailPage({
   const departmentName = getDisplayNoticeDepartment(project);
   const originalLink = getNoticeOriginalLink(project);
   const applicationLink = getNoticeApplicationLink(project);
+  const schoolName = getDisplaySchoolName(project.schoolName);
+  const title = normalizeNoticeTitle(project.projectName, 100);
+  const detailUrl = absoluteUrl(`/notices/${encodeURIComponent(project.id)}`);
+  const description = `${schoolName} ${departmentName} ${formatNoticeDateOnly(project.deadlineDate)} 截止。查看保研通知原文、材料要求和申请进度管理入口。`;
+  const noticeJsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: `${schoolName} ${title}`,
+      description,
+      inLanguage: 'zh-CN',
+      datePublished: project.publishDate,
+      dateModified: project.updatedAt || project.collectedAt || project.publishDate,
+      mainEntityOfPage: detailUrl,
+      author: {
+        '@type': 'Organization',
+        name: schoolName
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: SITE_NAME,
+        logo: {
+          '@type': 'ImageObject',
+          url: absoluteUrl('/logo.png')
+        }
+      },
+      about: [schoolName, departmentName, getDisplayProjectType(project.projectType), getDisplayDiscipline(project.discipline)].filter(Boolean),
+      url: detailUrl
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: '首页',
+          item: absoluteUrl('/')
+        },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: '通知库',
+          item: absoluteUrl('/notices')
+        },
+        {
+          '@type': 'ListItem',
+          position: 3,
+          name: `${schoolName} ${title}`,
+          item: detailUrl
+        }
+      ]
+    }
+  ];
 
   return (
     <SiteShell>
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(noticeJsonLd)} />
       <PageSectionTitle
         eyebrow="Project Detail"
-        title={`${getDisplaySchoolName(project.schoolName)} · ${normalizeNoticeTitle(project.projectName, 80)}`}
+        title={`${schoolName} · ${normalizeNoticeTitle(project.projectName, 80)}`}
         subtitle="查看项目详情、截止时间、材料要求与原文入口，并可一键加入工作台。"
       />
 
@@ -112,7 +168,7 @@ export default async function NoticeDetailPage({
               />
               <div>
                 <div className="text-sm font-semibold text-slate-500">{departmentName}</div>
-                <div className="mt-1 text-2xl font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</div>
+                <div className="mt-1 text-2xl font-semibold text-ink">{schoolName}</div>
               </div>
             </div>
 

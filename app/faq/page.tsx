@@ -5,15 +5,45 @@ import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { QQ_GROUP_NUMBER, QQ_GROUP_URL } from '@/lib/contact';
 import { faqGroups } from '@/lib/help-content';
+import { absoluteUrl, jsonLdScript } from '@/lib/seo';
 
 export const metadata: Metadata = {
   title: '常见问题 - Seekoffer',
-  description: 'Seekoffer 常见问题：新手使用、通知数据、账号工作台、功能说明与反馈渠道说明。'
+  description: 'Seekoffer 常见问题：新手使用、通知数据、账号工作台、功能说明与反馈渠道说明。',
+  alternates: {
+    canonical: '/faq'
+  },
+  openGraph: {
+    title: 'Seekoffer 常见问题',
+    description: '保研通知、申请工作台、数据来源和反馈方式常见问题。',
+    url: '/faq',
+    siteName: '寻鹿 Seekoffer',
+    images: ['/logo.png'],
+    locale: 'zh_CN',
+    type: 'website'
+  }
 };
 
 export default function FaqPage() {
+  const faqJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqGroups.flatMap((group) =>
+      group.items.map((item) => ({
+        '@type': 'Question',
+        name: item.question,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: item.answer
+        }
+      }))
+    ),
+    url: absoluteUrl('/faq')
+  };
+
   return (
     <SiteShell>
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(faqJsonLd)} />
       <section className="page-hero px-6 py-8 md:px-10 md:py-10">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
           <div>
