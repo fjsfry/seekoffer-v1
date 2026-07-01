@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
-  ArrowUp,
   BookCheck,
   CalendarDays,
   ChevronLeft,
@@ -11,7 +10,6 @@ import {
   ClipboardList,
   ExternalLink,
   FileCheck2,
-  FileText,
   GraduationCap,
   ListChecks,
   MoreHorizontal,
@@ -76,13 +74,6 @@ const emptyProfile: UserProfile = {
 const TODO_COMPLETED_STORAGE_KEY = 'seekoffer-workbench-completed-todos';
 const TODO_CUSTOM_STORAGE_KEY = 'seekoffer-workbench-custom-todos';
 const CONTACTS_STORAGE_KEY = 'seekoffer-workbench-mentor-contacts';
-
-type ActionTask = {
-  id: string;
-  title: string;
-  detail: string;
-  href?: string;
-};
 
 type WorkbenchTypeFilter = '全部' | '夏令营' | '预推免' | '正式推免' | '宣讲会' | '入营名单';
 type WorkbenchRangeFilter = '全部' | '985' | '211' | '双一流' | '其他';
@@ -461,7 +452,6 @@ export default function MePage() {
   });
   const [completedTodoIds, setCompletedTodoIds] = useState<string[]>(() => readBrowserArray(TODO_COMPLETED_STORAGE_KEY));
   const [customTodos, setCustomTodos] = useState<WorkbenchCustomTodo[]>(() => readCustomTodos());
-  const [todoDraft, setTodoDraft] = useState('');
   const [todoSyncOwnerId, setTodoSyncOwnerId] = useState('');
   const [todoSyncReady, setTodoSyncReady] = useState(false);
   const [deletingProjectId, setDeletingProjectId] = useState('');
@@ -604,102 +594,12 @@ export default function MePage() {
     };
   }, [completedTodoIds, customTodos, syncableUserId, todoSyncOwnerId, todoSyncReady]);
 
-  const profileComplete = isProfileComplete(form);
-
   const stats = useMemo(
     () => ({
       total: rows.length,
-      submitted: rows.filter((row) => row.item.myStatus === '已提交').length,
-      highRisk: rows.filter((row) => row.project.deadlineLevel === 'today' || row.project.deadlineLevel === 'within3days')
-        .length,
-      upcoming7: rows.filter((row) =>
-        ['today', 'within3days', 'within7days'].includes(row.project.deadlineLevel)
-      ).length,
-      materialPending: rows.filter((row) => row.item.materialsProgress < 100).length,
-      pendingResults: rows.filter((row) => row.item.myStatus === '已提交' || row.item.myStatus === '待考核').length,
-      actionCount: rows.filter((row) => row.item.materialsProgress < 100 || row.item.myStatus === '待考核').length
+      materialPending: rows.filter((row) => row.item.materialsProgress < 100).length
     }),
     [rows]
-  );
-
-  const pipelineSummary = useMemo(() => {
-    const finishedStatuses = ['已通过', '未通过', '已放弃'];
-
-    return {
-      已收藏: rows.filter((row) => row.item.myStatus === '已收藏').length,
-      准备材料中: rows.filter((row) => row.item.myStatus === '准备材料中').length,
-      已提交: rows.filter((row) => row.item.myStatus === '已提交').length,
-      待考核: rows.filter((row) => row.item.myStatus === '待考核').length,
-      已结束: rows.filter((row) => finishedStatuses.includes(row.item.myStatus)).length
-    };
-  }, [rows]);
-
-  const actionTasks = useMemo<ActionTask[]>(() => {
-    const tasks: ActionTask[] = [];
-
-    if (!profileComplete) {
-      tasks.push({
-        id: 'profile',
-        title: '补齐个人资料',
-        detail: '完善本科院校、专业、目标方向和地区，工作台提醒会更准确。',
-        href: '#profile-form'
-      });
-    }
-
-    rows
-      .filter((row) => row.project.deadlineLevel === 'today' && row.item.myStatus !== '已提交')
-      .slice(0, 2)
-      .forEach(({ item, project }) => {
-        tasks.push({
-          id: `today-${item.userProjectId}`,
-          title: `今天处理 ${project.schoolName}`,
-          detail: `${project.projectName} 今天截止，优先检查材料并完成提交。`,
-          href: project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(project.id)
-        });
-      });
-
-    rows
-      .filter(
-        (row) =>
-          (row.project.deadlineLevel === 'within3days' || row.project.deadlineLevel === 'within7days') &&
-          row.item.myStatus !== '已提交'
-      )
-      .slice(0, 3)
-      .forEach(({ item, project }) => {
-        tasks.push({
-          id: `deadline-${item.userProjectId}`,
-          title: `本周推进 ${project.schoolName}`,
-          detail: `${project.projectName} 即将截止，建议尽快补齐关键材料。`,
-          href: project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(project.id)
-        });
-      });
-
-    rows
-      .filter((row) => row.item.materialsProgress < 100)
-      .slice(0, 3)
-      .forEach(({ item, project }) => {
-        tasks.push({
-          id: `material-${item.userProjectId}`,
-          title: `补齐 ${project.schoolName} 的材料`,
-          detail: `当前材料完成度 ${item.materialsProgress}%，还需要继续推进。`,
-          href: project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(project.id)
-        });
-      });
-
-    return tasks.slice(0, 8);
-  }, [profileComplete, rows]);
-
-  const todoItems = useMemo(
-    () => [
-      ...actionTasks.map((task) => ({ id: task.id, text: task.title, detail: task.detail, href: task.href, source: 'system' as const })),
-      ...customTodos.map((task) => ({ id: task.id, text: task.text, detail: task.note, source: 'custom' as const }))
-    ],
-    [actionTasks, customTodos]
-  );
-
-  const visibleTodoItems = useMemo(
-    () => todoItems.filter((item) => !completedTodoIds.includes(item.id)),
-    [todoItems, completedTodoIds]
   );
 
   const sortedRows = useMemo(
@@ -735,10 +635,6 @@ export default function MePage() {
     schoolRangeFilter
   ]);
   const applicationPreview = filteredApplicationRows;
-  const urgentRows = sortedRows
-    .filter((row) => ['today', 'within3days', 'within7days'].includes(row.project.deadlineLevel))
-    .slice(0, 3);
-  const todayActionItems = visibleTodoItems.slice(0, 3);
   const scheduleItems = useMemo<ScheduleItem[]>(() => {
     return customTodos
       .map((task) => ({
@@ -815,10 +711,6 @@ export default function MePage() {
     }
   }
 
-  function handleCompleteTodo(id: string) {
-    setCompletedTodoIds((current) => (current.includes(id) ? current : [...current, id]));
-  }
-
   function handleScheduleDoneChange(id: string, done: boolean) {
     setCompletedTodoIds((current) => {
       if (done) {
@@ -855,13 +747,6 @@ export default function MePage() {
     ]);
 
     return nextId;
-  }
-
-  function handleCreateQuickTodo() {
-    createCustomTodo({
-      text: todoDraft
-    });
-    setTodoDraft('');
   }
 
   function handleCreateScheduleTodo(payload: Pick<WorkbenchCustomTodo, 'text'> & Partial<Omit<WorkbenchCustomTodo, 'id' | 'text'>>) {
@@ -948,7 +833,7 @@ export default function MePage() {
       <SiteShell>
         <LoginRequiredCard
           title="别再用 Excel 追保研截止了"
-          description="免费创建申请表，保存目标院校、材料进度、今日待办和截止提醒。通知库、资源库和院校库仍可直接浏览。"
+          description="免费创建申请表，保存目标院校、申请状态和材料进度。通知库、资源库和院校库仍可直接浏览。"
         />
       </SiteShell>
     );
@@ -995,7 +880,7 @@ export default function MePage() {
       <SiteShell>
         <LoginRequiredCard
           title="别再用 Excel 追保研截止了"
-          description="登录后可以保存目标项目、管理申请状态、记录材料进度，并把临近截止自动变成行动清单。"
+          description="登录后可以保存目标项目、管理申请状态、记录材料进度，并集中维护申请清单。"
         />
       </SiteShell>
     );
@@ -1090,8 +975,7 @@ export default function MePage() {
       </section>
 
       {activeSection === 'applications' ? (
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <main id="application-board" className="grid gap-5">
+        <section id="application-board" className="grid gap-5">
             <section className="product-card rounded-[30px] p-5 lg:p-6">
               <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
@@ -1210,7 +1094,7 @@ export default function MePage() {
                     <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
                       {rows.length
                         ? '调整筛选条件或关键词后再试，所有项目都在当前工作台内维护。'
-                        : '从通知库加入一个目标项目，或手动录入正在跟进的院校，工作台会立刻开始生成提醒和行动清单。'}
+                        : '从通知库加入一个目标项目，或手动录入正在跟进的院校，工作台会立刻开始维护申请状态和材料清单。'}
                     </p>
                     <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
                       <Link href="/notices" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white">
@@ -1230,154 +1114,6 @@ export default function MePage() {
                 </div>
               ) : null}
             </section>
-          </main>
-
-          <aside className="grid content-start gap-5">
-            <section className="surface-card rounded-[30px] p-5">
-              <h2 className="text-xl font-semibold text-ink">申请阶段</h2>
-              <div className="mt-5 grid gap-4">
-                {[
-                  ['准备中', pipelineSummary.准备材料中 + pipelineSummary.已收藏],
-                  ['已提交', pipelineSummary.已提交],
-                  ['待考核', pipelineSummary.待考核],
-                  ['已结束', pipelineSummary.已结束]
-                ].map(([label, value]) => (
-                  <div key={label}>
-                    <div className="mb-2 flex items-center justify-between text-sm">
-                      <span className="font-semibold text-slate-600">{label}</span>
-                      <span className="font-semibold text-ink">{value}</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-slate-100">
-                      <div className="h-full rounded-full bg-brand" style={{ width: `${stats.total ? Math.round((Number(value) / stats.total) * 100) : 0}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section id="today-actions" className="surface-card rounded-[30px] p-5">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold text-ink">今日行动</h2>
-                <button onClick={handleClearCompleted} className="text-sm font-semibold text-slate-400 hover:text-brand">
-                  清理完成
-                </button>
-              </div>
-
-              <div className="mt-5 grid gap-3">
-                {todayActionItems.length ? (
-                  todayActionItems.map((task) => (
-                    <div key={task.id} className="flex items-start gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
-                      <button
-                        onClick={() => handleCompleteTodo(task.id)}
-                        className="mt-0.5 text-slate-300 transition hover:text-brand"
-                        aria-label={`完成任务：${task.text}`}
-                      >
-                        <Square className="h-5 w-5" />
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        {'href' in task && task.href ? (
-                          <Link href={task.href} className="line-clamp-1 text-sm font-semibold text-ink hover:text-brand">
-                            {task.text}
-                          </Link>
-                        ) : (
-                          <div className="line-clamp-1 text-sm font-semibold text-ink">{task.text}</div>
-                        )}
-                        {'detail' in task && task.detail ? (
-                          <div className="mt-1 line-clamp-1 text-xs text-slate-500">{task.detail}</div>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-sm leading-7 text-slate-500">
-                    当前没有需要立刻处理的任务。加入项目后，这里会自动生成真正的行动清单。
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4 flex items-center gap-2 rounded-[18px] border border-black/5 bg-slate-50 px-3 py-2">
-                <input
-                  value={todoDraft}
-                  onChange={(event) => setTodoDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      handleCreateQuickTodo();
-                    }
-                  }}
-                  placeholder="添加碎片备注，回车保存..."
-                  className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                />
-                <button
-                  onClick={handleCreateQuickTodo}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-brand shadow-sm"
-                  aria-label="添加任务"
-                >
-                  <ArrowUp className="h-4 w-4" />
-                </button>
-              </div>
-            </section>
-
-            <section className="surface-card rounded-[30px] p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-ink">临近截止</h2>
-                <Link href="/deadlines" className="text-sm font-semibold text-slate-400 hover:text-brand">
-                  更多
-                </Link>
-              </div>
-              <div className="grid gap-3">
-                {urgentRows.length ? (
-                  urgentRows.map(({ item, project }) => (
-                    <Link
-                      key={item.userProjectId}
-                      href={project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(project.id)}
-                      className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm"
-                    >
-                      <span className="rounded-2xl bg-rose-50 px-2 py-2 text-center text-xs font-semibold text-rose-500">
-                        {getDaysLeft(project.deadlineDate) ?? '-'}
-                        <br />
-                        天
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</span>
-                        <span className="mt-1 block truncate text-xs text-slate-500">{formatNoticeDateOnly(project.deadlineDate)} 截止 · {item.myStatus}</span>
-                      </span>
-                    </Link>
-                  ))
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-sm text-slate-500">
-                    暂无 7 天内截止项目。
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section className="surface-card rounded-[30px] p-5">
-              <h2 className="text-xl font-semibold text-ink">申请提醒</h2>
-              <div className="mt-5 grid gap-3">
-                <Link href="/resources" className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-brand shadow-sm">
-                    <FileText className="h-5 w-5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-ink">
-                      检查 {applicationPreview[0]?.project.schoolName || '目标院校'} 的材料准备
-                    </span>
-                    <span className="mt-1 block text-xs text-slate-500">建议优先补齐简历、个人陈述和证明材料</span>
-                  </span>
-                </Link>
-                <Link href="/notices" className="flex items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3">
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-amber-600 shadow-sm">
-                    <Search className="h-5 w-5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-ink">继续补充目标项目</span>
-                    <span className="mt-1 block text-xs text-slate-500">可按学校、学院和专业关键词继续筛选</span>
-                  </span>
-                </Link>
-              </div>
-            </section>
-          </aside>
         </section>
       ) : null}
 
