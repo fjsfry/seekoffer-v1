@@ -5,9 +5,12 @@ import Link from 'next/link';
 import {
   BookCheck,
   CalendarDays,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Circle,
   ClipboardList,
+  Clock3,
   ExternalLink,
   FileCheck2,
   GraduationCap,
@@ -20,7 +23,7 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
-  Square,
+  Target,
   Trash2
 } from 'lucide-react';
 import { ExternalSiteMark } from '@/components/external-site-mark';
@@ -332,10 +335,59 @@ function formatManualScheduleDate(date?: string) {
   return date || '待安排';
 }
 
+function getDateTimeValue(date?: string) {
+  if (!date) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  const timestamp = new Date(`${date}T00:00:00+08:00`).getTime();
+  return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp;
+}
+
+function formatScheduleDateTitle(date?: string) {
+  if (!date) {
+    return '待安排';
+  }
+
+  const [, month, day] = date.split('-');
+  return `${Number(month)}月${Number(day)}日`;
+}
+
+function getScheduleRelativeLabel(date?: string, today = getTodayDateString()) {
+  if (!date) {
+    return '待安排';
+  }
+
+  const dayDiff = Math.round((getDateTimeValue(date) - getDateTimeValue(today)) / (1000 * 60 * 60 * 24));
+  if (dayDiff === 0) return '今天';
+  if (dayDiff === 1) return '明天';
+  if (dayDiff === -1) return '昨天';
+  if (dayDiff > 1) return `${dayDiff}天后`;
+  return `已过${Math.abs(dayDiff)}天`;
+}
+
 function getManualScheduleType(value?: string): Exclude<ScheduleTypeFilter, '全部'> {
   return manualScheduleTypes.includes(value as Exclude<ScheduleTypeFilter, '全部'>)
     ? (value as Exclude<ScheduleTypeFilter, '全部'>)
     : '其他';
+}
+
+function getScheduleTypeTone(type: Exclude<ScheduleTypeFilter, '全部'>) {
+  if (type === '申请截止') return 'bg-rose-50 text-rose-600';
+  if (type === '材料准备') return 'bg-emerald-50 text-brand';
+  if (type === '套磁') return 'bg-sky-50 text-sky-600';
+  if (type === '笔试') return 'bg-amber-50 text-amber-700';
+  if (type === '面试') return 'bg-violet-50 text-violet-600';
+  return 'bg-slate-100 text-slate-500';
+}
+
+function getScheduleDotTone(type: Exclude<ScheduleTypeFilter, '全部'>) {
+  if (type === '申请截止') return 'bg-rose-500';
+  if (type === '材料准备') return 'bg-brand';
+  if (type === '套磁') return 'bg-sky-500';
+  if (type === '笔试') return 'bg-amber-500';
+  if (type === '面试') return 'bg-violet-500';
+  return 'bg-slate-400';
 }
 
 function getCalendarCells(monthKey: string) {
@@ -1341,6 +1393,12 @@ function ScheduleWorkspace({
   onClearCompleted: () => void;
 }) {
   const [expandedScheduleId, setExpandedScheduleId] = useState('');
+  const today = getTodayDateString();
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftDate, setDraftDate] = useState(today);
+  const [draftType, setDraftType] = useState<Exclude<ScheduleTypeFilter, '全部'>>('其他');
+  const [draftNote, setDraftNote] = useState('');
   const calendarCells = getCalendarCells(calendarMonth);
   const itemsByDate = items.reduce<Record<string, ScheduleItem[]>>((grouped, item) => {
     if (!item.date) {
@@ -1350,27 +1408,61 @@ function ScheduleWorkspace({
     grouped[item.date] = [...(grouped[item.date] || []), item];
     return grouped;
   }, {});
-  const today = getTodayDateString();
+  const monthItems = items.filter((item) => item.date?.startsWith(calendarMonth));
+  const todayItems = items.filter((item) => item.date === today);
+  const selectedDateItems = items.filter((item) => item.date === selectedDate);
+  const unfinishedItems = items.filter((item) => !item.done);
+  const unplannedItems = items.filter((item) => !item.date);
+  const upcomingItems = items
+    .filter((item) => !item.done && item.date && item.date >= today)
+    .sort((left, right) => (left.date || '').localeCompare(right.date || ''))
+    .slice(0, 4);
+  const groupedItems = items.reduce<Record<string, ScheduleItem[]>>((grouped, item) => {
+    const key = item.date || 'unplanned';
+    grouped[key] = [...(grouped[key] || []), item];
+    return grouped;
+  }, {});
+  const groupKeys = Object.keys(groupedItems).sort((left, right) => {
+    if (left === 'unplanned') return 1;
+    if (right === 'unplanned') return -1;
+    return left.localeCompare(right);
+  });
+  const activeFilterCount = [typeFilter !== '全部', doneFilter !== '全部', Boolean(keyword.trim())].filter(Boolean).length;
+
+  function handleSelectDate(date: string) {
+    setSelectedDate(date);
+    setDraftDate(date);
+  }
+
+  function handleCalendarMonthChange(nextMonth: string) {
+    onCalendarMonthChange(nextMonth);
+    const nextSelectedDate = nextMonth === getMonthKey(today) ? today : `${nextMonth}-01`;
+    setSelectedDate(nextSelectedDate);
+    setDraftDate(nextSelectedDate);
+  }
 
   function handleSubmitSchedule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const text = String(formData.get('title') || '').trim();
+    const text = draftTitle.trim();
     if (!text) {
       return;
     }
 
     const nextId = onCreateTodo({
       text,
-      date: String(formData.get('date') || '').trim(),
-      type: getManualScheduleType(String(formData.get('type') || '')),
-      note: String(formData.get('note') || '').trim()
+      date: draftDate.trim(),
+      type: draftType,
+      note: draftNote.trim()
     });
     if (nextId) {
       setExpandedScheduleId(nextId);
+      if (draftDate) {
+        setSelectedDate(draftDate);
+        onCalendarMonthChange(getMonthKey(draftDate));
+      }
     }
-    form.reset();
+    setDraftTitle('');
+    setDraftNote('');
   }
 
   return (
@@ -1388,146 +1480,222 @@ function ScheduleWorkspace({
           </button>
         </div>
 
-        <div className="mt-5 rounded-[28px] bg-slate-50/80 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="inline-flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onCalendarMonthChange(shiftMonth(calendarMonth, -1))}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition hover:text-brand"
-                aria-label="上个月"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <div className="min-w-[8rem] rounded-full bg-white px-4 py-2 text-center text-sm font-semibold text-brand shadow-sm">
-                {formatMonthTitle(calendarMonth)}
+        <div className="mt-5 grid gap-3 md:grid-cols-4">
+          {[
+            { label: '本月日程', value: monthItems.length, detail: formatMonthTitle(calendarMonth), icon: CalendarDays },
+            { label: '今天', value: todayItems.length, detail: todayItems.length ? '当天事项' : '暂无安排', icon: Clock3 },
+            { label: '未完成', value: unfinishedItems.length, detail: '需要继续推进', icon: Target },
+            { label: '待安排', value: unplannedItems.length, detail: '还没有日期', icon: ListChecks }
+          ].map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <div key={item.label} className="rounded-[24px] border border-slate-100 bg-white px-4 py-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-brand/8 text-brand">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span className="text-right">
+                    <span className="block text-xs font-semibold text-slate-400">{item.label}</span>
+                    <span className="mt-1 block text-2xl font-semibold text-ink">{item.value}</span>
+                  </span>
+                </div>
+                <div className="mt-3 truncate text-xs font-semibold text-slate-500">{item.detail}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
+          <div className="rounded-[28px] bg-slate-50/80 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="inline-flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCalendarMonthChange(shiftMonth(calendarMonth, -1))}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition hover:text-brand"
+                  aria-label="上个月"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <div className="min-w-[8rem] rounded-full bg-white px-4 py-2 text-center text-sm font-semibold text-brand shadow-sm">
+                  {formatMonthTitle(calendarMonth)}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCalendarMonthChange(shiftMonth(calendarMonth, 1))}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition hover:text-brand"
+                  aria-label="下个月"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
               <button
                 type="button"
-                onClick={() => onCalendarMonthChange(shiftMonth(calendarMonth, 1))}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition hover:text-brand"
-                aria-label="下个月"
+                onClick={() => handleCalendarMonthChange(getMonthKey())}
+                className="w-fit rounded-full bg-white px-4 py-2 text-xs font-semibold text-slate-500 shadow-sm transition hover:text-brand"
               >
-                <ChevronRight className="h-4 w-4" />
+                回到本月
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => onCalendarMonthChange(getMonthKey())}
-              className="w-fit rounded-full bg-white px-4 py-2 text-xs font-semibold text-slate-500 shadow-sm transition hover:text-brand"
-            >
-              回到本月
-            </button>
+
+            <div className="mt-5 grid grid-cols-7 gap-2 text-center text-xs font-semibold text-slate-400">
+              {['一', '二', '三', '四', '五', '六', '日'].map((day) => (
+                <div key={day}>{day}</div>
+              ))}
+            </div>
+
+            <div className="mt-2 grid grid-cols-7 gap-2">
+              {calendarCells.map((cell, index) => {
+                const dayItems = cell ? itemsByDate[cell.date] || [] : [];
+                const isToday = cell?.date === today;
+                const isSelected = cell?.date === selectedDate;
+
+                return (
+                  <button
+                    key={cell?.date || `blank-${index}`}
+                    type="button"
+                    disabled={!cell}
+                    onClick={() => (cell ? handleSelectDate(cell.date) : undefined)}
+                    className={`min-h-[92px] rounded-2xl border p-2 text-left transition ${
+                      cell
+                        ? isSelected
+                          ? 'border-brand/35 bg-white shadow-sm ring-4 ring-brand/5'
+                          : isToday
+                            ? 'border-brand/20 bg-white shadow-sm'
+                            : 'border-white bg-white/75 hover:border-brand/20 hover:bg-white'
+                        : 'border-transparent bg-transparent'
+                    }`}
+                  >
+                    {cell ? (
+                      <>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className={`text-sm font-semibold ${isToday || isSelected ? 'text-brand' : 'text-slate-600'}`}>{cell.day}</span>
+                          {dayItems.length ? (
+                            <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">{dayItems.length}</span>
+                          ) : null}
+                        </div>
+                        <div className="mt-2 grid gap-1">
+                          {dayItems.slice(0, 3).map((item) => (
+                            <span key={item.id} className="flex min-w-0 items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[11px] font-semibold text-slate-600 shadow-sm">
+                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${getScheduleDotTone(item.type)}`} />
+                              <span className="truncate">{item.title}</span>
+                            </span>
+                          ))}
+                          {dayItems.length > 3 ? (
+                            <div className="px-2 text-[11px] font-semibold text-slate-400">+{dayItems.length - 3}</div>
+                          ) : null}
+                        </div>
+                      </>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-7 gap-2 text-center text-xs font-semibold text-slate-400">
-            {['一', '二', '三', '四', '五', '六', '日'].map((day) => (
-              <div key={day}>{day}</div>
-            ))}
-          </div>
-
-          <div className="mt-2 grid grid-cols-7 gap-2">
-            {calendarCells.map((cell, index) => {
-              const dayItems = cell ? itemsByDate[cell.date] || [] : [];
-              const isToday = cell?.date === today;
-
-              return (
-                <div
-                  key={cell?.date || `blank-${index}`}
-                  className={`min-h-[86px] rounded-2xl border p-2 transition ${
-                    cell
-                      ? isToday
-                        ? 'border-brand/25 bg-white shadow-sm'
-                        : 'border-white bg-white/75'
-                      : 'border-transparent bg-transparent'
-                  }`}
-                >
-                  {cell ? (
-                    <>
-                      <div className={`text-sm font-semibold ${isToday ? 'text-brand' : 'text-slate-600'}`}>{cell.day}</div>
-                      <div className="mt-2 grid gap-1">
-                        {dayItems.slice(0, 2).map((item) => (
-                          <div key={item.id} className="truncate rounded-full bg-brand/8 px-2 py-1 text-[11px] font-semibold text-brand">
-                            {item.title}
-                          </div>
-                        ))}
-                        {dayItems.length > 2 ? (
-                          <div className="px-2 text-[11px] font-semibold text-slate-400">+{dayItems.length - 2}</div>
-                        ) : null}
-                      </div>
-                    </>
-                  ) : null}
+          <aside className="grid content-start gap-3">
+            <section className="rounded-[26px] bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-400">选中日期</div>
+                  <div className="mt-1 text-2xl font-semibold text-ink">{formatScheduleDateTitle(selectedDate)}</div>
+                  <div className="mt-1 text-xs font-semibold text-brand">{getScheduleRelativeLabel(selectedDate, today)}</div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-3 text-sm">
-          <div className="grid gap-2 lg:grid-cols-[84px_minmax(0,1fr)] lg:items-center">
-            <div className="font-semibold text-slate-500">日程类型</div>
-            <div className="flex flex-wrap gap-2">
-              {scheduleTypeFilters.map((item) => (
                 <button
-                  key={item}
                   type="button"
-                  onClick={() => onTypeFilterChange(item === '全部' || typeFilter === item ? '全部' : item)}
-                  className={`rounded-full px-3 py-1.5 font-semibold transition ${
-                    typeFilter === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-500 hover:bg-brand/8 hover:text-brand'
-                  }`}
+                  onClick={() => {
+                    setDraftDate(selectedDate);
+                    setDraftTitle('');
+                  }}
+                  className="rounded-full bg-brand/8 px-3 py-2 text-xs font-semibold text-brand"
                 >
-                  {item}
+                  添加到这天
                 </button>
-              ))}
-            </div>
-          </div>
+              </div>
+              <div className="mt-4 grid gap-2">
+                {selectedDateItems.length ? (
+                  selectedDateItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setExpandedScheduleId(item.id)}
+                      className="flex min-w-0 items-start gap-3 rounded-2xl bg-slate-50 px-3 py-3 text-left transition hover:bg-brand/5"
+                    >
+                      <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${getScheduleDotTone(item.type)}`} />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-ink">{item.title}</span>
+                        <span className="mt-1 block truncate text-xs text-slate-500">{item.type} · {item.done ? '已完成' : '未完成'}</span>
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm leading-7 text-slate-500">
+                    当天暂无安排。选中日期后可以直接新增一条日程。
+                  </div>
+                )}
+              </div>
+            </section>
 
-          <div className="grid gap-2 lg:grid-cols-[84px_minmax(0,1fr)] lg:items-center">
-            <div className="font-semibold text-slate-500">完成状态</div>
-            <div className="flex flex-wrap gap-2">
-              {scheduleDoneFilters.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => onDoneFilterChange(item === '全部' || doneFilter === item ? '全部' : item)}
-                  className={`rounded-full px-3 py-1.5 font-semibold transition ${
-                    doneFilter === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-500 hover:bg-brand/8 hover:text-brand'
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          </div>
+            <section className="rounded-[26px] bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-ink">下一步</h3>
+                <span className="text-xs font-semibold text-slate-400">{unfinishedItems.length} 未完成</span>
+              </div>
+              <div className="mt-3 grid gap-2">
+                {upcomingItems.length ? (
+                  upcomingItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setExpandedScheduleId(item.id)}
+                      className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-3 text-left transition hover:bg-brand/5"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-ink">{item.title}</span>
+                        <span className="mt-1 block text-xs text-slate-500">{formatScheduleDateTitle(item.date)} · {getScheduleRelativeLabel(item.date, today)}</span>
+                      </span>
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${getScheduleTypeTone(item.type)}`}>{item.type}</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-7 text-sm leading-7 text-slate-500">
+                    暂无未来待办。可以先补充材料准备、联系导师或笔面试安排。
+                  </div>
+                )}
+              </div>
+            </section>
+          </aside>
         </div>
 
-        <div className="mt-5 grid gap-3">
-          <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-            <Search className="h-4 w-4 shrink-0 text-slate-400" />
+        <form onSubmit={handleSubmitSchedule} className="mt-5 rounded-[28px] border border-brand/10 bg-brand/5 p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-ink">快速新增</h3>
+              <p className="mt-1 text-sm text-slate-500">像日程软件一样先把事情记下来，再补日期、类型和备注。</p>
+            </div>
+            {draftDate ? (
+              <div className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-slate-500 shadow-sm">
+                默认日期：{formatScheduleDateTitle(draftDate)}
+              </div>
+            ) : null}
+          </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_170px_150px]">
             <input
-              value={keyword}
-              onChange={(event) => onKeywordChange(event.target.value)}
-              placeholder="搜索日程标题或备注"
-              className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-            />
-          </label>
-        </div>
-
-        <form onSubmit={handleSubmitSchedule} className="mt-3 grid gap-3">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,0.85fr)_180px_150px]">
-            <input
-              name="title"
-              placeholder="日程标题，例如 北大材料提交"
+              value={draftTitle}
+              onChange={(event) => setDraftTitle(event.target.value)}
+              placeholder="输入日程，例如 复旦材料提交 / 联系导师 / 面试复盘"
               className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand/30"
             />
             <input
-              name="date"
+              value={draftDate}
+              onChange={(event) => setDraftDate(event.target.value)}
               type="date"
               className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm outline-none transition focus:border-brand/30"
             />
             <select
-              name="type"
-              defaultValue="其他"
+              value={draftType}
+              onChange={(event) => setDraftType(getManualScheduleType(event.target.value))}
               className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 shadow-sm outline-none transition focus:border-brand/30"
             >
               {manualScheduleTypes.map((item) => (
@@ -1535,10 +1703,11 @@ function ScheduleWorkspace({
               ))}
             </select>
           </div>
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] xl:pr-28">
             <input
-              name="note"
-              placeholder="备注，例如 个人陈述、成绩单、推荐信"
+              value={draftNote}
+              onChange={(event) => setDraftNote(event.target.value)}
+              placeholder="备注，例如 个人陈述、成绩单、推荐信或下一步动作"
               className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand/30"
             />
             <button
@@ -1550,6 +1719,70 @@ function ScheduleWorkspace({
             </button>
           </div>
         </form>
+
+        <div className="mt-5 grid gap-4 rounded-[28px] bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <label className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+              <input
+                value={keyword}
+                onChange={(event) => onKeywordChange(event.target.value)}
+                placeholder="搜索日程标题或备注"
+                className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+              />
+            </label>
+            {activeFilterCount ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onTypeFilterChange('全部');
+                  onDoneFilterChange('全部');
+                  onKeywordChange('');
+                }}
+                className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-500 transition hover:text-brand"
+              >
+                清空筛选
+              </button>
+            ) : null}
+          </div>
+          <div className="grid gap-3 text-sm">
+            <div className="grid gap-2 lg:grid-cols-[84px_minmax(0,1fr)] lg:items-center">
+              <div className="font-semibold text-slate-500">日程类型</div>
+              <div className="flex flex-wrap gap-2">
+                {scheduleTypeFilters.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => onTypeFilterChange(item === '全部' || typeFilter === item ? '全部' : item)}
+                    className={`rounded-full px-3 py-1.5 font-semibold transition ${
+                      typeFilter === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-500 hover:bg-brand/8 hover:text-brand'
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-2 lg:grid-cols-[84px_minmax(0,1fr)] lg:items-center">
+              <div className="font-semibold text-slate-500">完成状态</div>
+              <div className="flex flex-wrap gap-2">
+                {scheduleDoneFilters.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => onDoneFilterChange(item === '全部' || doneFilter === item ? '全部' : item)}
+                    className={`rounded-full px-3 py-1.5 font-semibold transition ${
+                      doneFilter === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-500 hover:bg-brand/8 hover:text-brand'
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="surface-card rounded-[30px] p-5">
@@ -1559,76 +1792,88 @@ function ScheduleWorkspace({
             <p className="mt-1 text-sm text-slate-500">当前显示 {items.length} / {totalCount} 个事项。</p>
           </div>
           <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
-            {scheduleTypeFilters.slice(1, 5).map((item) => (
-              <span key={item} className="rounded-full bg-slate-100 px-2.5 py-1">{item}</span>
-            ))}
+            <span className="rounded-full bg-slate-100 px-2.5 py-1">未完成 {unfinishedItems.length}</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1">待安排 {unplannedItems.length}</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1">本月 {monthItems.length}</span>
           </div>
         </div>
 
         <div className="mt-5 grid gap-3">
           {items.length ? (
-            items.map((item) => {
-              const expanded = expandedScheduleId === item.id;
+            groupKeys.map((groupKey) => (
+              <div key={groupKey} className="grid gap-2">
+                <div className="flex items-center justify-between px-1 text-xs font-semibold text-slate-400">
+                  <span>{groupKey === 'unplanned' ? '待安排' : `${formatScheduleDateTitle(groupKey)} · ${getScheduleRelativeLabel(groupKey, today)}`}</span>
+                  <span>{groupedItems[groupKey].length} 项</span>
+                </div>
+                {groupedItems[groupKey].map((item) => {
+                  const expanded = expandedScheduleId === item.id;
 
-              return (
-                <article key={item.id} className={`rounded-[24px] border bg-white shadow-sm transition ${expanded ? 'border-brand/20 ring-4 ring-brand/5' : 'border-slate-100 hover:border-brand/20'}`}>
-                  <div className="grid gap-3 px-4 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-                    <button
-                      type="button"
-                      onClick={() => onDoneChange(item.id, !item.done)}
-                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
-                        item.done ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-300 hover:border-brand hover:text-brand'
-                      }`}
-                      aria-label={item.done ? `恢复日程：${item.title}` : `完成日程：${item.title}`}
-                    >
-                      <Square className="h-3.5 w-3.5" />
-                    </button>
+                  return (
+                    <article key={item.id} className={`rounded-[24px] border bg-white shadow-sm transition ${expanded ? 'border-brand/20 ring-4 ring-brand/5' : 'border-slate-100 hover:border-brand/20'}`}>
+                      <div className="grid gap-3 px-4 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+                        <button
+                          type="button"
+                          onClick={() => onDoneChange(item.id, !item.done)}
+                          className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                            item.done ? 'bg-brand text-white' : 'bg-slate-50 text-slate-300 hover:text-brand'
+                          }`}
+                          aria-label={item.done ? `恢复日程：${item.title}` : `完成日程：${item.title}`}
+                        >
+                          {item.done ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setExpandedScheduleId(expanded ? '' : item.id)}
-                      className="min-w-0 text-left"
-                    >
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className={`line-clamp-1 text-base font-semibold ${item.done ? 'text-slate-400 line-through' : 'text-ink'}`}>{item.title}</span>
-                        <span className="rounded-full bg-brand/8 px-2.5 py-1 text-xs font-semibold text-brand">{item.type}</span>
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.done ? 'bg-emerald-50 text-brand' : 'bg-amber-50 text-amber-700'}`}>
-                          {item.done ? '已完成' : '未完成'}
-                        </span>
-                      </span>
-                      <span className="mt-1 block line-clamp-2 text-sm leading-6 text-slate-500">{item.detail}</span>
-                    </button>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedScheduleId(expanded ? '' : item.id)}
+                          className="min-w-0 text-left"
+                        >
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className={`line-clamp-1 text-base font-semibold ${item.done ? 'text-slate-400 line-through' : 'text-ink'}`}>{item.title}</span>
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getScheduleTypeTone(item.type)}`}>{item.type}</span>
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.done ? 'bg-emerald-50 text-brand' : 'bg-amber-50 text-amber-700'}`}>
+                              {item.done ? '已完成' : '未完成'}
+                            </span>
+                          </span>
+                          <span className="mt-1 block line-clamp-2 text-sm leading-6 text-slate-500">{item.detail}</span>
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setExpandedScheduleId(expanded ? '' : item.id)}
-                      className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3 text-left sm:min-w-[150px]"
-                    >
-                      <span>
-                        <span className="block text-xs font-semibold text-slate-400">时间</span>
-                        <span className="mt-1 block text-sm font-semibold text-ink">{item.dateLabel}</span>
-                      </span>
-                      <ChevronRight className={`h-4 w-4 text-slate-400 transition ${expanded ? 'rotate-90 text-brand' : ''}`} />
-                    </button>
-                  </div>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedScheduleId(expanded ? '' : item.id)}
+                          className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3 text-left sm:min-w-[170px]"
+                        >
+                          <span>
+                            <span className="block text-xs font-semibold text-slate-400">{getScheduleRelativeLabel(item.date, today)}</span>
+                            <span className="mt-1 block text-sm font-semibold text-ink">{item.dateLabel}</span>
+                          </span>
+                          <ChevronRight className={`h-4 w-4 text-slate-400 transition ${expanded ? 'rotate-90 text-brand' : ''}`} />
+                        </button>
+                      </div>
 
-                  {expanded ? (
-                    <ScheduleEditor
-                      item={item}
-                      onSave={(patch) => {
-                        onUpdateTodo(item.id, patch);
-                        setExpandedScheduleId('');
-                      }}
-                      onDelete={() => {
-                        onDeleteTodo(item.id);
-                        setExpandedScheduleId('');
-                      }}
-                      onDoneChange={(done) => onDoneChange(item.id, done)}
-                    />
-                  ) : null}
-                </article>
-              );
-            })
+                      {expanded ? (
+                        <ScheduleEditor
+                          item={item}
+                          onSave={(patch) => {
+                            onUpdateTodo(item.id, patch);
+                            if (patch.date) {
+                              setSelectedDate(patch.date);
+                              onCalendarMonthChange(getMonthKey(patch.date));
+                            }
+                            setExpandedScheduleId('');
+                          }}
+                          onDelete={() => {
+                            onDeleteTodo(item.id);
+                            setExpandedScheduleId('');
+                          }}
+                          onDoneChange={(done) => onDoneChange(item.id, done)}
+                        />
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+            ))
           ) : (
             <div className="rounded-[28px] border border-dashed border-slate-200 px-5 py-14 text-center">
               <div className="text-lg font-semibold text-ink">当前条件下暂无日程</div>
