@@ -851,8 +851,15 @@ export default function MePage() {
   }
 
   function handleAddContact() {
-    setContacts((current) => [createEmptyContact(), ...current]);
+    const nextContact = createEmptyContact();
+    setContacts((current) => [nextContact, ...current]);
+    setContactRangeFilter('全部');
+    setContactFeedbackFilter('全部');
+    setContactDeliveryFilter('全部');
+    setContactKeyword('');
+    setContactSort('updated');
     setActiveSection('contacts');
+    return nextContact.id;
   }
 
   function handleContactChange<K extends keyof MentorContact>(id: string, key: K, value: MentorContact[K]) {
@@ -933,514 +940,450 @@ export default function MePage() {
 
   return (
     <SiteShell>
-      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
-        <div>
-          <h1 className="text-4xl font-semibold text-ink md:text-5xl">我的申请</h1>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
-            集中管理申请进度、关键截止、材料准备和后续安排，让每一个目标项目都有清晰下一步。
-          </p>
-        </div>
-
-        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
-          {[
-            { label: '申请项目', value: stats.total.toString(), icon: ClipboardList },
-            { label: '7天内截止', value: stats.upcoming7.toString(), icon: Clock3 },
-            { label: '待补材料', value: stats.materialPending.toString(), icon: BookCheck }
-          ].map((item) => {
-            const Icon = item.icon;
-
-            return (
-              <div key={item.label} className="soft-stat-pill rounded-[28px] px-4 py-4">
-                <div className="flex items-center justify-center gap-3 text-center">
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="whitespace-nowrap text-xs text-slate-500">{item.label}</div>
-                    <div className="whitespace-nowrap text-xl font-semibold text-ink">{item.value}</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="product-card rounded-[30px] p-5 lg:p-6">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px_240px] lg:items-center">
-          <div className="flex items-start gap-4">
-            <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
-              <CalendarDays className="h-6 w-6" />
-            </span>
-            <div>
-              <div className="text-lg font-semibold text-ink">
-                关键时间轴
-              </div>
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                {nearestDeadlineRow
-                  ? `最近项目：${getDisplaySchoolName(nearestDeadlineRow.project.schoolName)}，${formatNoticeDateOnly(nearestDeadlineRow.project.deadlineDate)} 截止。`
-                  : '先添加目标项目，工作台会把项目截止、材料进度和保研关键节点统一排好。'}
-              </p>
+      <section className="page-hero overflow-hidden px-6 py-7 lg:px-8">
+        <div className="grid gap-7 lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)] lg:items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-brand/8 px-3 py-1.5 text-xs font-semibold text-brand">
+              <Sparkles className="h-3.5 w-3.5" />
+              申请工作台
+            </div>
+            <h1 className="mt-4 text-4xl font-semibold text-ink md:text-5xl">把申请推进到下一步</h1>
+            <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
+              这里不是简单的项目列表，而是围绕目标、截止、材料和沟通进展搭起来的个人申请控制台。
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href="/notices" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep">
+                <PlusCircle className="h-4 w-4" />
+                添加目标项目
+              </Link>
+              <button
+                type="button"
+                onClick={() => setActiveSection('schedule')}
+                className="inline-flex items-center gap-2 rounded-2xl border border-brand/15 bg-white px-5 py-3 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5"
+              >
+                <CalendarDays className="h-4 w-4" />
+                管理日程
+              </button>
             </div>
           </div>
 
-          <Link
-            href={nearestDeadlineRow ? (nearestDeadlineRow.project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(nearestDeadlineRow.project.id)) : '/notices'}
-            className="flex items-center justify-between rounded-[24px] border border-brand/10 bg-white px-5 py-4 text-brand shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft"
-          >
-            <span>
-              <span className="block text-xs text-slate-500">最近截止</span>
-              <span className="mt-1 block text-3xl font-semibold text-ink">
-                {nearestDeadlineDays === null ? '-' : Math.max(0, nearestDeadlineDays)}
-                <span className="ml-1 text-base font-semibold">天</span>
-              </span>
-            </span>
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8">
-              <ChevronRight className="h-5 w-5" />
-            </span>
-          </Link>
-
-          <button
-            type="button"
-            onClick={() => setActiveSection('schedule')}
-            className="flex items-center justify-between rounded-[24px] bg-brand px-5 py-4 text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
-          >
-            <span>
-              <span className="block text-xs opacity-80">保研倒计时 9.22</span>
-              <span className="mt-1 block text-3xl font-semibold">
-                {baoYanCountdownDays}
-                <span className="ml-1 text-base font-semibold">天</span>
-              </span>
-            </span>
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/15">
-              <Clock3 className="h-5 w-5" />
-            </span>
-          </button>
-        </div>
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-[232px_minmax(0,1fr)]">
-        <aside className="grid content-start gap-4">
-          <section className="surface-card rounded-[28px] p-4">
-            <div className="mb-3 px-2 text-xs font-semibold text-slate-400">我的申请</div>
-            <div className="grid gap-2">
+          <div className="rounded-[30px] bg-white/88 p-4 shadow-soft ring-1 ring-black/5">
+            <div className="grid gap-3 sm:grid-cols-2">
               {[
-                { id: 'applications' as const, label: '申请清单', icon: ClipboardList },
-                { id: 'schedule' as const, label: '我的日程', icon: CalendarDays },
-                { id: 'contacts' as const, label: '我的联系', icon: ListChecks }
-              ].map((item) => {
+                { label: '申请项目', value: stats.total.toString(), hint: '目标总数', icon: ClipboardList },
+                { label: '7天内截止', value: stats.upcoming7.toString(), hint: '需要优先处理', icon: Clock3 },
+                { label: '待补材料', value: stats.materialPending.toString(), hint: '仍有缺口', icon: BookCheck },
+                { label: '保研倒计时', value: baoYanCountdownDays.toString(), hint: '距离 9.22', icon: CalendarDays }
+              ].map((item, index) => {
                 const Icon = item.icon;
-                const active = activeSection === item.id;
+                const strong = index === 3;
 
                 return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setActiveSection(item.id)}
-                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
-                      active ? 'bg-brand/8 text-brand' : 'text-slate-600 hover:bg-slate-50 hover:text-brand'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </button>
+                  <div key={item.label} className={`rounded-[24px] px-4 py-4 ${strong ? 'bg-brand text-white' : 'bg-slate-50 text-ink'}`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ${strong ? 'bg-white/15 text-white' : 'bg-white text-brand shadow-sm'}`}>
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span className={`text-xs font-semibold ${strong ? 'text-white/75' : 'text-slate-500'}`}>{item.hint}</span>
+                    </div>
+                    <div className="mt-4 text-sm font-semibold">{item.label}</div>
+                    <div className="mt-1 text-3xl font-semibold">
+                      {item.value}
+                      <span className="ml-1 text-sm font-semibold">{item.label === '保研倒计时' ? '天' : ''}</span>
+                    </div>
+                  </div>
                 );
               })}
             </div>
-          </section>
-
-          <section className="surface-card rounded-[28px] p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-500">
-                {activeSection === 'contacts' ? '联系摘要' : activeSection === 'schedule' ? '日程摘要' : '申请摘要'}
-              </div>
-              <span className="rounded-full bg-brand/8 px-2.5 py-1 text-xs font-semibold text-brand">
-                {activeSection === 'contacts' ? '导师' : activeSection === 'schedule' ? '日程' : '进度'}
-              </span>
-            </div>
-            <div className="mt-4 text-3xl font-semibold text-ink">
-              {activeSection === 'contacts' ? contactSummary.total : activeSection === 'schedule' ? filteredScheduleItems.length : stats.total}
-            </div>
-            <div className="mt-1 text-sm text-slate-500">
-              {activeSection === 'contacts' ? '联系对象' : activeSection === 'schedule' ? '当前日程' : '项目总数'}
-            </div>
-            <div className="mt-4 h-2 rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-brand"
-                style={{
-                  width:
-                    activeSection === 'contacts'
-                      ? `${contactSummary.total ? Math.round((contactSummary.delivered / contactSummary.total) * 100) : 0}%`
-                      : activeSection === 'schedule'
-                        ? `${scheduleItems.length ? Math.round((scheduleItems.filter((item) => item.done).length / scheduleItems.length) * 100) : 0}%`
-                        : `${stats.total ? Math.round((stats.submitted / stats.total) * 100) : 0}%`
-                }}
-              />
-            </div>
-            <div className="mt-4 grid gap-2 text-sm text-slate-500">
-              {(activeSection === 'contacts'
-                ? [
-                    ['已投递', contactSummary.delivered],
-                    ['已回复', contactSummary.replied],
-                    ['需跟进', contactSummary.followUp],
-                    ['未联系', contacts.filter((item) => item.feedbackStatus === '未联系').length]
-                  ]
-                : activeSection === 'schedule'
-                  ? [
-                      ['未完成', scheduleItems.filter((item) => !item.done).length],
-                      ['已完成', scheduleItems.filter((item) => item.done).length],
-                      ['截止事项', scheduleItems.filter((item) => item.type === '申请截止').length],
-                      ['材料事项', scheduleItems.filter((item) => item.type === '材料准备').length]
-                    ]
-                  : [
-                      ['准备中', pipelineSummary.准备材料中 + pipelineSummary.已收藏],
-                      ['已提交', pipelineSummary.已提交],
-                      ['待考核', pipelineSummary.待考核],
-                      ['已结束', pipelineSummary.已结束]
-                    ]
-              ).map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between">
-                  <span>{label}</span>
-                  <span className="font-semibold text-ink">{value}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        </aside>
-
-        {activeSection === 'applications' ? (
-        <section id="application-board" className="grid gap-4">
-          <section className="product-card rounded-[30px] p-5 lg:p-6">
-            <div className="flex flex-wrap gap-4 border-b border-slate-100 pb-5">
-              {workbenchTypeFilters.map((item) => (
-                <button
-                  key={item}
-                  onClick={() => setApplicationTypeFilter((current) => (item === '全部' || current === item ? '全部' : item))}
-                  className={`relative px-3 py-2 text-sm font-semibold transition ${
-                    applicationTypeFilter === item ? 'text-brand' : 'text-slate-500 hover:text-brand'
-                  }`}
-                >
-                  {item}
-                  {applicationTypeFilter === item ? <span className="absolute inset-x-3 -bottom-[1.35rem] h-0.5 rounded-full bg-brand" /> : null}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-5 grid gap-4 text-sm">
-              <ApplicationFilterRow
-                label="学校范围"
-                values={workbenchRangeFilters}
-                active={schoolRangeFilter}
-                onChange={(item) => setSchoolRangeFilter((current) => (item === '全部' || current === item ? '全部' : item))}
-                trailing={
-                  <div className="grid gap-2 sm:grid-cols-[72px_260px] sm:items-center">
-                    <span className="font-semibold text-slate-500">学校名称</span>
-                    <input
-                      value={applicationKeyword}
-                      onChange={(event) => setApplicationKeyword(event.target.value)}
-                      placeholder="请输入学校名称"
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-brand/40"
-                    />
-                  </div>
-                }
-              />
-              <ApplicationFilterRow
-                label="进行状态"
-                values={workbenchProgressFilters}
-                active={progressFilter}
-                onChange={(item) => setProgressFilter((current) => (item === '全部' || current === item ? '全部' : item))}
-              />
-              <ApplicationFilterRow
-                label="申请状态"
-                values={workbenchApplicationStatusFilters}
-                active={applicationStatusFilter}
-                onChange={(item) => setApplicationStatusFilter((current) => (item === '全部' || current === item ? '全部' : item))}
-              />
-              <ApplicationFilterRow
-                label="申请结果"
-                values={workbenchResultFilters}
-                active={resultFilter}
-                onChange={(item) => setResultFilter((current) => (item === '全部' || current === item ? '全部' : item))}
-              />
-            </div>
-
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setApplicationKeyword((current) => current.trim())}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep"
-              >
-                <Search className="h-4 w-4" />
-                搜索
-              </button>
-            </div>
-          </section>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap gap-2">
-              {[
-                ['deadline', '按截止日期排序'],
-                ['school', '按学校排序']
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setApplicationSort(value as WorkbenchSortOption)}
-                  className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
-                    applicationSort === value ? 'bg-brand/8 text-brand' : 'bg-white/85 text-slate-600 shadow-sm hover:text-brand'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <Link href="/notices" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep">
-              <PlusCircle className="h-4 w-4" />
-              添加项目
-            </Link>
           </div>
+        </div>
+      </section>
 
-          <details id="manual-entry" className="surface-card rounded-[24px] p-4">
-            <summary className="cursor-pointer list-none text-sm font-semibold text-brand">
-              手动新增项目
-            </summary>
-            <div className="mt-4">
-              <ManualProjectEntryCard compact onCreated={refreshApplicationRows} />
-            </div>
-          </details>
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <section className="product-card rounded-[30px] p-3">
+          <div className="grid gap-2 sm:grid-cols-3">
+            {[
+              { id: 'applications' as const, label: '申请清单', detail: `${stats.total} 个项目`, icon: ClipboardList },
+              { id: 'schedule' as const, label: '我的日程', detail: `${filteredScheduleItems.length} 条日程`, icon: CalendarDays },
+              { id: 'contacts' as const, label: '我的联系', detail: `${contactSummary.total} 位联系人`, icon: ListChecks }
+            ].map((item) => {
+              const Icon = item.icon;
+              const active = activeSection === item.id;
 
-          <section className="surface-card rounded-[30px] p-5">
-            <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-ink">申请进度</h2>
-                <p className="mt-1 text-sm text-slate-500">当前筛选出 {filteredApplicationRows.length} 个项目，可直接维护状态、优先级、材料和备注。</p>
-              </div>
-              <a href="#manual-entry" className="inline-flex items-center gap-2 rounded-2xl border border-brand/20 bg-white px-4 py-2.5 text-sm font-semibold text-brand shadow-sm">
-                手动新增项目
-                <PlusCircle className="h-4 w-4" />
-              </a>
-            </div>
-
-            <div className="mt-5 grid gap-3">
-              {applicationPreview.length ? (
-                applicationPreview.map((row) => (
-                  <ApplicationProgressCard
-                    key={row.item.userProjectId}
-                    row={row}
-                    openChecklistId={openChecklistId}
-                    setOpenChecklistId={setOpenChecklistId}
-                    isDeleting={deletingProjectId === row.item.userProjectId}
-                    onChange={handleRecordChange}
-                    onToggleChecklist={handleToggleChecklist}
-                    onDelete={handleDeleteApplication}
-                  />
-                ))
-              ) : (
-                <div className="rounded-[28px] border border-dashed border-black/10 px-5 py-12 text-center">
-                  <div className="text-lg font-semibold text-ink">{rows.length ? '没有匹配的申请项目' : '你的申请表还是空的'}</div>
-                  <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
-                    {rows.length
-                      ? '调整筛选条件或关键词后再试，所有项目都在当前工作台内维护。'
-                      : '从通知库加入一个目标项目，或手动录入正在跟进的院校，工作台会立刻开始生成提醒和行动清单。'}
-                  </p>
-                  <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-                    <Link href="/notices" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white">
-                      去通知库添加
-                    </Link>
-                    <a href="#manual-entry" className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm">
-                      手动新增项目
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {filteredApplicationRows.length ? (
-              <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                共 {filteredApplicationRows.length} 个项目。状态、优先级、材料清单和备注修改后会自动同步到你的工作区。
-              </div>
-            ) : null}
-          </section>
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveSection(item.id)}
+                  className={`flex items-center gap-3 rounded-[24px] px-4 py-4 text-left transition ${
+                    active ? 'bg-brand text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-brand'
+                  }`}
+                >
+                  <span className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ${active ? 'bg-white/15' : 'bg-brand/8 text-brand'}`}>
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold">{item.label}</span>
+                    <span className={`mt-1 block text-xs ${active ? 'text-white/75' : 'text-slate-400'}`}>{item.detail}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </section>
-        ) : null}
 
-        {activeSection === 'schedule' ? (
-          <ScheduleWorkspace
-            items={filteredScheduleItems}
-            totalCount={scheduleItems.length}
-            typeFilter={scheduleTypeFilter}
-            doneFilter={scheduleDoneFilter}
-            keyword={scheduleKeyword}
-            onTypeFilterChange={setScheduleTypeFilter}
-            onDoneFilterChange={setScheduleDoneFilter}
-            onKeywordChange={setScheduleKeyword}
-            calendarMonth={calendarMonth}
-            onCalendarMonthChange={setCalendarMonth}
-            onCreateTodo={handleCreateScheduleTodo}
-            onCompleteTodo={handleCompleteTodo}
-            onClearCompleted={handleClearCompleted}
-          />
-        ) : null}
-
-        {activeSection === 'contacts' ? (
-          <ContactsWorkspace
-            contacts={filteredContacts}
-            totalCount={contacts.length}
-            summary={contactSummary}
-            rangeFilter={contactRangeFilter}
-            feedbackFilter={contactFeedbackFilter}
-            deliveryFilter={contactDeliveryFilter}
-            keyword={contactKeyword}
-            sort={contactSort}
-            onRangeFilterChange={setContactRangeFilter}
-            onFeedbackFilterChange={setContactFeedbackFilter}
-            onDeliveryFilterChange={setContactDeliveryFilter}
-            onKeywordChange={setContactKeyword}
-            onSortChange={setContactSort}
-            onAddContact={handleAddContact}
-            onContactChange={handleContactChange}
-            onDeleteContact={handleDeleteContact}
-          />
-        ) : null}
+        <Link
+          href={nearestDeadlineRow ? (nearestDeadlineRow.project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(nearestDeadlineRow.project.id)) : '/notices'}
+          className="product-card flex items-center justify-between rounded-[30px] px-5 py-4 transition hover:-translate-y-0.5 hover:shadow-soft"
+        >
+          <span>
+            <span className="block text-xs font-semibold text-slate-500">最近截止</span>
+            <span className="mt-1 block text-3xl font-semibold text-ink">
+              {nearestDeadlineDays === null ? '-' : Math.max(0, nearestDeadlineDays)}
+              <span className="ml-1 text-base font-semibold">天</span>
+            </span>
+            <span className="mt-1 block max-w-[210px] truncate text-xs text-slate-500">
+              {nearestDeadlineRow ? getDisplaySchoolName(nearestDeadlineRow.project.schoolName) : '从通知库添加目标项目'}
+            </span>
+          </span>
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-brand/8 text-brand">
+            <ChevronRight className="h-5 w-5" />
+          </span>
+        </Link>
       </section>
 
       {activeSection === 'applications' ? (
-      <>
-      <section id="today-actions" className="grid gap-5 xl:grid-cols-3">
-        <section className="surface-card rounded-[30px] p-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold text-ink">今日行动</h2>
-            <button onClick={handleClearCompleted} className="text-sm font-semibold text-slate-400 hover:text-brand">
-              清理完成
-            </button>
-          </div>
-
-          <div className="mt-5 grid gap-3">
-            {todayActionItems.length ? (
-              todayActionItems.map((task) => (
-                <div key={task.id} className="flex items-start gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
-                  <button
-                    onClick={() => handleCompleteTodo(task.id)}
-                    className="mt-0.5 text-slate-300 transition hover:text-brand"
-                    aria-label={`完成任务：${task.text}`}
-                  >
-                    <Square className="h-5 w-5" />
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    {'href' in task && task.href ? (
-                      <Link href={task.href} className="line-clamp-1 text-sm font-semibold text-ink hover:text-brand">
-                        {task.text}
-                      </Link>
-                    ) : (
-                      <div className="line-clamp-1 text-sm font-semibold text-ink">{task.text}</div>
-                    )}
-                    {'detail' in task && task.detail ? (
-                      <div className="mt-1 line-clamp-1 text-xs text-slate-500">{task.detail}</div>
-                    ) : null}
-                  </div>
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <main id="application-board" className="grid gap-5">
+            <section className="product-card rounded-[30px] p-5 lg:p-6">
+              <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-ink">目标项目筛选</h2>
+                  <p className="mt-1 text-sm text-slate-500">先按类型和关键状态缩小范围，再维护材料和申请结果。</p>
                 </div>
-              ))
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-sm leading-7 text-slate-500">
-                当前没有需要立刻处理的任务。加入项目后，这里会自动生成真正的行动清单。
+                <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:w-[320px]">
+                  <Search className="h-4 w-4 text-slate-400" />
+                  <input
+                    value={applicationKeyword}
+                    onChange={(event) => setApplicationKeyword(event.target.value)}
+                    placeholder="搜索学校名称"
+                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                  />
+                </div>
               </div>
-            )}
-          </div>
 
-          <div className="mt-4 flex items-center gap-2 rounded-[18px] border border-black/5 bg-slate-50 px-3 py-2">
-            <input
-              value={todoDraft}
-              onChange={(event) => setTodoDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  handleCreateQuickTodo();
-                }
-              }}
-              placeholder="添加碎片备注，回车保存..."
-              className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400"
-            />
-            <button
-              onClick={handleCreateQuickTodo}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-brand shadow-sm"
-              aria-label="添加任务"
-            >
-              <ArrowUp className="h-4 w-4" />
-            </button>
-          </div>
-        </section>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {workbenchTypeFilters.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setApplicationTypeFilter((current) => (item === '全部' || current === item ? '全部' : item))}
+                    className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                      applicationTypeFilter === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-brand/8 hover:text-brand'
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
 
-        <section className="surface-card rounded-[30px] p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-ink">临近截止</h2>
-            <Link href="/deadlines" className="text-sm font-semibold text-slate-400 hover:text-brand">
-              更多
-            </Link>
-          </div>
-          <div className="grid gap-3">
-            {urgentRows.length ? (
-              urgentRows.map(({ item, project }) => (
-                <Link
-                  key={item.userProjectId}
-                  href={project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(project.id)}
-                  className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm"
+              <div className="mt-5 grid gap-4 text-sm">
+                <ApplicationFilterRow
+                  label="学校范围"
+                  values={workbenchRangeFilters}
+                  active={schoolRangeFilter}
+                  onChange={(item) => setSchoolRangeFilter((current) => (item === '全部' || current === item ? '全部' : item))}
+                />
+                <ApplicationFilterRow
+                  label="进行状态"
+                  values={workbenchProgressFilters}
+                  active={progressFilter}
+                  onChange={(item) => setProgressFilter((current) => (item === '全部' || current === item ? '全部' : item))}
+                />
+                <ApplicationFilterRow
+                  label="申请状态"
+                  values={workbenchApplicationStatusFilters}
+                  active={applicationStatusFilter}
+                  onChange={(item) => setApplicationStatusFilter((current) => (item === '全部' || current === item ? '全部' : item))}
+                />
+                <ApplicationFilterRow
+                  label="申请结果"
+                  values={workbenchResultFilters}
+                  active={resultFilter}
+                  onChange={(item) => setResultFilter((current) => (item === '全部' || current === item ? '全部' : item))}
+                />
+              </div>
+            </section>
+
+            <section className="product-card rounded-[30px] p-5">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                <div>
+                  <h2 className="text-xl font-semibold text-ink">申请进度</h2>
+                  <p className="mt-1 text-sm text-slate-500">当前筛选出 {filteredApplicationRows.length} 个项目，所有状态、优先级和材料清单都在这里维护。</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    ['deadline', '按截止排序'],
+                    ['school', '按学校排序']
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setApplicationSort(value as WorkbenchSortOption)}
+                      className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                        applicationSort === value ? 'bg-brand/8 text-brand' : 'bg-slate-100 text-slate-600 hover:text-brand'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  <Link href="/notices" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-4 py-2 text-sm font-semibold text-white">
+                    <PlusCircle className="h-4 w-4" />
+                    添加项目
+                  </Link>
+                </div>
+              </div>
+
+              <details id="manual-entry" className="mt-5 rounded-[24px] border border-brand/10 bg-brand/5 p-4">
+                <summary className="cursor-pointer list-none text-sm font-semibold text-brand">
+                  手动新增一个未收录项目
+                </summary>
+                <div className="mt-4">
+                  <ManualProjectEntryCard compact onCreated={refreshApplicationRows} />
+                </div>
+              </details>
+
+              <div className="mt-5 grid gap-3">
+                {applicationPreview.length ? (
+                  applicationPreview.map((row) => (
+                    <ApplicationProgressCard
+                      key={row.item.userProjectId}
+                      row={row}
+                      openChecklistId={openChecklistId}
+                      setOpenChecklistId={setOpenChecklistId}
+                      isDeleting={deletingProjectId === row.item.userProjectId}
+                      onChange={handleRecordChange}
+                      onToggleChecklist={handleToggleChecklist}
+                      onDelete={handleDeleteApplication}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-[28px] border border-dashed border-black/10 px-5 py-12 text-center">
+                    <div className="text-lg font-semibold text-ink">{rows.length ? '没有匹配的申请项目' : '你的申请表还是空的'}</div>
+                    <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
+                      {rows.length
+                        ? '调整筛选条件或关键词后再试，所有项目都在当前工作台内维护。'
+                        : '从通知库加入一个目标项目，或手动录入正在跟进的院校，工作台会立刻开始生成提醒和行动清单。'}
+                    </p>
+                    <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                      <Link href="/notices" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white">
+                        去通知库添加
+                      </Link>
+                      <a href="#manual-entry" className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+                        手动新增项目
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {filteredApplicationRows.length ? (
+                <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  共 {filteredApplicationRows.length} 个项目。状态、优先级、材料清单和备注修改后会自动同步到你的工作区。
+                </div>
+              ) : null}
+            </section>
+          </main>
+
+          <aside className="grid content-start gap-5">
+            <section className="surface-card rounded-[30px] p-5">
+              <h2 className="text-xl font-semibold text-ink">申请阶段</h2>
+              <div className="mt-5 grid gap-4">
+                {[
+                  ['准备中', pipelineSummary.准备材料中 + pipelineSummary.已收藏],
+                  ['已提交', pipelineSummary.已提交],
+                  ['待考核', pipelineSummary.待考核],
+                  ['已结束', pipelineSummary.已结束]
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span className="font-semibold text-slate-600">{label}</span>
+                      <span className="font-semibold text-ink">{value}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-slate-100">
+                      <div className="h-full rounded-full bg-brand" style={{ width: `${stats.total ? Math.round((Number(value) / stats.total) * 100) : 0}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section id="today-actions" className="surface-card rounded-[30px] p-5">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl font-semibold text-ink">今日行动</h2>
+                <button onClick={handleClearCompleted} className="text-sm font-semibold text-slate-400 hover:text-brand">
+                  清理完成
+                </button>
+              </div>
+
+              <div className="mt-5 grid gap-3">
+                {todayActionItems.length ? (
+                  todayActionItems.map((task) => (
+                    <div key={task.id} className="flex items-start gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
+                      <button
+                        onClick={() => handleCompleteTodo(task.id)}
+                        className="mt-0.5 text-slate-300 transition hover:text-brand"
+                        aria-label={`完成任务：${task.text}`}
+                      >
+                        <Square className="h-5 w-5" />
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        {'href' in task && task.href ? (
+                          <Link href={task.href} className="line-clamp-1 text-sm font-semibold text-ink hover:text-brand">
+                            {task.text}
+                          </Link>
+                        ) : (
+                          <div className="line-clamp-1 text-sm font-semibold text-ink">{task.text}</div>
+                        )}
+                        {'detail' in task && task.detail ? (
+                          <div className="mt-1 line-clamp-1 text-xs text-slate-500">{task.detail}</div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-sm leading-7 text-slate-500">
+                    当前没有需要立刻处理的任务。加入项目后，这里会自动生成真正的行动清单。
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 flex items-center gap-2 rounded-[18px] border border-black/5 bg-slate-50 px-3 py-2">
+                <input
+                  value={todoDraft}
+                  onChange={(event) => setTodoDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleCreateQuickTodo();
+                    }
+                  }}
+                  placeholder="添加碎片备注，回车保存..."
+                  className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                />
+                <button
+                  onClick={handleCreateQuickTodo}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-brand shadow-sm"
+                  aria-label="添加任务"
                 >
-                  <span className="rounded-2xl bg-rose-50 px-2 py-2 text-center text-xs font-semibold text-rose-500">
-                    {getDaysLeft(project.deadlineDate) ?? '-'}
-                    <br />
-                    天
+                  <ArrowUp className="h-4 w-4" />
+                </button>
+              </div>
+            </section>
+
+            <section className="surface-card rounded-[30px] p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-ink">临近截止</h2>
+                <Link href="/deadlines" className="text-sm font-semibold text-slate-400 hover:text-brand">
+                  更多
+                </Link>
+              </div>
+              <div className="grid gap-3">
+                {urgentRows.length ? (
+                  urgentRows.map(({ item, project }) => (
+                    <Link
+                      key={item.userProjectId}
+                      href={project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(project.id)}
+                      className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm"
+                    >
+                      <span className="rounded-2xl bg-rose-50 px-2 py-2 text-center text-xs font-semibold text-rose-500">
+                        {getDaysLeft(project.deadlineDate) ?? '-'}
+                        <br />
+                        天
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</span>
+                        <span className="mt-1 block truncate text-xs text-slate-500">{formatNoticeDateOnly(project.deadlineDate)} 截止 · {item.myStatus}</span>
+                      </span>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-sm text-slate-500">
+                    暂无 7 天内截止项目。
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="surface-card rounded-[30px] p-5">
+              <h2 className="text-xl font-semibold text-ink">申请提醒</h2>
+              <div className="mt-5 grid gap-3">
+                <Link href="/resources" className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-brand shadow-sm">
+                    <FileText className="h-5 w-5" />
                   </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</span>
-                    <span className="mt-1 block truncate text-xs text-slate-500">{formatNoticeDateOnly(project.deadlineDate)} 截止</span>
-                  </span>
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getWorkbenchStatusTone(item.myStatus)}`}>
-                    {item.myStatus}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-ink">
+                      检查 {applicationPreview[0]?.project.schoolName || '目标院校'} 的材料准备
+                    </span>
+                    <span className="mt-1 block text-xs text-slate-500">建议优先补齐简历、个人陈述和证明材料</span>
                   </span>
                 </Link>
-              ))
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-sm text-slate-500">
-                暂无 7 天内截止项目。
+                <Link href="/notices" className="flex items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-amber-600 shadow-sm">
+                    <Search className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-ink">继续补充目标项目</span>
+                    <span className="mt-1 block text-xs text-slate-500">可按学校、学院和专业关键词继续筛选</span>
+                  </span>
+                </Link>
               </div>
-            )}
-          </div>
+            </section>
+          </aside>
         </section>
+      ) : null}
 
-        <section className="surface-card rounded-[30px] p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-ink">申请提醒</h2>
-            <Link href="/deadlines" className="text-sm font-semibold text-slate-400 hover:text-brand">
-              更多
-            </Link>
-          </div>
-          <div className="grid gap-3">
-            <Link href="/resources" className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-brand shadow-sm">
-                <FileText className="h-5 w-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-ink">
-                  检查 {applicationPreview[0]?.project.schoolName || '目标院校'} 的材料准备
-                </span>
-                <span className="mt-1 block text-xs text-slate-500">建议优先补齐简历、个人陈述和证明材料</span>
-              </span>
-              <ChevronRight className="h-4 w-4 text-slate-400" />
-            </Link>
-            <Link href="/notices" className="flex items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-amber-600 shadow-sm">
-                <Search className="h-5 w-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-ink">发现 {Math.max(3, stats.materialPending)} 个可继续跟进的新增项目</span>
-                <span className="mt-1 block text-xs text-slate-500">可按学校、学院和专业关键词继续筛选</span>
-              </span>
-              <ChevronRight className="h-4 w-4 text-slate-400" />
-            </Link>
-          </div>
-        </section>
-      </section>
+      {activeSection === 'schedule' ? (
+        <ScheduleWorkspace
+          items={filteredScheduleItems}
+          totalCount={scheduleItems.length}
+          typeFilter={scheduleTypeFilter}
+          doneFilter={scheduleDoneFilter}
+          keyword={scheduleKeyword}
+          onTypeFilterChange={setScheduleTypeFilter}
+          onDoneFilterChange={setScheduleDoneFilter}
+          onKeywordChange={setScheduleKeyword}
+          calendarMonth={calendarMonth}
+          onCalendarMonthChange={setCalendarMonth}
+          onCreateTodo={handleCreateScheduleTodo}
+          onCompleteTodo={handleCompleteTodo}
+          onClearCompleted={handleClearCompleted}
+        />
+      ) : null}
 
+      {activeSection === 'contacts' ? (
+        <ContactsWorkspace
+          contacts={filteredContacts}
+          totalCount={contacts.length}
+          summary={contactSummary}
+          rangeFilter={contactRangeFilter}
+          feedbackFilter={contactFeedbackFilter}
+          deliveryFilter={contactDeliveryFilter}
+          keyword={contactKeyword}
+          sort={contactSort}
+          onRangeFilterChange={setContactRangeFilter}
+          onFeedbackFilterChange={setContactFeedbackFilter}
+          onDeliveryFilterChange={setContactDeliveryFilter}
+          onKeywordChange={setContactKeyword}
+          onSortChange={setContactSort}
+          onAddContact={handleAddContact}
+          onContactChange={handleContactChange}
+          onDeleteContact={handleDeleteContact}
+        />
+      ) : null}
+
+      {activeSection === 'applications' ? (
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]">
         <section id="profile-form" className="surface-card rounded-[30px] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1528,7 +1471,6 @@ export default function MePage() {
           </div>
         </section>
       </section>
-      </>
       ) : null}
 
     </SiteShell>
@@ -1920,10 +1862,16 @@ function ContactsWorkspace({
   onDeliveryFilterChange: (value: '全部' | ContactDeliveryStatus) => void;
   onKeywordChange: (value: string) => void;
   onSortChange: (value: ContactSortOption) => void;
-  onAddContact: () => void;
+  onAddContact: () => string;
   onContactChange: <K extends keyof MentorContact>(id: string, key: K, value: MentorContact[K]) => void;
   onDeleteContact: (id: string) => void;
 }) {
+  const [expandedContactId, setExpandedContactId] = useState('');
+  const hasActiveFilters = rangeFilter !== '全部' || feedbackFilter !== '全部' || deliveryFilter !== '全部' || keyword.trim().length > 0;
+  const handleAddContact = () => {
+    setExpandedContactId(onAddContact());
+  };
+
   return (
     <section id="contacts-board" className="grid gap-4">
       <section className="product-card rounded-[30px] p-5 lg:p-6">
@@ -1934,9 +1882,9 @@ function ContactsWorkspace({
               维护导师信息、投递状态和联系反馈，避免邮箱、方向、跟进备注分散在多个表格里。
             </p>
           </div>
-          <button onClick={onAddContact} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep">
+          <button onClick={handleAddContact} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep">
             <PlusCircle className="h-4 w-4" />
-            新增一行
+            添加导师
           </button>
         </div>
 
@@ -1972,96 +1920,164 @@ function ContactsWorkspace({
         <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-ink">联系对象</h2>
-            <p className="mt-1 text-sm text-slate-500">当前显示 {contacts.length} / {totalCount} 位联系人，可直接编辑投递和反馈。</p>
+            <p className="mt-1 text-sm text-slate-500">
+              当前显示 {contacts.length} / {totalCount} 位联系人，新增后会出现在列表顶部，修改内容会自动保存。
+            </p>
           </div>
-          <div className="flex flex-wrap gap-3 text-xs font-semibold text-slate-500">
-            <span className="rounded-full bg-slate-100 px-2.5 py-1">总计 {summary.total}</span>
-            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-600">已投递 {summary.delivered}</span>
-            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-brand">已回复 {summary.replied}</span>
-            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">需跟进 {summary.followUp}</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
+              <span className="rounded-full bg-slate-100 px-2.5 py-1">总计 {summary.total}</span>
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-600">已投递 {summary.delivered}</span>
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-brand">已回复 {summary.replied}</span>
+              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">需跟进 {summary.followUp}</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleAddContact}
+              className="inline-flex items-center gap-2 rounded-2xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep"
+            >
+              <PlusCircle className="h-4 w-4" />
+              添加导师
+            </button>
           </div>
         </div>
 
         <div className="mt-5 grid gap-4">
           {contacts.length ? (
-            contacts.map((contact) => (
-              <article key={contact.id} className="rounded-[26px] border border-slate-100 bg-white p-4 shadow-sm">
-                <div className="grid gap-3 lg:grid-cols-[1.05fr_1fr_0.85fr_0.8fr_auto] lg:items-end">
-                  <CompactField label="所在高校">
-                    <input value={contact.schoolName} onChange={(event) => onContactChange(contact.id, 'schoolName', event.target.value)} placeholder="例如 清华大学" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
-                  </CompactField>
-                  <CompactField label="所在学院">
-                    <input value={contact.departmentName} onChange={(event) => onContactChange(contact.id, 'departmentName', event.target.value)} placeholder="例如 计算机学院" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
-                  </CompactField>
-                  <CompactField label="导师名字">
-                    <input value={contact.mentorName} onChange={(event) => onContactChange(contact.id, 'mentorName', event.target.value)} placeholder="导师名字" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
-                  </CompactField>
-                  <CompactField label="导师职称">
-                    <input value={contact.mentorTitle} onChange={(event) => onContactChange(contact.id, 'mentorTitle', event.target.value)} placeholder="教授 / 副教授" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
-                  </CompactField>
-                  <button type="button" onClick={() => onDeleteContact(contact.id)} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-500 transition hover:bg-rose-100" aria-label="删除联系人">
-                    <Trash2 className="h-4 w-4" />
+            contacts.map((contact) => {
+              const expanded = expandedContactId === contact.id;
+              const title = contact.mentorName || contact.schoolName || '新导师联系人';
+              const subtitle =
+                [contact.schoolName, contact.departmentName, contact.researchDirection].filter(Boolean).join(' · ') ||
+                '保存后会以这一行摘要展示，点击即可继续编辑。';
+
+              return (
+                <article key={contact.id} className={`rounded-[26px] border bg-white shadow-sm transition ${expanded ? 'border-brand/20 ring-4 ring-brand/5' : 'border-slate-100 hover:border-brand/20'}`}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedContactId(expanded ? '' : contact.id)}
+                    className="grid w-full gap-3 px-4 py-4 text-left sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                  >
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-sm font-semibold text-brand">
+                        {(contact.mentorName || contact.schoolName || '导').slice(0, 1)}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-base font-semibold text-ink">{title}</span>
+                        <span className="mt-1 block truncate text-sm text-slate-500">{subtitle}</span>
+                      </span>
+                    </span>
+                    <span className="flex flex-wrap items-center gap-2 text-xs font-semibold sm:justify-end">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-500">{contact.schoolRange}</span>
+                      <span className={contact.deliveryStatus === '已投递' ? 'rounded-full bg-blue-50 px-2.5 py-1 text-blue-600' : 'rounded-full bg-slate-100 px-2.5 py-1 text-slate-500'}>
+                        {contact.deliveryStatus}
+                      </span>
+                      <span className={contact.feedbackStatus === '已回复' || contact.feedbackStatus === '已offer' ? 'rounded-full bg-emerald-50 px-2.5 py-1 text-brand' : 'rounded-full bg-amber-50 px-2.5 py-1 text-amber-700'}>
+                        {contact.feedbackStatus}
+                      </span>
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-400">
+                        <ChevronRight className={`h-4 w-4 transition ${expanded ? 'rotate-90 text-brand' : ''}`} />
+                      </span>
+                    </span>
                   </button>
-                </div>
 
-                <div className="mt-3 grid gap-3 lg:grid-cols-[0.9fr_1fr_1.3fr_1.3fr]">
-                  <CompactField label="学院层次">
-                    <select value={contact.schoolRange} onChange={(event) => onContactChange(contact.id, 'schoolRange', event.target.value as MentorContact['schoolRange'])} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40">
-                      {contactRangeFilters.filter((item) => item !== '全部').map((item) => (
-                        <option key={item} value={item}>{item}</option>
-                      ))}
-                    </select>
-                  </CompactField>
-                  <CompactField label="导师邮箱">
-                    <input value={contact.email} onChange={(event) => onContactChange(contact.id, 'email', event.target.value)} placeholder="mentor@example.com" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
-                  </CompactField>
-                  <CompactField label="导师方向">
-                    <input value={contact.researchDirection} onChange={(event) => onContactChange(contact.id, 'researchDirection', event.target.value)} placeholder="研究方向或关键词" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
-                  </CompactField>
-                  <CompactField label="导师主页">
-                    <input value={contact.homepage} onChange={(event) => onContactChange(contact.id, 'homepage', event.target.value)} placeholder="https://..." className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
-                  </CompactField>
-                </div>
+                  {expanded ? (
+                    <div className="border-t border-slate-100 px-4 pb-4 pt-4">
+                      <div className="mb-4 flex flex-col gap-3 rounded-[22px] bg-slate-50/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="text-sm font-semibold text-ink">编辑导师信息</div>
+                          <div className="mt-1 text-xs text-slate-500">内容会自动保存，确认无误后可以收起成一行摘要。</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedContactId('')}
+                          className="inline-flex items-center justify-center rounded-2xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep"
+                        >
+                          保存并收起
+                        </button>
+                      </div>
 
-                <div className="mt-3 grid gap-3 lg:grid-cols-[0.85fr_0.85fr_1fr]">
-                  <CompactField label="投递状态">
-                    <select value={contact.deliveryStatus} onChange={(event) => onContactChange(contact.id, 'deliveryStatus', event.target.value as ContactDeliveryStatus)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40">
-                      {contactDeliveryFilters.filter((item) => item !== '全部').map((item) => (
-                        <option key={item} value={item}>{item}</option>
-                      ))}
-                    </select>
-                  </CompactField>
-                  <CompactField label="联系反馈">
-                    <select value={contact.feedbackStatus} onChange={(event) => onContactChange(contact.id, 'feedbackStatus', event.target.value as ContactFeedbackStatus)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40">
-                      {contactFeedbackFilters.filter((item) => item !== '全部').map((item) => (
-                        <option key={item} value={item}>{item}</option>
-                      ))}
-                    </select>
-                  </CompactField>
-                  <CompactField label="最近联系">
-                    <input type="date" value={contact.lastContactDate} onChange={(event) => onContactChange(contact.id, 'lastContactDate', event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
-                  </CompactField>
-                </div>
+                      <div className="grid gap-3 lg:grid-cols-[1.05fr_1fr_0.85fr_0.8fr_auto] lg:items-end">
+                        <CompactField label="所在高校">
+                          <input value={contact.schoolName} onChange={(event) => onContactChange(contact.id, 'schoolName', event.target.value)} placeholder="例如 清华大学" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
+                        </CompactField>
+                        <CompactField label="所在学院">
+                          <input value={contact.departmentName} onChange={(event) => onContactChange(contact.id, 'departmentName', event.target.value)} placeholder="例如 计算机学院" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
+                        </CompactField>
+                        <CompactField label="导师名字">
+                          <input value={contact.mentorName} onChange={(event) => onContactChange(contact.id, 'mentorName', event.target.value)} placeholder="导师名字" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
+                        </CompactField>
+                        <CompactField label="导师职称">
+                          <input value={contact.mentorTitle} onChange={(event) => onContactChange(contact.id, 'mentorTitle', event.target.value)} placeholder="教授 / 副教授" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
+                        </CompactField>
+                        <button type="button" onClick={() => onDeleteContact(contact.id)} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-500 transition hover:bg-rose-100" aria-label="删除联系人">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
 
-                <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                  <CompactField label="导师特点">
-                    <textarea value={contact.contactNotes} onChange={(event) => onContactChange(contact.id, 'contactNotes', event.target.value)} rows={3} placeholder="职称、团队情况、招生倾向、沟通印象等" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
-                  </CompactField>
-                  <CompactField label="备注">
-                    <textarea value={contact.notes} onChange={(event) => onContactChange(contact.id, 'notes', event.target.value)} rows={3} placeholder="补充信息、下次跟进动作或材料说明" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
-                  </CompactField>
-                </div>
-              </article>
-            ))
+                      <div className="mt-3 grid gap-3 lg:grid-cols-[0.9fr_1fr_1.3fr_1.3fr]">
+                        <CompactField label="学院层次">
+                          <select value={contact.schoolRange} onChange={(event) => onContactChange(contact.id, 'schoolRange', event.target.value as MentorContact['schoolRange'])} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40">
+                            {contactRangeFilters.filter((item) => item !== '全部').map((item) => (
+                              <option key={item} value={item}>{item}</option>
+                            ))}
+                          </select>
+                        </CompactField>
+                        <CompactField label="导师邮箱">
+                          <input value={contact.email} onChange={(event) => onContactChange(contact.id, 'email', event.target.value)} placeholder="mentor@example.com" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
+                        </CompactField>
+                        <CompactField label="导师方向">
+                          <input value={contact.researchDirection} onChange={(event) => onContactChange(contact.id, 'researchDirection', event.target.value)} placeholder="研究方向或关键词" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
+                        </CompactField>
+                        <CompactField label="导师主页">
+                          <input value={contact.homepage} onChange={(event) => onContactChange(contact.id, 'homepage', event.target.value)} placeholder="https://..." className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
+                        </CompactField>
+                      </div>
+
+                      <div className="mt-3 grid gap-3 lg:grid-cols-[0.85fr_0.85fr_1fr]">
+                        <CompactField label="投递状态">
+                          <select value={contact.deliveryStatus} onChange={(event) => onContactChange(contact.id, 'deliveryStatus', event.target.value as ContactDeliveryStatus)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40">
+                            {contactDeliveryFilters.filter((item) => item !== '全部').map((item) => (
+                              <option key={item} value={item}>{item}</option>
+                            ))}
+                          </select>
+                        </CompactField>
+                        <CompactField label="联系反馈">
+                          <select value={contact.feedbackStatus} onChange={(event) => onContactChange(contact.id, 'feedbackStatus', event.target.value as ContactFeedbackStatus)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40">
+                            {contactFeedbackFilters.filter((item) => item !== '全部').map((item) => (
+                              <option key={item} value={item}>{item}</option>
+                            ))}
+                          </select>
+                        </CompactField>
+                        <CompactField label="最近联系">
+                          <input type="date" value={contact.lastContactDate} onChange={(event) => onContactChange(contact.id, 'lastContactDate', event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
+                        </CompactField>
+                      </div>
+
+                      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                        <CompactField label="导师特点">
+                          <textarea value={contact.contactNotes} onChange={(event) => onContactChange(contact.id, 'contactNotes', event.target.value)} rows={3} placeholder="职称、团队情况、招生倾向、沟通印象等" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
+                        </CompactField>
+                        <CompactField label="备注">
+                          <textarea value={contact.notes} onChange={(event) => onContactChange(contact.id, 'notes', event.target.value)} rows={3} placeholder="补充信息、下次跟进动作或材料说明" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-brand/40" />
+                        </CompactField>
+                      </div>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })
           ) : (
             <div className="rounded-[28px] border border-dashed border-slate-200 px-5 py-14 text-center">
               <div className="text-lg font-semibold text-ink">{totalCount ? '没有匹配的联系人' : '还没有联系对象'}</div>
               <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
-                {totalCount ? '调整筛选条件或关键词后再试。' : '先新增导师联系人，再记录邮箱、方向、投递状态和反馈。'}
+                {totalCount && hasActiveFilters
+                  ? '当前筛选条件把联系人隐藏了。添加新导师会自动回到全部联系人，也可以手动清空筛选后再查看。'
+                  : '先新增导师联系人，再记录邮箱、方向、投递状态和反馈。'}
               </p>
-              <button onClick={onAddContact} className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white">
+              <button onClick={handleAddContact} className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white">
                 <PlusCircle className="h-4 w-4" />
-                新增联系人
+                添加导师
               </button>
             </div>
           )}
@@ -2131,7 +2147,7 @@ function ApplicationProgressCard({
 
   return (
     <article className="rounded-[28px] border border-slate-100 bg-white px-5 py-5 shadow-sm transition hover:border-brand/20 hover:shadow-soft md:px-7">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.9fr)_130px_150px_150px_150px] xl:items-center">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.82fr)] lg:items-start">
         <div className="flex min-w-0 items-start gap-5">
           <WorkbenchApplicationMark project={project} />
           <div className="min-w-0 flex-1 pt-1">
@@ -2150,63 +2166,65 @@ function ApplicationProgressCard({
           </div>
         </div>
 
-        <div className="rounded-2xl bg-slate-50/70 px-4 py-3 text-sm xl:bg-transparent xl:px-0 xl:py-0">
-          <div className="text-xs font-semibold text-slate-400">截止时间</div>
-          <div className={project.deadlineLevel === 'expired' || project.deadlineLevel === 'today' ? 'mt-2 font-semibold text-rose-500' : 'mt-2 font-semibold text-brand'}>
-            {formatNoticeDateOnly(project.deadlineDate)}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl bg-slate-50/80 px-4 py-3 text-sm">
+            <div className="text-xs font-semibold text-slate-400">截止时间</div>
+            <div className={project.deadlineLevel === 'expired' || project.deadlineLevel === 'today' ? 'mt-2 font-semibold text-rose-500' : 'mt-2 font-semibold text-brand'}>
+              {formatNoticeDateOnly(project.deadlineDate)}
+            </div>
+            <div className="mt-1 text-xs text-slate-500">{daysLeft === null ? '待补充' : daysLeft < 0 ? `超期 ${Math.abs(daysLeft)} 天` : `剩余 ${daysLeft} 天`}</div>
           </div>
-          <div className="mt-1 text-xs text-slate-500">{daysLeft === null ? '待补充' : daysLeft < 0 ? `超期 ${Math.abs(daysLeft)} 天` : `剩余 ${daysLeft} 天`}</div>
-        </div>
 
-        <div className="rounded-2xl bg-slate-50/70 px-4 py-3 xl:bg-transparent xl:px-0 xl:py-0">
-          <div className="mb-2 flex items-center justify-between text-xs">
-            <span className="font-semibold text-slate-400">材料进度</span>
-            <span className={missing ? 'font-semibold text-orange-500' : 'font-semibold text-brand'}>
-              {missing ? `待补 ${missing}` : '已完成'}
-            </span>
+          <div className="rounded-2xl bg-slate-50/80 px-4 py-3">
+            <div className="mb-2 flex items-center justify-between text-xs">
+              <span className="font-semibold text-slate-400">材料进度</span>
+              <span className={missing ? 'font-semibold text-orange-500' : 'font-semibold text-brand'}>
+                {missing ? `待补 ${missing}` : '已完成'}
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-brand" style={{ width: `${item.materialsProgress}%` }} />
+            </div>
+            <div className="mt-1 text-xs font-semibold text-ink">{completed} / {total}</div>
           </div>
-          <div className="h-2 rounded-full bg-slate-100">
-            <div className="h-full rounded-full bg-brand" style={{ width: `${item.materialsProgress}%` }} />
+
+          <div className="rounded-2xl bg-slate-50/80 px-4 py-3">
+            <div className="mb-2 text-xs font-semibold text-slate-400">优先级</div>
+            <select
+              value={item.priorityLevel}
+              onChange={(event) =>
+                onChange(item.userProjectId, {
+                  priorityLevel: event.target.value as UserProjectRecord['priorityLevel']
+                })
+              }
+              className={`w-full rounded-xl border border-transparent px-3 py-2 text-xs font-semibold outline-none ${getPriorityTone(item.priorityLevel)}`}
+            >
+              {priorityOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="mt-1 text-xs font-semibold text-ink">{completed} / {total}</div>
-        </div>
 
-        <div className="rounded-2xl bg-slate-50/70 px-4 py-3 xl:bg-transparent xl:px-0 xl:py-0">
-          <div className="mb-2 text-xs font-semibold text-slate-400">优先级</div>
-          <select
-            value={item.priorityLevel}
-            onChange={(event) =>
-              onChange(item.userProjectId, {
-                priorityLevel: event.target.value as UserProjectRecord['priorityLevel']
-              })
-            }
-            className={`w-full rounded-xl border border-transparent px-3 py-2 text-xs font-semibold outline-none ${getPriorityTone(item.priorityLevel)}`}
-          >
-            {priorityOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="rounded-2xl bg-slate-50/70 px-4 py-3 xl:bg-transparent xl:px-0 xl:py-0">
-          <div className="mb-2 text-xs font-semibold text-slate-400">状态</div>
-          <select
-            value={item.myStatus}
-            onChange={(event) =>
-              onChange(item.userProjectId, {
-                myStatus: event.target.value as UserProjectRecord['myStatus']
-              })
-            }
-            className={`w-full rounded-xl border border-transparent px-3 py-2 text-xs font-semibold outline-none ${getWorkbenchStatusTone(item.myStatus)}`}
-          >
-            {userStatusOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+          <div className="rounded-2xl bg-slate-50/80 px-4 py-3">
+            <div className="mb-2 text-xs font-semibold text-slate-400">状态</div>
+            <select
+              value={item.myStatus}
+              onChange={(event) =>
+                onChange(item.userProjectId, {
+                  myStatus: event.target.value as UserProjectRecord['myStatus']
+                })
+              }
+              className={`w-full rounded-xl border border-transparent px-3 py-2 text-xs font-semibold outline-none ${getWorkbenchStatusTone(item.myStatus)}`}
+            >
+              {userStatusOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
