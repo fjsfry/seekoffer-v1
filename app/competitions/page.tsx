@@ -7,8 +7,10 @@ import {
   ArrowUpRight,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   Filter,
   Flame,
+  RotateCcw,
   Search,
   Trophy
 } from 'lucide-react';
@@ -25,12 +27,34 @@ import {
 type LevelFilter = (typeof competitionLevelOptions)[number];
 type DeadlineFilter = (typeof competitionDeadlineOptions)[number];
 
+type CompetitionFilters = {
+  level: LevelFilter;
+  category: string;
+  deadline: DeadlineFilter;
+  keyword: string;
+};
+
+const CATEGORY_PREVIEW_LIMIT = 18;
+
+const deadlineLabels: Record<DeadlineFilter, string> = {
+  全部: '全部',
+  有截止时间: '有截止',
+  '30天内': '30天内',
+  已过期: '已过期',
+  长期准备: '长期准备'
+};
+
 export default function CompetitionsPage() {
   const [level, setLevel] = useState<LevelFilter>('全部');
   const [category, setCategory] = useState('全部');
   const [deadline, setDeadline] = useState<DeadlineFilter>('全部');
   const [keyword, setKeyword] = useState('');
+  const [showAllCategories, setShowAllCategories] = useState(false);
   const categories = useMemo(() => getCompetitionCategories(), []);
+  const filters = useMemo<CompetitionFilters>(
+    () => ({ level, category, deadline, keyword }),
+    [category, deadline, keyword, level]
+  );
   const pageStats = useMemo(
     () => [
       { label: '总赛事', value: competitionItems.length, icon: Trophy },
@@ -40,28 +64,62 @@ export default function CompetitionsPage() {
     []
   );
   const filteredItems = useMemo(
-    () =>
-      competitionItems.filter((item) => {
-        const normalizedKeyword = keyword.trim().toLowerCase();
-        const matchesKeyword =
-          !normalizedKeyword ||
-          [item.title, item.shortName, item.category, item.organizer]
-            .join(' ')
-            .toLowerCase()
-            .includes(normalizedKeyword);
-        const matchesLevel = level === '全部' || item.level === level;
-        const matchesCategory =
-          category === '全部' ||
-          item.category
-            .split('/')
-            .map((entry) => entry.trim())
-            .includes(category);
-        const matchesDeadline = matchesDeadlineFilter(item, deadline);
+    () => competitionItems.filter((item) => matchesCompetitionFilters(item, filters)),
+    [filters]
+  );
+  const levelCounts = useMemo(
+    () => buildFilterCounts(competitionLevelOptions, filters, 'level'),
+    [filters]
+  );
+  const deadlineCounts = useMemo(
+    () => buildFilterCounts(competitionDeadlineOptions, filters, 'deadline'),
+    [filters]
+  );
+  const categoryCounts = useMemo(
+    () => buildFilterCounts(categories, filters, 'category'),
+    [categories, filters]
+  );
+  const orderedCategories = useMemo(() => {
+    const [allOption, ...restOptions] = categories;
 
-        return matchesKeyword && matchesLevel && matchesCategory && matchesDeadline;
-      }),
+    return [
+      allOption,
+      ...restOptions.sort((left, right) => {
+        const countDelta = (categoryCounts.get(right) ?? 0) - (categoryCounts.get(left) ?? 0);
+        return countDelta || left.localeCompare(right, 'zh-CN');
+      })
+    ];
+  }, [categories, categoryCounts]);
+  const categoryPreviewOptions = useMemo(() => {
+    if (showAllCategories) return orderedCategories;
+
+    const preview = orderedCategories.slice(0, CATEGORY_PREVIEW_LIMIT);
+    if (category !== '全部' && !preview.includes(category)) {
+      return [...preview, category];
+    }
+
+    return preview;
+  }, [category, orderedCategories, showAllCategories]);
+  const activeFilterLabels = useMemo(
+    () =>
+      [
+        level !== '全部' ? `级别：${level}` : '',
+        category !== '全部' ? `类别：${category}` : '',
+        deadline !== '全部' ? `节点：${deadlineLabels[deadline]}` : '',
+        keyword.trim() ? `关键词：${keyword.trim()}` : ''
+      ].filter(Boolean),
     [category, deadline, keyword, level]
   );
+  const hasActiveFilters = activeFilterLabels.length > 0;
+  const hiddenCategoryCount = Math.max(orderedCategories.length - CATEGORY_PREVIEW_LIMIT, 0);
+
+  const resetFilters = () => {
+    setLevel('全部');
+    setCategory('全部');
+    setDeadline('全部');
+    setKeyword('');
+    setShowAllCategories(false);
+  };
 
   return (
     <SiteShell>
@@ -96,7 +154,7 @@ export default function CompetitionsPage() {
         </div>
       </section>
 
-      <section className="surface-card rounded-[32px] p-5 lg:p-6">
+      <section className="surface-card overflow-hidden rounded-[32px] p-5 lg:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-brand/8 text-brand">
@@ -109,19 +167,16 @@ export default function CompetitionsPage() {
           </div>
           <button
             type="button"
-            onClick={() => {
-              setLevel('全部');
-              setCategory('全部');
-              setDeadline('全部');
-              setKeyword('');
-            }}
-            className="inline-flex w-fit items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-brand/30 hover:text-brand"
+            onClick={resetFilters}
+            disabled={!hasActiveFilters}
+            className="inline-flex w-fit items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-brand/30 hover:text-brand disabled:cursor-not-allowed disabled:opacity-45"
           >
+            <RotateCcw className="h-4 w-4" />
             重置筛选
           </button>
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
           <label className="relative block">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
@@ -131,33 +186,67 @@ export default function CompetitionsPage() {
               className="h-12 w-full rounded-2xl border border-slate-100 bg-white pl-12 pr-4 text-sm font-semibold text-ink outline-none transition placeholder:text-slate-400 focus:border-brand/35 focus:ring-4 focus:ring-brand/8"
             />
           </label>
-          <select
-            value={deadline}
-            onChange={(event) => setDeadline(event.target.value as DeadlineFilter)}
-            className="h-12 rounded-2xl border border-slate-100 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-brand/35 focus:ring-4 focus:ring-brand/8"
-          >
-            {competitionDeadlineOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-sm font-semibold text-slate-600">
+            当前显示 <span className="text-brand">{filteredItems.length}</span>
+            <span className="mx-1 text-slate-300">/</span>
+            {competitionItems.length} 个赛事
+          </div>
         </div>
 
-        <div className="mt-5 grid gap-4">
+        <div className="mt-5 rounded-[24px] border border-slate-100 bg-slate-50/60 p-4">
+          <div className="grid gap-4">
           <FilterChips
             label="级别"
             options={competitionLevelOptions}
             value={level}
-            onChange={(value) => setLevel(value as LevelFilter)}
+              counts={levelCounts}
+              onChange={(value) =>
+                setLevel((current) => (current === value && value !== '全部' ? '全部' : (value as LevelFilter)))
+              }
           />
-          <FilterChips label="类别" options={categories} value={category} onChange={setCategory} />
+            <FilterChips
+              label="报名节点"
+              options={competitionDeadlineOptions}
+              value={deadline}
+              counts={deadlineCounts}
+              getLabel={(option) => deadlineLabels[option as DeadlineFilter] ?? option}
+              onChange={(value) =>
+                setDeadline((current) =>
+                  current === value && value !== '全部' ? '全部' : (value as DeadlineFilter)
+                )
+              }
+            />
+            <FilterChips
+              label="专业类别"
+              options={categoryPreviewOptions}
+              value={category}
+              counts={categoryCounts}
+              onChange={(value) => setCategory((current) => (current === value && value !== '全部' ? '全部' : value))}
+            />
+            {hiddenCategoryCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => setShowAllCategories((current) => !current)}
+                className="inline-flex w-fit items-center gap-1 rounded-2xl bg-white px-3.5 py-2 text-xs font-semibold text-brand shadow-sm ring-1 ring-slate-100 transition hover:ring-brand/20"
+              >
+                {showAllCategories ? '收起类别' : `展开全部类别（还有 ${hiddenCategoryCount} 个）`}
+                <ChevronDown className={`h-3.5 w-3.5 transition ${showAllCategories ? 'rotate-180' : ''}`} />
+              </button>
+            ) : null}
+          </div>
         </div>
       </section>
 
       <section className="flex flex-wrap items-center justify-between gap-3 px-1 lg:px-2">
-        <div className="text-sm font-semibold text-slate-500">
-          当前显示 <span className="text-brand">{filteredItems.length}</span> 个赛事
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold text-slate-500">
+          <span>
+            当前显示 <span className="text-brand">{filteredItems.length}</span> 个赛事
+          </span>
+          {activeFilterLabels.map((item) => (
+            <span key={item} className="rounded-full bg-white/85 px-3 py-1 text-xs text-brand shadow-sm ring-1 ring-slate-100">
+              {item}
+            </span>
+          ))}
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs leading-6 text-slate-400">
           <a href="https://www.cahe.edu.cn/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand hover:text-brand-deep">
@@ -191,38 +280,92 @@ function FilterChips({
   label,
   options,
   value,
-  onChange
+  counts,
+  onChange,
+  getLabel = (option) => option
 }: {
   label: string;
   options: readonly string[];
   value: string;
+  counts: Map<string, number>;
   onChange: (value: string) => void;
+  getLabel?: (value: string) => string;
 }) {
   return (
-    <div className="grid gap-2">
-      <div className="text-xs font-semibold text-slate-500">{label}</div>
-      <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none]">
+    <div className="grid gap-2 md:grid-cols-[72px_minmax(0,1fr)] md:items-start">
+      <div className="pt-2 text-xs font-semibold text-slate-500">{label}</div>
+      <div className="flex min-w-0 flex-wrap gap-2">
         {options.map((option) => {
           const active = value === option;
+          const count = counts.get(option) ?? 0;
+          const disabled = option !== '全部' && count === 0 && !active;
 
           return (
             <button
               key={option}
               type="button"
-              onClick={() => onChange(option)}
-              className={`shrink-0 rounded-2xl border px-3.5 py-2 text-sm font-semibold transition ${
+              onClick={() => {
+                if (!disabled) onChange(option);
+              }}
+              disabled={disabled}
+              aria-pressed={active}
+              className={`inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2 text-sm font-semibold transition ${
                 active
                   ? 'border-brand/25 bg-brand text-white shadow-sm'
-                  : 'border-slate-100 bg-white text-slate-600 hover:border-brand/20 hover:text-brand'
+                  : disabled
+                    ? 'cursor-not-allowed border-slate-100 bg-white/60 text-slate-300'
+                    : 'border-slate-100 bg-white text-slate-600 hover:border-brand/20 hover:text-brand'
               }`}
             >
-              {option}
+              <span>{getLabel(option)}</span>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] ${active ? 'bg-white/18 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                {count}
+              </span>
             </button>
           );
         })}
       </div>
     </div>
   );
+}
+
+function buildFilterCounts<T extends string>(
+  options: readonly T[],
+  filters: CompetitionFilters,
+  key: keyof CompetitionFilters
+) {
+  const counts = new Map<string, number>();
+
+  for (const option of options) {
+    counts.set(
+      option,
+      competitionItems.filter((item) => matchesCompetitionFilters(item, { ...filters, [key]: option })).length
+    );
+  }
+
+  return counts;
+}
+
+function matchesCompetitionFilters(item: CompetitionItem, filters: CompetitionFilters) {
+  const normalizedKeyword = filters.keyword.trim().toLowerCase();
+  const matchesKeyword =
+    !normalizedKeyword ||
+    [item.title, item.shortName, item.category, item.organizer]
+      .join(' ')
+      .toLowerCase()
+      .includes(normalizedKeyword);
+  const matchesLevel = filters.level === '全部' || item.level === filters.level;
+  const matchesCategory = filters.category === '全部' || getItemCategories(item).includes(filters.category);
+  const matchesDeadline = matchesDeadlineFilter(item, filters.deadline);
+
+  return matchesKeyword && matchesLevel && matchesCategory && matchesDeadline;
+}
+
+function getItemCategories(item: CompetitionItem) {
+  return item.category
+    .split('/')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function CompetitionCard({ item }: { item: CompetitionItem }) {
