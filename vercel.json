@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/baidu_verify_codeva-x5pn9knuby.html",
+      "destination": "/baidu_verify_codeva-x5pn9knuby/"
+    }
+  ]
+}
