@@ -187,26 +187,26 @@ export default function ResourcesPage() {
                     href={item.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="group rounded-[22px] border border-slate-100 bg-white/95 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15"
+                    className="group relative overflow-hidden rounded-[24px] border border-slate-100 bg-white/95 px-5 py-6 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15"
                   >
-                    <div className="grid min-h-16 grid-cols-[3.75rem_minmax(0,1fr)_2.25rem] items-center gap-4">
-                      <span className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-slate-50">
+                    <div className="flex min-h-[9.5rem] flex-col items-center justify-center gap-3">
+                      <span className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-brand transition group-hover:bg-brand group-hover:text-white">
+                        <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      </span>
+                      <span className="flex h-20 w-20 items-center justify-center rounded-[26px] bg-slate-50 shadow-inner shadow-slate-200/50 transition group-hover:scale-[1.03] group-hover:bg-white">
                         <ExternalSiteMark
                           source={item.href}
                           label={item.title}
-                          size="lg"
+                          size="xl"
                           layout="square"
                         />
                       </span>
                       <div className="min-w-0">
-                        <div className="truncate text-base font-semibold text-ink">{item.title}</div>
-                        <div className="mt-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500 transition group-hover:bg-brand/8 group-hover:text-brand">
+                        <div className="max-w-full truncate text-center text-lg font-bold text-slate-950">{item.title}</div>
+                        <div className="mt-2 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 transition group-hover:bg-brand/8 group-hover:text-brand">
                           {item.badge}
                         </div>
                       </div>
-                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-50 text-brand transition group-hover:bg-brand group-hover:text-white">
-                        <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                      </span>
                     </div>
                   </a>
                 ))}
