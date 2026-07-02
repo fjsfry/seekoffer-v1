@@ -60,7 +60,7 @@ async function submitBaidu(urls) {
     return { skipped: true, reason: '缺少 BAIDU_PUSH_TOKEN' };
   }
 
-  const endpoint = `https://data.zz.baidu.com/urls?site=${encodeURIComponent(siteUrl)}&token=${encodeURIComponent(token)}`;
+  const endpoint = `http://data.zz.baidu.com/urls?site=${siteUrl}&token=${encodeURIComponent(token)}`;
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
