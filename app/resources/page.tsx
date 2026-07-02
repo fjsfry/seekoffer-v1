@@ -54,6 +54,24 @@ const applicationKits = [
   }
 ];
 
+const resourceSectionStyles = [
+  {
+    panel: 'bg-emerald-50/70',
+    icon: 'bg-white text-brand shadow-sm shadow-emerald-100',
+    pill: 'bg-white/80 text-brand ring-1 ring-emerald-100'
+  },
+  {
+    panel: 'bg-sky-50/70',
+    icon: 'bg-white text-sky-600 shadow-sm shadow-sky-100',
+    pill: 'bg-white/80 text-sky-700 ring-1 ring-sky-100'
+  },
+  {
+    panel: 'bg-amber-50/70',
+    icon: 'bg-white text-amber-700 shadow-sm shadow-amber-100',
+    pill: 'bg-white/80 text-amber-800 ring-1 ring-amber-100'
+  }
+] as const;
+
 export default function ResourcesPage() {
   const totalResourceLinks = officialResourceSections.reduce((total, section) => total + section.links.length, 0);
 
@@ -165,51 +183,61 @@ export default function ResourcesPage() {
         </div>
       </section>
 
-      <section className="grid gap-7">
-        {officialResourceSections.map((section) => {
+      <section className="grid gap-6">
+        {officialResourceSections.map((section, sectionIndex) => {
           const Icon = sectionIcons[section.title as keyof typeof sectionIcons];
+          const style = resourceSectionStyles[sectionIndex % resourceSectionStyles.length];
 
           return (
-            <div key={section.title} className="surface-card rounded-[34px] p-6 lg:p-8">
-              <div className="flex items-start gap-3">
-                <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
-                  <Icon className="h-5 w-5" />
-                </span>
-                <div>
-                  <h2 className="text-2xl font-semibold tracking-tight text-ink md:text-3xl">{section.title}</h2>
+            <div key={section.title} className="surface-card overflow-hidden rounded-[34px] p-0">
+              <div className="grid lg:grid-cols-[17rem_minmax(0,1fr)]">
+                <div className={`flex flex-col justify-between p-6 lg:p-7 ${style.panel}`}>
+                  <div>
+                    <span className={`inline-flex h-14 w-14 items-center justify-center rounded-[22px] ${style.icon}`}>
+                      <Icon className="h-7 w-7" />
+                    </span>
+                    <h2 className="mt-5 text-2xl font-semibold tracking-tight text-ink">{section.title}</h2>
+                    <p className="mt-3 line-clamp-3 text-sm leading-7 text-slate-600">{section.description}</p>
+                  </div>
+                  <div className="mt-7 flex flex-wrap gap-2">
+                    <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${style.pill}`}>
+                      {section.links.length} 个常用入口
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {section.links.map((item) => (
-                  <a
-                    key={item.title}
-                    href={item.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="group relative overflow-hidden rounded-[24px] border border-slate-100 bg-white/95 px-5 py-6 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15"
-                  >
-                    <div className="flex min-h-[9.5rem] flex-col items-center justify-center gap-3">
-                      <span className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-brand transition group-hover:bg-brand group-hover:text-white">
-                        <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                      </span>
-                      <span className="flex h-20 w-20 items-center justify-center rounded-[26px] bg-slate-50 shadow-inner shadow-slate-200/50 transition group-hover:scale-[1.03] group-hover:bg-white">
-                        <ExternalSiteMark
-                          source={item.href}
-                          label={item.title}
-                          size="xl"
-                          layout="square"
-                        />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="max-w-full truncate text-center text-lg font-bold text-slate-950">{item.title}</div>
-                        <div className="mt-2 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 transition group-hover:bg-brand/8 group-hover:text-brand">
-                          {item.badge}
-                        </div>
-                      </div>
-                    </div>
-                  </a>
-                ))}
+                <div className="p-5 lg:p-6">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {section.links.map((item) => (
+                      <a
+                        key={item.title}
+                        href={item.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group flex min-h-[7.25rem] items-center gap-4 rounded-[24px] border border-slate-100 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/20 hover:shadow-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15"
+                      >
+                        <span className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-[24px] bg-slate-50 shadow-inner shadow-slate-200/50 transition group-hover:bg-brand/5">
+                          <ExternalSiteMark
+                            source={item.href}
+                            label={item.title}
+                            size="xl"
+                            layout="square"
+                          />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="line-clamp-2 text-base font-bold leading-6 text-slate-950">{item.title}</span>
+                          <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500 transition group-hover:bg-brand/8 group-hover:text-brand">
+                            {item.badge}
+                          </span>
+                          <span className="mt-2 block truncate text-xs leading-5 text-slate-500">{item.description}</span>
+                        </span>
+                        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50 text-brand transition group-hover:bg-brand group-hover:text-white">
+                          <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           );
