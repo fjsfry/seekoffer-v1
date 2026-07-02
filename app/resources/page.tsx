@@ -102,9 +102,9 @@ export default function ResourcesPage() {
           {applicationKits.map((item, index) => {
             const Icon = item.icon;
             const cardClassName =
-              'group rounded-[24px] border border-slate-100 bg-white/95 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15';
+              'group relative overflow-hidden rounded-[24px] border border-slate-100 bg-white/95 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15';
             const cardContent = (
-              <div className="flex h-full min-h-[15rem] flex-col">
+              <div className="flex h-full min-h-[13.5rem] flex-col">
                 <div className="flex items-start justify-between gap-4">
                   <div
                     className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] ${
@@ -119,24 +119,24 @@ export default function ResourcesPage() {
                   >
                     <Icon className="h-7 w-7 transition group-hover:scale-105" />
                   </div>
-                  <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-400">
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50 text-brand transition group-hover:bg-brand group-hover:text-white">
+                    <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                  </span>
+                </div>
+                <div className="mt-5 flex items-center gap-2">
+                  <h3 className="min-w-0 flex-1 truncate text-lg font-semibold text-ink">{item.title}</h3>
+                  <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-400">
                     {index < 3 ? '模板' : '工具'}
                   </span>
                 </div>
-                <h3 className="mt-5 text-lg font-semibold text-ink">{item.title}</h3>
-                <div className="mt-5 flex min-h-[3rem] flex-wrap content-start gap-2">
+                <div className="mt-5 flex flex-wrap gap-2">
                   {item.items.map((entry) => (
                     <span key={entry} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500 transition group-hover:bg-brand/8 group-hover:text-brand">
                       {entry}
                     </span>
                   ))}
                 </div>
-                {item.href ? (
-                  <span className="mt-auto inline-flex w-fit items-center gap-2 rounded-full bg-brand/8 px-3.5 py-2 text-sm font-semibold text-brand transition group-hover:bg-brand group-hover:text-white">
-                    {item.external ? '打开链接' : '打开工具'}
-                    <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                  </span>
-                ) : null}
+                <p className="mt-auto line-clamp-2 pt-5 text-sm leading-6 text-slate-500">{item.description}</p>
               </div>
             );
 
@@ -187,10 +187,10 @@ export default function ResourcesPage() {
                     href={item.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="group min-h-[116px] rounded-[22px] border border-slate-100 bg-white/95 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft"
+                    className="group rounded-[22px] border border-slate-100 bg-white/95 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15"
                   >
-                    <div className="grid h-full grid-cols-[4rem_minmax(0,1fr)] items-center gap-4">
-                      <span className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-slate-50">
+                    <div className="grid min-h-16 grid-cols-[3.75rem_minmax(0,1fr)_2.25rem] items-center gap-4">
+                      <span className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-slate-50">
                         <ExternalSiteMark
                           source={item.href}
                           label={item.title}
@@ -200,11 +200,13 @@ export default function ResourcesPage() {
                       </span>
                       <div className="min-w-0">
                         <div className="truncate text-base font-semibold text-ink">{item.title}</div>
-                        <div className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-brand">
-                          打开入口
-                          <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                        <div className="mt-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500 transition group-hover:bg-brand/8 group-hover:text-brand">
+                          {item.badge}
                         </div>
                       </div>
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-50 text-brand transition group-hover:bg-brand group-hover:text-white">
+                        <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      </span>
                     </div>
                   </a>
                 ))}
