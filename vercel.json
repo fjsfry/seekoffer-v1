@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/googlef6d37ad2e103e5b2.html",
+      "destination": "/googlef6d37ad2e103e5b2/"
+    },
+    {
       "source": "/baidu_verify_codeva-x5pn9knuby.html",
       "destination": "/baidu_verify_codeva-x5pn9knuby/"
     }
