@@ -34,7 +34,8 @@ export const metadata: Metadata = {
   metadataBase: new URL(absoluteUrl('/')),
   verification: {
     other: {
-      'baidu-site-verification': 'codeva-x5pn9knuby'
+      'baidu-site-verification': 'codeva-x5pn9knuby',
+      'msvalidate.01': 'C67709E1DCD40CBE041BF4898BF5562F'
     }
   },
   alternates: {
