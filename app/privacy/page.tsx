@@ -28,7 +28,7 @@ export default function PrivacyPage() {
           <div className="rounded-[26px] bg-slate-50 px-5 py-5">
             <div className="font-semibold text-ink">我们当前会处理的信息</div>
             <p className="mt-3">
-              邮箱账号、个人资料、申请状态、工作台待办、收藏项目、手动录入项目、Offer 发布内容、反馈信息和必要的操作日志。Offer 动态支持匿名展示，但后台会保留账号与审核记录用于纠错和风控。
+              邮箱账号、个人资料、申请状态、工作台待办、收藏项目、手动录入项目、Offer 发布内容、反馈信息和必要的操作日志。Offer 动态支持匿名展示，我们会保留必要核验记录用于纠错和风控。
             </p>
           </div>
           <div className="rounded-[26px] bg-slate-50 px-5 py-5">

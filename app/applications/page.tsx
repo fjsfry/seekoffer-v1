@@ -16,7 +16,7 @@ export default function ApplicationsRedirectPage() {
 
   return (
     <SiteShell>
-      <section className="page-hero px-6 py-8 lg:px-10 lg:py-10">
+      <section className="page-hero px-6 py-7 lg:px-8">
         <div className="max-w-3xl">
           <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand/8 text-brand">
             <ClipboardList className="h-6 w-6" />

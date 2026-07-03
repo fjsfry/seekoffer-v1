@@ -65,7 +65,7 @@ export const footerColumns = [
     title: '帮助',
     links: [
       { label: '知识/经验中心', href: '/knowledge' },
-      { label: '人工复核', href: '/consulting' },
+      { label: '保研咨询', href: '/consulting' },
       { label: '使用指南', href: '/guide' },
       { label: '常见问题', href: '/faq' },
       { label: '加入 QQ 群', href: QQ_GROUP_URL, external: true }

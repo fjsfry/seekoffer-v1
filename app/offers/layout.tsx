@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 export const metadata: Metadata = {
   title: 'Offer 圈 - Seekoffer',
-  description: '低噪音、可纠错的保研录取、放弃、候补、补录和申请讨论社区，提交内容审核通过后公开展示。',
+  description: '低噪音、可纠错的保研录取、放弃、候补、补录和申请讨论社区，提交内容核验通过后公开展示。',
   alternates: {
     canonical: '/offers'
   },

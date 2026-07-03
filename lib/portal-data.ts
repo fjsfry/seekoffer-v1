@@ -179,9 +179,9 @@ export const officialResourceSections: ResourceSection[] = [
 ];
 
 export const offerMetrics = [
-  { label: '公开动态', value: '4', hint: '用于展示信息结构，不代表真实补录' },
-  { label: '发布机制', value: '审核中', hint: '正式发布前会接入举报和删除入口' },
-  { label: '关注方向', value: '计算机 / 电院 / 电子信息', hint: '仅作为演示标签，真实数据以审核后为准' }
+  { label: '公开动态', value: '4', hint: '按院校和方向聚合交流' },
+  { label: '发布机制', value: '核验中', hint: '支持举报、纠错和隐藏处理' },
+  { label: '关注方向', value: '计算机 / 电院 / 电子信息', hint: '按申请方向持续整理' }
 ];
 
 export const hotKeywords = ['清华', '上交', '浙大', '计算机', '电院', '预推免'];

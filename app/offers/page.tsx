@@ -249,7 +249,7 @@ export default function OffersPage() {
   const [discussionCategory, setDiscussionCategory] = useState<DiscussionCategory>('全部');
   const [offers, setOffers] = useState<PublicOffer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('正在连接 Offer 圈...');
+  const [message, setMessage] = useState('正在整理近期公开动态...');
   const [reportingId, setReportingId] = useState<string | null>(null);
   const [followedDiscussionIds, setFollowedDiscussionIds] = useState<string[]>([]);
   const [decisionVotes, setDecisionVotes] = useState<Record<string, string>>({});
@@ -263,16 +263,15 @@ export default function OffersPage() {
 
   async function loadOffers() {
     setLoading(true);
-    setMessage('正在读取已审核通过的 Offer 动态...');
+    setMessage('正在更新公开动态...');
 
     try {
       const data = await fetchPublicOffers();
       setOffers(data);
-      setMessage(data.length ? `已加载 ${data.length} 条审核通过的 Offer 动态。` : '正在展示近期精选匿名投稿；新审核通过的动态会自动排在最前。');
-    } catch (error) {
+      setMessage(data.length ? `已更新 ${data.length} 条公开动态。` : '当前展示近期精选投稿，新动态核验通过后会自动更新。');
+    } catch {
       setOffers([]);
-      const reason = error instanceof Error ? error.message : 'Offer 圈读取失败';
-      setMessage(`${reason}，当前展示近期精选匿名投稿。`);
+      setMessage('当前展示近期精选投稿，新动态核验通过后会自动更新。');
     } finally {
       setLoading(false);
     }
@@ -398,10 +397,10 @@ export default function OffersPage() {
     const schoolCount = new Set([...displayOffers.map((item) => item.schoolName), ...discussionPosts.map((item) => item.school)]).size;
 
     return [
-      { label: 'Offer 动态', value: String(displayOffers.length), hint: '录取、放弃、候补都在这里沉淀', icon: FileText },
-      { label: '近 7 天新增', value: String(recentCount), hint: '按发布时间统计', icon: Flame },
-      { label: '社区讨论', value: String(discussionPosts.length), hint: '选校、材料、面试与选择题', icon: MessageCircle },
-      { label: '覆盖院校', value: String(schoolCount), hint: '围绕真实申请场景聚合', icon: University }
+      { label: '公开动态', value: String(displayOffers.length), hint: '录取、放弃、候补', icon: FileText },
+      { label: '近 7 天', value: String(recentCount), hint: '新增交流', icon: Flame },
+      { label: '社区讨论', value: String(discussionPosts.length), hint: '选校、材料、面试', icon: MessageCircle },
+      { label: '覆盖院校', value: String(schoolCount), hint: '按学校聚合', icon: University }
     ];
   }, [displayOffers]);
 
@@ -416,9 +415,9 @@ export default function OffersPage() {
 
     try {
       await reportOfferPost(offer.id, reason, session?.userId);
-      setMessage('举报已提交，后台会在 Offer 审核工作台中处理。');
+      setMessage('举报已提交，我们会优先核查这条动态。');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '举报提交失败，请稍后重试。');
+      setMessage(error instanceof Error ? error.message : '反馈入口暂时不可用，请稍后重试。');
     } finally {
       setReportingId(null);
     }
@@ -441,7 +440,7 @@ export default function OffersPage() {
   function openPinnedItem(item: PinnedItem) {
     setPinnedItem(item);
     setReplyDraft('');
-    setMessage('已打开置顶详情，可以查看完整上下文，也可以继续回复交流。');
+    setMessage('已打开详情，可在下方继续补充信息或追问。');
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         document.getElementById('offer-pinned-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -467,56 +466,35 @@ export default function OffersPage() {
 
   return (
     <SiteShell>
-      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-center lg:px-8">
+      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">Offer 圈</h1>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
-            把录取、放弃、候补、补录和申请讨论放在同一个低噪音社区里。看真实去向，也看同校同专业同学怎么准备、怎么选择。
-          </p>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">把录取、候补、放弃和申请讨论放在一个低噪音社区里，减少猜测，帮助你判断真实去向。</p>
         </div>
-        <div className="grid gap-3">
-          <Link
-            href="/publish"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-6 py-4 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
-          >
-            <Edit3 className="h-5 w-5" />
-            发布动态
-          </Link>
-          <button
-            type="button"
-            onClick={() => setHubTab('discussions')}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-brand/15 bg-white px-6 py-3 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5"
-          >
-            <MessageCircle className="h-4 w-4" />
-            看讨论
-          </button>
-        </div>
-      </section>
+        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+          {metrics.slice(0, 3).map((item) => {
+            const Icon = item.icon || TrendingUp;
 
-      <section className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((item) => {
-          const Icon = item.icon || TrendingUp;
-
-          return (
-            <div key={item.label} className="product-card rounded-[26px] p-6">
-              <div className="flex items-center gap-5">
-                <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-brand/8 text-brand">
-                  <Icon className="h-7 w-7" />
-                </span>
-                <div>
-                  <div className="text-sm font-semibold text-slate-600">{item.label}</div>
-                  <div className="mt-2 text-3xl font-semibold text-ink">{item.value}</div>
-                  <div className="mt-2 text-sm text-slate-500">{item.hint}</div>
+            return (
+              <div key={item.label} className="soft-stat-pill rounded-[28px] px-4 py-4">
+                <div className="flex items-center justify-center gap-3 text-center">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="whitespace-nowrap text-xs text-slate-500">{item.label}</div>
+                    <div className="whitespace-nowrap text-xl font-semibold text-ink">{item.value}</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="product-card rounded-[30px] p-5 lg:p-6">
-          <div className="grid gap-3 border-b border-slate-100 pb-5 md:grid-cols-4">
+          <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-5">
             {hubTabs.map((item) => {
               const Icon = item.icon;
               const active = hubTab === item.id;
@@ -526,15 +504,12 @@ export default function OffersPage() {
                   key={item.id}
                   type="button"
                   onClick={() => setHubTab(item.id)}
-                  className={`rounded-2xl px-4 py-3 text-left transition ${
-                    active ? 'bg-brand text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-50'
+                  className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                    active ? 'bg-brand text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-brand/8 hover:text-brand'
                   }`}
                 >
-                  <span className="flex items-center gap-2 text-sm font-semibold">
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </span>
-                  <span className={`mt-1 block text-xs leading-5 ${active ? 'text-white/80' : 'text-slate-400'}`}>{item.description}</span>
+                  <Icon className="h-4 w-4" />
+                  {item.label}
                 </button>
               );
             })}
@@ -546,7 +521,7 @@ export default function OffersPage() {
               <input
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
-                placeholder="搜索学校、专业、讨论或背景"
+                placeholder="搜索学校、专业或关键词"
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
               />
             </div>
@@ -573,7 +548,7 @@ export default function OffersPage() {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {hotKeywords.map((item) => (
+            {hotKeywords.slice(0, 6).map((item) => (
               <button
                 key={item}
                 type="button"
@@ -585,7 +560,7 @@ export default function OffersPage() {
             ))}
           </div>
 
-          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-500">{message}</div>
+          <div className="mt-4 rounded-2xl bg-brand/5 px-4 py-3 text-sm font-medium leading-7 text-slate-600">{message}</div>
 
           {pinnedDetail ? (
             <PinnedDetail
@@ -610,9 +585,8 @@ export default function OffersPage() {
             >
               <span className="inline-flex items-center gap-2 font-semibold text-brand">
                 <Pin className="h-4 w-4" />
-                点击任一动态、讨论、选择题或候补消息，可在这里置顶查看并继续交流。
+                点击动态可展开详情并继续交流。
               </span>
-              <span className="text-xs font-semibold text-slate-400">详情不会打断当前筛选</span>
             </div>
           )}
 
@@ -697,12 +671,12 @@ export default function OffersPage() {
           </div>
 
           <div className="product-card rounded-[22px] p-6">
-            <h2 className="text-lg font-semibold text-ink">社区说明</h2>
-            <div className="mt-5 grid gap-5">
+            <h2 className="text-lg font-semibold text-ink">交流守则</h2>
+            <div className="mt-5 grid gap-4">
               {[
-                ['真实有价值', '围绕本人申请、可靠来源和可复盘经验交流，避免夸张标题和二手传闻。'],
-                ['隐私先行', '不要发布身份证、手机号、微信号、导师私人信息或可识别他人的材料截图。'],
-                ['可纠错', '发现疑似虚假、误导或引流内容时直接举报，后台会留痕处理。']
+                ['真实', '优先分享本人经历和可复盘线索。'],
+                ['克制', '不公开联系方式和导师私人信息。'],
+                ['纠错', '发现误导内容可以直接举报。']
               ].map(([title, text]) => (
                 <div key={title} className="flex gap-3">
                   <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand/8 text-brand">
@@ -787,7 +761,9 @@ function PinnedDetail({
             <div className="flex flex-wrap items-center gap-2">
               <span className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${resultTone[detail.offer.result]}`}>{detail.offer.result}</span>
               <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-600">{detail.offer.projectType}</span>
-              <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-brand">{detail.offer.sourceLabel || '已审核投稿'}</span>
+              <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-brand">
+                {detail.offer.sourceLabel || '已核验'}
+              </span>
             </div>
             <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600">
               <span className="font-semibold text-slate-700">本科背景：</span>
@@ -1082,7 +1058,7 @@ function OfferFeed({
             </div>
             <h2 className="mt-4 text-lg font-semibold text-ink">暂无匹配的 Offer 动态</h2>
             <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-slate-500">
-              你可以换个关键词，或者发布一条真实动态。提交后会先进入后台审核，通过后展示在这里。
+              你可以换个关键词，或者发布一条真实动态。通过核验后会展示在这里。
             </p>
             <Link href="/publish" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white">
               去发布
@@ -1340,37 +1316,35 @@ function OfferCard({
   onOpen: (offer: PublicOffer) => void;
 }) {
   const authorLabel = getOfferAuthorLabel(offer);
+  const sourceLabel = offer.sourceLabel || '已核验';
 
   return (
     <article className="relative overflow-hidden rounded-[24px] border border-slate-100 bg-white p-5 transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft">
       <div className="flex items-start gap-4">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand text-lg font-semibold text-white">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand text-base font-semibold text-white">
           {getOfferAvatar(authorLabel)}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-semibold text-ink">{authorLabel}</span>
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-brand">
                   <BadgeCheck className="h-3.5 w-3.5" />
-                  {offer.sourceLabel || '已审核投稿'}
+                  {sourceLabel}
                 </span>
-                {offer.isAnonymous ? (
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">匿名展示</span>
-                ) : null}
               </div>
               <div className="mt-1 text-sm text-slate-500">
-                {offer.major} · {offer.projectType}
+                {formatOfferTime(offer.createdAt)} · {offer.projectType}
               </div>
             </div>
             <button
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 transition hover:border-rose-200 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-400 transition hover:border-rose-200 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={reportingId === offer.id}
               onClick={() => onReport(offer)}
+              aria-label="举报这条动态"
             >
               {reportingId === offer.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
-              举报
             </button>
           </div>
 
@@ -1378,7 +1352,8 @@ function OfferCard({
             <span className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${resultTone[offer.result]}`}>
               {offer.result}
             </span>
-            <span className="text-base font-semibold text-ink">{offer.schoolName}</span>
+            <h3 className="text-lg font-semibold leading-7 text-ink">{offer.schoolName}</h3>
+            <span className="text-sm font-medium text-slate-500">{offer.major}</span>
           </div>
 
           <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600">
@@ -1386,22 +1361,21 @@ function OfferCard({
             {offer.undergraduateBackground}
           </div>
 
-          <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-slate-600">{offer.content}</p>
+          <p className="mt-4 line-clamp-3 whitespace-pre-wrap text-sm leading-7 text-slate-600">{offer.content}</p>
 
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-4 text-sm text-slate-500">
-            <span>{formatOfferTime(offer.createdAt)}</span>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4 text-sm text-slate-500">
+            <button type="button" onClick={() => onOpen(offer)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:text-brand-deep">
+              查看详情
+              <ArrowRight className="h-4 w-4" />
+            </button>
             <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-                <ShieldCheck className="h-4 w-4 text-brand" />
-                审核后公开，支持纠错
-              </span>
               <button
                 type="button"
                 onClick={() => onOpen(offer)}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-deep"
               >
                 <Pin className="h-4 w-4" />
-                打开详情
+                置顶
               </button>
               <button
                 type="button"
@@ -1409,7 +1383,7 @@ function OfferCard({
                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-brand transition hover:border-brand/25"
               >
                 <MessageCircle className="h-4 w-4" />
-                看同校讨论
+                同校讨论
               </button>
             </div>
           </div>

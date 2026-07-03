@@ -2,11 +2,9 @@ import type { Metadata } from 'next';
 import type { ComponentType } from 'react';
 import Link from 'next/link';
 import {
-  ArrowRight,
   BookOpenCheck,
   CalendarDays,
   FileText,
-  GraduationCap,
   HelpCircle,
   Layers3,
   MessageSquareText
@@ -48,42 +46,27 @@ const navCards = [
 export default function KnowledgePage() {
   return (
     <SiteShell>
-      <section className="page-hero grid gap-7 px-6 py-8 lg:grid-cols-[minmax(0,1fr)_430px] lg:items-center lg:px-8">
+      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-brand/8 px-4 py-2 text-sm font-semibold text-brand">
-            <GraduationCap className="h-4 w-4" />
-            新手留存与 SEO 内容
-          </div>
-          <h1 className="mt-5 max-w-4xl text-4xl font-semibold tracking-tight text-ink md:text-5xl">知识/经验中心</h1>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
-            先做我们自己的结构化内容：时间线、黑话词典、申请阶段区别、材料指南和面试题。新手能快速建立全局认知，老用户也能按模块查漏补缺。
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/notices" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:bg-brand-deep">
-              看最新通知
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link href="/resources" className="inline-flex items-center gap-2 rounded-2xl border border-brand/20 bg-white px-5 py-3 text-sm font-semibold text-brand shadow-sm transition hover:border-brand/40">
-              准备申请材料
-            </Link>
-          </div>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">知识/经验中心</h1>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">系统整理保研时间线、黑话词典、阶段区别、材料指南和面试题。</p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          {navCards.map((item) => {
+        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+          {navCards.slice(0, 3).map((item) => {
             const Icon = item.icon;
 
             return (
               <Link
                 key={item.title}
                 href={item.href}
-                className="soft-stat-pill group rounded-[24px] px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-soft"
+                className="soft-stat-pill group rounded-[28px] px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-soft"
               >
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brand/8 text-brand transition group-hover:bg-brand group-hover:text-white">
+                <div className="flex items-center justify-center gap-3 text-center">
+                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand/8 text-brand transition group-hover:bg-brand group-hover:text-white">
                     <Icon className="h-5 w-5" />
                   </span>
-                  <span className="font-semibold text-ink">{item.title}</span>
+                  <span className="whitespace-nowrap text-sm font-semibold text-ink">{item.title}</span>
                 </div>
               </Link>
             );

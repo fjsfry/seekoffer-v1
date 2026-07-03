@@ -23,12 +23,27 @@ const sourceCards = [
 export default function DataQualityPage() {
   return (
     <SiteShell>
-      <section className="page-hero px-6 py-8 lg:px-8">
-        <div className="eyebrow">Notice Source</div>
-        <h1 className="mt-5 text-4xl font-semibold tracking-tight text-ink md:text-5xl">通知来源说明</h1>
-        <p className="mt-5 max-w-3xl text-base leading-8 text-slate-600">
-          Seekoffer 的目标是帮你更快找到值得关注的保研通知，同时保留官网原文入口，方便你在申请前完成最终确认。
-        </p>
+      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
+        <div>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">通知来源说明</h1>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">更快找到值得关注的保研通知，同时保留官网原文入口。</p>
+        </div>
+        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+          {sourceCards.map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <div key={item.title} className="soft-stat-pill rounded-[28px] px-4 py-4">
+                <div className="flex items-center justify-center gap-3 text-center">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div className="whitespace-nowrap text-sm font-semibold text-ink">{item.title}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       <section className="grid gap-5 lg:grid-cols-3">

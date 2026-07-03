@@ -37,7 +37,7 @@ export default function PublishPage() {
     isAnonymous: true
   });
   const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState('提交后会进入后台审核，通过后才会展示到 Offer 圈。');
+  const [message, setMessage] = useState('提交后会先核验，通过后才会展示到 Offer 圈。');
   const [submitted, setSubmitted] = useState(false);
 
   function updateForm<K extends keyof OfferFormState>(key: K, value: OfferFormState[K]) {
@@ -63,7 +63,7 @@ export default function PublishPage() {
         authorName: form.authorName || defaultAuthorName
       });
       setSubmitted(true);
-      setMessage('提交成功，已进入后台待审核队列。审核通过后会公开展示在 Offer 圈。');
+      setMessage('提交成功，核验通过后会公开展示在 Offer 圈。');
       setForm((current) => ({
         ...current,
         schoolName: '',
@@ -84,11 +84,11 @@ export default function PublishPage() {
         <PageSectionTitle
           eyebrow="Share Offer"
           title="发布 Offer 动态"
-          subtitle="真实 Offer 发布会影响候补判断，因此需要登录、审核和后续举报机制。"
+          subtitle="真实 Offer 发布会影响候补判断，因此需要登录、核验和后续纠错机制。"
         />
         <LoginRequiredCard
           title="发布动态前需要先登录"
-          description="为了减少虚假信息，发布 Offer 动态会记录账号状态；你仍然可以选择在前台匿名展示。"
+          description="为了减少虚假信息，发布 Offer 动态需要登录核验；你仍然可以选择匿名展示。"
           requiredAuth="member"
           actionLabel="登录后继续"
           intent={{
@@ -115,7 +115,7 @@ export default function PublishPage() {
           description={
             loggedIn
               ? '试用模式可以先体验通知库和基础工作台，但发布 Offer 会影响社区可信度，所以需要使用邮箱账号登录后再继续。'
-              : '登录后即可发布 Offer 动态。提交内容会先进入后台审核，前台可匿名展示。'
+              : '登录后即可发布 Offer 动态。提交内容会先核验，也可以匿名展示。'
           }
           requiredAuth="member"
           actionLabel={loggedIn ? '使用正式账号登录' : '登录后继续'}
@@ -142,17 +142,17 @@ export default function PublishPage() {
         <form onSubmit={handleSubmit} className="product-card rounded-[30px] p-6 lg:p-8">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-5">
             <div>
-              <h2 className="text-xl font-semibold text-ink">提交待审核动态</h2>
+              <h2 className="text-xl font-semibold text-ink">提交动态</h2>
               <p className="mt-2 text-sm leading-7 text-slate-500">请只提交你本人确认的信息，避免写入联系方式、导师隐私或可识别他人的内容。</p>
             </div>
             <span className="inline-flex items-center gap-2 rounded-full bg-brand/8 px-3 py-1.5 text-xs font-semibold text-brand">
               <ShieldCheck className="h-4 w-4" />
-              审核后公开
+              核验后公开
             </span>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
-            <Field label="后台核验称呼">
+            <Field label="核验称呼">
               <input
                 value={form.authorName}
                 onChange={(event) => updateForm('authorName', event.target.value)}
@@ -238,7 +238,7 @@ export default function PublishPage() {
               className="mt-1 h-4 w-4 rounded border-slate-300 text-brand"
             />
             <span>
-              前台匿名展示。后台仍会记录你的账号与核验称呼，用于处理举报和内容追溯。
+              匿名展示。我们仍会保留必要核验信息，用于处理举报和内容追溯。
             </span>
           </label>
 
@@ -254,7 +254,7 @@ export default function PublishPage() {
               className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-70"
             >
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <PencilLine className="h-4 w-4" />}
-              提交审核
+              提交核验
             </button>
             <Link
               href="/offers"
@@ -273,7 +273,7 @@ export default function PublishPage() {
                 '只提交你本人确认或可靠来源的信息',
                 '不要填写联系方式、身份证号和导师私人信息',
                 '说明时间节点和确认方式，比单句结论更有价值',
-                '审核通过前不会公开展示'
+                '核验通过前不会公开展示'
               ].map((item) => (
                 <div key={item} className="flex gap-3 text-sm leading-6 text-slate-600">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
@@ -284,11 +284,11 @@ export default function PublishPage() {
           </section>
 
           <section className="product-card rounded-[22px] p-6">
-            <h2 className="text-lg font-semibold text-ink">审核流转</h2>
+            <h2 className="text-lg font-semibold text-ink">发布流程</h2>
             <div className="mt-5 grid gap-3 text-sm leading-7 text-slate-600">
-              <p>1. 提交后写入 Supabase 的 `offer_posts` 表，状态为 pending。</p>
-              <p>2. 管理员在后台 Offer 审核工作台中审核、隐藏或删除。</p>
-              <p>3. 只有 approved 且未隐藏、未删除的内容会出现在前台。</p>
+              <p>1. 你提交动态，并选择是否匿名展示。</p>
+              <p>2. 我们核验明显风险信息，避免误导和隐私泄露。</p>
+              <p>3. 通过后展示在 Offer 圈，后续支持举报和纠错。</p>
             </div>
             <Link href="/community" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand">
               查看社区规范

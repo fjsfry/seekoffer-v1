@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Bell,
   BookOpen,
-  CheckCircle2,
   ClipboardList,
   ExternalLink,
   FileCheck2,
@@ -136,7 +135,7 @@ const productStatus = [
   ['通知库', '已上线', '支持搜索、筛选、详情页、原文核对和加入工作台。'],
   ['申请工作台', '登录可用', '支持保存项目、状态管理、优先级和材料进度维护。'],
   ['院校库 / 资源库', '已上线', '作为高频入口和辅助工具，帮助你快速回访官方页面。'],
-  ['Offer 圈', '审核开放', '登录用户可提交动态和申请讨论，审核通过后公开展示，并支持举报纠错。'],
+  ['Offer 圈', '核验开放', '登录用户可提交动态和申请讨论，核验通过后公开展示，并支持举报纠错。'],
   ['竞赛库', '已上线', '按赛事等级、专业类别和截止节点整理背景提升入口。'],
   ['自动提醒', '逐步完善', '当前先展示截止风险，后续会继续完善更主动的提醒机制。']
 ] as const;
@@ -144,52 +143,27 @@ const productStatus = [
 export default function GuidePage() {
   return (
     <SiteShell>
-      <section className="page-hero px-6 py-8 md:px-10 md:py-10">
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
-          <div>
-            <div className="eyebrow w-fit">使用指南</div>
-            <h1 className="title-balance mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-ink md:text-5xl">
-              5 分钟上手 Seekoffer
-            </h1>
-            <p className="mt-5 max-w-3xl text-base leading-9 text-slate-600">
-              推荐路径很简单：先在通知库找到目标项目，打开详情核对原文，再加入工作台，最后在同一个页面持续跟进截止时间、材料和申请状态。
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link
-                href="/notices"
-                className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
-              >
-                从通知库开始
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/me"
-                className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5"
-              >
-                打开申请工作台
-              </Link>
-            </div>
-          </div>
+      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
+        <div>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">使用指南</h1>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">从通知筛选、原文核对到加入工作台，按步骤完成核心流程。</p>
+        </div>
 
-          <div className="rounded-[30px] border border-brand/10 bg-white/88 p-5 shadow-soft">
-            <div className="flex items-center gap-3">
-              <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-white">
-                <CheckCircle2 className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="font-semibold text-ink">正确使用顺序</div>
-                <div className="mt-1 text-sm text-slate-500">查通知 → 看原文 → 加申请表 → 管进度</div>
+        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+          {[
+            ['查通知', Search],
+            ['看原文', ExternalLink],
+            ['管进度', LayoutDashboard]
+          ].map(([label, Icon]) => (
+            <div key={label as string} className="soft-stat-pill rounded-[28px] px-4 py-4">
+              <div className="flex items-center justify-center gap-3 text-center">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div className="whitespace-nowrap text-sm font-semibold text-ink">{label as string}</div>
               </div>
             </div>
-            <div className="mt-5 grid gap-3">
-              {['找到值得申请的项目', '确认官方原文和截止时间', '把项目加入个人工作台', '持续更新材料和状态'].map((item) => (
-                <div key={item} className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
-                  <span className="h-2 w-2 rounded-full bg-brand" />
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 

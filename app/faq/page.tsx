@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { ArrowRight, HelpCircle, MessageCircle, Search, ShieldCheck } from 'lucide-react';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
@@ -44,58 +43,27 @@ export default function FaqPage() {
   return (
     <SiteShell>
       <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(faqJsonLd)} />
-      <section className="page-hero px-6 py-8 md:px-10 md:py-10">
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
-          <div>
-            <div className="eyebrow w-fit">常见问题</div>
-            <h1 className="title-balance mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-ink md:text-5xl">
-              使用中遇到疑问，先看这里
-            </h1>
-            <p className="mt-5 max-w-3xl text-base leading-9 text-slate-600">
-              这里把新用户最容易困惑的问题集中说明，包括通知来源、报名入口、工作台保存、功能说明和反馈方式。
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link
-                href="/guide"
-                className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
-              >
-                查看使用指南
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <a
-                href={QQ_GROUP_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5"
-              >
-                加入 QQ 群
-              </a>
-            </div>
-          </div>
+      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
+        <div>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">常见问题</h1>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">集中说明通知来源、报名入口、工作台保存和反馈方式。</p>
+        </div>
 
-          <div className="rounded-[30px] border border-brand/10 bg-white/88 p-5 shadow-soft">
-            <div className="flex items-center gap-3">
-              <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-white">
-                <HelpCircle className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="font-semibold text-ink">快速定位问题</div>
-                <div className="mt-1 text-sm text-slate-500">按场景分类，先解决最常见的使用阻塞</div>
+        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+          {[
+            ['新手使用', HelpCircle],
+            ['数据说明', Search],
+            ['反馈渠道', MessageCircle]
+          ].map(([label, Icon]) => (
+            <div key={label as string} className="soft-stat-pill rounded-[28px] px-4 py-4">
+              <div className="flex items-center justify-center gap-3 text-center">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div className="whitespace-nowrap text-sm font-semibold text-ink">{label as string}</div>
               </div>
             </div>
-            <div className="mt-5 grid gap-3">
-              {faqGroups.map((group) => (
-                <a
-                  key={group.title}
-                  href={`#${group.id}`}
-                  className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-brand-cream hover:text-brand"
-                >
-                  {group.title}
-                  <ArrowRight className="h-4 w-4" />
-                </a>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 

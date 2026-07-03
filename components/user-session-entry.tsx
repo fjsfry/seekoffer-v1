@@ -98,7 +98,7 @@ export function UserSessionEntry() {
           className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-brand-deep md:h-11 md:px-4"
         >
           <ArrowUpRight className="h-4 w-4" />
-          升级正式登录
+          登录并同步
         </button>
       ) : null}
 

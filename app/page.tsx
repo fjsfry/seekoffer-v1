@@ -180,7 +180,7 @@ export default function HomePage() {
     {
       label: 'Offer 动态',
       value: offerCount ? `${offerCount}` : '开放中',
-      hint: offersLoading ? '正在同步审核动态' : '审核后展示',
+      hint: offersLoading ? '正在同步公开动态' : '核验后展示',
       icon: CalendarDays,
       href: '/offers'
     }
@@ -216,33 +216,6 @@ export default function HomePage() {
     }
   ];
 
-  const growthEntryCards = [
-    {
-      title: '竞赛库',
-      description: '覆盖 A 类、B 类和热门竞赛，按专业类别、节点和官网入口快速筛选。',
-      href: '/competitions',
-      action: '查看竞赛',
-      icon: Trophy,
-      tone: 'bg-amber-50 text-amber-600'
-    },
-    {
-      title: '知识/经验中心',
-      description: '系统了解时间线、黑话词典、材料指南和面试题。',
-      href: '/knowledge',
-      action: '开始学习',
-      icon: BookOpen,
-      tone: 'bg-sky-50 text-sky-600'
-    },
-    {
-      title: '人工复核',
-      description: '人工检查申请组合、材料短板和下一步动作。',
-      href: '/consulting',
-      action: '了解流程',
-      icon: ShieldCheck,
-      tone: 'bg-rose-50 text-rose-500'
-    }
-  ];
-
   return (
     <SiteShell>
       <section className="relative overflow-hidden rounded-[42px] px-3 pb-8 pt-8 sm:px-8 lg:px-14 lg:pb-12 lg:pt-14">
@@ -250,29 +223,28 @@ export default function HomePage() {
         <div className="pointer-events-none absolute left-[46%] top-[46%] h-3 w-3 rounded-full bg-brand/25" />
         <div className="pointer-events-none absolute left-[50%] top-[58%] h-4 w-4 rounded-full bg-brand/20" />
         <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_620px] xl:grid-cols-[minmax(0,1fr)_660px]">
-          <div className="relative z-10">
-            <h1 className="title-balance max-w-4xl text-[2.7rem] font-semibold leading-[1.12] tracking-tight text-ink md:text-5xl lg:text-[3.35rem] xl:text-[3.6rem]">
-              把分散的保研信息，
-              <br />
-              整理成清晰的申请路径
+          <div className="relative z-10 max-w-[720px] lg:pl-2 xl:pl-4">
+            <h1 className="max-w-none text-[3rem] font-semibold leading-[1.16] text-ink md:text-[3.55rem] md:leading-[1.13] lg:text-[3.9rem] xl:text-[4.15rem]">
+              <span className="block whitespace-nowrap">把保研信息</span>
+              <span className="block whitespace-nowrap">整理成清晰路径</span>
             </h1>
-            <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 lg:text-lg">
-              不再担心错过通知，自动帮你收集院校、追踪截止、管理材料，减少漏申，让保研从信息焦虑变成有节奏的行动计划。
+            <p className="mt-8 max-w-[610px] text-base leading-8 text-slate-600 lg:text-lg lg:leading-9">
+              寻鹿 Seekoffer 同步整理夏令营、预推免与正式推免通知，把院校筛选、截止提醒、申请材料和进度跟进放进同一个工作台。
             </p>
 
-            <div className="mt-9 flex flex-wrap gap-4">
+            <div className="mt-10 flex flex-wrap gap-4 sm:gap-5">
               <Link
                 href="/notices"
-                className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3.5 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
+                className="inline-flex items-center gap-2 rounded-[18px] bg-brand px-7 py-4 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
               >
-                探索寻鹿的功能
+                进入通知库
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
                 href="/me"
-                className="inline-flex items-center gap-2 rounded-xl border border-brand/25 bg-white/90 px-6 py-3.5 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5 hover:border-brand"
+                className="inline-flex items-center gap-2 rounded-[18px] border border-brand/25 bg-white/92 px-7 py-4 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5 hover:border-brand"
               >
-                免费创建申请表
+                打开工作台
               </Link>
             </div>
           </div>
@@ -281,7 +253,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-5 px-1 sm:grid-cols-2 lg:grid-cols-4 lg:px-16">
+      <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {heroMetrics.map((item) => {
           const Icon = item.icon;
 
@@ -307,7 +279,7 @@ export default function HomePage() {
         })}
       </section>
 
-      <section className="grid gap-5 px-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)] lg:px-12">
+      <section className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
         <div className="product-card rounded-[28px] p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -384,7 +356,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="px-1 lg:px-12">
+      <section>
         <div className="product-card rounded-[28px] p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -431,45 +403,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="px-1 lg:px-12">
-        <div className="product-card rounded-[28px] p-6">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-ink">从信息查询到申请准备</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">把竞赛背景、知识内容和人工复核串成后续路径。</p>
-            </div>
-            <Link href="/resources" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
-              查看资源库
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {growthEntryCards.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <Link
-                  key={item.title}
-                  href={item.href}
-                  className="group rounded-[24px] border border-slate-100 bg-white/88 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/20 hover:shadow-soft"
-                >
-                  <span className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl ${item.tone}`}>
-                    <Icon className="h-7 w-7" />
-                  </span>
-                  <h3 className="mt-5 text-lg font-semibold text-ink">{item.title}</h3>
-                  <p className="mt-3 min-h-[4.2rem] text-sm leading-7 text-slate-500">{item.description}</p>
-                  <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand">
-                    {item.action}
-                    <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-1 lg:px-12">
+      <section>
         <h2 className="text-center text-2xl font-semibold tracking-tight text-ink">为什么选择寻鹿</h2>
         <div className="product-card mt-5 grid overflow-hidden rounded-[26px] bg-white/[0.88] backdrop-blur sm:grid-cols-2 lg:grid-cols-6">
           {featureCards.map((item, index) => {
@@ -491,7 +425,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="px-1 lg:px-12">
+      <section>
         <h2 className="text-center text-2xl font-semibold tracking-tight text-ink">三步开始，轻松管理保研申请</h2>
         <div className="product-card mt-5 grid gap-4 rounded-[26px] bg-white/[0.88] p-5 backdrop-blur lg:grid-cols-[1fr_auto_1fr_auto_1fr] lg:items-center">
           {stepCards.map((item, index) => {

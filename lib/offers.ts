@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { getSupabaseBrowserClient } from './supabase-browser';
 import { isSupabaseConfigured } from './supabase-env';
@@ -127,7 +127,7 @@ export const curatedOfferSamples: PublicOffer[] = [
     reportsCount: 0,
     createdAt: '2026-06-26T09:30:00+08:00',
     isCuratedSample: true,
-    sourceLabel: '已审核投稿'
+    sourceLabel: '已核验'
   },
   {
     id: 'post-offer-fudan-econ-2026',
@@ -157,7 +157,7 @@ export const curatedOfferSamples: PublicOffer[] = [
     reportsCount: 0,
     createdAt: '2026-06-24T11:10:00+08:00',
     isCuratedSample: true,
-    sourceLabel: '已审核投稿'
+    sourceLabel: '已核验'
   },
   {
     id: 'post-offer-nju-business-2026',
@@ -187,7 +187,7 @@ export const curatedOfferSamples: PublicOffer[] = [
     reportsCount: 0,
     createdAt: '2026-06-22T21:15:00+08:00',
     isCuratedSample: true,
-    sourceLabel: '已审核投稿'
+    sourceLabel: '已核验'
   },
   {
     id: 'post-offer-pku-law-2026',
@@ -202,13 +202,13 @@ export const curatedOfferSamples: PublicOffer[] = [
     reportsCount: 0,
     createdAt: '2026-06-21T10:00:00+08:00',
     isCuratedSample: true,
-    sourceLabel: '已审核投稿'
+    sourceLabel: '已核验'
   }
 ];
 
 export async function fetchPublicOffers() {
   if (!isSupabaseConfigured()) {
-    throw new Error('Supabase 环境变量未配置，Offer 圈动态暂不可用。');
+    throw new Error('Offer 圈动态正在整理中。');
   }
 
   const supabase = getSupabaseBrowserClient();
@@ -224,7 +224,7 @@ export async function fetchPublicOffers() {
     .limit(200);
 
   if (error) {
-    throw new Error(error.message || '读取 Offer 圈失败。');
+    throw new Error('Offer 圈动态正在整理中。');
   }
 
   return ((data || []) as OfferPostRow[]).map(mapOfferRow);
@@ -242,7 +242,7 @@ export function validateOfferSubmitInput(input: OfferSubmitInput) {
   }
 
   if (!authorName) {
-    throw new Error('请填写后台可核验的发布人称呼。');
+    throw new Error('请填写用于核验的发布人称呼。');
   }
 
   if (!schoolName) {
@@ -284,7 +284,7 @@ export function validateOfferSubmitInput(input: OfferSubmitInput) {
 
 export async function submitOfferPost(input: OfferSubmitInput) {
   if (!isSupabaseConfigured()) {
-    throw new Error('Supabase 环境变量未配置，暂时不能发布 Offer。');
+    throw new Error('发布入口正在维护中，请稍后再试。');
   }
 
   const validated = validateOfferSubmitInput(input);
@@ -302,13 +302,13 @@ export async function submitOfferPost(input: OfferSubmitInput) {
   });
 
   if (error) {
-    throw new Error(error.message || '发布失败，请稍后重试。');
+    throw new Error('发布失败，请稍后重试。');
   }
 }
 
 export async function reportOfferPost(offerId: string, content: string, userId?: string | null) {
   if (!isSupabaseConfigured()) {
-    throw new Error('Supabase 环境变量未配置，暂时不能提交举报。');
+    throw new Error('反馈入口正在维护中，请稍后再试。');
   }
 
   const cleanContent = cleanMultiline(content, 800);
@@ -326,6 +326,6 @@ export async function reportOfferPost(offerId: string, content: string, userId?:
   });
 
   if (error) {
-    throw new Error(error.message || '举报提交失败，请稍后重试。');
+    throw new Error('举报提交失败，请稍后重试。');
   }
 }

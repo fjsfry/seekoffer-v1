@@ -654,15 +654,6 @@ export default function MePage() {
     [rows]
   );
 
-  const sortedRows = useMemo(
-    () => [...rows].sort((left, right) => parseDeadlineTimestamp(left.project.deadlineDate) - parseDeadlineTimestamp(right.project.deadlineDate)),
-    [rows]
-  );
-  const nearestDeadlineRow =
-    sortedRows.find((row) => {
-      const daysLeft = getDaysLeft(row.project.deadlineDate);
-      return daysLeft !== null && daysLeft >= 0;
-    }) ?? null;
   const filteredApplicationRows = useMemo(() => {
     const keyword = applicationKeyword.trim().toLowerCase();
     const filtered = rows.filter((row) => {
@@ -915,7 +906,6 @@ export default function MePage() {
     }
   }
 
-  const nearestDeadlineDays = nearestDeadlineRow ? getDaysLeft(nearestDeadlineRow.project.deadlineDate) : null;
   const baoYanCountdownDays = getAnnualCountdownDays(BAOYAN_DATE_MONTH, BAOYAN_DATE_DAY);
 
   async function handleRecordChange(userProjectId: string, patch: Partial<UserProjectRecord>) {
@@ -952,19 +942,32 @@ export default function MePage() {
           {[
             { label: '申请项目', value: stats.total.toString(), icon: ClipboardList },
             { label: '待补材料', value: stats.materialPending.toString(), icon: BookCheck },
-            { label: '保研倒计时', value: `${baoYanCountdownDays}天`, icon: CalendarDays }
+            { label: '保研倒计时', value: `${baoYanCountdownDays}天`, hint: '距 9.22', icon: CalendarDays, featured: true }
           ].map((item) => {
             const Icon = item.icon;
+            const featured = 'featured' in item && item.featured;
 
             return (
-              <div key={item.label} className="soft-stat-pill rounded-[28px] px-4 py-4">
+              <div
+                key={item.label}
+                className={`rounded-[28px] px-4 py-4 ${
+                  featured ? 'bg-brand text-white shadow-float ring-1 ring-white/30' : 'soft-stat-pill'
+                }`}
+              >
                 <div className="flex items-center justify-center gap-3 text-center">
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
+                  <span
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+                      featured ? 'bg-white/15 text-white' : 'bg-brand/8 text-brand'
+                    }`}
+                  >
                     <Icon className="h-5 w-5" />
                   </span>
                   <div className="min-w-0">
-                    <div className="whitespace-nowrap text-xs text-slate-500">{item.label}</div>
-                    <div className="whitespace-nowrap text-xl font-semibold text-ink">{item.value}</div>
+                    <div className={`whitespace-nowrap text-xs ${featured ? 'text-white/75' : 'text-slate-500'}`}>{item.label}</div>
+                    <div className={`whitespace-nowrap font-semibold ${featured ? 'text-2xl text-white' : 'text-xl text-ink'}`}>
+                      {item.value}
+                    </div>
+                    {featured ? <div className="whitespace-nowrap text-[11px] font-semibold text-white/70">{item.hint}</div> : null}
                   </div>
                 </div>
               </div>
@@ -973,7 +976,7 @@ export default function MePage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <section className="grid gap-4">
         <section className="product-card rounded-[30px] p-3">
           <div className="grid gap-2 sm:grid-cols-3">
             {[
@@ -1005,25 +1008,6 @@ export default function MePage() {
             })}
           </div>
         </section>
-
-        <Link
-          href={nearestDeadlineRow ? (nearestDeadlineRow.project.sourceSite === '用户手动录入' ? '#manual-entry' : buildNoticeDetailHref(nearestDeadlineRow.project.id)) : '/notices'}
-          className="product-card flex items-center justify-between rounded-[30px] px-5 py-4 transition hover:-translate-y-0.5 hover:shadow-soft"
-        >
-          <span>
-            <span className="block text-xs font-semibold text-slate-500">最近截止</span>
-            <span className="mt-1 block text-3xl font-semibold text-ink">
-              {nearestDeadlineDays === null ? '-' : Math.max(0, nearestDeadlineDays)}
-              <span className="ml-1 text-base font-semibold">天</span>
-            </span>
-            <span className="mt-1 block max-w-[210px] truncate text-xs text-slate-500">
-              {nearestDeadlineRow ? getDisplaySchoolName(nearestDeadlineRow.project.schoolName) : '从通知库添加目标项目'}
-            </span>
-          </span>
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-brand/8 text-brand">
-            <ChevronRight className="h-5 w-5" />
-          </span>
-        </Link>
       </section>
 
       {activeSection === 'applications' ? (

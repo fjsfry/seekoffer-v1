@@ -1,22 +1,17 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import {
-  ArrowRight,
   CheckCircle2,
   ClipboardList,
   FileSearch,
   HelpCircle,
-  MessageCircle,
-  ShieldCheck,
   Target,
   UsersRound
 } from 'lucide-react';
 import { SiteShell } from '@/components/site-shell';
-import { QQ_GROUP_URL } from '@/lib/contact';
 
 export const metadata: Metadata = {
-  title: '保研咨询与人工复核 - 寻鹿 Seekoffer',
-  description: '面向保研申请的人工复核服务说明，包含适合人群、服务流程、案例结构和常见问题。'
+  title: '保研咨询 - 寻鹿 Seekoffer',
+  description: '面向保研申请的咨询服务说明，包含适合人群、服务流程、案例结构和常见问题。'
 };
 
 const serviceFlow = [
@@ -53,7 +48,7 @@ const caseFrames = [
 
 const faqs = [
   ['会不会承诺录取？', '不会。我们只做信息整理、定位复核和行动建议，录取取决于院校要求、竞争环境和个人表现。'],
-  ['什么时候需要人工复核？', '当你已经有目标清单或材料初稿，但不确定组合、优先级和表达重点时，再做人工复核更有效。'],
+  ['什么时候需要保研咨询？', '当你已经有目标清单或材料初稿，但不确定组合、优先级和表达重点时，再做保研咨询更有效。'],
   ['需要准备哪些材料？', '一页简历、成绩排名、目标方向、科研竞赛经历、英语成绩和当前申请清单即可开始。'],
   ['适合什么时候做？', '夏令营投递前、夏令营结果后、预推免前都适合，越早做越容易调整组合。']
 ];
@@ -61,43 +56,30 @@ const faqs = [
 export default function ConsultingPage() {
   return (
     <SiteShell>
-      <section className="page-hero grid gap-7 px-6 py-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center lg:px-8">
+      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-brand/8 px-4 py-2 text-sm font-semibold text-brand">
-            <ShieldCheck className="h-4 w-4" />
-            克制的人工服务承接
-          </div>
-          <h1 className="mt-5 max-w-4xl text-4xl font-semibold tracking-tight text-ink md:text-5xl">保研咨询与人工复核</h1>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
-            我们不做夸张承诺。人工复核只帮助你把背景、目标、材料和申请节奏整理清楚，形成更稳的下一步动作。
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/notices" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:bg-brand-deep">
-              先看通知库
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <a
-              href={QQ_GROUP_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-2xl border border-brand/20 bg-white px-5 py-3 text-sm font-semibold text-brand shadow-sm transition hover:border-brand/40"
-            >
-              加入社群咨询
-              <MessageCircle className="h-4 w-4" />
-            </a>
-          </div>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">保研咨询</h1>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">把背景、目标、材料和申请节奏整理清楚，形成更稳的下一步动作。</p>
         </div>
 
-        <div className="soft-stat-pill rounded-[30px] p-6">
-          <h2 className="text-xl font-semibold text-ink">人工复核看什么</h2>
-          <div className="mt-5 grid gap-3">
-            {['背景竞争力', '目标项目组合', '材料完成度', '截止时间风险'].map((item) => (
-              <div key={item} className="flex items-center gap-3 rounded-2xl bg-white/85 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
-                <CheckCircle2 className="h-4 w-4 text-brand" />
-                {item}
+        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+          {[
+            ['定位复核', '冲稳保'],
+            ['材料清单', '查短板'],
+            ['申请节奏', '定动作']
+          ].map(([label, value]) => (
+            <div key={label} className="soft-stat-pill rounded-[28px] px-4 py-4">
+              <div className="flex items-center justify-center gap-3 text-center">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
+                  <CheckCircle2 className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="whitespace-nowrap text-xs text-slate-500">{label}</div>
+                  <div className="whitespace-nowrap text-xl font-semibold text-ink">{value}</div>
+                </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -139,7 +121,7 @@ export default function ConsultingPage() {
             </span>
             <div>
               <h2 className="text-2xl font-semibold tracking-tight text-ink">适合人群</h2>
-              <p className="mt-2 text-sm leading-7 text-slate-500">如果你只是想看通知，通知库已经足够；以下情况更适合人工复核。</p>
+              <p className="mt-2 text-sm leading-7 text-slate-500">如果你只是想看通知，通知库已经足够；以下情况更适合保研咨询。</p>
             </div>
           </div>
           <div className="mt-6 grid gap-3">
