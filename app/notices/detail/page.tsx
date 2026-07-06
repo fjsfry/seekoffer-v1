@@ -3,29 +3,13 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, ArrowUpRight, Clock3, History, LoaderCircle, ShieldCheck } from 'lucide-react';
-import { ApplicationActionButton } from '@/components/application-action-button';
-import { ExternalSiteMark } from '@/components/external-site-mark';
+import { ArrowRight, LoaderCircle } from 'lucide-react';
+import { NoticeDetailView } from '@/components/notice-detail-view';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
-import { DeadlineBadge, StatusBadge } from '@/components/status-badge';
-import { QQ_GROUP_NUMBER, QQ_GROUP_URL } from '@/lib/contact';
 import { fetchPublicNotices } from '@/lib/cloudbase-data';
-import { getCountdownLabel, getDeadlineLevelFromDate } from '@/lib/deadline-display';
-import {
-  formatNoticeDate,
-  formatNoticeDateOnly,
-  getDisplayDiscipline,
-  getDisplayNoticeDepartment,
-  getDisplayProjectType,
-  getDisplaySchoolName,
-  getDisplaySourceLabel,
-  getDisplayTags,
-  normalizeNoticeTitle
-} from '@/lib/notice-display';
-import { getNoticeApplicationLink, getNoticeOriginalLink } from '@/lib/notice-links';
+import { sanitizeNoticeForPublicView } from '@/lib/notice-public-copy';
 import { baseNoticeProjects } from '@/lib/notice-source';
-import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
 
 function getSafeNoticeReturnHref(value: string | null) {
@@ -44,7 +28,10 @@ function NoticeDetailContent() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id') || '';
   const returnHref = getSafeNoticeReturnHref(searchParams.get('returnTo'));
-  const initialProject = useMemo(() => baseNoticeProjects.find((item) => item.id === id) || null, [id]);
+  const initialProject = useMemo(() => {
+    const matchedProject = baseNoticeProjects.find((item) => item.id === id) || null;
+    return matchedProject ? sanitizeNoticeForPublicView(matchedProject) : null;
+  }, [id]);
   const [remoteState, setRemoteState] = useState<{
     id: string;
     project: PublicNoticeProject | null;
@@ -54,6 +41,7 @@ function NoticeDetailContent() {
     project: null,
     message: ''
   });
+
   const remoteReady = remoteState.id === id;
   const project = initialProject || (remoteReady ? remoteState.project : null);
   const loading = Boolean(id && !initialProject && !remoteReady);
@@ -75,8 +63,8 @@ function NoticeDetailContent() {
         const matchedProject = rows.find((item) => item.id === id) || null;
         setRemoteState({
           id,
-          project: matchedProject,
-          message: matchedProject ? '' : '没有在当前通知库中找到这条记录，可能已被合并或下线。'
+          project: matchedProject ? sanitizeNoticeForPublicView(matchedProject) : null,
+          message: matchedProject ? '' : '当前通知库没有找到这条记录，可能已合并、更新或下线。'
         });
       })
       .catch(() => {
@@ -84,7 +72,7 @@ function NoticeDetailContent() {
           setRemoteState({
             id,
             project: null,
-            message: '通知详情加载失败，请返回通知库重新打开，或加入 QQ 群告诉我们。'
+            message: '通知详情加载失败，请返回通知库重新打开，或加入 QQ 群反馈。'
           });
         }
       });
@@ -104,12 +92,12 @@ function NoticeDetailContent() {
 
   if (loading) {
     return (
-      <DetailShell title="正在加载通知详情" subtitle="正在从最新通知库读取项目详情，请稍等。">
+      <DetailShell title="正在加载通知详情" subtitle="正在读取最新整理结果，请稍等。">
         <section className="surface-card rounded-[34px] p-8">
           <div className="flex flex-col items-center justify-center gap-5 text-center">
             <LoaderCircle className="h-8 w-8 animate-spin text-brand" />
             <p className="max-w-xl text-sm leading-7 text-slate-600">
-              如果这条通知刚刚更新，详情页可能需要几秒钟同步，请稍等一下。
+              如果这条通知刚刚更新，详情页可能需要几秒钟同步。
             </p>
           </div>
         </section>
@@ -125,7 +113,11 @@ function NoticeDetailContent() {
     );
   }
 
-  return <NoticeDetail project={project} returnHref={returnHref} />;
+  return (
+    <SiteShell>
+      <NoticeDetailView project={project} returnHref={returnHref} />
+    </SiteShell>
+  );
 }
 
 function DetailShell({
@@ -139,7 +131,7 @@ function DetailShell({
 }) {
   return (
     <SiteShell>
-      <PageSectionTitle eyebrow="Notice Detail" title={title} subtitle={subtitle} level="h1" />
+      <PageSectionTitle eyebrow="通知详情" title={title} subtitle={subtitle} level="h1" />
       {children}
     </SiteShell>
   );
@@ -150,7 +142,7 @@ function EmptyDetailState({ href, label }: { href: string; label: string }) {
     <section className="surface-card rounded-[34px] p-8">
       <div className="flex flex-col items-center justify-center gap-5 text-center">
         <p className="max-w-xl text-sm leading-7 text-slate-600">
-          我们没有让页面一直转圈，而是把异常状态直接告诉你。你可以先回到通知库重新选择，也可以加入 QQ 群告诉我们。
+          页面没有继续停留在异常状态。你可以先回到通知库重新选择，也可以加入 QQ 群告诉我们。
         </p>
         <Link
           href={href}
@@ -164,253 +156,12 @@ function EmptyDetailState({ href, label }: { href: string; label: string }) {
   );
 }
 
-function NoticeDetail({ project, returnHref }: { project: PublicNoticeProject; returnHref: string }) {
-  const sourceLabel = getDisplaySourceLabel(project.sourceSite);
-  const departmentName = getDisplayNoticeDepartment(project);
-  const originalLink = getNoticeOriginalLink(project);
-  const applicationLink = getNoticeApplicationLink(project);
-
-  return (
-    <SiteShell>
-      <Link href={returnHref} className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
-        <ArrowLeft className="h-4 w-4" />
-        返回通知库
-      </Link>
-
-      <PageSectionTitle
-        eyebrow="Notice Detail"
-        title={`${getDisplaySchoolName(project.schoolName)} · ${normalizeNoticeTitle(project.projectName, 80)}`}
-        subtitle="查看项目详情、截止时间、材料要求与原文入口，并可一键加入工作台。"
-        level="h1"
-      />
-
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
-        <div className="grid gap-6">
-          <section className="rounded-[30px] border border-black/5 bg-white p-6 shadow-soft">
-            <div className="mb-5 flex flex-wrap items-center gap-4">
-              <ExternalSiteMark
-                source={resolveNoticeLogoSource(project)}
-                label={getDisplaySchoolName(project.schoolName)}
-                size="xl"
-                rounded="full"
-              />
-              <div>
-                <div className="text-sm font-semibold text-slate-500">{departmentName}</div>
-                <div className="mt-1 text-2xl font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <DeadlineBadge level={getDeadlineLevelFromDate(project.deadlineDate)} />
-              <StatusBadge status={project.status} />
-              <span className="rounded-full bg-brand-cream px-3 py-1 text-xs font-semibold text-slate-700">
-                {getDisplayProjectType(project.projectType)}
-              </span>
-              {getDisplayTags(project.tags).slice(0, 3).map((tag) => (
-                <span key={tag} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
-                  {tag}
-                </span>
-              ))}
-            </div>
-
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <InfoItem label="学校" value={getDisplaySchoolName(project.schoolName)} />
-              <InfoItem label="学院 / 系" value={departmentName} />
-              <InfoItem label="学科方向" value={getDisplayDiscipline(project.discipline)} />
-              <InfoItem label="发布时间" value={formatNoticeDateOnly(project.publishDate)} />
-              <InfoItem label="截止时间" value={formatNoticeDate(project.deadlineDate)} />
-              <InfoItem label="活动时间" value={formatEventRange(project.eventStartDate, project.eventEndDate)} />
-            </div>
-
-            <div className="mt-5 rounded-2xl bg-brand-cream px-4 py-4 text-sm text-slate-700">
-              <div className="inline-flex items-center gap-2 font-semibold text-brand">
-                <Clock3 className="h-4 w-4" />
-                截止倒计时
-              </div>
-              <div className="mt-2 text-lg font-semibold text-ink">{getCountdownLabel(project.deadlineDate)}</div>
-            </div>
-          </section>
-
-          <ContentCard title="申请条件">
-            <p>{project.requirements}</p>
-          </ContentCard>
-
-          <ContentCard title="材料要求">
-            <ul className="space-y-2">
-              {project.materialsRequired.length ? (
-                project.materialsRequired.map((item) => (
-                  <li key={item} className="rounded-2xl bg-slate-50 px-4 py-3">
-                    {item}
-                  </li>
-                ))
-              ) : (
-                <li className="rounded-2xl bg-slate-50 px-4 py-3">材料要求待补充，请以原文通知为准。</li>
-              )}
-            </ul>
-          </ContentCard>
-
-          <ContentCard title="笔试 / 面试说明">
-            <p>{project.examInterviewInfo || '考核安排待补充，请以原文通知为准。'}</p>
-          </ContentCard>
-
-          <ContentCard title="联系方式与备注">
-            <div className="grid gap-4 md:grid-cols-2">
-              <InfoItem label="联系方式" value={project.contactInfo} />
-              <InfoItem label="备注" value={project.remarks} />
-            </div>
-          </ContentCard>
-
-          <ContentCard title="历史记录参考">
-            <div className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-brand">
-              <History className="h-4 w-4" />
-              往年规律
-            </div>
-            <div className="grid gap-3">
-              {project.historyRecords.length ? (
-                project.historyRecords.map((item) => (
-                  <div key={`${project.id}-${item.year}`} className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                    <div className="font-semibold text-ink">{item.year} 年</div>
-                    <div className="mt-2">发布时间：{item.publishDate}</div>
-                    <div className="mt-1">截止时间：{item.deadlineDate}</div>
-                    <div className="mt-2 leading-7">{item.summary}</div>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                  暂无结构化历史记录，后续会逐步补齐同院校、同学院的往年时间线。
-                </div>
-              )}
-            </div>
-          </ContentCard>
-        </div>
-
-        <aside className="space-y-6">
-          <section className="rounded-[30px] border border-black/5 bg-white p-6 shadow-soft">
-            <div className="text-lg font-semibold text-ink">操作</div>
-            <div className="mt-4 grid gap-3">
-              <ApplicationActionButton projectId={project.id} />
-              {originalLink ? (
-                <a
-                  href={originalLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"
-                >
-                  打开原文通知
-                  <ArrowUpRight className="h-4 w-4" />
-                </a>
-              ) : (
-                <span className="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-400">
-                  暂无原文链接
-                </span>
-              )}
-              {applicationLink ? (
-                <a
-                  href={applicationLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-brand shadow-sm"
-                >
-                  打开报名入口
-                  <ArrowUpRight className="h-4 w-4" />
-                </a>
-              ) : null}
-              <a
-                href={QQ_GROUP_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800"
-              >
-                加 QQ 群反馈
-              </a>
-              <Link
-                href="/deadlines"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
-              >
-                去看截止提醒
-              </Link>
-            </div>
-          </section>
-
-          <section className="rounded-[30px] border border-black/5 bg-white p-6 shadow-soft">
-            <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
-              <ShieldCheck className="h-4 w-4" />
-              来源与提醒
-            </div>
-            <div className="mt-4 grid gap-3 text-sm text-slate-600">
-              <InfoItem label="来源说明" value={sourceLabel} />
-              <InfoItem label="平台录入时间" value={project.collectedAt} />
-              <InfoItem label="最近更新时间" value={project.updatedAt} />
-            </div>
-            <div className="mt-4 grid gap-2 text-xs leading-6 text-slate-500">
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">截止时间：以院校官网原文为最终依据。</div>
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">材料要求：以院校官网原文为最终依据。</div>
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                发现信息有误：可加入 QQ 群 {QQ_GROUP_NUMBER} 告诉我们。
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-[30px] border border-black/5 bg-white p-6 shadow-soft">
-            <div className="text-lg font-semibold text-ink">变更记录</div>
-            <div className="mt-4 space-y-3">
-              {project.changeLog.length ? (
-                project.changeLog.map((item) => (
-                  <div key={`${item.date}-${item.field}`} className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                    <div className="font-semibold text-ink">
-                      {item.date} · {item.field}
-                    </div>
-                    <div className="mt-2 leading-7">{item.change}</div>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-600">
-                  暂无公开变更记录。若你发现截止时间、入口或材料要求变化，可以加入 QQ 群告诉我们。
-                </div>
-              )}
-            </div>
-          </section>
-        </aside>
-      </section>
-    </SiteShell>
-  );
-}
-
-function InfoItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-slate-50 px-4 py-4">
-      <div className="text-sm font-semibold text-ink">{label}</div>
-      <div className="mt-2 text-sm leading-7 text-slate-600">{value || '待补充'}</div>
-    </div>
-  );
-}
-
-function formatEventRange(start: string, end: string) {
-  const startText = formatNoticeDate(start, '');
-  const endText = formatNoticeDate(end, '');
-
-  if (startText && endText) {
-    return `${startText} 至 ${endText}`;
-  }
-
-  return startText || endText || '以原文通知为准';
-}
-
-function ContentCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-[30px] border border-black/5 bg-white p-6 text-sm leading-7 text-slate-600 shadow-soft">
-      <h2 className="mb-4 text-xl font-semibold text-ink">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
 export default function NoticeDetailQueryPage() {
   return (
     <Suspense
       fallback={
         <SiteShell>
-          <PageSectionTitle eyebrow="Notice Detail" title="正在打开通知详情" subtitle="正在准备详情页，请稍等。" level="h1" />
+          <PageSectionTitle eyebrow="通知详情" title="正在打开通知详情" subtitle="正在准备详情页，请稍等。" level="h1" />
         </SiteShell>
       }
     >

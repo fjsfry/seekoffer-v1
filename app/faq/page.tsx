@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'Seekoffer 常见问题',
-    description: '保研通知、申请工作台、数据来源和反馈方式常见问题。',
+  description: '保研通知、申请工作台、通知整理和反馈方式常见问题。',
     url: '/faq',
     siteName: '寻鹿 Seekoffer',
     images: ['/logo.png'],
@@ -46,7 +46,7 @@ export default function FaqPage() {
       <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">常见问题</h1>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">集中说明通知来源、报名入口、工作台保存和反馈方式。</p>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">集中说明通知整理、报名入口、工作台保存和反馈方式。</p>
         </div>
 
         <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
@@ -99,7 +99,7 @@ export default function FaqPage() {
             </div>
             <div className="mt-5 grid gap-3 text-sm leading-7 text-slate-600">
               <div className="rounded-2xl bg-slate-50 px-4 py-3">先确认是否已经登录，工作台和加入申请表都需要账号状态。</div>
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">再确认原文通知与报名入口是否为同一个页面，部分院校会分开设置。</div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">再确认完整通知与报名入口是否为同一个页面，部分院校会分开设置。</div>
               <div className="rounded-2xl bg-slate-50 px-4 py-3">最后通过 QQ 群或反馈入口提交截图，方便我们复现问题。</div>
             </div>
           </section>
@@ -110,7 +110,7 @@ export default function FaqPage() {
               重要提醒
             </div>
             <p className="mt-4 text-sm leading-7 text-slate-600">
-              Seekoffer 会持续整理公开通知，但正式报名、材料要求和截止时间，仍以院校官方原文为准。
+              Seekoffer 会持续整理公开通知，但正式报名、材料要求和截止时间，仍建议在提交前核对学校页面与报名系统。
             </p>
           </section>
 

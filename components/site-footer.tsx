@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import Image from 'next/image';
+import Link from 'next/link';
 import { MessageCircle, Play, Send, Share2 } from 'lucide-react';
 import { footerAbout, footerColumns } from '@/lib/site-content';
 
@@ -14,7 +14,7 @@ export function SiteFooter() {
             <div>联系邮箱：seekoffer@qq.com</div>
             <div>QQ 交流群：1092490793</div>
             <div>数据删除 / 账号注销：可通过邮箱联系我们。</div>
-            <div>通知与材料要求请以院校官网原文为准，发现问题欢迎进群反馈。</div>
+            <div>通知与材料会持续整理，正式提交前请再次核对学校页面与报名系统。</div>
           </div>
           <div className="mt-5 flex items-center gap-3">
             {[MessageCircle, Share2, Send, Play].map((Icon, index) => (

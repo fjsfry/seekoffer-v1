@@ -20,7 +20,7 @@ const groupMeta: Record<
 > = {
   today: {
     title: '24 小时内截止',
-    subtitle: '最危险的一组，建议现在就核对原文并处理提交动作。',
+    subtitle: '最危险的一组，建议现在就核对学校页面并处理提交动作。',
     empty: '当前没有 24 小时内截止项目。',
     tone: 'text-rose-700',
     border: 'border-rose-100 bg-rose-50'

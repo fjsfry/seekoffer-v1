@@ -168,7 +168,7 @@ export function ManualProjectEntryCard({
                 />
               </Field>
 
-              <Field label="原文或报名链接">
+              <Field label="通知或报名链接">
                 <input
                   value={form.applyLink}
                   onChange={(event) => updateField('applyLink', event.target.value)}

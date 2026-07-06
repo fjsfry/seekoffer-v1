@@ -96,7 +96,7 @@ export type UserProjectRecord = {
   customReminderEnabled: boolean;
 };
 
-export type FieldGuideCategory = '项目基础信息' | '个人申请记录' | '来源与变更信息';
+export type FieldGuideCategory = '项目基础信息' | '个人申请记录' | '整理与变更信息';
 
 export type FieldGuideItem = {
   key: string;
@@ -267,9 +267,9 @@ export const statusDefinitions: StatusDefinition[] = [
 ];
 
 export const guideTips = [
-  '项目基础信息帮你快速看清学校、学院、项目阶段、截止时间和官网原文。',
+  '项目基础信息帮你快速看清学校、学院、项目阶段、截止时间和完整通知。',
   '个人申请记录由你自己维护，用来把 Excel、备忘录和聊天记录里的进度集中到一起。',
-  '来源与变更信息用于提醒你关注官网原文和重要调整，提交前仍建议再次确认官方页面。'
+  '整理与变更信息用于提醒你关注重要调整，提交前仍建议再次确认学校页面和报名系统。'
 ];
 
 export const noticeProjects: PublicNoticeProject[] = [
@@ -290,19 +290,19 @@ export const noticeProjects: PublicNoticeProject[] = [
       '欢迎生命科学、医学、化学、计算机、数学等相关背景本科生报名，要求成绩优秀、学术兴趣明确，并能在暑期全程参与课程与交流活动。',
     materialsRequired: ['简历', '成绩单', '排名证明', '英语成绩证明', '个人陈述'],
     examInterviewInfo: '以材料审核为主，是否安排面试以后续邮件或官网通知为准。',
-    contactInfo: '见原文通知页面中的官方联系方式',
-    remarks: '原文为微信图文，建议先保存原文链接，再把材料准备拆到自己的申请表里。',
+    contactInfo: '见学校页面中的官方联系方式',
+    remarks: '建议先保存通知链接，再把材料准备拆到自己的申请表里。',
     tags: ['985', '211', '双一流', '生命科学', '材料要求复杂'],
     status: '即将截止',
     year: 2026,
     deadlineLevel: 'today',
-    sourceSite: '保研通知网',
+    sourceSite: '寻鹿整理',
     collectedAt: '2026-04-11 10:30',
     updatedAt: '2026-04-11 10:30',
     lastCheckedAt: '2026-04-11 10:30',
     isVerified: true,
     changeLog: [
-      { date: '2026-04-10 22:10', field: '初次录入', change: '从保研通知网录入基础项目字段。' },
+      { date: '2026-04-10 22:10', field: '初次录入', change: '整理基础项目字段。' },
       { date: '2026-04-11 10:30', field: '材料要求', change: '补充简历、成绩单、排名证明、英语成绩与个人陈述。' }
     ],
     historyRecords: [
@@ -327,13 +327,13 @@ export const noticeProjects: PublicNoticeProject[] = [
       '面向人工智能、计算机、自动化等方向优秀本科生，建议具备算法、工程项目或科研训练经历。',
     materialsRequired: ['简历', '成绩单', '个人陈述', '项目经历说明', '英语成绩'],
     examInterviewInfo: '往年通常以材料审核加综合面试为主，今年以学院后续通知为准。',
-    contactInfo: '建议优先通过学院官网或原文通知确认联系渠道',
+    contactInfo: '建议优先通过学院官网或报名系统确认联系渠道',
     remarks: '适合作为高优先级项目尽快推进，尤其要留意项目经历说明与英语材料。',
     tags: ['985', '上海', '强 com', '需面试'],
     status: '即将截止',
     year: 2026,
     deadlineLevel: 'within3days',
-    sourceSite: '保研通知网',
+    sourceSite: '寻鹿整理',
     collectedAt: '2026-04-11 10:30',
     updatedAt: '2026-04-11 10:30',
     lastCheckedAt: '2026-04-11 10:30',
@@ -362,14 +362,14 @@ export const noticeProjects: PublicNoticeProject[] = [
     requirements:
       '欢迎计算机、软件、网络安全等方向优秀学生申请，建议具备项目经历或科研经历。',
     materialsRequired: ['简历', '成绩单', '排名证明', '项目经历说明'],
-    examInterviewInfo: '往年常见机试与综合面试，今年需重点关注原文是否有笔试安排。',
+    examInterviewInfo: '往年常见机试与综合面试，今年需重点关注学校页面是否有笔试安排。',
     contactInfo: '以学院官方渠道发布为准',
     remarks: '强 com 热门项目，建议尽早确定是否需要额外准备机试。',
     tags: ['985', '杭州', '强 com', '需笔试'],
     status: '报名中',
     year: 2026,
     deadlineLevel: 'within7days',
-    sourceSite: '保研通知网',
+    sourceSite: '寻鹿整理',
     collectedAt: '2026-04-11 10:30',
     updatedAt: '2026-04-11 10:30',
     lastCheckedAt: '2026-04-11 10:30',
@@ -402,7 +402,7 @@ export const noticeProjects: PublicNoticeProject[] = [
     status: '即将截止',
     year: 2026,
     deadlineLevel: 'within3days',
-    sourceSite: '保研通知网',
+    sourceSite: '寻鹿整理',
     collectedAt: '2026-04-11 10:30',
     updatedAt: '2026-04-11 10:30',
     lastCheckedAt: '2026-04-11 10:30',
@@ -429,13 +429,13 @@ export const noticeProjects: PublicNoticeProject[] = [
       '欢迎经管相关专业学生申请，要求成绩优秀、英语能力良好，并具备较好的专业基础。',
     materialsRequired: ['简历', '成绩单', '英语成绩', '个人陈述', '获奖证明'],
     examInterviewInfo: '预计以综合面试为主，是否增加笔试以后续通知为准。',
-    contactInfo: '建议保存原文链接，后续再核对学院官网',
+    contactInfo: '建议保存通知链接，后续再核对学院官网',
     remarks: '偏长期跟踪项目，可先入表后分配优先级。',
     tags: ['985', '正式推免', '经管', '英语要求高'],
     status: '报名中',
     year: 2026,
     deadlineLevel: 'future',
-    sourceSite: '保研通知网',
+    sourceSite: '寻鹿整理',
     collectedAt: '2026-04-11 10:30',
     updatedAt: '2026-04-11 10:30',
     lastCheckedAt: '2026-04-11 10:30',
@@ -462,13 +462,13 @@ export const noticeProjects: PublicNoticeProject[] = [
       '要求具备较好的英语能力和专业基础，欢迎长期规划正式推免的同学提前关注。',
     materialsRequired: ['简历', '成绩单', '英语成绩', '个人陈述'],
     examInterviewInfo: '预计以面试为主，正式安排以后续通知为准。',
-    contactInfo: '见原文通知中的学院招生联系方式',
+    contactInfo: '见学校页面中的学院招生联系方式',
     remarks: '属于相对后周期项目，适合在申请表里做长期跟踪与风险平衡。',
     tags: ['正式推免', '经管', '长期跟踪'],
     status: '报名中',
     year: 2026,
     deadlineLevel: 'future',
-    sourceSite: '保研通知网',
+    sourceSite: '寻鹿整理',
     collectedAt: '2026-04-11 10:30',
     updatedAt: '2026-04-11 10:30',
     lastCheckedAt: '2026-04-11 10:30',
@@ -495,13 +495,13 @@ export const noticeProjects: PublicNoticeProject[] = [
       '要求网络安全相关背景，欢迎有科研、竞赛或工程经历的学生申请。',
     materialsRequired: ['简历', '成绩单', '竞赛证明', '个人陈述'],
     examInterviewInfo: '项目已截止，可以作为历史节奏和字段拆解参考。',
-    contactInfo: '见原文通知',
+    contactInfo: '见学校页面',
     remarks: '已截止项目保留在库里，方便学生参考往年发布时间和材料结构。',
     tags: ['网安', '竞赛加分', '已截止'],
     status: '已截止',
     year: 2026,
     deadlineLevel: 'expired',
-    sourceSite: '保研通知网',
+    sourceSite: '寻鹿整理',
     collectedAt: '2026-04-11 10:30',
     updatedAt: '2026-04-11 10:30',
     lastCheckedAt: '2026-04-11 10:30',
@@ -532,7 +532,7 @@ export const sampleUserProjects: UserProjectRecord[] = [
     submittedAt: '',
     interviewTime: '',
     resultStatus: '未出结果',
-    myNotes: '今天优先补推荐信，并确认原文里是否需要额外英语证明。',
+    myNotes: '今天优先补推荐信，并确认学校页面是否需要额外英语证明。',
     customReminderEnabled: true
   },
   {
@@ -642,9 +642,9 @@ export const fieldGuideItems: FieldGuideItem[] = [
   },
   {
     key: 'apply_link',
-    label: '原文链接',
+    label: '完整通知链接',
     category: '项目基础信息',
-    description: '无论网站怎么结构化，最终都要保留原始官方入口，避免信息失真。',
+    description: '无论网站怎么结构化，最终都要保留学校页面或报名入口，避免信息失真。',
     example: 'https://mp.weixin.qq.com/...'
   },
   {
@@ -691,22 +691,22 @@ export const fieldGuideItems: FieldGuideItem[] = [
   },
   {
     key: 'source_status',
-    label: '来源状态',
-    category: '来源与变更信息',
-    description: '提示这条通知是否有清晰的官网来源，方便你回到原文确认。',
-    example: '官网来源'
+    label: '整理状态',
+    category: '整理与变更信息',
+    description: '提示这条通知是否已经完成关键字段整理，方便你判断是否需要进一步核对。',
+    example: '关键字段已整理'
   },
   {
     key: 'last_checked_at',
     label: '最近更新时间',
-    category: '来源与变更信息',
+    category: '整理与变更信息',
     description: '显示这条通知最近一次整理或更新的时间。',
     example: '2026-04-11 10:30'
   },
   {
     key: 'change_log',
     label: '变更记录',
-    category: '来源与变更信息',
+    category: '整理与变更信息',
     description: '记录截止时间、材料要求、活动时间等变化，方便学生判断是否需要补操作。',
     example: '补充科研经历说明字段'
   }

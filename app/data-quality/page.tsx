@@ -1,21 +1,21 @@
-import { ArrowUpRight, Clock3, ExternalLink, MessageCircle, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, Clock3, ClipboardCheck, MessageCircle, ShieldCheck } from 'lucide-react';
 import { SiteShell } from '@/components/site-shell';
 import { QQ_GROUP_NUMBER, QQ_GROUP_URL } from '@/lib/contact';
 
-const sourceCards = [
+const qualityCards = [
   {
-    title: '来源以官网为准',
-    description: 'Seekoffer 会整理院校官网、研究生院和学院公开入口中的保研相关通知，正式报名仍请回到官网原文确认。',
-    icon: ExternalLink
+    title: '字段结构化',
+    description: '把通知拆成学校、学院、项目类型、截止时间、材料清单和报名入口，减少用户反复阅读的成本。',
+    icon: ClipboardCheck
   },
   {
-    title: '时间统一显示',
-    description: '列表和详情页会尽量把发布时间、截止时间和活动时间拆开展示，方便你判断下一步要先处理什么。',
+    title: '时间统一展示',
+    description: '列表和详情页会尽量把发布时间、截止时间和活动时间拆开展示，方便判断下一步要先处理什么。',
     icon: Clock3
   },
   {
-    title: '重要信息请二次确认',
-    description: '材料要求、报名入口、考核安排和录取规则可能会调整，提交前请以院校官网最新页面为准。',
+    title: '提交前再确认',
+    description: '材料要求、报名入口、考核安排和录取规则可能调整，正式提交前请再次核对学校页面与报名系统。',
     icon: ShieldCheck
   }
 ] as const;
@@ -25,11 +25,13 @@ export default function DataQualityPage() {
     <SiteShell>
       <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
-          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">通知来源说明</h1>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">更快找到值得关注的保研通知，同时保留官网原文入口。</p>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">通知整理说明</h1>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
+            寻鹿会把分散的保研通知整理成更容易筛选、收藏和推进的申请信息。
+          </p>
         </div>
         <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
-          {sourceCards.map((item) => {
+          {qualityCards.map((item) => {
             const Icon = item.icon;
 
             return (
@@ -47,7 +49,7 @@ export default function DataQualityPage() {
       </section>
 
       <section className="grid gap-5 lg:grid-cols-3">
-        {sourceCards.map((item) => {
+        {qualityCards.map((item) => {
           const Icon = item.icon;
 
           return (
@@ -69,7 +71,7 @@ export default function DataQualityPage() {
             {[
               '先看通知标题、院校和学院是否与你的目标方向匹配。',
               '再看截止时间和报名入口，优先处理临近截止的项目。',
-              '提交材料前打开官网原文，确认附件、格式和最新安排。'
+              '提交材料前再次核对附件、格式和最新安排。'
             ].map((item, index) => (
               <div key={item} className="flex items-start gap-3 rounded-2xl bg-white px-4 py-4 shadow-sm">
                 <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">

@@ -1179,7 +1179,7 @@ function NoticesPageContent() {
                           </span>
                         ))}
                       </div>
-                      <div className="mt-auto pt-3 text-xs font-semibold text-brand">官网来源 · 以原文为准</div>
+                      <div className="mt-auto pt-3 text-xs font-semibold text-brand">寻鹿整理 · 关键信息已提取</div>
                     </div>
 
                     <div className="grid gap-3 sm:h-full sm:justify-items-end">
@@ -1302,9 +1302,9 @@ function NoticesPageContent() {
             </div>
           </SideCard>
 
-          <SideCard title="数据说明" icon={Lightbulb}>
+          <SideCard title="整理说明" icon={Lightbulb}>
             <p className="text-sm leading-7 text-slate-600">
-              通知来源于院校官网与公开入口，Seekoffer 会做字段清洗、时间提取和去重整理。关键申请要求仍建议以原文为准。
+              寻鹿会持续整理保研通知，提取学校、学院、项目阶段、截止时间和报名入口，帮助你更快判断下一步。
             </p>
             <Link href="/disclaimer" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand">
               了解更多
@@ -1319,8 +1319,8 @@ function NoticesPageContent() {
                 优先关注院校、学院、通知标题、发布时间和截止时间。
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                <span className="font-semibold text-ink">官网确认：</span>
-                报名入口、材料要求和考核安排请以院校官网原文为准。
+                <span className="font-semibold text-ink">再做确认：</span>
+                正式提交前，请再次核对学校页面与报名系统里的具体要求。
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-3">
                 <span className="font-semibold text-ink">发现问题：</span>

@@ -744,7 +744,7 @@ function LatestNoticeList({ projects }: { projects: PublicNoticeProject[] }) {
               </div>
             </div>
             <div className="text-xs leading-5 text-slate-500 sm:text-right">
-              <div>来源：{getDisplayNoticeDepartment(project)}</div>
+              <div>学院：{getDisplayNoticeDepartment(project)}</div>
               <div>{formatNoticeDateOnly(project.publishDate)}</div>
             </div>
             <div className="sm:text-right">

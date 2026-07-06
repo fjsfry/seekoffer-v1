@@ -21,13 +21,13 @@ import { applicationColumnPresets, statusDefinitions } from '@/lib/mock-data';
 
 export const metadata: Metadata = {
   title: '使用指南 - Seekoffer',
-  description: '5 分钟上手 Seekoffer：从通知库筛选项目、查看原文、加入申请表到使用工作台管理材料和截止时间。',
+  description: '5 分钟上手 Seekoffer：从通知库筛选项目、查看详情、加入申请表到使用工作台管理材料和截止时间。',
   alternates: {
     canonical: '/guide'
   },
   openGraph: {
     title: 'Seekoffer 使用指南',
-    description: '从查保研通知、看原文到加入申请工作台的完整使用路径。',
+    description: '从查保研通知、看详情到加入申请工作台的完整使用路径。',
     url: '/guide',
     siteName: '寻鹿 Seekoffer',
     images: ['/logo.png'],
@@ -47,8 +47,8 @@ const onboardingSteps = [
   },
   {
     step: '02',
-    title: '看详情和原文',
-    description: '打开通知详情页，先看截止时间、学院、材料要求，再点击原文通知核对官方页面。',
+    title: '看详情和入口',
+    description: '打开通知详情页，先看截止时间、学院、材料要求，再查看完整通知和报名入口。',
     action: '了解数据说明',
     href: '/data-quality',
     icon: ExternalLink
@@ -85,15 +85,15 @@ const pageGuides = [
     title: '通知库',
     status: '已上线',
     description: '用来找项目、筛选截止时间、查看详情和加入申请表。建议先从这里开始。',
-    tips: ['优先看 7 天内截止', '提交前核对原文', '感兴趣就加入申请表'],
+    tips: ['优先看 7 天内截止', '提交前核对学校页面', '感兴趣就加入申请表'],
     href: '/notices',
     icon: Bell
   },
   {
     title: '通知详情',
     status: '已上线',
-    description: '用来确认学校、学院、截止时间、原文通知和报名入口。原文与报名入口会分开展示。',
-    tips: ['原文是最终依据', '报名入口可能是问卷', '发现错误请反馈'],
+    description: '用来确认学校、学院、截止时间、完整通知和报名入口。通知说明与报名入口会分开展示。',
+    tips: ['学校页面是最终依据', '报名入口可能是问卷', '发现错误请反馈'],
     href: '/notices',
     icon: FileCheck2
   },
@@ -132,7 +132,7 @@ const pageGuides = [
 ] as const;
 
 const productStatus = [
-  ['通知库', '已上线', '支持搜索、筛选、详情页、原文核对和加入工作台。'],
+  ['通知库', '已上线', '支持搜索、筛选、详情页、学校页面核对和加入工作台。'],
   ['申请工作台', '登录可用', '支持保存项目、状态管理、优先级和材料进度维护。'],
   ['院校库 / 资源库', '已上线', '作为高频入口和辅助工具，帮助你快速回访官方页面。'],
   ['Offer 圈', '核验开放', '登录用户可提交动态和申请讨论，核验通过后公开展示，并支持举报纠错。'],
@@ -146,13 +146,13 @@ export default function GuidePage() {
       <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">使用指南</h1>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">从通知筛选、原文核对到加入工作台，按步骤完成核心流程。</p>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">从通知筛选、详情核对到加入工作台，按步骤完成核心流程。</p>
         </div>
 
         <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
           {[
             ['查通知', Search],
-            ['看原文', ExternalLink],
+            ['看详情', ExternalLink],
             ['管进度', LayoutDashboard]
           ].map(([label, Icon]) => (
             <div key={label as string} className="soft-stat-pill rounded-[28px] px-4 py-4">
@@ -250,8 +250,8 @@ export default function GuidePage() {
               使用前请记住
             </div>
             <div className="mt-5 grid gap-3 text-sm leading-7 text-slate-600">
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">正式报名、材料要求和截止时间，请以院校官网原文为最终依据。</div>
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">“原文通知”和“报名入口”是两个不同按钮，报名入口可能是问卷或系统。</div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">正式报名、材料要求和截止时间，请在提交前核对学校页面与报名系统。</div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">“完整通知”和“报名入口”是两个不同按钮，报名入口可能是问卷或系统。</div>
               <div className="rounded-2xl bg-slate-50 px-4 py-3">工作台需要登录后使用，未登录时只能浏览公开内容。</div>
             </div>
           </section>
