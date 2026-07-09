@@ -14,7 +14,6 @@ import {
   FolderOpen,
   GraduationCap,
   LayoutDashboard,
-  Megaphone,
   Monitor,
   Search,
   ShieldCheck,
@@ -139,8 +138,6 @@ export default function HomePage() {
     > = {
       夏令营: { icon: GraduationCap, hint: '集中报名季，先看高价值项目', tone: 'bg-emerald-50 text-brand' },
       预推免: { icon: ClipboardList, hint: '提前锁定秋招前的关键机会', tone: 'bg-sky-50 text-sky-600' },
-      宣讲会: { icon: Megaphone, hint: '了解项目、导师和申请节奏', tone: 'bg-amber-50 text-amber-600' },
-      入营名单: { icon: Trophy, hint: '跟进入营、优秀营员和结果公示', tone: 'bg-rose-50 text-rose-600' },
       推免: { icon: ShieldCheck, hint: '正式推免和九推阶段通知', tone: 'bg-slate-100 text-slate-700' }
     };
 
@@ -279,11 +276,11 @@ export default function HomePage() {
         })}
       </section>
 
-      <section className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-        <div className="product-card rounded-[28px] p-6">
+      <section>
+        <div className="product-card rounded-[28px] p-6 lg:p-7">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-ink">按类型找机会</h2>
+              <h2 className="text-2xl font-semibold tracking-tight text-ink">按申请阶段找机会</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">先按申请阶段进入通知库，再继续筛学校、地区和专业方向。</p>
             </div>
             <Link href="/notices" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
@@ -291,7 +288,7 @@ export default function HomePage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
             {typeEntryCards.map((item) => {
               const Icon = item.icon;
 
@@ -299,59 +296,25 @@ export default function HomePage() {
                 <Link
                   key={item.type}
                   href={item.href}
-                  className="group rounded-[22px] border border-slate-100 bg-white/86 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/20 hover:shadow-soft"
+                  className="group rounded-[24px] border border-slate-100 bg-white/86 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/20 hover:shadow-soft"
                 >
-                  <span className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ${item.tone}`}>
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <div className="mt-4 flex items-end justify-between gap-2">
-                    <div className="whitespace-nowrap text-base font-semibold text-ink">{item.type}</div>
-                    <div className="text-2xl font-semibold leading-none text-brand">{item.count}</div>
+                  <div className="flex items-start justify-between gap-4">
+                    <span className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl ${item.tone}`}>
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <div className="text-3xl font-semibold leading-none text-brand">{item.count}</div>
                   </div>
-                  <p className="mt-2 min-h-10 text-xs leading-5 text-slate-500">{item.hint}</p>
-                  <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand">
+                  <div className="mt-5">
+                    <div className="whitespace-nowrap text-lg font-semibold text-ink">{item.type}</div>
+                    <p className="mt-2 min-h-10 text-sm leading-6 text-slate-500">{item.hint}</p>
+                  </div>
+                  <span className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-brand">
                     立即筛选
-                    <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                    <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
                   </span>
                 </Link>
               );
             })}
-          </div>
-        </div>
-
-        <div className="product-card rounded-[28px] p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-ink">即将截止</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">优先处理近 7 天内需要提交的项目。</p>
-            </div>
-            <Link href="/notices?deadline=within7days&sort=deadline" className="text-sm font-semibold text-brand">
-              全部
-            </Link>
-          </div>
-          <div className="mt-5 divide-y divide-slate-100">
-            {deadlineProjects.slice(0, 4).map((project) => (
-              <Link
-                key={project.id}
-                href={buildNoticeDetailHref(project.id, '/notices?deadline=within7days&sort=deadline')}
-                className="grid grid-cols-[42px_minmax(0,1fr)_88px] items-center gap-3 py-4 transition hover:bg-slate-50/80"
-              >
-                <ExternalSiteMark
-                  source={resolveNoticeLogoSource(project)}
-                  label={getDisplaySchoolName(project.schoolName)}
-                  size="sm"
-                  rounded="full"
-                />
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</div>
-                  <div className="mt-1 truncate text-xs text-slate-500">{getDisplayNoticeDepartment(project)}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-semibold text-rose-500">{getDeadlineDistanceLabel(project.deadlineDate)}</div>
-                  <div className="mt-1 text-[11px] text-slate-400">{formatNoticeDateOnly(project.deadlineDate)}</div>
-                </div>
-              </Link>
-            ))}
           </div>
         </div>
       </section>

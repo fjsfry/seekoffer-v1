@@ -44,9 +44,11 @@ import { buildNoticeDetailHref } from '@/lib/notice-links';
 import {
   getNoticeRegion,
   getNoticeRegionOptions,
+  matchesNoticeKind,
   matchesNoticeType,
+  noticeKindFilters,
   noticeTypeFilters,
-  type NoticeTypeFilter
+  type NoticeKindFilter
 } from '@/lib/notice-analytics';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { baseNoticeProjects, inferDisciplineCategory, inferSchoolRange, matchesSchoolRange } from '@/lib/notice-source';
@@ -63,6 +65,7 @@ type SearchParamReader = Pick<URLSearchParams, 'get' | 'toString'>;
 const PAGE_SIZE = 16;
 const NOTICE_LIST_POSITION_STORAGE_KEY = 'seekoffer.noticeListPosition.v1';
 const projectTypeOptions = noticeTypeFilters;
+const noticeKindOptions = noticeKindFilters;
 const sortOptions: SortOption[] = ['deadline', 'publish', 'updated', 'school'];
 const progressOptions: ProgressFilter[] = ['全部', '报名中', '未开始', '已结束'];
 const rangeOptions: RangeFilter[] = ['全部', '985', '211', '双一流', '其他'];
@@ -80,6 +83,7 @@ const defaultNoticeListState: NoticeListUrlState = {
   deadlineQuick: '全部',
   fresh: '全部',
   projectType: '全部',
+  noticeKind: '全部',
   year: '2026',
   sortBy: 'publish',
   advancedOpen: false,
@@ -224,11 +228,8 @@ const quickFilters = [
   { label: '985', kind: 'range', value: '985' },
   { label: '211', kind: 'range', value: '211' },
   { label: '双一流', kind: 'range', value: '双一流' },
-  { label: '夏令营', kind: 'type', value: '夏令营' },
-  { label: '预推免', kind: 'type', value: '预推免' },
-  { label: '宣讲会', kind: 'type', value: '宣讲会' },
-  { label: '入营名单', kind: 'type', value: '入营名单' },
-  { label: '推免', kind: 'type', value: '推免' }
+  { label: '宣讲会', kind: 'noticeKind', value: '宣讲会' },
+  { label: '入营名单', kind: 'noticeKind', value: '入营名单' }
 ] as const;
 
 type NoticeListFilterValues = {
@@ -243,6 +244,7 @@ type NoticeListFilterValues = {
   deadlineQuick: DeadlineQuickFilter;
   fresh: FreshFilter;
   projectType: string;
+  noticeKind: string;
   year: string;
   sortBy: SortOption;
 };
@@ -296,6 +298,7 @@ function buildNoticeFilterKey(values: NoticeListFilterValues) {
     values.deadlineQuick,
     values.fresh,
     values.projectType,
+    values.noticeKind,
     values.year,
     values.sortBy
   ].join('|');
@@ -318,6 +321,7 @@ function parseNoticeListUrlState(params: SearchParamReader) {
     deadlineQuick: pickAllowedValue(readFirstSearchParam(params, 'deadline'), deadlineQuickOptions, '全部'),
     fresh: pickAllowedValue(readFirstSearchParam(params, 'fresh', 'new'), freshOptions, '全部'),
     projectType: pickAllowedValue(readFirstSearchParam(params, 'type'), projectTypeOptions, '全部'),
+    noticeKind: pickAllowedValue(readFirstSearchParam(params, 'kind', 'noticeKind'), noticeKindOptions, '全部'),
     year: readFirstSearchParam(params, 'year') || '2026',
     sortBy: pickAllowedValue(readFirstSearchParam(params, 'sort'), sortOptions, 'publish'),
     advancedOpen: readFirstSearchParam(params, 'advanced') === '1',
@@ -347,6 +351,7 @@ function buildNoticeListHref(values: NoticeListFilterValues, page: number, advan
   appendSearchParam(params, 'deadline', values.deadlineQuick, '全部');
   appendSearchParam(params, 'fresh', values.fresh, '全部');
   appendSearchParam(params, 'type', values.projectType, '全部');
+  appendSearchParam(params, 'kind', values.noticeKind, '全部');
   appendSearchParam(params, 'year', values.year, '2026');
   appendSearchParam(params, 'sort', values.sortBy, 'publish');
 
@@ -478,6 +483,7 @@ function NoticesPageContent() {
   const [deadlineQuick, setDeadlineQuick] = useState<DeadlineQuickFilter>(initialNoticeState.deadlineQuick);
   const [fresh, setFresh] = useState<FreshFilter>(initialNoticeState.fresh);
   const [projectType, setProjectType] = useState(initialNoticeState.projectType);
+  const [noticeKind, setNoticeKind] = useState(initialNoticeState.noticeKind);
   const [year, setYear] = useState(initialNoticeState.year);
   const [sortBy, setSortBy] = useState<SortOption>(initialNoticeState.sortBy);
   const [advancedOpen, setAdvancedOpen] = useState(initialNoticeState.advancedOpen);
@@ -498,10 +504,26 @@ function NoticesPageContent() {
       deadlineQuick,
       fresh,
       projectType,
+      noticeKind,
       year,
       sortBy
     }),
-    [keyword, schoolName, region, majorKeyword, category, discipline, schoolRange, progress, deadlineQuick, fresh, projectType, year, sortBy]
+    [
+      keyword,
+      schoolName,
+      region,
+      majorKeyword,
+      category,
+      discipline,
+      schoolRange,
+      progress,
+      deadlineQuick,
+      fresh,
+      projectType,
+      noticeKind,
+      year,
+      sortBy
+    ]
   );
   const filterKey = buildNoticeFilterKey(filterValues);
 
@@ -581,6 +603,7 @@ function NoticesPageContent() {
         .toLowerCase();
       const canUseBroadKeyword = noticeKeyword.length >= 4 || /[a-z0-9]/i.test(noticeKeyword);
       const matchesType = matchesNoticeType(item, projectType);
+      const matchesKind = matchesNoticeKind(item, noticeKind);
       const matchesRange = matchesSchoolRange(item, schoolRange);
       const matchesRegion = region === '全部' ? true : getNoticeRegion(item) === region || (item.tags || []).includes(region);
       const matchesSchool =
@@ -613,6 +636,7 @@ function NoticesPageContent() {
 
       return (
         matchesType &&
+        matchesKind &&
         matchesRange &&
         matchesRegion &&
         matchesSchool &&
@@ -641,6 +665,7 @@ function NoticesPageContent() {
     deadlineQuick,
     fresh,
     projectType,
+    noticeKind,
     year,
     sortBy,
     todayInBeijing
@@ -799,6 +824,7 @@ function NoticesPageContent() {
     setDeadlineQuick(defaultNoticeListState.deadlineQuick);
     setFresh(defaultNoticeListState.fresh);
     setProjectType(defaultNoticeListState.projectType);
+    setNoticeKind(defaultNoticeListState.noticeKind);
     setYear(defaultNoticeListState.year);
     setSortBy(defaultNoticeListState.sortBy);
     setAdvancedOpen(defaultNoticeListState.advancedOpen);
@@ -855,8 +881,8 @@ function NoticesPageContent() {
       return;
     }
 
-    if (filter.kind === 'type') {
-      setProjectType((current) => (current === filter.value ? '全部' : (filter.value as NoticeTypeFilter)));
+    if (filter.kind === 'noticeKind') {
+      setNoticeKind((current) => (current === filter.value ? '全部' : (filter.value as NoticeKindFilter)));
     }
   }
 
@@ -865,7 +891,7 @@ function NoticesPageContent() {
     if (filter.kind === 'progress') return progress === filter.value;
     if (filter.kind === 'deadline') return deadlineQuick === filter.value;
     if (filter.kind === 'range') return schoolRange === filter.value;
-    return projectType === filter.value;
+    return noticeKind === filter.value;
   }
 
   return (
@@ -969,8 +995,15 @@ function NoticesPageContent() {
               <option value="2026">2026</option>
               <option value="全部">全部</option>
             </FilterSelect>
-            <FilterSelect label="通知类型" value={projectType} onChange={setProjectType}>
+            <FilterSelect label="申请阶段" value={projectType} onChange={setProjectType}>
               {projectTypeOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </FilterSelect>
+            <FilterSelect label="通知性质" value={noticeKind} onChange={setNoticeKind}>
+              {noticeKindOptions.map((item) => (
                 <option key={item} value={item}>
                   {item}
                 </option>

@@ -230,7 +230,9 @@ function extractLabeledDate(text, labels, fallbackTime = '23:59') {
 function inferProjectType(projectType, title) {
   const text = `${projectType} ${title}`;
   if (/夏令营|暑期学校|开放日|交流营|科学营/.test(text)) return '夏令营';
-  if (/预推免|预报名/.test(text)) return '预推免';
+  if (/预推免|推免预报名|预接收|预报名.*推免|接收推荐免试(?:研究生)?预报名|推荐免试(?:研究生)?预报名/.test(text)) {
+    return '预推免';
+  }
   if (/推免|免试|正式/.test(text)) return '正式推免';
   return '夏令营';
 }

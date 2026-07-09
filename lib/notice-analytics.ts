@@ -7,8 +7,12 @@ import {
 } from '@/lib/notice-display';
 import type { PublicNoticeProject } from '@/lib/mock-data';
 
-export const noticeTypeFilters = ['全部', '夏令营', '预推免', '宣讲会', '入营名单', '推免'] as const;
-export type NoticeTypeFilter = (typeof noticeTypeFilters)[number];
+export const noticeStageFilters = ['全部', '夏令营', '预推免', '推免'] as const;
+export type NoticeStageFilter = (typeof noticeStageFilters)[number];
+export const noticeTypeFilters = noticeStageFilters;
+export type NoticeTypeFilter = NoticeStageFilter;
+export const noticeKindFilters = ['全部', '申请通知', '宣讲会', '入营名单'] as const;
+export type NoticeKindFilter = (typeof noticeKindFilters)[number];
 
 const regionTags = [
   '北京',
@@ -65,35 +69,89 @@ function compactText(value: string | undefined | null) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
 
-function getNoticeSearchText(project: PublicNoticeProject) {
+function getNoticeClassificationText(project: PublicNoticeProject) {
   return [
-    getDisplayProjectType(project.projectType),
     getDisplaySchoolName(project.schoolName),
     getDisplayNoticeDepartment(project),
-    normalizeNoticeTitle(project.projectName, 160),
+    normalizeNoticeTitle(project.projectName, 200),
     compactText(project.requirements),
     ...(project.tags || [])
   ].join(' ');
 }
 
-export function getNoticeTypeBucket(project: PublicNoticeProject): Exclude<NoticeTypeFilter, '全部'> {
-  const text = getNoticeSearchText(project);
-  const projectType = getDisplayProjectType(project.projectType);
+function getDateMonth(value: string | undefined | null) {
+  const rawDate = value || '';
+  const match = String(rawDate).match(/(?:20\d{2})[-/.年](\d{1,2})/);
+
+  if (!match) {
+    return 0;
+  }
+
+  return Number(match[1]);
+}
+
+export function getNoticeKindBucket(project: PublicNoticeProject): Exclude<NoticeKindFilter, '全部'> {
+  const text = getNoticeClassificationText(project);
 
   if (/(入营名单|入选名单|营员名单|参营名单|拟入营|入营结果|夏令营名单|优秀营员)/.test(text)) {
     return '入营名单';
   }
 
-  if (/(宣讲会|说明会|咨询会|开放日|线上交流|招生宣讲|项目宣讲)/.test(text)) {
+  if (/(宣讲会|说明会|咨询会|线上交流|招生宣讲|项目宣讲|政策宣讲|招生直播)/.test(text)) {
     return '宣讲会';
   }
 
-  if (projectType.includes('夏令营') || /夏令营|暑期学校|暑期项目/.test(text)) {
+  return '申请通知';
+}
+
+export function getNoticeTypeBucket(project: PublicNoticeProject): Exclude<NoticeTypeFilter, '全部'> {
+  const text = getNoticeClassificationText(project);
+  const projectType = getDisplayProjectType(project.projectType);
+  const publishMonth = getDateMonth(project.publishDate);
+  const deadlineMonth = getDateMonth(project.deadlineDate);
+  const month = publishMonth || deadlineMonth || getDateMonth(project.updatedAt) || getDateMonth(project.collectedAt);
+  const hasAutumnDeadline = deadlineMonth >= 9 || publishMonth >= 9;
+
+  if (projectType.includes('夏令营') || /夏令营|暑期学校|暑期项目|暑期学术|科创营|科学营|交流营|开放日/.test(text)) {
     return '夏令营';
   }
 
-  if (projectType.includes('预推免') || /预推免|预报名|预接收/.test(text)) {
+  if (/(预推免|推免预报名|预接收|预报名.*推免|接收推荐免试(?:研究生)?预报名|推荐免试(?:研究生)?预报名)/.test(text)) {
     return '预推免';
+  }
+
+  if (
+    /(正式推免|九推|全国推免系统|推免服务系统|待录取|志愿填报|复试录取|推免.*复试|推荐免试.*复试|接收推免.*复试|接收推荐免试.*(?:工作|细则|办法|公告))/.test(
+      text
+    )
+  ) {
+    return hasAutumnDeadline || month >= 8 ? '推免' : '夏令营';
+  }
+
+  if (projectType.includes('预推免') && month >= 8) {
+    return '预推免';
+  }
+
+  if (/预报名/.test(text)) {
+    return month >= 8 ? '预推免' : '夏令营';
+  }
+
+  if (/(正式推免|九推|全国推免系统|推免服务系统|待录取|志愿填报|正式报名)/.test(text) || projectType.includes('正式推免')) {
+    return month && month < 9 ? '预推免' : '推免';
+  }
+
+  if (/(推免|免试|推荐免试)/.test(text) || /推免/.test(projectType)) {
+    if (month >= 9) return '推免';
+    if (month >= 8) return '预推免';
+    return '夏令营';
+  }
+
+  if (month >= 8) {
+    return '预推免';
+  }
+
+  if (month && month < 8) {
+    return '夏令营';
   }
 
   return '推免';
@@ -105,6 +163,14 @@ export function matchesNoticeType(project: PublicNoticeProject, filter: NoticeTy
   }
 
   return getNoticeTypeBucket(project) === filter;
+}
+
+export function matchesNoticeKind(project: PublicNoticeProject, filter: NoticeKindFilter | string) {
+  if (!filter || filter === '全部') {
+    return true;
+  }
+
+  return getNoticeKindBucket(project) === filter;
 }
 
 export function isActiveNotice(project: PublicNoticeProject) {

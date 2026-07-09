@@ -376,10 +376,12 @@ function unique(items) {
 
 function inferProjectType(...values) {
   const text = values.map(normalizeSpace).join(' ');
-  if (/正式推免|九推/.test(text)) return '正式推免';
-  if (/预推免|推免预报名|预报名/.test(text)) return '预推免';
-  if (/导师直招|直博生|直博/.test(text)) return '导师直招';
   if (/开放日|科创营|科学营|夏令营|暑期学校|交流营/.test(text)) return '夏令营';
+  if (/预推免|推免预报名|预接收|预报名.*推免|接收推荐免试(?:研究生)?预报名|推荐免试(?:研究生)?预报名/.test(text)) return '预推免';
+  if (/正式推免|九推|全国推免系统|推免服务系统|接收推免|接收推荐免试|推免.*复试|推荐免试.*复试|复试录取/.test(text)) {
+    return '正式推免';
+  }
+  if (/导师直招|直博生|直博/.test(text)) return '导师直招';
   return '夏令营';
 }
 
