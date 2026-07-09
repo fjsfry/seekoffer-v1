@@ -71,9 +71,6 @@ export const footerColumns = [
     links: [
       { label: '关于寻鹿', href: '/about' },
       { label: '数据说明', href: '/data-quality' },
-      { label: '免责声明', href: '/disclaimer' },
-      { label: '用户协议', href: '/terms' },
-      { label: '隐私政策', href: '/privacy' },
       { label: '社区规范', href: '/community' }
     ]
   }

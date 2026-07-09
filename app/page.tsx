@@ -37,7 +37,7 @@ import { buildNoticeDetailHref } from '@/lib/notice-links';
 import { collegeDirectory } from '@/lib/college-directory';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { baseNoticeProjects } from '@/lib/notice-source';
-import { getNoticeTypeBucket, getTopCollegeNoticeStats, noticeTypeFilters } from '@/lib/notice-analytics';
+import { getTopCollegeNoticeStats } from '@/lib/notice-analytics';
 import { officialResourceSections } from '@/lib/portal-data';
 import { fetchPublicOffers } from '@/lib/offers';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
@@ -127,29 +127,6 @@ export default function HomePage() {
 
   const priorityActions = useMemo(() => deadlineProjects.slice(0, 3), [deadlineProjects]);
   const totalResourceLinks = officialResourceSections.flatMap((item) => item.links).length;
-  const typeEntryCards = useMemo(() => {
-    const meta: Record<
-      string,
-      {
-        icon: ComponentType<{ className?: string }>;
-        hint: string;
-        tone: string;
-      }
-    > = {
-      夏令营: { icon: GraduationCap, hint: '集中报名季，先看高价值项目', tone: 'bg-emerald-50 text-brand' },
-      预推免: { icon: ClipboardList, hint: '提前锁定秋招前的关键机会', tone: 'bg-sky-50 text-sky-600' },
-      推免: { icon: ShieldCheck, hint: '正式推免和九推阶段通知', tone: 'bg-slate-100 text-slate-700' }
-    };
-
-    return noticeTypeFilters
-      .filter((item) => item !== '全部')
-      .map((type) => ({
-        type,
-        count: projects.filter((project) => getNoticeTypeBucket(project) === type).length,
-        href: `/notices?type=${encodeURIComponent(type)}`,
-        ...meta[type]
-      }));
-  }, [projects]);
   const hotCollegeStats = useMemo(() => getTopCollegeNoticeStats(projects, 6), [projects]);
 
   const heroMetrics = [
@@ -274,49 +251,6 @@ export default function HomePage() {
             </Link>
           );
         })}
-      </section>
-
-      <section>
-        <div className="product-card rounded-[28px] p-6 lg:p-7">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-ink">按申请阶段找机会</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">先按申请阶段进入通知库，再继续筛学校、地区和专业方向。</p>
-            </div>
-            <Link href="/notices" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
-              进入通知库
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {typeEntryCards.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <Link
-                  key={item.type}
-                  href={item.href}
-                  className="group rounded-[24px] border border-slate-100 bg-white/86 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/20 hover:shadow-soft"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <span className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl ${item.tone}`}>
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <div className="text-3xl font-semibold leading-none text-brand">{item.count}</div>
-                  </div>
-                  <div className="mt-5">
-                    <div className="whitespace-nowrap text-lg font-semibold text-ink">{item.type}</div>
-                    <p className="mt-2 min-h-10 text-sm leading-6 text-slate-500">{item.hint}</p>
-                  </div>
-                  <span className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-brand">
-                    立即筛选
-                    <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
       </section>
 
       <section>
@@ -454,7 +388,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(380px,0.72fr)]">
+      <section className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,1.06fr)_minmax(440px,0.94fr)]">
         <LatestNoticeList projects={latestProjects} />
         <DeadlineReminderList projects={deadlineProjects} />
       </section>
@@ -673,7 +607,7 @@ function NoticeIllustration() {
 
 function LatestNoticeList({ projects }: { projects: PublicNoticeProject[] }) {
   return (
-    <section className="product-card rounded-[24px] p-6">
+    <section className="product-card rounded-[24px] p-7">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-xl font-semibold text-ink">最新通知</h2>
         <Link href="/notices" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
@@ -687,7 +621,7 @@ function LatestNoticeList({ projects }: { projects: PublicNoticeProject[] }) {
           <Link
             key={project.id}
             href={buildNoticeDetailHref(project.id)}
-            className="group grid gap-3 py-4 transition hover:bg-slate-50/70 sm:grid-cols-[48px_minmax(0,1fr)_150px_96px] sm:items-center"
+            className="group grid gap-4 py-[18px] transition hover:bg-slate-50/70 sm:grid-cols-[52px_minmax(0,1fr)_174px_104px] sm:items-center"
           >
             <ExternalSiteMark
               source={resolveNoticeLogoSource(project)}
@@ -722,7 +656,7 @@ function LatestNoticeList({ projects }: { projects: PublicNoticeProject[] }) {
 
 function DeadlineReminderList({ projects }: { projects: PublicNoticeProject[] }) {
   return (
-    <aside className="product-card rounded-[24px] p-6">
+    <aside className="product-card rounded-[24px] p-7">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-xl font-semibold text-ink">截止提醒（近7天）</h2>
         <Link href="/notices" className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
@@ -732,11 +666,11 @@ function DeadlineReminderList({ projects }: { projects: PublicNoticeProject[] })
       </div>
 
       <div className="mt-5 divide-y divide-slate-100">
-        {projects.map((project, index) => (
+        {projects.map((project) => (
           <Link
             key={project.id}
             href={buildNoticeDetailHref(project.id)}
-            className="grid grid-cols-[44px_minmax(0,1fr)_88px] items-center gap-3 py-4 transition hover:bg-slate-50/70"
+            className="grid grid-cols-[46px_minmax(0,1fr)_124px] items-center gap-4 py-[18px] transition hover:bg-slate-50/70"
           >
             <ExternalSiteMark
               source={resolveNoticeLogoSource(project)}
@@ -752,7 +686,7 @@ function DeadlineReminderList({ projects }: { projects: PublicNoticeProject[] })
               <div className="mt-1 truncate text-sm text-slate-500">{getDisplayNoticeDepartment(project)}</div>
             </div>
             <div className="text-right">
-              <div className={index < 2 ? 'font-semibold text-rose-500' : 'font-semibold text-orange-500'}>
+              <div className="whitespace-nowrap text-base font-semibold leading-tight text-rose-500">
                 {getDeadlineDistanceLabel(project.deadlineDate)}
               </div>
               <div className="mt-1 text-xs text-slate-500">{formatNoticeDateOnly(project.deadlineDate)}</div>
