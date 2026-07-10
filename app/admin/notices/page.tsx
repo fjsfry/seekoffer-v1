@@ -227,12 +227,12 @@ export default function AdminNoticesPage() {
   }
 
   return (
-    <AdminShell title="通知管理" description="审核、发布、下架和删除通知内容；已发布内容才会进入前台首页与通知库。">
+    <AdminShell title="通知管理" description="集中审核、发布与维护通知内容。">
       <div className="space-y-6">
         <AdminPanel>
           <div className="grid gap-5 p-5">
             <div
-              className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_160px_150px_150px_150px_140px_140px_120px]"
+              className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(260px,1fr)_160px_150px_150px_150px_140px_140px_120px]"
               onKeyDown={(event) => event.key === 'Enter' && applyFilters()}
             >
               <AdminInput
@@ -277,7 +277,7 @@ export default function AdminNoticesPage() {
               />
               <Link
                 href="/admin/notices/new"
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800"
               >
                 <Plus className="h-4 w-4" />
                 新建通知
@@ -479,7 +479,7 @@ export default function AdminNoticesPage() {
                 </dl>
 
                 <div className="rounded-xl border border-slate-200 p-4">
-                  <div className="text-sm font-semibold text-slate-900">AI 解析信息</div>
+                  <div className="text-sm font-semibold text-slate-900">正文摘要</div>
                   <p className="mt-3 line-clamp-5 whitespace-pre-wrap text-sm leading-7 text-slate-600">
                     {selectedNotice.requirements || '暂无正文，建议打开官方原文核验后补充。'}
                   </p>

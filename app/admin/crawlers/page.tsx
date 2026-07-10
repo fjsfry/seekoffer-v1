@@ -30,18 +30,11 @@ const operationsSectionTitles: Record<OperationsSection, string> = {
 };
 
 const operationsSectionDescriptions: Record<OperationsSection, string> = {
-  users: '管理注册用户、风险状态和用户侧申请行为，所有限制和封禁都会留痕。',
-  feedback: '集中处理用户反馈、内容举报和纠错工单，形成可追踪的处理闭环。',
-  logs: '审计后台关键操作、导出日志并排查异常登录与高危动作。',
-  settings: '管理角色权限、审核开关、举报提醒和后台基础安全策略。'
+  users: '查看账号状态、活跃情况与风险记录。',
+  feedback: '集中处理反馈、举报与纠错工单。',
+  logs: '审计关键操作并排查异常行为。',
+  settings: '管理角色权限与运营安全策略。'
 };
-
-const operationsSectionRoutes: Array<{ section: OperationsSection; href: string; label: string; hint: string }> = [
-  { section: 'users', href: '/admin/users', label: '用户', hint: '账号状态' },
-  { section: 'feedback', href: '/admin/feedback', label: '反馈', hint: '工单闭环' },
-  { section: 'logs', href: '/admin/logs', label: '日志', hint: '审计追踪' },
-  { section: 'settings', href: '/admin/settings', label: '设置', hint: '权限开关' }
-];
 
 const defaultUserFilters = {
   userId: '',
@@ -103,7 +96,7 @@ export default function AdminOperationsPage() {
   const [userFilters, setUserFilters] = useState<UserFilters>(defaultUserFilters);
   const [feedbackFilters, setFeedbackFilters] = useState<FeedbackFilters>(defaultFeedbackFilters);
   const [logFilters, setLogFilters] = useState<LogFilters>(defaultLogFilters);
-  const [message, setMessage] = useState('正在加载运营数据...');
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     const syncSection = () => {
@@ -190,7 +183,7 @@ export default function AdminOperationsPage() {
       setUserFilters(nextUserFilters);
       setFeedbackFilters(nextFeedbackFilters);
       setLogFilters(nextLogFilters);
-      setMessage('运营数据已更新，当前页面展示最新记录。');
+      setMessage('');
     } catch (error) {
       setUsers([]);
       setFeedback([]);
@@ -234,9 +227,8 @@ export default function AdminOperationsPage() {
 
   return (
     <AdminShell title={operationsSectionTitles[activeSection]} description={operationsSectionDescriptions[activeSection]}>
-      <div className="space-y-8">
-        <OperationsSwitch activeSection={activeSection} />
-        <AdminActionBanner tone={message.includes('失败') || message.includes('无法') ? 'danger' : 'info'}>{message}</AdminActionBanner>
+      <div className="space-y-6">
+        {message ? <AdminActionBanner tone={message.includes('失败') || message.includes('无法') ? 'danger' : 'info'}>{message}</AdminActionBanner> : null}
         {activeSection === 'users' ? (
           <UsersView
             users={users}
@@ -284,31 +276,6 @@ export default function AdminOperationsPage() {
         {activeSection === 'settings' ? <SettingsView onUpdateSetting={updateSetting} onNotify={setMessage} /> : null}
       </div>
     </AdminShell>
-  );
-}
-
-function OperationsSwitch({ activeSection }: { activeSection: OperationsSection }) {
-  return (
-    <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-4">
-      {operationsSectionRoutes.map((item) => {
-        const active = item.section === activeSection;
-
-        return (
-          <Link
-            key={item.section}
-            href={item.href}
-            className={`rounded-xl border px-4 py-3 transition ${
-              active
-                ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm'
-                : 'border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            <div className="text-sm font-semibold">{item.label}</div>
-            <div className="mt-1 text-xs opacity-75">{item.hint}</div>
-          </Link>
-        );
-      })}
-    </section>
   );
 }
 
@@ -368,7 +335,7 @@ function UsersView({
     <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_280px]">
       <div className="space-y-6">
         <AdminPanel>
-          <div className="grid gap-4 p-5 xl:grid-cols-[220px_minmax(0,1fr)_180px_180px_120px_120px]">
+          <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[180px_minmax(280px,1fr)_160px_160px_110px_110px]">
             <AdminInput
               placeholder="请输入用户ID"
               value={draftFilters.userId}
@@ -554,7 +521,7 @@ function FeedbackView({
     <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-6">
         <AdminPanel>
-          <div className="grid gap-4 p-5 xl:grid-cols-[160px_180px_180px_160px_160px_minmax(0,1fr)_120px_120px]">
+          <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[140px_160px_160px_150px_150px_minmax(260px,1fr)_100px_100px]">
             <AdminSelect
               label="类型"
               value={draftFilters.type}
@@ -713,7 +680,7 @@ function LogsView({
     <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-6">
         <AdminPanel>
-          <div className="grid gap-4 p-5 xl:grid-cols-[170px_180px_180px_160px_160px_minmax(0,1fr)_120px_120px]">
+          <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[150px_160px_160px_150px_150px_minmax(260px,1fr)_100px_100px]">
             <AdminSelect
               label="操作人"
               value={draftFilters.operator}

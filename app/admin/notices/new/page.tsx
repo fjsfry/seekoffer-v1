@@ -61,7 +61,7 @@ export default function AdminNewNoticePage() {
   }
 
   return (
-    <AdminShell title="新建通知" description="用于人工补录重点院校、修正爬虫遗漏或临时发布高价值申请信息。">
+    <AdminShell title="新建通知" description="补录或修正需要发布的申请信息。">
       <div className="space-y-6">
         <Link href="/admin/notices" className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600">
           <ArrowLeft className="h-4 w-4" />
@@ -70,7 +70,7 @@ export default function AdminNewNoticePage() {
 
         <AdminPanel
           title="基础信息"
-          description="标题、学校、学院和时间会直接影响前台检索与截止提醒，请优先保持准确。"
+          description="请准确填写学校、学院与关键时间。"
         >
           <div className="grid gap-5 p-5 lg:grid-cols-2">
             <Field label="通知标题">
@@ -104,13 +104,13 @@ export default function AdminNewNoticePage() {
           </div>
         </AdminPanel>
 
-        <AdminPanel title="内容与审核" description="用于记录材料要求、申请条件、时间节点和管理员核验备注。">
+        <AdminPanel title="内容与审核" description="补充申请要求与核验备注。">
           <div className="grid gap-5 p-5">
             <Field label="正文 / 材料要求">
               <textarea
                 value={form.requirements}
                 onChange={(event) => updateField('requirements', event.target.value)}
-                className="min-h-[220px] rounded-xl border border-slate-200 p-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                className="min-h-[200px] rounded-xl border border-slate-200 p-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-emerald-50"
                 placeholder="填写材料要求、申请条件、时间节点、联系方式等。"
               />
             </Field>
@@ -118,7 +118,7 @@ export default function AdminNewNoticePage() {
               <textarea
                 value={form.remarks}
                 onChange={(event) => updateField('remarks', event.target.value)}
-                className="min-h-[100px] rounded-xl border border-slate-200 p-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                className="min-h-[96px] rounded-xl border border-slate-200 p-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-emerald-50"
                 placeholder="例如：来源已核验，需二次确认学院名称。"
               />
             </Field>

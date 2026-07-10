@@ -194,25 +194,25 @@ export default function AdminOffersPage() {
   const allVisibleSelected = rows.length > 0 && rows.every((item) => selectedIds.includes(item.id));
 
   return (
-    <AdminShell title="Offer池管理" description="审核用户贡献的 Offer 动态，优先排查隐私、引流和明显虚假内容。">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+    <AdminShell title="Offer池管理" description="审核社区动态，维护内容真实性与隐私安全。">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
           <AdminPanel>
             <div className="grid gap-5 p-5">
               <div
-                className="grid gap-4 xl:grid-cols-5"
+                className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5"
                 onKeyDown={(event) => event.key === 'Enter' && void loadOffers({ page: 1 })}
               >
                 <AdminInput placeholder="学校" value={filters.school} onChange={(value) => setFilters((current) => ({ ...current, school: value }))} />
                 <AdminInput placeholder="专业" value={filters.major} onChange={(value) => setFilters((current) => ({ ...current, major: value }))} />
                 <AdminSelect
-                  label="结果"
+                  label=""
                   value={filters.result}
                   options={['全部结果', '录取', '放弃', '候补', '补录传闻']}
                   onChange={(value) => setFilters((current) => ({ ...current, result: value }))}
                 />
                 <AdminSelect
-                  label="审核状态"
+                  label=""
                   value={filters.status}
                   options={['全部状态', '待审核', '已通过', '已驳回', '已隐藏', '已删除']}
                   onChange={(value) => setFilters((current) => ({ ...current, status: value }))}
@@ -407,9 +407,9 @@ export default function AdminOffersPage() {
                 请选择一条 Offer 查看完整审核信息。
               </div>
             )}
-            <ReviewTip title="检查隐私信息" body="确认内容中是否包含姓名、邮箱、电话、地址、身份证号、学号等个人隐私信息。" />
-            <ReviewTip title="检查广告引流" body="确认内容中是否存在引导添加微信、QQ群、外链、二维码等广告引流信息。" />
-            <ReviewTip title="检查内容真实性" body="确认内容真实克制，无明显夸大或误导，维护社区可信度。" />
+            <div className="rounded-xl bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500">
+              审核重点：个人隐私、广告引流与内容真实性。
+            </div>
           </div>
         </AdminPanel>
       </div>
@@ -489,16 +489,6 @@ function mapOfferStatus(status: string): AdminOfferRow['status'] {
   if (status === 'hidden') return '已隐藏';
   if (status === 'deleted') return '已删除';
   return '待审核';
-}
-
-function ReviewTip({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="relative pl-5">
-      <span className="absolute left-0 top-2 h-2 w-2 rounded-full bg-blue-600" />
-      <div className="font-semibold text-slate-950">{title}</div>
-      <p className="mt-2">{body}</p>
-    </div>
-  );
 }
 
 function DetailItem({ label, value }: { label: string; value: string }) {

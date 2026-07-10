@@ -7,10 +7,10 @@ import {
   CheckCircle2,
   ClipboardList,
   Download,
-  Globe2,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
+  UserPlus,
   UsersRound
 } from 'lucide-react';
 import Link from 'next/link';
@@ -18,17 +18,14 @@ import type React from 'react';
 import { useEffect, useState } from 'react';
 import { AdminShell } from '@/components/admin-shell';
 import {
-  AdminMetricCard,
   AdminMiniBars,
   AdminPanel,
   AdminStatusBadge,
   adminClassNames
 } from '@/components/admin-ui';
-import type { AdminFeedbackRow, AdminMetric, AdminNoticeRow, AdminOfferRow, TrendPoint } from '@/lib/admin-data';
+import type { AdminFeedbackRow, AdminNoticeRow, AdminOfferRow, TrendPoint } from '@/lib/admin-data';
 import { getAdminErrorMessage, invokeAdminApi } from '@/lib/admin-api';
 import { formatBeijingDateTime } from '@/lib/admin-time';
-
-const dashboardIcons = [Activity, Globe2, UsersRound, Bell, ClipboardList, ShieldAlert];
 
 const emptyOverview: AdminOverviewMetrics = {
   totalUsers: 0,
@@ -74,7 +71,6 @@ const emptyAnalytics: AdminAnalyticsPayload = {
 export default function AdminDashboardPage() {
   const [overviewMetrics, setOverviewMetrics] = useState<AdminOverviewMetrics>(emptyOverview);
   const [analytics, setAnalytics] = useState<AdminAnalyticsPayload>(emptyAnalytics);
-  const [metrics, setMetrics] = useState<AdminMetric[]>(buildLiveMetrics(emptyOverview, emptyAnalytics.metrics));
   const [trends, setTrends] = useState<TrendPoint[]>(buildEmptyTrends());
   const [pendingNotices, setPendingNotices] = useState<AdminNoticeRow[]>([]);
   const [pendingOffers, setPendingOffers] = useState<AdminOfferRow[]>([]);
@@ -102,7 +98,6 @@ export default function AdminDashboardPage() {
 
       setOverviewMetrics(overview.metrics);
       setAnalytics(analyticsData);
-      setMetrics(buildLiveMetrics(overview.metrics, analyticsData.metrics));
       setTrends(overview.trends?.length ? overview.trends : buildEmptyTrends());
       setPendingNotices(notices.notices.map(mapNoticeApiRow));
       setPendingOffers(offers.offers.filter((item) => item.review_status === 'pending' || item.reports_count > 0).slice(0, 5).map(mapOfferApiRow));
@@ -114,7 +109,6 @@ export default function AdminDashboardPage() {
       const errorMessage = getAdminErrorMessage(error, '数据暂时无法更新，请稍后重试。');
       setOverviewMetrics(emptyOverview);
       setAnalytics(emptyAnalytics);
-      setMetrics(buildLiveMetrics(emptyOverview, emptyAnalytics.metrics));
       setTrends(buildEmptyTrends());
       setPendingNotices([]);
       setPendingOffers([]);
@@ -140,45 +134,74 @@ export default function AdminDashboardPage() {
 
   const maxNotices = Math.max(...trends.map((item) => item.notices), 1);
   const maxOffers = Math.max(...trends.map((item) => item.offers), 1);
+  const maxUserTrend = Math.max(...trends.map((item) => item.users), 1);
   const dataHealthy = !dataError;
+  const pendingTotal = overviewMetrics.pendingNotices + overviewMetrics.pendingOffers + overviewMetrics.pendingFeedback;
+  const recentRegistrations = trends.reduce((total, item) => total + item.users, 0);
+  const registrationConversion = analytics.metrics.totalVisitors > 0
+    ? Math.min((overviewMetrics.totalUsers / analytics.metrics.totalVisitors) * 100, 100)
+    : 0;
   const todoCards = [
-    { href: '/admin/notices', label: '通知审核', value: overviewMetrics.pendingNotices, hint: '待发布通知', tone: 'bg-amber-50 text-amber-700' },
-    { href: '/admin/feedback', label: '反馈工单', value: overviewMetrics.pendingFeedback, hint: '待处理举报', tone: 'bg-rose-50 text-rose-700' },
-    { href: '/admin/offers', label: '高风险操作', value: overviewMetrics.pendingOffers, hint: 'Offer 审核', tone: 'bg-violet-50 text-violet-700' }
+    { href: '/admin/notices', label: '待审核通知', value: overviewMetrics.pendingNotices, hint: '确认后进入通知库', icon: Bell, tone: 'bg-amber-50 text-amber-700' },
+    { href: '/admin/offers', label: '待审核 Offer', value: overviewMetrics.pendingOffers, hint: '核验投稿真实性', icon: ClipboardList, tone: 'bg-violet-50 text-violet-700' },
+    { href: '/admin/feedback', label: '待处理举报', value: overviewMetrics.pendingFeedback, hint: '优先处理用户风险', icon: ShieldAlert, tone: 'bg-rose-50 text-rose-700' }
   ];
-  const recentActivities = [
-    ...pendingNotices.slice(0, 2).map((item) => ({
-      label: `新通知待审：${item.school}`,
-      time: item.submittedAt,
+  const secondaryMetrics = [
+    {
+      href: '/admin/dashboard',
+      label: '实时在线',
+      value: formatNumber(analytics.metrics.onlineVisitors),
+      hint: `最近 ${analytics.metrics.activeWindowMinutes} 分钟`,
+      icon: Activity,
+      tone: 'bg-emerald-50 text-emerald-700'
+    },
+    {
       href: '/admin/notices',
-      tone: 'bg-blue-500'
-    })),
-    ...pendingOffers.slice(0, 2).map((item) => ({
-      label: `Offer 待审：${item.school}`,
-      time: item.submittedAt,
+      label: '待审核通知',
+      value: formatNumber(overviewMetrics.pendingNotices),
+      hint: `通知总数 ${formatNumber(overviewMetrics.totalNotices)}`,
+      icon: Bell,
+      tone: 'bg-amber-50 text-amber-700'
+    },
+    {
       href: '/admin/offers',
-      tone: 'bg-emerald-500'
-    })),
-    ...latestFeedback.slice(0, 2).map((item) => ({
-      label: `${item.type}工单：${item.module}`,
-      time: item.submittedAt,
+      label: '待审核 Offer',
+      value: formatNumber(overviewMetrics.pendingOffers),
+      hint: `Offer 总数 ${formatNumber(overviewMetrics.totalOffers)}`,
+      icon: ClipboardList,
+      tone: 'bg-violet-50 text-violet-700'
+    },
+    {
       href: '/admin/feedback',
-      tone: 'bg-amber-500'
-    }))
-  ].slice(0, 5);
-  const operationAlerts = recentActivities.length
-    ? recentActivities
-    : [
-        { label: `当前待审核通知 ${formatNumber(overviewMetrics.pendingNotices)} 条`, time: '实时', href: '/admin/notices', tone: 'bg-blue-500' },
-        { label: `当前待处理反馈 ${formatNumber(overviewMetrics.pendingFeedback)} 条`, time: '实时', href: '/admin/feedback', tone: 'bg-amber-500' },
-        { label: `实时在线访客 ${formatNumber(analytics.metrics.onlineVisitors)} 人`, time: `最近 ${analytics.metrics.activeWindowMinutes} 分钟`, href: '/admin/dashboard', tone: 'bg-emerald-500' }
-      ];
-  const quickLinks: Array<{ href: string; label: string; hint: string; icon: typeof Bell }> = [
-    { href: '/admin/notices', label: '通知管理', hint: '审核与发布通知', icon: Bell },
-    { href: '/admin/offers', label: 'Offer池管理', hint: '处理社区动态', icon: ClipboardList },
-    { href: '/admin/settings', label: '系统设置', hint: '配置安全策略', icon: ShieldCheck }
+      label: '待处理举报',
+      value: formatNumber(overviewMetrics.pendingFeedback),
+      hint: `反馈总数 ${formatNumber(overviewMetrics.totalFeedback)}`,
+      icon: ShieldAlert,
+      tone: 'bg-rose-50 text-rose-700'
+    }
   ];
-
+  const operationStatusRows = [
+    {
+      label: '数据同步',
+      value: dataHealthy ? '正常' : '需要刷新',
+      detail: lastLoadedAt ? `最近更新 ${formatBeijingDateTime(lastLoadedAt)}` : '等待首次同步'
+    },
+    {
+      label: '内容规模',
+      value: `通知 ${formatNumber(overviewMetrics.totalNotices)} / Offer ${formatNumber(overviewMetrics.totalOffers)}`,
+      detail: `累计用户 ${formatNumber(analytics.metrics.totalVisitors)}，注册用户 ${formatNumber(overviewMetrics.totalUsers)}`
+    },
+    {
+      label: '审核积压',
+      value: `通知 ${formatNumber(overviewMetrics.pendingNotices)} / Offer ${formatNumber(overviewMetrics.pendingOffers)} / 反馈 ${formatNumber(overviewMetrics.pendingFeedback)}`,
+      detail: pendingTotal > 0 ? '建议优先处理公开展示相关内容' : '暂无积压任务'
+    },
+    {
+      label: '账号风控',
+      value: overviewMetrics.bannedUsers + overviewMetrics.restrictedUsers > 0 ? `封禁 ${formatNumber(overviewMetrics.bannedUsers)} / 限制 ${formatNumber(overviewMetrics.restrictedUsers)}` : '无告警',
+      detail: '异常账号与高风险行为会在这里汇总'
+    }
+  ];
   function exportDashboardSnapshot() {
     const payload = {
       generatedAt: new Date().toISOString(),
@@ -197,111 +220,214 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <AdminShell title="数据概览">
-      <div className="space-y-6">
-        <section
-          className={adminClassNames(
-            'flex flex-col gap-4 rounded-[22px] border px-5 py-4 text-sm shadow-sm lg:flex-row lg:items-center lg:justify-between',
-            dataHealthy ? 'border-blue-100 bg-blue-50/80 text-blue-700' : 'border-rose-100 bg-rose-50/80 text-rose-700'
-          )}
-        >
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <span className="inline-flex items-center gap-2 font-semibold">
-              <ShieldCheck className="h-4 w-4" />
-              工作台状态：{dataHealthy ? '正常' : '需要关注'}
+    <AdminShell title="数据概览" description="把用户增长、内容审核和系统状态放在同一视野里。">
+      <div className="space-y-5">
+        <section className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/90 px-5 py-4 shadow-[0_12px_36px_rgba(15,23,42,0.04)] backdrop-blur lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className={adminClassNames('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', dataHealthy ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700')}>
+              <ShieldCheck className="h-5 w-5" />
             </span>
-            <span>最近更新：{lastLoadedAt ? formatBeijingDateTime(lastLoadedAt) : '等待刷新'}</span>
-            <span>{message}</span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="font-semibold text-slate-900">{dataHealthy ? '系统运行正常' : '数据需要关注'}</span>
+                <span className="text-sm text-slate-400">待处理 {formatNumber(pendingTotal)} 项</span>
+              </div>
+              <p className={adminClassNames('mt-1 truncate text-sm', dataHealthy ? 'text-slate-500' : 'text-rose-600')} title={message}>{message}</p>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={exportDashboardSnapshot}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
-            >
-              <Download className="h-4 w-4" />
-              导出日报
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-xs font-medium text-slate-400">
+              更新于 {lastLoadedAt ? formatBeijingDateTime(lastLoadedAt) : '等待刷新'}
+            </span>
             <button
               type="button"
               onClick={() => void loadDashboard()}
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700"
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-emerald-50/50 hover:text-teal-700"
             >
               <RefreshCw className="h-4 w-4" />
               刷新数据
             </button>
+            <button
+              type="button"
+              onClick={exportDashboardSnapshot}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-teal-800 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-900"
+            >
+              <Download className="h-4 w-4" />
+              导出日报
+            </button>
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-          {metrics.map((metric, index) => (
-            <AdminMetricCard key={metric.label} metric={metric} icon={dashboardIcons[index]} />
-          ))}
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.04fr)_minmax(420px,1fr)]">
+          <article className="overflow-hidden rounded-[24px] border border-teal-900/20 bg-[#07594f] p-6 text-white shadow-[0_22px_58px_rgba(6,78,67,0.18)] lg:p-7">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15">
+                  <UsersRound className="h-6 w-6" />
+                </span>
+                <div>
+                  <div className="text-sm font-medium text-emerald-100">用户覆盖</div>
+                  <h2 className="mt-0.5 text-lg font-semibold">累计用户</h2>
+                </div>
+              </div>
+              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-emerald-50">
+                今日新增 {formatNumber(analytics.metrics.todayVisitors)}
+              </span>
+            </div>
+
+            <div className="mt-7 text-5xl font-semibold tracking-tight sm:text-6xl">{formatNumber(analytics.metrics.totalVisitors)}</div>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-emerald-100/80">持续积累的独立访问用户，反映平台当前的真实覆盖规模。</p>
+
+            <dl className="mt-8 grid grid-cols-3 divide-x divide-white/10 border-t border-white/10 pt-5">
+              <div className="pr-4">
+                <dt className="text-xs text-emerald-100/70">今日新增</dt>
+                <dd className="mt-1 text-xl font-semibold">{formatNumber(analytics.metrics.todayVisitors)}</dd>
+              </div>
+              <div className="px-4">
+                <dt className="text-xs text-emerald-100/70">今日浏览</dt>
+                <dd className="mt-1 text-xl font-semibold">{formatNumber(analytics.metrics.todayPageViews)}</dd>
+              </div>
+              <div className="pl-4">
+                <dt className="text-xs text-emerald-100/70">实时在线</dt>
+                <dd className="mt-1 text-xl font-semibold">{formatNumber(analytics.metrics.onlineVisitors)}</dd>
+              </div>
+            </dl>
+          </article>
+
+          <article className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_18px_52px_rgba(15,23,42,0.055)] lg:p-7">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                  <UserPlus className="h-6 w-6" />
+                </span>
+                <div>
+                  <div className="text-sm font-medium text-slate-500">账号增长</div>
+                  <h2 className="mt-0.5 text-lg font-semibold text-slate-950">注册用户</h2>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs font-medium text-slate-400">注册转化率</div>
+                <div className="mt-1 text-xl font-semibold text-teal-700">{registrationConversion.toFixed(1)}%</div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <div className="text-5xl font-semibold tracking-tight text-slate-950 sm:text-6xl">{formatNumber(overviewMetrics.totalUsers)}</div>
+                <div className="mt-2 text-sm font-semibold text-emerald-700">今日注册 {formatNumber(overviewMetrics.todayUsers)}</div>
+              </div>
+              <div className="text-right text-xs leading-5 text-slate-400">近 7 日新增<br /><span className="text-base font-semibold text-slate-700">{formatNumber(recentRegistrations)}</span></div>
+            </div>
+
+            <div className="mt-6">
+              <div className="flex items-center justify-between text-xs font-medium text-slate-400">
+                <span>近 7 日注册趋势</span>
+                <span>访问 → 注册</span>
+              </div>
+              <div className="mt-3 flex h-24 items-end gap-2 sm:gap-3">
+                {trends.map((point) => (
+                  <div key={`registration-${point.date}`} className="flex h-full min-w-0 flex-1 flex-col items-center gap-2">
+                    <div className="flex min-h-0 w-full flex-1 items-end justify-center">
+                      <div
+                        className="w-full max-w-10 rounded-t-lg bg-emerald-200 transition hover:bg-emerald-300"
+                        style={{ height: `${Math.max((point.users / maxUserTrend) * 100, point.users > 0 ? 12 : 4)}%` }}
+                        title={`${point.date} 注册 ${point.users}`}
+                      />
+                    </div>
+                    <span className="text-[11px] text-slate-400">{point.date}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </article>
         </section>
 
-        <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)_minmax(360px,0.8fr)]">
+        <section className="grid overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_14px_44px_rgba(15,23,42,0.045)] sm:grid-cols-2 xl:grid-cols-4">
+          {secondaryMetrics.map((item, index) => {
+            const MetricIcon = item.icon;
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={adminClassNames(
+                  'group flex min-w-0 items-center gap-4 px-5 py-4 transition hover:bg-slate-50',
+                  index > 0 && 'border-t border-slate-100 sm:border-l sm:border-t-0',
+                  index === 2 && 'sm:border-t xl:border-t-0'
+                )}
+              >
+                <span className={adminClassNames('flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl', item.tone)}>
+                  <MetricIcon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-medium text-slate-400">{item.label}</span>
+                  <span className="mt-0.5 block text-2xl font-semibold tracking-tight text-slate-950">{item.value}</span>
+                  <span className="mt-0.5 block truncate text-xs text-slate-400">{item.hint}</span>
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-teal-700" />
+              </Link>
+            );
+          })}
+        </section>
+
+        <section className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.8fr)_minmax(320px,0.72fr)]">
           <AdminPanel
-            title="今日待办"
-            description="优先处理会影响内容质量、用户体验和公开展示的事项。"
-            action={<Link href="/admin/notices" className="text-sm font-semibold text-blue-600">进入工作台 →</Link>}
+            title="增长概览"
+            description="查看近 7 日注册用户变化，及时判断增长节奏。"
+            action={<span className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500">近 7 日</span>}
           >
-            <div className="grid gap-4 p-5 sm:grid-cols-2">
-              {todoCards.map((item) => (
-                <Link key={item.label} href={item.href} className="group rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-blue-200 hover:bg-blue-50/40">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${item.tone}`}>
-                      <CheckCircle2 className="h-5 w-5" />
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-600" />
-                  </div>
-                  <div className="mt-4 text-2xl font-semibold text-slate-950">{formatNumber(item.value)}</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-800">{item.label}</div>
-                  <div className="mt-1 text-xs text-slate-500">{item.hint}</div>
-                </Link>
-              ))}
+            <AdminMiniBars data={trends} valueKey="users" color="bg-teal-700" />
+            <div className="grid grid-cols-3 border-t border-slate-100 text-center">
+              <div className="px-3 py-4"><div className="text-xs text-slate-400">累计用户</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(analytics.metrics.totalVisitors)}</div></div>
+              <div className="border-x border-slate-100 px-3 py-4"><div className="text-xs text-slate-400">注册用户</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(overviewMetrics.totalUsers)}</div></div>
+              <div className="px-3 py-4"><div className="text-xs text-slate-400">近 7 日新增</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(recentRegistrations)}</div></div>
             </div>
           </AdminPanel>
 
           <AdminPanel
-            title="运营状态"
-            action={
-              <span className={adminClassNames('rounded-full px-3 py-1 text-xs font-semibold', dataHealthy ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700')}>
-                {dataHealthy ? '整体健康' : '需要排查'}
-              </span>
-            }
+            title="运营动态"
+            action={<Link href="/admin/settings" className="text-sm font-semibold text-teal-700">系统详情 →</Link>}
           >
-            <div className="space-y-3 p-5 text-sm">
-              {[
-                ['数据更新', dataHealthy ? '正常' : '需要刷新'],
-                ['内容规模', `通知 ${formatNumber(overviewMetrics.totalNotices)} 条 / 访客 ${formatNumber(analytics.metrics.totalVisitors)} 人`],
-                ['待处理事项', `通知 ${formatNumber(overviewMetrics.pendingNotices)} / Offer ${formatNumber(overviewMetrics.pendingOffers)} / 反馈 ${formatNumber(overviewMetrics.pendingFeedback)}`],
-                ['异常告警', overviewMetrics.bannedUsers + overviewMetrics.restrictedUsers > 0 ? `封禁 ${formatNumber(overviewMetrics.bannedUsers)} / 限制 ${formatNumber(overviewMetrics.restrictedUsers)}` : '无告警']
-              ].map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-                  <span className="flex items-center gap-2 text-slate-600">
-                    <CheckCircle2 className={adminClassNames('h-4 w-4', dataHealthy ? 'text-emerald-600' : 'text-rose-600')} />
-                    {label}
+            <div className="divide-y divide-slate-100 px-5">
+              {operationStatusRows.map((item) => (
+                <div key={item.label} className="flex items-start justify-between gap-4 py-4">
+                  <span className="flex min-w-0 gap-3">
+                    <CheckCircle2 className={adminClassNames('mt-0.5 h-4 w-4 shrink-0', dataHealthy ? 'text-emerald-600' : 'text-rose-600')} />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-slate-800">{item.label}</span>
+                      <span className="mt-1 block truncate text-xs text-slate-400">{item.detail}</span>
+                    </span>
                   </span>
-                  <span className={adminClassNames('font-semibold', dataHealthy ? 'text-emerald-700' : 'text-rose-700')}>{value}</span>
+                  <span className={adminClassNames('shrink-0 text-right text-sm font-semibold', dataHealthy ? 'text-teal-700' : 'text-rose-700')}>{item.value}</span>
                 </div>
               ))}
-              <Link href="/admin/settings" className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600">
-                查看系统详情 <ArrowRight className="h-4 w-4" />
-              </Link>
             </div>
           </AdminPanel>
 
-          <AdminPanel title="重点提醒" action={<Link href="/admin/logs" className="text-sm font-semibold text-teal-700">查看更多 →</Link>}>
-            <div className="space-y-3 p-5 text-sm">
-              {operationAlerts.map((item) => (
-                <Link key={`${item.href}-${item.label}`} href={item.href} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-white p-3 transition hover:border-blue-200 hover:bg-blue-50/30">
-                  <span className={adminClassNames('mt-1 h-2.5 w-2.5 rounded-full', item.tone)} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-slate-700">{item.label}</div>
-                    <div className="mt-1 text-xs text-slate-400">{item.time}</div>
-                  </div>
-                </Link>
-              ))}
+          <AdminPanel
+            title="优先处理"
+            action={<span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">共 {formatNumber(pendingTotal)} 项</span>}
+            className="xl:col-span-2 2xl:col-span-1"
+          >
+            <div className="divide-y divide-slate-100 px-5">
+              {todoCards.map((item) => {
+                const TodoIcon = item.icon;
+                return (
+                  <Link key={item.label} href={item.href} className="group flex items-center gap-3 py-4">
+                    <span className={adminClassNames('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', item.tone)}>
+                      <TodoIcon className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-slate-800">{item.label}</span>
+                      <span className="mt-1 block truncate text-xs text-slate-400">{item.hint}</span>
+                    </span>
+                    <span className="text-xl font-semibold text-slate-950">{formatNumber(item.value)}</span>
+                    <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-teal-700" />
+                  </Link>
+                );
+              })}
+              <Link href="/admin/notices" className="inline-flex items-center gap-2 py-4 text-sm font-semibold text-teal-700">
+                进入审核工作台 <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
           </AdminPanel>
         </section>
@@ -321,17 +447,10 @@ export default function AdminDashboardPage() {
           />
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-          <AdminPanel
-            title="最近7天用户增长趋势"
-            action={<span className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600">近7天</span>}
-          >
-            <AdminMiniBars data={trends} valueKey="users" color="bg-blue-500" />
-          </AdminPanel>
-
+        <section>
           <AdminPanel
             title="近7天内容提交趋势"
-            action={<span className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600">近7天</span>}
+            action={<span className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500">近 7 日</span>}
           >
             <div className="grid h-64 grid-cols-7 items-end gap-4 px-6 pb-6 pt-8">
               {trends.map((point) => (
@@ -402,23 +521,6 @@ export default function AdminDashboardPage() {
           />
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {quickLinks.map((item) => {
-            const LinkIcon = item.icon;
-            return (
-              <Link key={item.href} href={item.href} className="group rounded-[20px] border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:bg-blue-50/40">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                    <LinkIcon className="h-5 w-5" />
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-600" />
-                </div>
-                <div className="mt-4 font-semibold text-slate-950">{item.label}</div>
-                <div className="mt-1 text-sm text-slate-500">{item.hint}</div>
-              </Link>
-            );
-          })}
-        </section>
       </div>
     </AdminShell>
   );
@@ -479,17 +581,6 @@ type AdminAnalyticsPayload = {
   onlineVisitors: AdminVisitorRow[];
   recentVisitors: AdminVisitorRow[];
 };
-
-function buildLiveMetrics(metrics: AdminOverviewMetrics, analytics: AdminAnalyticsMetrics): AdminMetric[] {
-  return [
-    { label: '实时在线', value: formatNumber(analytics.onlineVisitors), hint: `最近 ${analytics.activeWindowMinutes} 分钟心跳`, tone: 'green' },
-    { label: '累计访客', value: formatNumber(analytics.totalVisitors), hint: `今日新增 ${formatNumber(analytics.todayVisitors)}，PV ${formatNumber(analytics.todayPageViews)}`, tone: 'blue' },
-    { label: '注册用户', value: formatNumber(metrics.totalUsers), hint: `今日注册 ${formatNumber(metrics.todayUsers)}`, tone: 'slate' },
-    { label: '待审核通知', value: formatNumber(metrics.pendingNotices), hint: `通知总数 ${formatNumber(metrics.totalNotices)}`, tone: 'amber' },
-    { label: '待审核 Offer', value: formatNumber(metrics.pendingOffers), hint: `Offer 总数 ${formatNumber(metrics.totalOffers)}`, tone: 'purple' },
-    { label: '待处理举报', value: formatNumber(metrics.pendingFeedback), hint: `反馈总数 ${formatNumber(metrics.totalFeedback)}`, tone: 'rose' }
-  ];
-}
 
 function buildEmptyTrends(): TrendPoint[] {
   return Array.from({ length: 7 }, (_, index) => ({

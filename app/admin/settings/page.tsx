@@ -8,12 +8,8 @@ import {
   ClipboardList,
   Flag,
   LayoutDashboard,
-  LoaderCircle,
-  LockKeyhole,
-  RotateCw,
   Settings,
   ShieldCheck,
-  SlidersHorizontal,
   UsersRound
 } from 'lucide-react';
 import { AdminActionBanner, AdminButton, AdminPanel, adminClassNames } from '@/components/admin-ui';
@@ -148,7 +144,7 @@ export default function AdminSettingsPage() {
   const [retentionDraft, setRetentionDraft] = useState(String(defaultSettings.operation_log_retention_days));
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<AdminSettingKey | null>(null);
-  const [message, setMessage] = useState('正在读取后台设置...');
+  const [message, setMessage] = useState('');
   const [lastCheckedAt, setLastCheckedAt] = useState('');
 
   const disabledWarnings = useMemo(
@@ -173,7 +169,7 @@ export default function AdminSettingsPage() {
       setSettingMeta(nextMeta);
       setRetentionDraft(String(nextSettings.operation_log_retention_days));
       setLastCheckedAt(new Date().toLocaleString('zh-CN'));
-      setMessage('系统设置已更新，当前页面展示最新配置。');
+      setMessage('');
     } catch (error) {
       setMessage(getAdminErrorMessage(error, '系统设置读取失败，请稍后重试。'));
     } finally {
@@ -229,37 +225,8 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <AdminShell title="系统设置" description="管理后台通道、安全策略、审核开关和运营基础配置。">
-      <div className="space-y-8">
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <AdminPanel>
-            <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                  <LockKeyhole className="h-4 w-4" />
-                  运营安全中心
-                </div>
-                <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">后台设置中心</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-500">
-                  集中管理内容审核、Offer 提交、举报提醒和操作记录保留周期。所有调整都会校验管理员权限，并保留变更记录。
-                </p>
-              </div>
-              <AdminButton tone="secondary" onClick={loadSettings} disabled={loading}>
-                {loading ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <RotateCw className="mr-2 h-4 w-4" />}
-                刷新设置
-              </AdminButton>
-            </div>
-          </AdminPanel>
-
-          <AdminPanel title="保护状态">
-            <div className="space-y-4 p-5 text-sm">
-              <HealthRow label="登录校验" value="已开启" good />
-              <HealthRow label="设置变更" value="核心管理员" good />
-              <HealthRow label="访问边界" value="已启用" good />
-              <HealthRow label="最近检查" value={lastCheckedAt || '等待刷新'} good={Boolean(lastCheckedAt)} />
-            </div>
-          </AdminPanel>
-        </section>
+    <AdminShell title="系统设置" description="管理审核开关、风险提醒和日志策略。">
+      <div className="space-y-6">
 
         {message ? (
           <AdminActionBanner tone={message.includes('失败') || message.includes('不可用') ? 'danger' : 'info'}>
@@ -281,7 +248,7 @@ export default function AdminSettingsPage() {
           </section>
         ) : null}
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
           <AdminPanel title="基础配置">
             <div className="divide-y divide-slate-100">
               {settingDefinitions.map((definition) => (
@@ -299,16 +266,17 @@ export default function AdminSettingsPage() {
             </div>
           </AdminPanel>
 
-          <AdminPanel title="治理策略说明">
-            <div className="space-y-4 p-5 text-sm text-slate-600">
-              <PolicyItem title="按角色开放操作" description="不同管理员只看到并使用与岗位匹配的操作入口，降低误操作风险。" />
-              <PolicyItem title="关键设置受保护" description="只允许修改经过确认的配置项，避免运营策略被随意改动。" />
-              <PolicyItem title="关键操作有留痕" description="配置更新、封禁、删除、下架等动作都会保留记录，方便后续复盘。" />
+          <AdminPanel title="保护状态" action={<button type="button" className="text-sm font-semibold text-teal-700" onClick={loadSettings} disabled={loading}>{loading ? '检查中' : '重新检查'}</button>}>
+            <div className="space-y-3 p-5 text-sm">
+              <HealthRow label="登录校验" value="已开启" good />
+              <HealthRow label="变更权限" value="核心管理员" good />
+              <HealthRow label="访问保护" value="已启用" good />
+              <HealthRow label="最近检查" value={lastCheckedAt || '等待检查'} good={Boolean(lastCheckedAt)} />
             </div>
           </AdminPanel>
         </section>
 
-        <AdminPanel title="后台通道巡检">
+        <AdminPanel title="运营通道">
           <div className="grid gap-4 p-5 md:grid-cols-2 2xl:grid-cols-4">
             {adminChannels.map((channel) => {
               const Icon = channel.icon;
@@ -328,8 +296,7 @@ export default function AdminSettingsPage() {
                     </span>
                   </div>
                   <div className="mt-4 text-base font-semibold text-slate-950">{channel.label}</div>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">{channel.hint}</p>
-                  <div className="mt-4 text-sm font-semibold text-blue-700">进入通道 →</div>
+                  <p className="mt-2 line-clamp-1 text-sm text-slate-500">{channel.hint}</p>
                 </Link>
               );
             })}
@@ -401,11 +368,9 @@ function SettingControl({
             </span>
           ) : null}
         </div>
-        <p className="mt-2 text-sm leading-6 text-slate-500">{definition.description}</p>
-        <p className="mt-1 text-xs leading-5 text-slate-400">{definition.risk}</p>
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
-          <span>更新人：{meta?.updated_by || 'system'}</span>
-          <span>更新时间：{formatUpdatedAt(meta?.updated_at || '')}</span>
+        <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500" title={definition.risk}>{definition.description}</p>
+        <div className="mt-2 text-xs text-slate-400">
+          最近更新：{formatUpdatedAt(meta?.updated_at || '')}
         </div>
       </div>
 
@@ -458,18 +423,6 @@ function HealthRow({ label, value, good }: { label: string; value: string; good:
     <div className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 px-3 py-2">
       <span className="text-slate-500">{label}</span>
       <span className={adminClassNames('font-semibold', good ? 'text-emerald-700' : 'text-amber-700')}>{value}</span>
-    </div>
-  );
-}
-
-function PolicyItem({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-xl border border-slate-200 p-4">
-      <div className="flex items-center gap-2 font-semibold text-slate-950">
-        <SlidersHorizontal className="h-4 w-4 text-blue-600" />
-        {title}
-      </div>
-      <p className="mt-2 leading-6 text-slate-500">{description}</p>
     </div>
   );
 }

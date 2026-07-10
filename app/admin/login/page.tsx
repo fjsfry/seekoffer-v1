@@ -59,45 +59,42 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.12),transparent_34%),linear-gradient(180deg,#f7fbfa_0%,#f6f8fb_52%,#ffffff_100%)] px-4 py-8">
-      <div className="mx-auto grid min-h-[calc(100vh-64px)] max-w-[1180px] items-center gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
-        <section className="rounded-3xl border border-slate-200/80 bg-white/95 p-8 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur lg:p-10">
+    <main className="min-h-screen bg-[#f4f7f6] px-4 py-8">
+      <div className="mx-auto grid min-h-[calc(100vh-64px)] max-w-[1080px] items-center gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <section className="rounded-2xl border border-slate-200/80 bg-white p-8 shadow-[0_20px_58px_rgba(15,23,42,0.07)] lg:p-10">
           <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-teal-700">
             <ShieldCheck className="h-4 w-4" />
-            Seekoffer Console
+            Seekoffer 运营平台
           </div>
-          <h1 className="mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-slate-950">
-            面向运营团队的内容与用户治理工作台。
+          <h1 className="mt-6 max-w-2xl text-3xl font-semibold tracking-tight text-slate-950 lg:text-4xl">
+            让运营数据、内容审核和风险处理保持清晰。
           </h1>
-          <p className="mt-5 max-w-2xl text-sm leading-8 text-slate-600">
-            集中处理通知审核、Offer 质量、用户反馈、操作记录与基础增长数据。个人申请表只做汇总统计，不进入具体内容。
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
+            登录后按角色进入对应工作区，关键操作自动保留记录。
           </p>
 
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             {[
-              [BarChart3, '数据概览', '一眼看清用户增长、待审核内容和申请功能使用趋势。'],
-              [Bell, '通知审核', '审核、发布、驳回、下架和删除通知，保障前台可信。'],
-              [ClipboardCheck, 'Offer 管理', '控制用户贡献内容的真实性、隐私和举报风险。'],
-              [UsersRound, '用户与反馈', '查看用户状态，处理反馈举报，所有关键操作留痕。']
-            ].map(([Icon, title, description]) => (
-              <div key={String(title)} className="rounded-2xl bg-slate-50 p-5">
-                <Icon className="h-6 w-6 text-blue-600" />
-                <div className="mt-4 font-semibold text-slate-950">{title as string}</div>
-                <p className="mt-2 text-sm leading-7 text-slate-500">{description as string}</p>
+              [BarChart3, '增长与访问'],
+              [Bell, '通知审核'],
+              [ClipboardCheck, 'Offer 管理'],
+              [UsersRound, '用户与反馈']
+            ].map(([Icon, title]) => (
+              <div key={String(title)} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-4">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-teal-700 shadow-sm"><Icon className="h-5 w-5" /></span>
+                <div className="font-semibold text-slate-800">{title as string}</div>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-200/80 bg-white/95 p-8 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+        <section className="rounded-2xl border border-slate-200/80 bg-white p-8 shadow-[0_20px_58px_rgba(15,23,42,0.07)]">
           <div className="inline-flex items-center gap-2 text-sm font-semibold text-teal-700">
             <LockKeyhole className="h-4 w-4" />
             后台登录
           </div>
           <h2 className="mt-4 text-2xl font-semibold text-slate-950">进入运营工作台</h2>
-          <p className="mt-3 text-sm leading-7 text-slate-500">
-            使用授权管理员账号登录。系统会按你的角色开放对应的运营入口，并记录关键操作。
-          </p>
+          <p className="mt-3 text-sm leading-6 text-slate-500">使用已授权的管理员账号。</p>
 
           <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
             <label className="grid gap-2">
@@ -132,8 +129,8 @@ export default function AdminLoginPage() {
           </form>
 
           {error ? <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
-          <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-500">
-            仅限内部授权成员访问。若无法登录，请确认账号权限或联系管理员处理。
+          <div className="mt-6 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+            无法登录时，请联系超级管理员核验权限。
           </div>
         </section>
       </div>

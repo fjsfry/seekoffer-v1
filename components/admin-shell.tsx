@@ -13,6 +13,8 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Search,
   Settings,
@@ -108,14 +110,14 @@ function AdminAuthGate({
   return (
     <main className="min-h-screen bg-[#f6f8fb] px-5 py-8 text-slate-900">
       <section className="mx-auto mt-24 max-w-xl rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-teal-700">
           <ShieldCheck className="h-8 w-8" />
         </div>
         <h1 className="mt-6 text-2xl font-semibold text-slate-950">{title}</h1>
         <p className="mt-3 text-sm leading-7 text-slate-500">{description}</p>
         <Link
           href="/admin/login"
-          className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white"
+          className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-semibold text-white"
         >
           进入后台登录
         </Link>
@@ -140,6 +142,7 @@ export function AdminShell({
   const [globalSearch, setGlobalSearch] = useState('');
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [shellStatus, setShellStatus] = useState<ShellStatus>(emptyShellStatus);
   const normalizedPathname = pathname.replace(/\/$/, '') || '/';
 
@@ -187,6 +190,18 @@ export function AdminShell({
     setMobileNavOpen(false);
     setQuickMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    setSidebarCollapsed(window.localStorage.getItem('seekoffer-admin-sidebar') === 'collapsed');
+  }, []);
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem('seekoffer-admin-sidebar', next ? 'collapsed' : 'expanded');
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!session) {
@@ -282,7 +297,7 @@ export function AdminShell({
           ? '/admin/feedback'
           : '/admin/logs';
   const systemHealthy = !shellStatus.error;
-  const renderNavItems = (onNavigate?: () => void) =>
+  const renderNavItems = (onNavigate?: () => void, compact = false) =>
     adminNavItems.map((item) => {
       const Icon = item.icon;
       const itemPath = item.href.replace(/\/$/, '');
@@ -295,36 +310,81 @@ export function AdminShell({
           key={item.href}
           href={item.href}
           onClick={onNavigate}
+          title={compact ? item.label : undefined}
+          aria-label={compact ? item.label : undefined}
           className={adminClassNames(
-            'relative flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-medium transition',
+            'relative flex h-11 items-center rounded-xl text-sm font-semibold transition',
+            compact ? 'justify-center px-0' : 'gap-3 px-4',
             active ? 'bg-emerald-50 text-teal-700 shadow-sm' : 'text-slate-700 hover:bg-slate-50 hover:text-teal-700'
           )}
           aria-current={active ? 'page' : undefined}
         >
           {active ? <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-teal-700" /> : null}
-          <Icon className="h-5 w-5" />
-          {item.label}
+          <Icon className="h-5 w-5 shrink-0" />
+          {!compact ? <span className="truncate">{item.label}</span> : null}
         </Link>
       );
     });
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.10),transparent_34%),linear-gradient(180deg,#f7fbfa_0%,#f6f8fb_46%,#f8fafc_100%)] text-slate-900">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] border-r border-slate-200/80 bg-white/92 shadow-[18px_0_50px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:block">
-        <div className="flex h-20 items-center gap-3 border-b border-slate-100 px-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-700 to-emerald-500 text-lg font-black text-white shadow-sm shadow-teal-500/20">S</div>
-          <div>
-            <div className="text-lg font-semibold text-teal-800">Seekoffer</div>
-            <div className="text-sm font-medium text-slate-700">运营管理中台</div>
-            <div className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-teal-700">运营中台</div>
-          </div>
+    <div className="min-h-screen bg-[#f4f7f6] text-slate-900">
+      <aside
+        className={adminClassNames(
+          'fixed inset-y-0 left-0 z-30 hidden border-r border-slate-200/80 bg-white shadow-[12px_0_36px_rgba(15,23,42,0.035)] transition-[width] duration-200 lg:block',
+          sidebarCollapsed ? 'w-[88px]' : 'w-[264px]'
+        )}
+      >
+        <div className={adminClassNames('flex h-20 items-center border-b border-slate-100', sidebarCollapsed ? 'justify-center px-3' : 'gap-3 px-5')}>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-800 text-lg font-black text-white shadow-sm">S</div>
+          {!sidebarCollapsed ? (
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-lg font-semibold text-teal-900">Seekoffer</div>
+              <div className="truncate text-xs font-medium text-slate-500">运营管理平台</div>
+            </div>
+          ) : null}
+          {!sidebarCollapsed ? (
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-teal-800"
+              aria-label="收起左侧导航"
+              title="收起导航"
+            >
+              <PanelLeftClose className="h-5 w-5" />
+            </button>
+          ) : null}
         </div>
 
-        <nav className="space-y-2 px-3 py-5">
-          {renderNavItems()}
+        <nav className="space-y-1.5 px-3 py-5">
+          {renderNavItems(undefined, sidebarCollapsed)}
         </nav>
 
-        <div className="absolute bottom-5 left-5 right-5">
+        <div className={adminClassNames('absolute bottom-5', sidebarCollapsed ? 'left-3 right-3' : 'left-5 right-5')}>
+          {sidebarCollapsed ? (
+            <div className="grid gap-2">
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-teal-200 hover:text-teal-800"
+                aria-label="展开左侧导航"
+                title="展开导航"
+              >
+                <PanelLeftOpen className="h-5 w-5" />
+              </button>
+              <Link
+                href="/admin/settings"
+                className={adminClassNames(
+                  'relative flex h-11 items-center justify-center rounded-xl border',
+                  systemHealthy ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-rose-100 bg-rose-50 text-rose-700'
+                )}
+                aria-label={systemHealthy ? '工作台运行正常' : '工作台需要关注'}
+                title={systemHealthy ? '工作台运行正常' : '工作台需要关注'}
+              >
+                <ShieldCheck className="h-5 w-5" />
+                {pendingCount > 0 ? <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{pendingCount > 99 ? '99+' : pendingCount}</span> : null}
+              </Link>
+            </div>
+          ) : (
           <div className={adminClassNames('rounded-2xl border p-4', systemHealthy ? 'border-emerald-100 bg-emerald-50/80' : 'border-rose-100 bg-rose-50/80')}>
             <div className={adminClassNames('flex items-center gap-2 text-sm font-semibold', systemHealthy ? 'text-emerald-700' : 'text-rose-700')}>
               <ShieldCheck className="h-4 w-4" />
@@ -341,6 +401,7 @@ export function AdminShell({
               查看运营设置 →
             </Link>
           </div>
+          )}
         </div>
       </aside>
 
@@ -355,7 +416,7 @@ export function AdminShell({
           <aside className="absolute inset-y-0 left-0 flex w-[min(86vw,320px)] flex-col border-r border-slate-200 bg-white shadow-2xl">
             <div className="flex h-20 items-center justify-between gap-3 border-b border-slate-100 px-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-700 to-emerald-500 text-lg font-black text-white shadow-sm shadow-teal-500/20">S</div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-800 text-lg font-black text-white shadow-sm">S</div>
                 <div>
                   <div className="text-lg font-semibold text-teal-800">Seekoffer</div>
                   <div className="text-sm font-medium text-slate-700">运营管理中台</div>
@@ -385,8 +446,8 @@ export function AdminShell({
         </div>
       ) : null}
 
-      <div className="lg:pl-[264px]">
-        <header className="sticky top-0 z-20 flex min-h-20 items-center justify-between gap-3 border-b border-slate-200/80 bg-white/92 px-4 py-3 shadow-[0_12px_40px_rgba(15,23,42,0.04)] backdrop-blur-xl lg:px-8">
+      <div className={adminClassNames('transition-[padding] duration-200', sidebarCollapsed ? 'lg:pl-[88px]' : 'lg:pl-[264px]')}>
+        <header className="sticky top-0 z-20 flex min-h-20 items-center justify-between gap-3 border-b border-slate-200/80 bg-white/95 px-4 py-3 shadow-[0_10px_32px_rgba(15,23,42,0.035)] backdrop-blur-xl lg:px-7">
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
@@ -395,6 +456,15 @@ export function AdminShell({
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 lg:hidden"
             >
               <Menu className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              aria-label={sidebarCollapsed ? '展开左侧导航' : '收起左侧导航'}
+              title={sidebarCollapsed ? '展开导航' : '收起导航'}
+              onClick={toggleSidebar}
+              className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:border-teal-200 hover:bg-emerald-50 hover:text-teal-800 lg:flex"
+            >
+              {sidebarCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
             </button>
             <div className="min-w-0">
               <h1 className="truncate text-xl font-semibold tracking-tight text-slate-950 lg:text-2xl">{title}</h1>
@@ -415,7 +485,7 @@ export function AdminShell({
                     window.location.href = `${targetPath}?query=${encodeURIComponent(keyword)}`;
                   }
                 }}
-                className="h-11 w-[360px] rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-emerald-50"
+                className="h-11 w-[260px] rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-emerald-50 2xl:w-[340px]"
                 placeholder="搜索通知、学校、用户"
               />
             </label>
@@ -424,7 +494,7 @@ export function AdminShell({
               <button
                 type="button"
                 onClick={() => setQuickMenuOpen((open) => !open)}
-                className="hidden h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 xl:inline-flex"
+                className="hidden h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 2xl:inline-flex"
               >
                 <Sparkles className="h-4 w-4 text-teal-700" />
                 快捷操作
@@ -450,7 +520,7 @@ export function AdminShell({
               ) : null}
             </div>
 
-            <div className="h-8 w-px bg-slate-200" />
+            <div className="hidden h-8 w-px bg-slate-200 xl:block" />
 
             <Link
               href={reminderHref}
@@ -474,12 +544,12 @@ export function AdminShell({
             </Link>
 
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-teal-800 text-white">
                 <UserRound className="h-5 w-5" />
               </div>
               <div className="hidden text-sm md:block">
-                <div className="font-semibold text-slate-950">{session?.name || 'admin'}</div>
-                <div className="text-xs text-slate-500">{session ? getRoleName(session.role) : '未登录'}</div>
+                <div className="font-semibold text-slate-950">{session.name || 'admin'}</div>
+                <div className="text-xs text-slate-500">{getRoleName(session.role)}</div>
               </div>
               <ChevronDown className="h-4 w-4 text-slate-500" />
             </div>
@@ -496,19 +566,19 @@ export function AdminShell({
           </div>
         </header>
 
-        <main className="min-h-[calc(100vh-80px)] px-5 py-6 lg:px-8">
+        <main className="mx-auto min-h-[calc(100vh-80px)] max-w-[1760px] px-4 py-5 sm:px-5 lg:px-7 lg:py-6">
           {session ? (
             children
           ) : (
             <section className="mx-auto mt-20 max-w-xl rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-teal-700">
                 <ShieldCheck className="h-8 w-8" />
               </div>
               <h2 className="mt-6 text-2xl font-semibold text-slate-950">请先登录运营后台</h2>
               <p className="mt-3 text-sm leading-7 text-slate-500">登录后可处理通知、Offer、用户反馈和操作记录，关键动作都会留痕。</p>
               <Link
                 href="/admin/login"
-                className="mt-6 inline-flex h-11 items-center justify-center rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white"
+                className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-semibold text-white"
               >
                 进入后台登录
               </Link>
