@@ -227,7 +227,7 @@ export default function AdminOperationsPage() {
 
   return (
     <AdminShell title={operationsSectionTitles[activeSection]} description={operationsSectionDescriptions[activeSection]}>
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         {message ? <AdminActionBanner tone={message.includes('失败') || message.includes('无法') ? 'danger' : 'info'}>{message}</AdminActionBanner> : null}
         {activeSection === 'users' ? (
           <UsersView
@@ -333,7 +333,7 @@ function UsersView({
 
   return (
     <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_280px]">
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <AdminPanel>
           <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[180px_minmax(280px,1fr)_160px_160px_110px_110px]">
             <AdminInput
@@ -519,7 +519,7 @@ function FeedbackView({
 
   return (
     <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <AdminPanel>
           <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[140px_160px_160px_150px_150px_minmax(260px,1fr)_100px_100px]">
             <AdminSelect
@@ -678,7 +678,7 @@ function LogsView({
 
   return (
     <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <AdminPanel>
           <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[150px_160px_160px_150px_150px_minmax(260px,1fr)_100px_100px]">
             <AdminSelect

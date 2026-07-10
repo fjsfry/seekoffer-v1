@@ -196,7 +196,7 @@ export default function AdminOffersPage() {
   return (
     <AdminShell title="Offer池管理" description="审核社区动态，维护内容真实性与隐私安全。">
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <AdminPanel>
             <div className="grid gap-5 p-5">
               <div
