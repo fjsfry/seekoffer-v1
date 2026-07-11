@@ -10,7 +10,11 @@ const privacySections = [
   },
   {
     title: '处理信息的目的',
-    body: '这些信息用于提供登录与跨设备同步、恢复你的申请进度、展示经核验的社区内容、处理举报纠错、保障账号和服务安全。我们不会把工作台资料、导师联系人或申请备注用于无关广告画像。'
+    body: '这些信息仅用于提供登录与跨设备同步、恢复申请进度、展示经核验的社区内容、处理举报纠错、保障账号安全和改进产品体验。我们不会把工作台资料、导师联系人、申请备注或浏览记录用于与本服务无关的商业营销和广告画像。'
+  },
+  {
+    title: '不出售、不营销、不泄露',
+    body: '我们不会出售、出租、交换个人信息，不会向广告商或其他无关第三方提供用户资料，也不会主动泄露你的工作台、联系人、社区互动和访问数据。只有在提供登录、托管、存储等必要服务，依法配合主管机关，或保护用户与平台合法权益时，才会在最小必要范围内处理或披露，并要求相关服务方承担保密与安全义务。'
   },
   {
     title: '匿名访问统计',
@@ -48,13 +52,14 @@ export default function PrivacyPage() {
       <PageSectionTitle
         eyebrow="Privacy Policy"
         title="隐私政策"
-        subtitle="清楚说明收集什么、为什么使用、保存多久，以及你如何管理自己的信息。更新日期：2026 年 7 月 11 日。"
+        subtitle="所有数据规则集中在这里说明：收集什么、为什么使用、保存多久，以及你如何管理自己的信息。更新日期：2026 年 7 月 11 日。"
       />
 
       <section className="surface-card rounded-[30px] p-6 sm:p-7">
         <div className="rounded-[24px] bg-brand/5 px-5 py-5 text-sm leading-8 text-slate-600">
           <div className="font-semibold text-ink">个人信息处理者</div>
           <p className="mt-2">寻鹿 Seekoffer 运营团队。隐私、数据导出、删除和账号注销申请可发送至 <a href="mailto:seekoffer@qq.com" className="font-semibold text-brand">seekoffer@qq.com</a>，或通过 QQ 群 {QQ_GROUP_NUMBER} 联系我们。</p>
+          <p className="mt-2 font-medium text-brand">我们不会出售用户信息，也不会将个人信息用于与提供本服务无关的商业营销或向无关第三方泄露。</p>
         </div>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-2">

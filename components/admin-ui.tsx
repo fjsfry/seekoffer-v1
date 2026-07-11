@@ -425,14 +425,14 @@ export function AdminMiniBars({
   const max = Math.max(...values, 1);
 
   return (
-    <div className="flex h-64 items-end gap-4 px-6 pb-6 pt-8">
+    <div className="flex h-56 items-end gap-4 px-6 pb-5 pt-6">
       {data.map((item) => {
         const value = Number(item[valueKey]);
         return (
           <div key={`${item.date}-${valueKey}`} className="flex min-w-0 flex-1 flex-col items-center gap-2">
             <div className="text-xs font-medium text-slate-500">{value.toLocaleString()}</div>
-            <div className="flex h-40 w-full max-w-8 items-end rounded-full bg-slate-100">
-              <div className={adminClassNames('w-full rounded-full', color)} style={{ height: `${Math.max((value / max) * 100, 8)}%` }} />
+            <div className="flex h-32 w-full max-w-8 items-end rounded-md bg-slate-100">
+              <div className={adminClassNames('w-full rounded-md', color)} style={{ height: `${Math.max((value / max) * 100, 8)}%` }} />
             </div>
             <div className="text-xs text-slate-400">{item.date}</div>
           </div>

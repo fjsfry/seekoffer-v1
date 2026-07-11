@@ -134,12 +134,12 @@ export default function AdminDashboardPage() {
 
   const maxNotices = Math.max(...trends.map((item) => item.notices), 1);
   const maxOffers = Math.max(...trends.map((item) => item.offers), 1);
-  const maxUserTrend = Math.max(...trends.map((item) => item.users), 1);
   const dataHealthy = !dataError;
   const pendingTotal = overviewMetrics.pendingNotices + overviewMetrics.pendingOffers + overviewMetrics.pendingFeedback;
   const recentRegistrations = trends.reduce((total, item) => total + item.users, 0);
-  const registrationConversion = analytics.metrics.totalVisitors > 0
-    ? Math.min((overviewMetrics.totalUsers / analytics.metrics.totalVisitors) * 100, 100)
+  const totalAudienceUsers = Math.max(analytics.metrics.totalVisitors, overviewMetrics.totalUsers);
+  const registrationConversion = totalAudienceUsers > 0
+    ? Math.min((overviewMetrics.totalUsers / totalAudienceUsers) * 100, 100)
     : 0;
   const todoCards = [
     { href: '/admin/notices', label: '待审核通知', value: overviewMetrics.pendingNotices, hint: '确认后进入通知库', icon: Bell, tone: 'bg-amber-50 text-amber-700' },
@@ -149,35 +149,35 @@ export default function AdminDashboardPage() {
   const secondaryMetrics = [
     {
       href: '/admin/dashboard',
-      label: '实时在线',
-      value: formatNumber(analytics.metrics.onlineVisitors),
-      hint: `最近 ${analytics.metrics.activeWindowMinutes} 分钟`,
+      label: '今日活跃',
+      value: formatNumber(analytics.metrics.todayVisitors),
+      hint: `实时在线 ${formatNumber(analytics.metrics.onlineVisitors)}`,
       icon: Activity,
       tone: 'bg-emerald-50 text-emerald-700'
     },
     {
       href: '/admin/notices',
-      label: '待审核通知',
-      value: formatNumber(overviewMetrics.pendingNotices),
-      hint: `通知总数 ${formatNumber(overviewMetrics.totalNotices)}`,
+      label: '通知内容',
+      value: formatNumber(overviewMetrics.totalNotices),
+      hint: `今日新增 ${formatNumber(overviewMetrics.todayNotices)}`,
       icon: Bell,
-      tone: 'bg-amber-50 text-amber-700'
+      tone: 'bg-blue-50 text-blue-700'
     },
     {
       href: '/admin/offers',
-      label: '待审核 Offer',
-      value: formatNumber(overviewMetrics.pendingOffers),
-      hint: `Offer 总数 ${formatNumber(overviewMetrics.totalOffers)}`,
+      label: 'Offer 内容',
+      value: formatNumber(overviewMetrics.totalOffers),
+      hint: `今日新增 ${formatNumber(overviewMetrics.todayOffers)}`,
       icon: ClipboardList,
       tone: 'bg-violet-50 text-violet-700'
     },
     {
-      href: '/admin/feedback',
-      label: '待处理举报',
-      value: formatNumber(overviewMetrics.pendingFeedback),
-      hint: `反馈总数 ${formatNumber(overviewMetrics.totalFeedback)}`,
+      href: pendingTotal > 0 ? '/admin/notices' : '/admin/settings',
+      label: '待处理事项',
+      value: formatNumber(pendingTotal),
+      hint: pendingTotal > 0 ? '通知、Offer 与反馈' : '当前无积压',
       icon: ShieldAlert,
-      tone: 'bg-rose-50 text-rose-700'
+      tone: pendingTotal > 0 ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'
     }
   ];
   const operationStatusRows = [
@@ -187,9 +187,9 @@ export default function AdminDashboardPage() {
       detail: lastLoadedAt ? `最近更新 ${formatBeijingDateTime(lastLoadedAt)}` : '等待首次同步'
     },
     {
-      label: '内容规模',
+      label: '用户与内容',
       value: `通知 ${formatNumber(overviewMetrics.totalNotices)} / Offer ${formatNumber(overviewMetrics.totalOffers)}`,
-      detail: `累计访客 ${formatNumber(analytics.metrics.totalVisitors)}，注册用户 ${formatNumber(overviewMetrics.totalUsers)}`
+      detail: `累计用户 ${formatNumber(totalAudienceUsers)}，其中注册用户 ${formatNumber(overviewMetrics.totalUsers)}`
     },
     {
       label: '审核积压',
@@ -220,37 +220,39 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <AdminShell title="数据概览" description="把用户增长、内容审核和系统状态放在同一视野里。">
+    <AdminShell title="数据概览" description="聚焦用户增长、内容质量与今日待办，快速判断下一步。">
       <div className="space-y-5">
-        <section className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/90 px-5 py-4 shadow-[0_12px_36px_rgba(15,23,42,0.04)] backdrop-blur lg:flex-row lg:items-center lg:justify-between">
+        <section className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-[0_8px_28px_rgba(15,23,42,0.035)] lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-start gap-3">
-            <span className={adminClassNames('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', dataHealthy ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700')}>
+            <span className={adminClassNames('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', dataHealthy ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700')}>
               <ShieldCheck className="h-5 w-5" />
             </span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="font-semibold text-slate-900">{dataHealthy ? '系统运行正常' : '数据需要关注'}</span>
-                <span className="text-sm text-slate-400">待处理 {formatNumber(pendingTotal)} 项</span>
+                <span className="font-semibold text-slate-950">{dataHealthy ? '今日运营数据已就绪' : '数据需要关注'}</span>
+                <span className={adminClassNames('rounded-md px-2 py-1 text-xs font-semibold', pendingTotal > 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700')}>
+                  {pendingTotal > 0 ? `待处理 ${formatNumber(pendingTotal)} 项` : '暂无积压'}
+                </span>
               </div>
-              <p className={adminClassNames('mt-1 truncate text-sm', dataHealthy ? 'text-slate-500' : 'text-rose-600')} title={message}>{message}</p>
+              <p className={adminClassNames('mt-1 line-clamp-1 text-sm', dataHealthy ? 'text-slate-500' : 'text-rose-600')} title={message}>{message}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="mr-1 text-xs font-medium text-slate-400">
-              更新于 {lastLoadedAt ? formatBeijingDateTime(lastLoadedAt) : '等待刷新'}
+              {lastLoadedAt ? `更新于 ${formatBeijingDateTime(lastLoadedAt)}` : '等待首次同步'}
             </span>
             <button
               type="button"
               onClick={() => void loadDashboard()}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-emerald-50/50 hover:text-teal-700"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-emerald-50/60 hover:text-teal-800"
             >
               <RefreshCw className="h-4 w-4" />
-              刷新数据
+              刷新
             </button>
             <button
               type="button"
               onClick={exportDashboardSnapshot}
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-teal-800 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-900"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-teal-800 px-4 text-sm font-semibold text-white transition hover:bg-teal-900"
             >
               <Download className="h-4 w-4" />
               导出日报
@@ -258,91 +260,86 @@ export default function AdminDashboardPage() {
           </div>
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.04fr)_minmax(420px,1fr)]">
-          <article className="overflow-hidden rounded-[24px] border border-teal-900/20 bg-[#07594f] p-6 text-white shadow-[0_22px_58px_rgba(6,78,67,0.18)] lg:p-7">
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(380px,0.85fr)]">
+          <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.045)] lg:p-7">
+            <div className="absolute inset-y-0 left-0 w-1 bg-teal-700" />
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15">
-                  <UsersRound className="h-6 w-6" />
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-50 text-teal-800 ring-1 ring-teal-100">
+                  <UsersRound className="h-5 w-5" />
                 </span>
                 <div>
-                  <div className="text-sm font-medium text-emerald-100">访问覆盖</div>
-                  <h2 className="mt-0.5 text-lg font-semibold">累计访客</h2>
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-700">用户规模</div>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-950">累计用户</h2>
                 </div>
               </div>
-              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-emerald-50">
+              <span className="rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
                 今日新增 {formatNumber(analytics.metrics.todayVisitors)}
               </span>
             </div>
 
-            <div className="mt-7 text-5xl font-semibold tracking-tight sm:text-6xl">{formatNumber(analytics.metrics.totalVisitors)}</div>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-emerald-100/80">按同意匿名统计的浏览器设备标识去重，用于观察访问覆盖，不等同于注册用户。</p>
+            <div className="mt-6 text-5xl font-semibold text-slate-950 sm:text-6xl">{formatNumber(totalAudienceUsers)}</div>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
+              按独立使用标识统计，包含未注册用户与注册账号；同一浏览器标识只累计一次。
+            </p>
 
-            <dl className="mt-8 grid grid-cols-3 divide-x divide-white/10 border-t border-white/10 pt-5">
+            <dl className="mt-7 grid grid-cols-3 divide-x divide-slate-100 border-t border-slate-100 pt-5">
               <div className="pr-4">
-                <dt className="text-xs text-emerald-100/70">今日新增</dt>
-                <dd className="mt-1 text-xl font-semibold">{formatNumber(analytics.metrics.todayVisitors)}</dd>
+                <dt className="text-xs text-slate-400">今日活跃</dt>
+                <dd className="mt-1 text-xl font-semibold text-slate-900">{formatNumber(analytics.metrics.todayVisitors)}</dd>
               </div>
               <div className="px-4">
-                <dt className="text-xs text-emerald-100/70">今日浏览</dt>
-                <dd className="mt-1 text-xl font-semibold">{formatNumber(analytics.metrics.todayPageViews)}</dd>
+                <dt className="text-xs text-slate-400">今日浏览</dt>
+                <dd className="mt-1 text-xl font-semibold text-slate-900">{formatNumber(analytics.metrics.todayPageViews)}</dd>
               </div>
               <div className="pl-4">
-                <dt className="text-xs text-emerald-100/70">实时在线</dt>
-                <dd className="mt-1 text-xl font-semibold">{formatNumber(analytics.metrics.onlineVisitors)}</dd>
+                <dt className="text-xs text-slate-400">实时在线</dt>
+                <dd className="mt-1 text-xl font-semibold text-slate-900">{formatNumber(analytics.metrics.onlineVisitors)}</dd>
               </div>
             </dl>
           </article>
 
-          <article className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_18px_52px_rgba(15,23,42,0.055)] lg:p-7">
+          <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.045)] lg:p-7">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-                  <UserPlus className="h-6 w-6" />
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                  <UserPlus className="h-5 w-5" />
                 </span>
                 <div>
-                  <div className="text-sm font-medium text-slate-500">账号增长</div>
-                  <h2 className="mt-0.5 text-lg font-semibold text-slate-950">注册用户</h2>
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">账号增长</div>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-950">注册用户</h2>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xs font-medium text-slate-400">访客注册率（参考）</div>
-                <div className="mt-1 text-xl font-semibold text-teal-700">{registrationConversion.toFixed(1)}%</div>
+                <div className="text-xs font-medium text-slate-400">注册转化率</div>
+                <div className="mt-1 text-xl font-semibold text-teal-800">{registrationConversion.toFixed(1)}%</div>
               </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap items-end justify-between gap-4">
+            <div className="mt-6 text-5xl font-semibold text-slate-950 sm:text-6xl">{formatNumber(overviewMetrics.totalUsers)}</div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-blue-500" style={{ width: `${registrationConversion}%` }} />
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-500">注册账号可跨设备同步申请清单、日程和导师联系人。</p>
+
+            <dl className="mt-6 grid grid-cols-3 gap-3 border-t border-slate-100 pt-5">
               <div>
-                <div className="text-5xl font-semibold tracking-tight text-slate-950 sm:text-6xl">{formatNumber(overviewMetrics.totalUsers)}</div>
-                <div className="mt-2 text-sm font-semibold text-emerald-700">今日注册 {formatNumber(overviewMetrics.todayUsers)}</div>
+                <dt className="text-xs text-slate-400">今日注册</dt>
+                <dd className="mt-1 text-lg font-semibold text-slate-900">{formatNumber(overviewMetrics.todayUsers)}</dd>
               </div>
-              <div className="text-right text-xs leading-5 text-slate-400">近 7 日新增<br /><span className="text-base font-semibold text-slate-700">{formatNumber(recentRegistrations)}</span></div>
-            </div>
-
-            <div className="mt-6">
-              <div className="flex items-center justify-between text-xs font-medium text-slate-400">
-                <span>近 7 日注册趋势</span>
-                <span>访问 → 注册</span>
+              <div>
+                <dt className="text-xs text-slate-400">近 7 日新增</dt>
+                <dd className="mt-1 text-lg font-semibold text-slate-900">{formatNumber(recentRegistrations)}</dd>
               </div>
-              <div className="mt-3 flex h-24 items-end gap-2 sm:gap-3">
-                {trends.map((point) => (
-                  <div key={`registration-${point.date}`} className="flex h-full min-w-0 flex-1 flex-col items-center gap-2">
-                    <div className="flex min-h-0 w-full flex-1 items-end justify-center">
-                      <div
-                        className="w-full max-w-10 rounded-t-lg bg-emerald-200 transition hover:bg-emerald-300"
-                        style={{ height: `${Math.max((point.users / maxUserTrend) * 100, point.users > 0 ? 12 : 4)}%` }}
-                        title={`${point.date} 注册 ${point.users}`}
-                      />
-                    </div>
-                    <span className="text-[11px] text-slate-400">{point.date}</span>
-                  </div>
-                ))}
+              <div>
+                <dt className="text-xs text-slate-400">正常账号</dt>
+                <dd className="mt-1 text-lg font-semibold text-slate-900">{formatNumber(overviewMetrics.normalUsers)}</dd>
               </div>
-            </div>
+            </dl>
           </article>
         </section>
 
-        <section className="grid overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_14px_44px_rgba(15,23,42,0.045)] sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_8px_28px_rgba(15,23,42,0.035)] sm:grid-cols-2 xl:grid-cols-4">
           {secondaryMetrics.map((item, index) => {
             const MetricIcon = item.icon;
             return (
@@ -355,12 +352,12 @@ export default function AdminDashboardPage() {
                   index === 2 && 'sm:border-t xl:border-t-0'
                 )}
               >
-                <span className={adminClassNames('flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl', item.tone)}>
+                <span className={adminClassNames('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', item.tone)}>
                   <MetricIcon className="h-5 w-5" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-medium text-slate-400">{item.label}</span>
-                  <span className="mt-0.5 block text-2xl font-semibold tracking-tight text-slate-950">{item.value}</span>
+                  <span className="mt-0.5 block text-2xl font-semibold text-slate-950">{item.value}</span>
                   <span className="mt-0.5 block truncate text-xs text-slate-400">{item.hint}</span>
                 </span>
                 <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-teal-700" />
@@ -369,22 +366,53 @@ export default function AdminDashboardPage() {
           })}
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.8fr)_minmax(320px,0.72fr)]">
+        <section className="grid gap-5 2xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.75fr)]">
           <AdminPanel
-            title="增长概览"
-            description="查看近 7 日注册用户变化，及时判断增长节奏。"
+            title="用户增长"
+            description="近 7 日注册用户变化，用于判断增长节奏与转化表现。"
             action={<span className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500">近 7 日</span>}
           >
             <AdminMiniBars data={trends} valueKey="users" color="bg-teal-700" />
             <div className="grid grid-cols-3 border-t border-slate-100 text-center">
-              <div className="px-3 py-4"><div className="text-xs text-slate-400">累计访客</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(analytics.metrics.totalVisitors)}</div></div>
+              <div className="px-3 py-4"><div className="text-xs text-slate-400">累计用户</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(totalAudienceUsers)}</div></div>
               <div className="border-x border-slate-100 px-3 py-4"><div className="text-xs text-slate-400">注册用户</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(overviewMetrics.totalUsers)}</div></div>
-              <div className="px-3 py-4"><div className="text-xs text-slate-400">近 7 日新增</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(recentRegistrations)}</div></div>
+              <div className="px-3 py-4"><div className="text-xs text-slate-400">注册转化率</div><div className="mt-1 font-semibold text-slate-900">{registrationConversion.toFixed(1)}%</div></div>
             </div>
           </AdminPanel>
 
           <AdminPanel
-            title="运营动态"
+            title="优先处理"
+            description="影响公开内容和用户体验的事项会优先出现在这里。"
+            action={<span className={adminClassNames('rounded-md px-3 py-1 text-xs font-semibold', pendingTotal > 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700')}>{pendingTotal > 0 ? `共 ${formatNumber(pendingTotal)} 项` : '已清空'}</span>}
+          >
+            <div className="divide-y divide-slate-100 px-5">
+              {todoCards.map((item) => {
+                const TodoIcon = item.icon;
+                return (
+                  <Link key={item.label} href={item.href} className="group flex items-center gap-3 py-4">
+                    <span className={adminClassNames('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', item.tone)}>
+                      <TodoIcon className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-slate-800">{item.label}</span>
+                      <span className="mt-1 block truncate text-xs text-slate-400">{item.hint}</span>
+                    </span>
+                    <span className="text-xl font-semibold text-slate-950">{formatNumber(item.value)}</span>
+                    <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-teal-700" />
+                  </Link>
+                );
+              })}
+              <Link href="/admin/notices" className="inline-flex items-center gap-2 py-4 text-sm font-semibold text-teal-700">
+                进入审核工作台 <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </AdminPanel>
+        </section>
+
+        <section className="grid gap-5 xl:grid-cols-2">
+          <AdminPanel
+            title="运营状态"
+            description="把系统健康度和关键规模集中在一处，减少重复信息。"
             action={<Link href="/admin/settings" className="text-sm font-semibold text-teal-700">系统详情 →</Link>}
           >
             <div className="divide-y divide-slate-100 px-5">
@@ -404,81 +432,52 @@ export default function AdminDashboardPage() {
           </AdminPanel>
 
           <AdminPanel
-            title="优先处理"
-            action={<span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">共 {formatNumber(pendingTotal)} 项</span>}
-            className="xl:col-span-2 2xl:col-span-1"
-          >
-            <div className="divide-y divide-slate-100 px-5">
-              {todoCards.map((item) => {
-                const TodoIcon = item.icon;
-                return (
-                  <Link key={item.label} href={item.href} className="group flex items-center gap-3 py-4">
-                    <span className={adminClassNames('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', item.tone)}>
-                      <TodoIcon className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-slate-800">{item.label}</span>
-                      <span className="mt-1 block truncate text-xs text-slate-400">{item.hint}</span>
-                    </span>
-                    <span className="text-xl font-semibold text-slate-950">{formatNumber(item.value)}</span>
-                    <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-teal-700" />
-                  </Link>
-                );
-              })}
-              <Link href="/admin/notices" className="inline-flex items-center gap-2 py-4 text-sm font-semibold text-teal-700">
-                进入审核工作台 <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-          </AdminPanel>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-          <VisitorPanel
-            title="实时在线访客"
-            description={`最近 ${analytics.metrics.activeWindowMinutes} 分钟内仍在浏览的前台访客`}
-            rows={analytics.onlineVisitors}
-            empty="当前暂无在线访客。"
-          />
-          <VisitorPanel
-            title="最近访问"
-            description="按最后活跃时间排序，帮助你判断站点访问节奏"
-            rows={analytics.recentVisitors}
-            empty="暂无访客记录。"
-          />
-        </section>
-
-        <section>
-          <AdminPanel
-            title="近7天内容提交趋势"
+            title="内容增长"
+            description="近 7 日通知与 Offer 内容新增情况。"
             action={<span className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500">近 7 日</span>}
           >
-            <div className="grid h-64 grid-cols-7 items-end gap-4 px-6 pb-6 pt-8">
+            <div className="grid h-52 grid-cols-7 items-end gap-3 px-6 pb-5 pt-6">
               {trends.map((point) => (
-                <div key={point.date} className="flex flex-col items-center gap-2">
-                  <div className="flex h-40 items-end gap-2">
+                <div key={point.date} className="flex min-w-0 flex-col items-center gap-2">
+                  <div className="flex h-28 items-end gap-1.5">
                     <div
-                      className="w-4 rounded-t bg-blue-500"
+                      className="w-3 rounded-t-sm bg-blue-500"
                       style={{ height: `${Math.max((point.notices / maxNotices) * 100, 8)}%` }}
                       title={`通知 ${point.notices}`}
                     />
                     <div
-                      className="w-4 rounded-t bg-emerald-500"
+                      className="w-3 rounded-t-sm bg-emerald-500"
                       style={{ height: `${Math.max((point.offers / maxOffers) * 100, 8)}%` }}
                       title={`Offer ${point.offers}`}
                     />
                   </div>
-                  <span className="text-xs text-slate-400">{point.date}</span>
+                  <span className="text-[11px] text-slate-400">{point.date}</span>
                 </div>
               ))}
             </div>
             <div className="flex items-center justify-center gap-6 border-t border-slate-100 py-3 text-xs text-slate-500">
-              <span className="inline-flex items-center gap-2"><i className="h-3 w-3 rounded-sm bg-blue-500" /> 通知新增数</span>
-              <span className="inline-flex items-center gap-2"><i className="h-3 w-3 rounded-sm bg-emerald-500" /> Offer提交数</span>
+              <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-sm bg-blue-500" /> 通知新增</span>
+              <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Offer 新增</span>
             </div>
           </AdminPanel>
         </section>
 
-        <section className="grid gap-6 2xl:grid-cols-3">
+        <section className="grid gap-5 xl:grid-cols-2">
+          <VisitorPanel
+            title="实时在线用户"
+            description={`最近 ${analytics.metrics.activeWindowMinutes} 分钟内仍在使用前台的用户`}
+            rows={analytics.onlineVisitors}
+            empty="当前暂无在线用户。"
+          />
+          <VisitorPanel
+            title="最近活跃用户"
+            description="按最后活跃时间排序，帮助判断产品使用节奏"
+            rows={analytics.recentVisitors}
+            empty="暂无用户活跃记录。"
+          />
+        </section>
+
+        <section className="grid gap-5 2xl:grid-cols-3">
           <DashboardTable
             title="待审核通知"
             href="/admin/notices"
@@ -494,7 +493,7 @@ export default function AdminDashboardPage() {
           />
 
           <DashboardTable
-            title="待审核Offer"
+            title="待审核 Offer"
             href="/admin/offers"
             columns={['学校', '专业', '结果', '提交时间', '状态']}
             rows={pendingOffers.map((item) => [
@@ -508,7 +507,7 @@ export default function AdminDashboardPage() {
           />
 
           <DashboardTable
-            title="最新反馈 / 举报"
+            title="最新反馈与举报"
             href="/admin/feedback"
             columns={['类型', '内容', '提交时间', '状态']}
             rows={latestFeedback.map((item) => [
@@ -520,7 +519,6 @@ export default function AdminDashboardPage() {
             total={overviewMetrics.totalFeedback}
           />
         </section>
-
       </div>
     </AdminShell>
   );
@@ -736,12 +734,12 @@ function VisitorPanel({
         <table className="w-full min-w-[680px] text-left text-sm">
           <thead className="bg-slate-50 text-xs font-semibold text-slate-500">
             <tr>
-              <th className="px-4 py-3">访客</th>
+              <th className="px-4 py-3">用户标识</th>
               <th className="px-4 py-3">当前位置</th>
               <th className="px-4 py-3">最后活跃</th>
               <th className="px-4 py-3">访问次数</th>
               <th className="px-4 py-3">页面浏览</th>
-              <th className="px-4 py-3">地区线索</th>
+              <th className="px-4 py-3">语言 / 时区</th>
             </tr>
           </thead>
           <tbody>
