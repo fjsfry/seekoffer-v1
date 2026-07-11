@@ -473,7 +473,7 @@ export function AdminShell({
           </div>
 
           <div className="flex shrink-0 items-center gap-2 lg:gap-4">
-            <label className="relative hidden md:block">
+            <label className="relative hidden xl:block">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 value={globalSearch}

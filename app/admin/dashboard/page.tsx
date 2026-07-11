@@ -222,7 +222,7 @@ export default function AdminDashboardPage() {
   return (
     <AdminShell title="数据概览" description="聚焦用户增长、内容质量与今日待办，快速判断下一步。">
       <div className="space-y-5">
-        <section className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-[0_8px_28px_rgba(15,23,42,0.035)] lg:flex-row lg:items-center lg:justify-between">
+        <section className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-[0_8px_28px_rgba(15,23,42,0.035)] xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 items-start gap-3">
             <span className={adminClassNames('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', dataHealthy ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700')}>
               <ShieldCheck className="h-5 w-5" />
@@ -237,7 +237,7 @@ export default function AdminDashboardPage() {
               <p className={adminClassNames('mt-1 line-clamp-1 text-sm', dataHealthy ? 'text-slate-500' : 'text-rose-600')} title={message}>{message}</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <span className="mr-1 text-xs font-medium text-slate-400">
               {lastLoadedAt ? `更新于 ${formatBeijingDateTime(lastLoadedAt)}` : '等待首次同步'}
             </span>
