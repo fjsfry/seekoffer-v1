@@ -47,6 +47,12 @@ export type AdminOfferRow = {
   id: string;
   user: string;
   avatar: string;
+  contentType: 'offer' | 'discussion';
+  title: string;
+  category: string;
+  content: string;
+  official: boolean;
+  sourceLabel: string;
   school: string;
   major: string;
   projectType: string;
@@ -56,6 +62,8 @@ export type AdminOfferRow = {
   submittedAt: string;
   status: '待审核' | '已通过' | '已驳回' | '已隐藏' | '已删除';
   reports: number;
+  comments: number;
+  follows: number;
 };
 
 export type AdminUserRow = {
@@ -118,6 +126,12 @@ export const adminOfferRows: AdminOfferRow[] = offerFeedItems.map((item, index) 
   id: item.id,
   user: item.author || `用户_${10230 + index}`,
   avatar: item.avatar || String.fromCharCode(65 + index),
+  contentType: 'offer',
+  title: '',
+  category: '',
+  content: item.message || '',
+  official: false,
+  sourceLabel: '',
   school: item.school || item.goTo.split('·')[0] || '待补充学校',
   major: item.major || item.field || '待补充专业',
   projectType: index % 3 === 0 ? '夏令营' : index % 3 === 1 ? '预推免' : '九推',
@@ -126,7 +140,9 @@ export const adminOfferRows: AdminOfferRow[] = offerFeedItems.map((item, index) 
   anonymous: !item.verified,
   submittedAt: `2026-04-${String(27 - index).padStart(2, '0')} ${String(10 + index).padStart(2, '0')}:21`,
   status: index === 0 ? '待审核' : index === 1 ? '已通过' : index === 2 ? '已隐藏' : '已通过',
-  reports: index === 0 ? 2 : index === 2 ? 1 : 0
+  reports: index === 0 ? 2 : index === 2 ? 1 : 0,
+  comments: 0,
+  follows: 0
 }));
 
 export const adminUsers: AdminUserRow[] = [

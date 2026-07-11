@@ -64,7 +64,9 @@ const REQUIREMENT_DEPARTMENT_PATTERN =
   /^\s*[\u3010\[]([^\u3011\]]{2,48})[\u3011\]]\s*[\u2014\u2013\u2212\-\uFF0D]{1,2}\s*([^\s,\.;\|\uFF0C\u3002\uFF1B\uFF5C]{2,48})/;
 
 const TITLE_DEPARTMENT_PATTERN =
-  /[\u4e00-\u9fffA-Za-z0-9（）()·\-]{2,48}(?:\u5b66\u9662|\u7814\u7a76\u9662|\u7814\u7a76\u6240|\u4e2d\u5fc3|\u5b9e\u9a8c\u5ba4|\u4e66\u9662|\u7cfb)/g;
+  /[\u4e00-\u9fffA-Za-z0-9（）()·\-]{2,48}(?:\u5b66\u9662|\u7814\u7a76\u9662|\u7814\u7a76\u6240|\u4e2d\u5fc3|\u5b9e\u9a8c\u5ba4|\u4e66\u9662|\u533b\u9662|\u57fa\u5730|\u5e73\u53f0|\u67a2\u7ebd|\u7cfb)/g;
+
+const SCHOOL_WIDE_NOTICE_PATTERN = /全校(?:通知|项目)?|校级(?:通知|项目)?|学校统一通知/;
 
 function normalizeDepartmentCandidate(value: string | undefined | null, schoolName: string) {
   const text = compactText(String(value || ''))
@@ -107,6 +109,11 @@ function extractDepartmentFromTitle(projectName: string | undefined | null, scho
   );
 }
 
+function extractSchoolWideScope(projectName: string | undefined | null) {
+  const title = compactText(String(projectName || ''));
+  return SCHOOL_WIDE_NOTICE_PATTERN.test(title) ? '全校通知' : '';
+}
+
 export function getDisplayNoticeDepartment(project: NoticeDepartmentFields) {
   const schoolName = getDisplaySchoolName(project.schoolName);
   const storedDepartment = getDisplayDepartmentName(project.departmentName);
@@ -121,6 +128,11 @@ export function getDisplayNoticeDepartment(project: NoticeDepartmentFields) {
   const titleDepartment = extractDepartmentFromTitle(project.projectName, schoolName);
   if (titleDepartment && (isWeakNoticeValue(storedRaw) || !referenceText.includes(storedRaw))) {
     return titleDepartment;
+  }
+
+  const schoolWideScope = extractSchoolWideScope(project.projectName);
+  if (schoolWideScope && isWeakNoticeValue(storedRaw)) {
+    return schoolWideScope;
   }
 
   return storedDepartment;

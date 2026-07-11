@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2.110.2';
 
 type AdminUser = {
   email: string;
@@ -506,15 +506,17 @@ async function updateNoticeStatus(service: SupabaseService, admin: AdminUser, re
 }
 
 async function getOfferMetrics(service: SupabaseService) {
-  const [pending, approved, hidden, rejected, deleted] = await Promise.all([
+  const [pending, approved, hidden, rejected, deleted, offerPosts, discussions] = await Promise.all([
     countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('review_status', 'pending')),
     countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('review_status', 'approved')),
     countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('review_status', 'hidden')),
     countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('review_status', 'rejected')),
-    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).not('deleted_at', 'is', null))
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).not('deleted_at', 'is', null)),
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('content_type', 'offer')),
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('content_type', 'discussion'))
   ]);
 
-  return { pending, approved, hidden, rejected, deleted };
+  return { pending, approved, hidden, rejected, deleted, offerPosts, discussions };
 }
 
 async function listOffers(service: SupabaseService, body: Record<string, unknown>) {
@@ -526,7 +528,7 @@ async function listOffers(service: SupabaseService, body: Record<string, unknown
 
   let query = service
     .from('offer_posts')
-    .select('id,author_name,school_name,major,project_type,result,undergraduate_background,is_anonymous,review_status,reports_count,created_at', { count: 'exact' });
+    .select('id,author_name,school_name,major,project_type,result,undergraduate_background,content,is_anonymous,review_status,reports_count,created_at,content_type,title,category,is_official,source_label,comments_count,follows_count', { count: 'exact' });
 
   const status = normalizeFilter(filters.status);
   if (status === 'deleted') {
@@ -540,7 +542,17 @@ async function listOffers(service: SupabaseService, body: Record<string, unknown
 
   if (normalizeFilter(filters.query)) {
     const pattern = likePattern(filters.query);
-    query = query.or(`author_name.ilike.${pattern},school_name.ilike.${pattern},major.ilike.${pattern},result.ilike.${pattern}`);
+    query = query.or(`author_name.ilike.${pattern},school_name.ilike.${pattern},major.ilike.${pattern},result.ilike.${pattern},title.ilike.${pattern},content.ilike.${pattern},category.ilike.${pattern}`);
+  }
+
+  const contentType = normalizeFilter(filters.contentType);
+  if (contentType === 'offer' || contentType === 'discussion') {
+    query = query.eq('content_type', contentType);
+  }
+
+  const category = normalizeFilter(filters.category);
+  if (category && category !== 'all') {
+    query = query.eq('category', category);
   }
 
   if (normalizeFilter(filters.school)) {

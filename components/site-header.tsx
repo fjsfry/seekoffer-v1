@@ -1,8 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, Building2, Heart, House, Newspaper, Search, Trophy } from 'lucide-react';
+import { BookOpen, Building2, Heart, House, Menu, Newspaper, Search, Trophy, X } from 'lucide-react';
 import { SeekofferLogo } from './seekoffer-logo';
 import { UserSessionEntry } from './user-session-entry';
 
@@ -17,6 +18,11 @@ const navItems = [
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   return (
     <header className="sticky top-0 z-40 -mx-4 border-b border-slate-200/70 bg-white/90 px-4 py-2.5 shadow-[0_10px_30px_rgba(18,32,38,0.04)] backdrop-blur-2xl sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
@@ -26,7 +32,7 @@ export function SiteHeader() {
             <SeekofferLogo />
           </div>
 
-          <div className="flex items-center gap-3 justify-self-end md:col-start-3 md:row-start-1">
+          <div className="hidden items-center gap-3 justify-self-end md:col-start-3 md:row-start-1 md:flex">
             <Link
               href="/notices"
               aria-label="搜索通知"
@@ -37,7 +43,18 @@ export function SiteHeader() {
             <UserSessionEntry />
           </div>
 
-          <div className="col-span-2 min-w-0 md:col-span-1 md:col-start-2 md:row-start-1">
+          <button
+            type="button"
+            onClick={() => setMobileOpen((current) => !current)}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm md:hidden"
+            aria-label={mobileOpen ? '关闭导航菜单' : '打开导航菜单'}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-site-navigation"
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+
+          <div className="hidden min-w-0 md:col-span-1 md:col-start-2 md:row-start-1 md:block">
             <div className="md:mx-auto md:max-w-[780px]">
               <nav className="no-scrollbar flex w-full items-center gap-1.5 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [touch-action:pan-x] [-webkit-overflow-scrolling:touch] md:justify-center">
                 {navItems.map((item) => {
@@ -69,6 +86,34 @@ export function SiteHeader() {
             </div>
           </div>
         </div>
+
+        {mobileOpen ? (
+          <div id="mobile-site-navigation" className="mt-3 border-t border-slate-100 pt-3 md:hidden">
+            <nav className="grid grid-cols-2 gap-2" aria-label="移动端主导航">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const active = item.href === '/' ? pathname === '/' : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={active ? 'page' : undefined}
+                    className={`flex min-h-11 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold ${active ? 'bg-brand/10 text-brand' : 'bg-slate-50 text-slate-600'}`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+            <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3">
+              <Link href="/notices" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600" aria-label="搜索通知">
+                <Search className="h-5 w-5" />
+              </Link>
+              <div className="min-w-0 flex-1 overflow-x-auto"><UserSessionEntry /></div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </header>
   );

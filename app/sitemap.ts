@@ -36,7 +36,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   const staticEntries = staticRoutes.map((route) => ({
     url: absoluteUrl(route),
-    lastModified: now,
     changeFrequency: route === '/' || route === '/notices' ? ('daily' as const) : ('weekly' as const),
     priority: route === '/' ? 1 : route === '/notices' ? 0.95 : 0.75
   }));

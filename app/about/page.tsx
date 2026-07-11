@@ -46,7 +46,7 @@ export default function AboutPage() {
       <PageSectionTitle
         eyebrow="About Seekoffer"
         title="关于寻鹿"
-        subtitle="寻鹿 Seekoffer 是面向保研申请全流程的信息整理与申请管理平台。我们希望把分散通知、截止节点、材料准备和交流反馈，整理成更清晰的申请路径。"
+        subtitle="寻鹿 Seekoffer 是面向保研申请全流程的信息整理与申请管理平台。我们希望把分散通知、截止节点、材料准备和交流反馈，整理成更清晰的申请路径。页面更新于 2026 年 7 月 11 日。"
       />
 
       <section className="page-hero min-h-0 px-6 py-8 md:px-8 lg:px-10">
@@ -80,6 +80,22 @@ export default function AboutPage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="surface-card rounded-[34px] p-7">
+        <h2 className="text-2xl font-semibold text-ink">运营与内容责任</h2>
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          {[
+            ['运营主体', '寻鹿 Seekoffer 运营团队负责产品维护、通知整理、社区审核与用户支持。'],
+            ['纠错响应', '收到有效的通知错误、失效链接或社区举报后，原则上在 2 个工作日内完成初步核查。'],
+            ['内容边界', '通知以院校正式页面和报名系统为最终依据；寻鹿整理结果用于检索、比较和申请管理。']
+          ].map(([title, body]) => (
+            <div key={title} className="rounded-[24px] border border-slate-100 bg-slate-50/80 px-5 py-5">
+              <div className="font-semibold text-ink">{title}</div>
+              <p className="mt-3 text-sm leading-7 text-slate-600">{body}</p>
+            </div>
+          ))}
         </div>
       </section>
 

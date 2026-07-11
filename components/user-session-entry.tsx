@@ -102,17 +102,19 @@ export function UserSessionEntry() {
         </button>
       ) : null}
 
-      <button
-        onClick={handleSignOut}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-200 md:h-11 md:w-11"
-        aria-label="退出登录"
-      >
-        {pendingAction === 'logout' ? (
-          <LoaderCircle className="h-4 w-4 animate-spin" />
-        ) : (
-          <LogOut className="h-4 w-4" />
-        )}
-      </button>
+      {session.authProvider !== 'anonymous' ? (
+        <button
+          onClick={handleSignOut}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-200 md:h-11 md:w-11"
+          aria-label="退出登录"
+        >
+          {pendingAction === 'logout' ? (
+            <LoaderCircle className="h-4 w-4 animate-spin" />
+          ) : (
+            <LogOut className="h-4 w-4" />
+          )}
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -189,7 +189,7 @@ export default function AdminDashboardPage() {
     {
       label: '内容规模',
       value: `通知 ${formatNumber(overviewMetrics.totalNotices)} / Offer ${formatNumber(overviewMetrics.totalOffers)}`,
-      detail: `累计用户 ${formatNumber(analytics.metrics.totalVisitors)}，注册用户 ${formatNumber(overviewMetrics.totalUsers)}`
+      detail: `累计访客 ${formatNumber(analytics.metrics.totalVisitors)}，注册用户 ${formatNumber(overviewMetrics.totalUsers)}`
     },
     {
       label: '审核积压',
@@ -266,8 +266,8 @@ export default function AdminDashboardPage() {
                   <UsersRound className="h-6 w-6" />
                 </span>
                 <div>
-                  <div className="text-sm font-medium text-emerald-100">用户覆盖</div>
-                  <h2 className="mt-0.5 text-lg font-semibold">累计用户</h2>
+                  <div className="text-sm font-medium text-emerald-100">访问覆盖</div>
+                  <h2 className="mt-0.5 text-lg font-semibold">累计访客</h2>
                 </div>
               </div>
               <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-emerald-50">
@@ -276,7 +276,7 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="mt-7 text-5xl font-semibold tracking-tight sm:text-6xl">{formatNumber(analytics.metrics.totalVisitors)}</div>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-emerald-100/80">持续积累的独立访问用户，反映平台当前的真实覆盖规模。</p>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-emerald-100/80">按同意匿名统计的浏览器设备标识去重，用于观察访问覆盖，不等同于注册用户。</p>
 
             <dl className="mt-8 grid grid-cols-3 divide-x divide-white/10 border-t border-white/10 pt-5">
               <div className="pr-4">
@@ -306,7 +306,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xs font-medium text-slate-400">注册转化率</div>
+                <div className="text-xs font-medium text-slate-400">访客注册率（参考）</div>
                 <div className="mt-1 text-xl font-semibold text-teal-700">{registrationConversion.toFixed(1)}%</div>
               </div>
             </div>
@@ -377,7 +377,7 @@ export default function AdminDashboardPage() {
           >
             <AdminMiniBars data={trends} valueKey="users" color="bg-teal-700" />
             <div className="grid grid-cols-3 border-t border-slate-100 text-center">
-              <div className="px-3 py-4"><div className="text-xs text-slate-400">累计用户</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(analytics.metrics.totalVisitors)}</div></div>
+              <div className="px-3 py-4"><div className="text-xs text-slate-400">累计访客</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(analytics.metrics.totalVisitors)}</div></div>
               <div className="border-x border-slate-100 px-3 py-4"><div className="text-xs text-slate-400">注册用户</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(overviewMetrics.totalUsers)}</div></div>
               <div className="px-3 py-4"><div className="text-xs text-slate-400">近 7 日新增</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(recentRegistrations)}</div></div>
             </div>
@@ -648,6 +648,14 @@ type OfferApiRow = {
   review_status: string;
   reports_count: number;
   created_at: string;
+  content?: string;
+  content_type?: string;
+  title?: string;
+  category?: string;
+  is_official?: boolean;
+  source_label?: string;
+  comments_count?: number;
+  follows_count?: number;
 };
 
 function mapOfferApiRow(row: OfferApiRow): AdminOfferRow {
@@ -655,6 +663,12 @@ function mapOfferApiRow(row: OfferApiRow): AdminOfferRow {
     id: row.id,
     user: row.author_name || '匿名用户',
     avatar: (row.author_name || '匿').slice(0, 1),
+    contentType: row.content_type === 'discussion' ? 'discussion' : 'offer',
+    title: row.title || '',
+    category: row.category || '',
+    content: row.content || '',
+    official: Boolean(row.is_official),
+    sourceLabel: row.source_label || '',
     school: row.school_name || '待补充学校',
     major: row.major || '待补充专业',
     projectType: row.project_type || '其他',
@@ -663,7 +677,9 @@ function mapOfferApiRow(row: OfferApiRow): AdminOfferRow {
     anonymous: row.is_anonymous,
     submittedAt: formatBeijingDateTime(row.created_at),
     status: mapOfferStatus(row.review_status),
-    reports: row.reports_count || 0
+    reports: row.reports_count || 0,
+    comments: row.comments_count || 0,
+    follows: row.follows_count || 0
   };
 }
 

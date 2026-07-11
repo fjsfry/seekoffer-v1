@@ -68,6 +68,7 @@ jobs:
       SUPABASE_INGEST_SECRET: ${{ secrets.SEEKOFFER_INGEST_SECRET || secrets.SUPABASE_INGEST_SECRET }}
       SUPABASE_INGEST_SOURCE: github-actions-sync
       DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
+      VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
 
     steps:
       - name: Checkout repository
@@ -80,3 +81,15 @@ jobs:
 
       - name: Sync notices
         run: npm run sync:notices:github
+
+      - name: Rebuild searchable notice pages
+        if: ${{ env.DRY_RUN != 'true' }}
+        shell: bash
+        run: |
+          if [ -z "$VERCEL_DEPLOY_HOOK_URL" ]; then
+            echo "VERCEL_DEPLOY_HOOK_URL is not configured; database sync is complete, static pages refresh on the next deployment."
+            exit 0
+          fi
+
+          curl --fail --silent --show-error --request POST "$VERCEL_DEPLOY_HOOK_URL"
+          echo "Triggered Vercel rebuild for notice detail pages and sitemap."

@@ -323,6 +323,17 @@ function readStoredRecords() {
 function mergeByKey<T>(remoteItems: T[], localItems: T[], getKey: (item: T) => string) {
   const merged = new Map<string, T>();
 
+  const getUpdatedTimestamp = (item: T) => {
+    if (!item || typeof item !== 'object') {
+      return 0;
+    }
+
+    const record = item as Record<string, unknown>;
+    const value = record.updatedAt || record.updated_at_ts || record.updated_at || record.createdAt || record.created_at;
+    const timestamp = typeof value === 'string' ? Date.parse(value) : Number.NaN;
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  };
+
   for (const item of remoteItems) {
     const key = getKey(item);
     if (key) {
@@ -330,11 +341,12 @@ function mergeByKey<T>(remoteItems: T[], localItems: T[], getKey: (item: T) => s
     }
   }
 
-  // Local items intentionally win because users may have just added or edited
-  // a record before the remote sync completed.
+  // Prefer the newest version. If both versions do not carry a timestamp,
+  // the cloud record remains canonical for a signed-in workspace.
   for (const item of localItems) {
     const key = getKey(item);
-    if (key) {
+    const remote = key ? merged.get(key) : undefined;
+    if (key && (!remote || getUpdatedTimestamp(item) > getUpdatedTimestamp(remote))) {
       merged.set(key, item);
     }
   }

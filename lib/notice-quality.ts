@@ -1,4 +1,5 @@
 import type { PublicNoticeProject } from './mock-data';
+import { getDisplayNoticeDepartment } from './notice-display';
 
 export type NoticeQualityTier = 'clean' | 'p0' | 'p1' | 'p2';
 
@@ -111,8 +112,19 @@ function hasBrokenPublicIdentity(project: PublicNoticeProject) {
   );
 }
 
+function hasBrokenDepartmentIdentity(project: PublicNoticeProject) {
+  const departmentName = compactText(getDisplayNoticeDepartment(project));
+  return !departmentName || departmentName === '学院信息待补充' || /待识别|待补充/.test(departmentName);
+}
+
 export function getNoticeQualityTier(project: PublicNoticeProject): NoticeQualityTier {
-  if (hasDirtyText(project) || hasBodyLikeTitle(project) || hasBrokenPublicIdentity(project) || !hasValidDeadline(project)) {
+  if (
+    hasDirtyText(project) ||
+    hasBodyLikeTitle(project) ||
+    hasBrokenPublicIdentity(project) ||
+    hasBrokenDepartmentIdentity(project) ||
+    !hasValidDeadline(project)
+  ) {
     return 'p0';
   }
 
@@ -120,7 +132,7 @@ export function getNoticeQualityTier(project: PublicNoticeProject): NoticeQualit
     return 'p1';
   }
 
-  if (!compactText(project.schoolName) || !compactText(project.departmentName) || !compactText(project.sourceLink)) {
+  if (!compactText(project.schoolName) || !compactText(project.sourceLink)) {
     return 'p2';
   }
 
@@ -128,7 +140,7 @@ export function getNoticeQualityTier(project: PublicNoticeProject): NoticeQualit
 }
 
 export function shouldShowInMainNoticeFlow(project: PublicNoticeProject) {
-  return getNoticeQualityTier(project) !== 'p0' && getNoticeQualityTier(project) !== 'p1';
+  return getNoticeQualityTier(project) === 'clean';
 }
 
 export function filterMainNoticeProjects(projects: PublicNoticeProject[]) {

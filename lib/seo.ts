@@ -39,3 +39,43 @@ export function buildOrganizationJsonLd() {
     sameAs: [SITE_URL]
   };
 }
+
+export function buildPageMetadata({
+  title,
+  description,
+  path,
+  index = true
+}: {
+  title: string;
+  description: string;
+  path: string;
+  index?: boolean;
+}): Metadata {
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: path
+    },
+    robots: {
+      index,
+      follow: true
+    },
+    openGraph: {
+      title,
+      description,
+      url: path,
+      siteName: SITE_NAME,
+      images: ['/logo.png'],
+      locale: 'zh_CN',
+      type: 'website'
+    },
+    twitter: {
+      card: 'summary',
+      title,
+      description,
+      images: ['/logo.png']
+    }
+  };
+}
+import type { Metadata } from 'next';

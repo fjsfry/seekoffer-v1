@@ -32,7 +32,7 @@ import { adminClassNames } from './admin-ui';
 const adminNavItems = [
   { href: '/admin/dashboard', label: '数据概览', icon: LayoutDashboard },
   { href: '/admin/notices', label: '通知管理', icon: Bell },
-  { href: '/admin/offers', label: 'Offer池管理', icon: ClipboardList },
+  { href: '/admin/offers', label: 'Offer圈管理', icon: ClipboardList },
   { href: '/admin/users', label: '用户管理', icon: UsersRound },
   { href: '/admin/feedback', label: '反馈举报', icon: Flag },
   { href: '/admin/logs', label: '操作日志', icon: ShieldCheck },

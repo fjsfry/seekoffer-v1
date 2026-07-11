@@ -52,7 +52,8 @@ import { matchesSchoolRange } from '@/lib/notice-source';
 import {
   hydrateWorkbenchState,
   saveWorkbenchState,
-  type WorkbenchCustomTodo
+  type WorkbenchCustomTodo,
+  type WorkbenchMentorContact
 } from '@/lib/workbench-state';
 import {
   materialChecklistDefinitions,
@@ -85,6 +86,7 @@ type WorkbenchApplicationStatusFilter = '全部' | '未申请' | '已申请';
 type WorkbenchResultFilter = '全部' | '未出结果' | '未入营' | '已入营' | '已优营';
 type WorkbenchSortOption = 'deadline' | 'school' | 'status';
 type WorkbenchSection = 'applications' | 'schedule' | 'contacts';
+type WorkbenchArchiveFilter = 'active' | 'archived';
 type ScheduleTypeFilter = '全部' | '申请截止' | '材料准备' | '套磁' | '笔试' | '面试' | '其他';
 type ScheduleDoneFilter = '全部' | '未完成' | '已完成';
 type ContactRangeFilter = '全部' | 'C9' | '985' | '211' | '双一流' | '普通高校' | '科研院所' | '其它';
@@ -103,22 +105,10 @@ type ScheduleItem = {
   href?: string;
 };
 
-type MentorContact = {
-  id: string;
-  schoolName: string;
-  departmentName: string;
-  mentorName: string;
-  mentorTitle: string;
+type MentorContact = Omit<WorkbenchMentorContact, 'schoolRange' | 'deliveryStatus' | 'feedbackStatus'> & {
   schoolRange: Exclude<ContactRangeFilter, '全部'>;
-  email: string;
-  researchDirection: string;
-  homepage: string;
   deliveryStatus: ContactDeliveryStatus;
   feedbackStatus: ContactFeedbackStatus;
-  lastContactDate: string;
-  contactNotes: string;
-  notes: string;
-  updatedAt: string;
 };
 
 const workbenchTypeFilters: WorkbenchTypeFilter[] = ['全部', '夏令营', '预推免', '正式推免'];
@@ -177,7 +167,8 @@ function readCustomTodos() {
             ...(item.date ? { date: String(item.date) } : {}),
             ...(item.type ? { type: String(item.type) } : {}),
             ...(item.note ? { note: String(item.note) } : {}),
-            ...(item.createdAt ? { createdAt: String(item.createdAt) } : {})
+            ...(item.createdAt ? { createdAt: String(item.createdAt) } : {}),
+            ...(item.updatedAt ? { updatedAt: String(item.updatedAt) } : {})
           }))
       : [];
   } catch {
@@ -205,7 +196,7 @@ function createEmptyContact(): MentorContact {
   };
 }
 
-function normalizeContact(raw: Partial<MentorContact>): MentorContact {
+function normalizeContact(raw: Partial<WorkbenchMentorContact>): MentorContact {
   const rawSchoolRange = String(raw.schoolRange || '');
   const nextSchoolRange =
     rawSchoolRange && rawSchoolRange !== '全部' && contactRangeFilters.includes(rawSchoolRange as ContactRangeFilter)
@@ -506,6 +497,8 @@ export default function MePage() {
   const [customTodos, setCustomTodos] = useState<WorkbenchCustomTodo[]>(() => readCustomTodos());
   const [todoSyncOwnerId, setTodoSyncOwnerId] = useState('');
   const [todoSyncReady, setTodoSyncReady] = useState(false);
+  const [workbenchSyncStatus, setWorkbenchSyncStatus] = useState<'local' | 'syncing' | 'synced' | 'error'>('local');
+  const [rowsLoading, setRowsLoading] = useState(true);
   const [deletingProjectId, setDeletingProjectId] = useState('');
   const [activeSection, setActiveSection] = useState<WorkbenchSection>('applications');
   const [applicationTypeFilter, setApplicationTypeFilter] = useState<WorkbenchTypeFilter>('全部');
@@ -515,6 +508,7 @@ export default function MePage() {
   const [resultFilter, setResultFilter] = useState<WorkbenchResultFilter>('全部');
   const [applicationKeyword, setApplicationKeyword] = useState('');
   const [applicationSort, setApplicationSort] = useState<WorkbenchSortOption>('deadline');
+  const [applicationArchiveFilter, setApplicationArchiveFilter] = useState<WorkbenchArchiveFilter>('active');
   const [openChecklistId, setOpenChecklistId] = useState('');
   const [scheduleTypeFilter, setScheduleTypeFilter] = useState<ScheduleTypeFilter>('全部');
   const [scheduleDoneFilter, setScheduleDoneFilter] = useState<ScheduleDoneFilter>('全部');
@@ -535,6 +529,14 @@ export default function MePage() {
   const syncableUserId =
     session?.loggedIn && session.authProvider !== 'anonymous' && session.userId ? session.userId : '';
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const view = new URLSearchParams(window.location.search).get('view');
+    if (view === 'schedule' || view === 'contacts' || view === 'applications') {
+      setActiveSection(view);
+    }
+  }, []);
+
   function setSaveMessage(value: string) {
     setSaveMessageState({
       ownerId: profileOwnerId,
@@ -550,9 +552,16 @@ export default function MePage() {
     let active = true;
 
     const load = async () => {
-      const merged = await fetchApplicationRows();
-      if (active) {
-        setRows(merged);
+      setRowsLoading(true);
+      try {
+        const merged = await fetchApplicationRows();
+        if (active) {
+          setRows(merged);
+        }
+      } finally {
+        if (active) {
+          setRowsLoading(false);
+        }
       }
     };
 
@@ -567,16 +576,21 @@ export default function MePage() {
 
   useEffect(() => {
     if (!syncableUserId) {
+      setTodoSyncOwnerId('');
+      setTodoSyncReady(false);
+      setWorkbenchSyncStatus('local');
       return () => undefined;
     }
 
     let active = true;
 
     const hydrateRemoteTodos = async () => {
+      setWorkbenchSyncStatus('syncing');
       try {
         const mergedState = await hydrateWorkbenchState(syncableUserId, {
           completedTodoIds: readBrowserArray(TODO_COMPLETED_STORAGE_KEY),
-          customTodos: readCustomTodos()
+          customTodos: readCustomTodos(),
+          contacts: readStoredContacts()
         });
 
         if (!active) {
@@ -585,8 +599,11 @@ export default function MePage() {
 
         setCompletedTodoIds(mergedState.completedTodoIds);
         setCustomTodos(mergedState.customTodos);
+        setContacts(mergedState.contacts.map((contact) => normalizeContact(contact)));
+        setWorkbenchSyncStatus('synced');
       } catch (error) {
         console.error('[Seekoffer][workbench] hydrate workbench state failed', error);
+        setWorkbenchSyncStatus('error');
       } finally {
         if (active) {
           setTodoSyncOwnerId(syncableUserId);
@@ -627,24 +644,33 @@ export default function MePage() {
 
     let cancelled = false;
     const persistRemoteTodos = async () => {
+      setWorkbenchSyncStatus('syncing');
       try {
         await saveWorkbenchState(syncableUserId, {
           completedTodoIds,
-          customTodos
+          customTodos,
+          contacts
         });
+        if (!cancelled) {
+          setWorkbenchSyncStatus('synced');
+        }
       } catch (error) {
         if (!cancelled) {
           console.error('[Seekoffer][workbench] save workbench state failed', error);
+          setWorkbenchSyncStatus('error');
         }
       }
     };
 
-    void persistRemoteTodos();
+    const timer = window.setTimeout(() => {
+      void persistRemoteTodos();
+    }, 600);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [completedTodoIds, customTodos, syncableUserId, todoSyncOwnerId, todoSyncReady]);
+  }, [completedTodoIds, contacts, customTodos, syncableUserId, todoSyncOwnerId, todoSyncReady]);
 
   const stats = useMemo(
     () => ({
@@ -657,6 +683,9 @@ export default function MePage() {
   const filteredApplicationRows = useMemo(() => {
     const keyword = applicationKeyword.trim().toLowerCase();
     const filtered = rows.filter((row) => {
+      const archived = getWorkbenchProgressBucket(row) === '已结束';
+      if (applicationArchiveFilter === 'active' && archived) return false;
+      if (applicationArchiveFilter === 'archived' && !archived) return false;
       if (!matchesWorkbenchType(applicationTypeFilter, row)) return false;
       if (schoolRangeFilter !== '全部' && !matchesSchoolRange(row.project, schoolRangeFilter)) return false;
       if (progressFilter !== '全部' && getWorkbenchProgressBucket(row) !== progressFilter) return false;
@@ -669,6 +698,7 @@ export default function MePage() {
     return sortWorkbenchRows(filtered, applicationSort);
   }, [
     applicationKeyword,
+    applicationArchiveFilter,
     applicationSort,
     applicationStatusFilter,
     applicationTypeFilter,
@@ -785,7 +815,8 @@ export default function MePage() {
         ...(payload.date ? { date: payload.date } : {}),
         ...(payload.type ? { type: payload.type } : {}),
         ...(payload.note ? { note: payload.note } : {}),
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
     ]);
 
@@ -805,7 +836,8 @@ export default function MePage() {
 
         const nextTodo: WorkbenchCustomTodo = {
           ...todo,
-          ...(patch.text !== undefined ? { text: patch.text.trim() || todo.text } : {})
+          ...(patch.text !== undefined ? { text: patch.text.trim() || todo.text } : {}),
+          updatedAt: new Date().toISOString()
         };
 
         if (patch.date !== undefined) {
@@ -932,16 +964,26 @@ export default function MePage() {
     <SiteShell>
       <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
-          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">我的申请</h1>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">申请工作台</h1>
           <p className="mt-4 text-base leading-8 text-slate-600">
             集中管理申请清单、日程和导师联系，把每个目标项目推进到下一步。
           </p>
+          <div className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-slate-500" role="status" aria-live="polite">
+            <span className={`h-2 w-2 rounded-full ${workbenchSyncStatus === 'error' ? 'bg-rose-500' : workbenchSyncStatus === 'syncing' ? 'animate-pulse bg-amber-400' : 'bg-emerald-500'}`} />
+            {workbenchSyncStatus === 'syncing'
+              ? '正在同步申请、日程和联系人'
+              : workbenchSyncStatus === 'error'
+                ? '云端同步失败，修改已保存在本机'
+                : workbenchSyncStatus === 'synced'
+                  ? '申请、日程和联系人已同步'
+                  : '当前修改保存在本机'}
+          </div>
         </div>
 
         <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
           {[
-            { label: '申请项目', value: stats.total.toString(), icon: ClipboardList },
-            { label: '待补材料', value: stats.materialPending.toString(), icon: BookCheck },
+            { label: '申请项目', value: rowsLoading ? '—' : stats.total.toString(), icon: ClipboardList },
+            { label: '待补材料', value: rowsLoading ? '—' : stats.materialPending.toString(), icon: BookCheck },
             { label: '保研倒计时', value: `${baoYanCountdownDays}天`, hint: '距 9.22', icon: CalendarDays, featured: true }
           ].map((item) => {
             const Icon = item.icon;
@@ -978,7 +1020,7 @@ export default function MePage() {
 
       <section className="grid gap-4">
         <section className="product-card rounded-[30px] p-3">
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-3" role="tablist" aria-label="工作台视图">
             {[
               { id: 'applications' as const, label: '申请清单', detail: `${stats.total} 个项目`, icon: ClipboardList },
               { id: 'schedule' as const, label: '我的日程', detail: `${filteredScheduleItems.length} 条日程`, icon: CalendarDays },
@@ -991,6 +1033,8 @@ export default function MePage() {
                 <button
                   key={item.id}
                   type="button"
+                  role="tab"
+                  aria-selected={active}
                   onClick={() => setActiveSection(item.id)}
                   className={`flex items-center gap-3 rounded-[24px] px-4 py-4 text-left transition ${
                     active ? 'bg-brand text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-brand'
@@ -1030,6 +1074,24 @@ export default function MePage() {
               </div>
 
               <div className="mt-5 flex flex-wrap gap-2">
+                <div className="mr-2 inline-flex rounded-2xl bg-slate-100 p-1" aria-label="项目范围">
+                  {([
+                    ['active', '进行中'],
+                    ['archived', '已归档']
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={applicationArchiveFilter === value}
+                      onClick={() => setApplicationArchiveFilter(value)}
+                      className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
+                        applicationArchiveFilter === value ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-brand'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 {workbenchTypeFilters.map((item) => (
                   <button
                     key={item}
@@ -1111,7 +1173,11 @@ export default function MePage() {
               </details>
 
               <div className="mt-5 grid gap-3">
-                {applicationPreview.length ? (
+                {rowsLoading ? (
+                  [0, 1, 2].map((item) => (
+                    <div key={item} className="h-44 animate-pulse rounded-[24px] border border-slate-100 bg-slate-50" />
+                  ))
+                ) : applicationPreview.length ? (
                   applicationPreview.map((row) => (
                     <ApplicationProgressCard
                       key={row.item.userProjectId}
@@ -1126,7 +1192,13 @@ export default function MePage() {
                   ))
                 ) : (
                   <div className="rounded-[28px] border border-dashed border-black/10 px-5 py-12 text-center">
-                    <div className="text-lg font-semibold text-ink">{rows.length ? '没有匹配的申请项目' : '你的申请表还是空的'}</div>
+                    <div className="text-lg font-semibold text-ink">
+                      {rows.length
+                        ? applicationArchiveFilter === 'archived'
+                          ? '还没有已归档项目'
+                          : '没有匹配的申请项目'
+                        : '你的申请表还是空的'}
+                    </div>
                     <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
                       {rows.length
                         ? '调整筛选条件或关键词后再试，所有项目都在当前工作台内维护。'

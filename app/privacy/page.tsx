@@ -1,6 +1,46 @@
+import { AnalyticsPreferenceControl } from '@/components/analytics-preference-control';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { QQ_GROUP_NUMBER } from '@/lib/contact';
+
+const privacySections = [
+  {
+    title: '我们处理哪些信息',
+    body: '账号注册时会处理邮箱、登录凭证状态和账号标识；你使用工作台时会处理主动填写的个人资料、目标项目、申请状态、日程、导师联系人和备注；你参与 Offer 圈时会处理投稿、回复、关注、举报和审核记录。请不要提交身份证号、完整住址、银行卡等与保研申请无关的敏感信息。'
+  },
+  {
+    title: '处理信息的目的',
+    body: '这些信息用于提供登录与跨设备同步、恢复你的申请进度、展示经核验的社区内容、处理举报纠错、保障账号和服务安全。我们不会把工作台资料、导师联系人或申请备注用于无关广告画像。'
+  },
+  {
+    title: '匿名访问统计',
+    body: '只有在你同意后，网站才会创建匿名访问设备标识，并记录页面路径、页面标题、来源页面、语言、时区、访问次数和在线状态，用于判断页面是否易用和发现运行异常。该标识不是注册账号，也不用于识别你的真实身份；你可以随时关闭。'
+  },
+  {
+    title: '本机保存与云端同步',
+    body: '未登录或同步失败时，部分工作台数据会暂存在当前浏览器。使用正式账号登录后，申请清单、日程和导师联系人会同步到个人云端空间。公共设备使用完成后，请主动退出账号并清理浏览器数据。'
+  },
+  {
+    title: '保存期限',
+    body: '账号和工作台数据一般保存至账号注销、你主动删除，或服务不再需要这些信息时；匿名访问和必要操作日志原则上不超过 180 天，安全事件、举报及依法需要留存的记录按处理所需的最短期限保存。到期后删除或匿名化。'
+  },
+  {
+    title: '服务提供方与数据位置',
+    body: '我们使用网站托管、内容分发、云数据库和身份认证服务提供产品能力，相关提供方只在完成托管、传输、登录和存储所需范围内处理信息。部分云服务可能部署在境外区域；涉及个人信息跨境处理时，我们会按照适用规则补充告知并采取必要保护措施。'
+  },
+  {
+    title: '你的权利',
+    body: '你可以申请查阅、复制、更正或删除个人信息，也可以撤回匿名统计选择、注销账号或要求说明处理规则。我们会核验账号归属，并在合理期限内答复；法律法规另有要求的除外。'
+  },
+  {
+    title: '未成年人保护',
+    body: '本产品主要面向高校学生。未满 14 周岁的用户不应自行注册或提交个人信息；确有需要时，应由监护人阅读并同意相关规则后联系我们。'
+  },
+  {
+    title: '安全与事件处理',
+    body: '我们通过访问控制、行级权限、内容审核、日志留痕和最小权限配置保护数据。若发生可能影响个人权益的安全事件，我们会及时处置，并按照适用规则告知风险、影响和补救方式。'
+  }
+];
 
 export default function PrivacyPage() {
   return (
@@ -8,42 +48,31 @@ export default function PrivacyPage() {
       <PageSectionTitle
         eyebrow="Privacy Policy"
         title="隐私政策"
-        subtitle="我们会尽量只收集产品运行必要的信息，并优先用它来帮助你管理申请进度，而不是制造额外打扰。"
+        subtitle="清楚说明收集什么、为什么使用、保存多久，以及你如何管理自己的信息。更新日期：2026 年 7 月 11 日。"
       />
 
-      <section className="surface-card rounded-[34px] p-7 text-sm leading-8 text-slate-600">
-        <div className="grid gap-5">
-          <p>
-            寻鹿 Seekoffer 当前会在你使用申请表、待办、Offer 发布和反馈等功能时，记录你主动提交的资料，例如昵称、院校信息、申请状态、备注和提醒设置。
-          </p>
-          <p>
-            这些信息的目的只有一个：帮助你更高效地获取通知、更清晰地管理申请进度，并在你需要时提供待办与风险提醒。我们不会为了无关用途额外索取与你申请无关的隐私数据。
-          </p>
-          <p>
-            在当前版本中，部分功能仍处于体验阶段。若涉及云端同步、账号登录和提醒能力扩展，我们会继续优化数据保护方式，并在能力正式上线后同步更新说明。
-          </p>
-          <p>
-            我们会为你提供个人信息查阅、更正、删除和账号注销的申请通道。你可以通过 seekoffer@qq.com 或 QQ 交流群 {QQ_GROUP_NUMBER} 联系我们。
-          </p>
-          <div className="rounded-[26px] bg-slate-50 px-5 py-5">
-            <div className="font-semibold text-ink">我们当前会处理的信息</div>
-            <p className="mt-3">
-              邮箱账号、个人资料、申请状态、工作台待办、收藏项目、手动录入项目、Offer 发布内容、反馈信息和必要的操作日志。Offer 动态支持匿名展示，我们会保留必要核验记录用于纠错和风控。
-            </p>
-          </div>
-          <div className="rounded-[26px] bg-slate-50 px-5 py-5">
-            <div className="font-semibold text-ink">数据保存与删除</div>
-            <p className="mt-3">
-              账号数据用于维持申请工作台同步和服务安全。你可以申请导出、更正或删除个人资料；处理目的已经实现、你撤回同意或账号注销后，我们会按法律要求删除或停止继续处理。
-            </p>
-          </div>
-          <div className="rounded-[26px] bg-slate-50 px-5 py-5">
-            <div className="font-semibold text-ink">重要说明</div>
-            <p className="mt-3">
-              Seekoffer 会尽力保护你的申请数据，但你也应避免在备注、Offer 动态或反馈中填写身份证号、准考证号、完整住址等非必要敏感信息。
-            </p>
-          </div>
+      <section className="surface-card rounded-[30px] p-6 sm:p-7">
+        <div className="rounded-[24px] bg-brand/5 px-5 py-5 text-sm leading-8 text-slate-600">
+          <div className="font-semibold text-ink">个人信息处理者</div>
+          <p className="mt-2">寻鹿 Seekoffer 运营团队。隐私、数据导出、删除和账号注销申请可发送至 <a href="mailto:seekoffer@qq.com" className="font-semibold text-brand">seekoffer@qq.com</a>，或通过 QQ 群 {QQ_GROUP_NUMBER} 联系我们。</p>
         </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          {privacySections.map((section) => (
+            <section key={section.title} className="rounded-[24px] border border-slate-100 bg-slate-50/70 px-5 py-5">
+              <h2 className="text-lg font-semibold text-ink">{section.title}</h2>
+              <p className="mt-3 text-sm leading-8 text-slate-600">{section.body}</p>
+            </section>
+          ))}
+        </div>
+
+        <div className="mt-5">
+          <AnalyticsPreferenceControl />
+        </div>
+
+        <p className="mt-5 text-xs leading-6 text-slate-400">
+          本政策会随功能和法律要求更新。发生重要变化时，我们会通过页面提示等适当方式告知。涉及具体法律义务时，以适用法律法规及专业法律意见为准。
+        </p>
       </section>
     </SiteShell>
   );

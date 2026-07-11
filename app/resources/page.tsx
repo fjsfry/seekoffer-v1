@@ -27,7 +27,8 @@ const applicationKits = [
     items: ['一页简历', '科研经历', '项目表达'],
     icon: FileText,
     href: taobaoTemplatePackHref,
-    external: true
+    external: true,
+    commercial: true
   },
   {
     title: '个人陈述模板',
@@ -35,7 +36,8 @@ const applicationKits = [
     items: ['结构模板', '常见问题', '修改提示'],
     icon: BookOpenText,
     href: taobaoTemplatePackHref,
-    external: true
+    external: true,
+    commercial: true
   },
   {
     title: '推荐信模板',
@@ -43,7 +45,8 @@ const applicationKits = [
     items: ['推荐信结构', '老师沟通', '提交提醒'],
     icon: Mail,
     href: taobaoTemplatePackHref,
-    external: true
+    external: true,
+    commercial: true
   },
   {
     title: 'GPA 与材料工具',
@@ -109,11 +112,14 @@ export default function ResourcesPage() {
       </section>
 
       <section className="surface-card rounded-[34px] p-6 lg:p-8">
-        <div className="flex items-start gap-3">
-          <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
-            <ClipboardList className="h-5 w-5" />
-          </span>
-          <h2 className="text-2xl font-semibold tracking-tight text-ink md:text-3xl">申请资料中心</h2>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
+              <ClipboardList className="h-5 w-5" />
+            </span>
+            <h2 className="text-2xl font-semibold tracking-tight text-ink md:text-3xl">申请资料中心</h2>
+          </div>
+          <span className="text-xs leading-5 text-slate-400">标注“外部付费资料”的卡片将跳转至第三方平台</span>
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -144,7 +150,7 @@ export default function ResourcesPage() {
                 <div className="mt-5 flex items-center gap-2">
                   <h3 className="min-w-0 flex-1 truncate text-lg font-semibold text-ink">{item.title}</h3>
                   <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-400">
-                    {index < 3 ? '模板' : '工具'}
+                    {'commercial' in item && item.commercial ? '外部付费资料' : '工具'}
                   </span>
                 </div>
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -160,7 +166,7 @@ export default function ResourcesPage() {
 
             if (item.external && item.href) {
               return (
-                <a key={item.title} href={item.href} target="_blank" rel="noreferrer" className={cardClassName}>
+                <a key={item.title} href={item.href} target="_blank" rel="noreferrer sponsored" className={cardClassName}>
                   {cardContent}
                 </a>
               );

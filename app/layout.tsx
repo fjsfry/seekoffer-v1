@@ -3,6 +3,7 @@ import { AuthActionBridge } from '@/components/auth-action-bridge';
 import { AuthModal } from '@/components/auth-modal';
 import { UserSessionProvider } from '@/components/user-session-provider';
 import { VisitorPresenceTracker } from '@/components/visitor-presence-tracker';
+import { PrivacyConsentBanner } from '@/components/privacy-consent-banner';
 import { SITE_DESCRIPTION, SITE_NAME, absoluteUrl, buildOrganizationJsonLd, buildWebSiteJsonLd, jsonLdScript } from '@/lib/seo';
 import './globals.css';
 
@@ -94,6 +95,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <AuthActionBridge />
           <AuthModal />
           <VisitorPresenceTracker />
+          <PrivacyConsentBanner />
           {children}
         </UserSessionProvider>
       </body>

@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2.110.2';
 
 type AnalyticsEvent = {
   visitorId?: unknown;
@@ -87,78 +87,20 @@ function normalizeEvent(body: AnalyticsEvent, request: Request) {
   };
 }
 
-async function upsertVisitor(service: SupabaseService, event: ReturnType<typeof normalizeEvent>) {
-  const now = new Date().toISOString();
-  const { data: existing, error: selectError } = await service
-    .from('site_visitors')
-    .select('visitor_id,last_session_id,visit_count,page_view_count')
-    .eq('visitor_id', event.visitorId)
-    .maybeSingle();
+async function recordAnalytics(service: SupabaseService, event: ReturnType<typeof normalizeEvent>) {
+  const { error } = await service.rpc('seekoffer_record_analytics', {
+    p_visitor_id: event.visitorId,
+    p_session_id: event.sessionId,
+    p_event_type: event.eventType,
+    p_path: event.path,
+    p_title: event.title,
+    p_referrer: event.referrer,
+    p_locale: event.locale,
+    p_timezone: event.timezone,
+    p_user_agent: event.userAgent
+  });
 
-  if (selectError) {
-    throw selectError;
-  }
-
-  if (existing) {
-    const sessionChanged = existing.last_session_id !== event.sessionId;
-    const { error } = await service
-      .from('site_visitors')
-      .update({
-        last_seen_at: now,
-        last_path: event.path,
-        last_title: event.title,
-        last_referrer: event.referrer,
-        last_locale: event.locale,
-        last_timezone: event.timezone,
-        last_user_agent: event.userAgent,
-        last_session_id: event.sessionId,
-        visit_count: Number(existing.visit_count || 1) + (sessionChanged ? 1 : 0),
-        page_view_count: Number(existing.page_view_count || 0) + (event.eventType === 'pageview' ? 1 : 0),
-        updated_at: now
-      })
-      .eq('visitor_id', event.visitorId);
-
-    if (error) {
-      throw error;
-    }
-  } else {
-    const { error } = await service.from('site_visitors').insert({
-      visitor_id: event.visitorId,
-      first_seen_at: now,
-      last_seen_at: now,
-      last_path: event.path,
-      last_title: event.title,
-      last_referrer: event.referrer,
-      last_locale: event.locale,
-      last_timezone: event.timezone,
-      last_user_agent: event.userAgent,
-      first_session_id: event.sessionId,
-      last_session_id: event.sessionId,
-      visit_count: 1,
-      page_view_count: event.eventType === 'pageview' ? 1 : 0
-    });
-
-    if (error) {
-      throw error;
-    }
-  }
-
-  if (event.eventType === 'pageview') {
-    const { error } = await service.from('site_visit_events').insert({
-      visitor_id: event.visitorId,
-      session_id: event.sessionId,
-      event_type: event.eventType,
-      path: event.path,
-      title: event.title,
-      referrer: event.referrer,
-      locale: event.locale,
-      timezone: event.timezone
-    });
-
-    if (error) {
-      throw error;
-    }
-  }
+  if (error) throw error;
 }
 
 Deno.serve(async (request) => {
@@ -174,6 +116,11 @@ Deno.serve(async (request) => {
     return json(request, 403, { error: 'origin_not_allowed' });
   }
 
+  const contentLength = Number(request.headers.get('content-length') || 0);
+  if (contentLength > 8192) {
+    return json(request, 413, { error: 'payload_too_large' });
+  }
+
   const serviceUrl = Deno.env.get('SUPABASE_URL') || '';
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
@@ -185,7 +132,7 @@ Deno.serve(async (request) => {
     const body = (await request.json()) as AnalyticsEvent;
     const event = normalizeEvent(body, request);
     const service = createClient(serviceUrl, serviceRoleKey);
-    await upsertVisitor(service, event);
+    await recordAnalytics(service, event);
     return json(request, 200, { ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

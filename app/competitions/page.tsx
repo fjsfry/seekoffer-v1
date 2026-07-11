@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -12,7 +12,9 @@ import {
   Flame,
   RotateCcw,
   Search,
-  Trophy
+  Trophy,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { SiteShell } from '@/components/site-shell';
 import {
@@ -32,12 +34,14 @@ type CompetitionFilters = {
 };
 
 const CATEGORY_PREVIEW_LIMIT = 18;
+const PAGE_SIZE = 18;
 
 export default function CompetitionsPage() {
   const [level, setLevel] = useState<LevelFilter>('全部');
   const [category, setCategory] = useState('全部');
   const [keyword, setKeyword] = useState('');
   const [showAllCategories, setShowAllCategories] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const categories = useMemo(() => getCompetitionCategories(), []);
   const filters = useMemo<CompetitionFilters>(
     () => ({ level, category, keyword }),
@@ -55,6 +59,19 @@ export default function CompetitionsPage() {
     () => competitionItems.filter((item) => matchesCompetitionFilters(item, filters)),
     [filters]
   );
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+  const pageItems = useMemo(
+    () => filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [currentPage, filteredItems]
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [category, keyword, level]);
+
+  useEffect(() => {
+    if (currentPage > pageCount) setCurrentPage(pageCount);
+  }, [currentPage, pageCount]);
   const levelCounts = useMemo(
     () => buildFilterCounts(competitionLevelOptions, filters, 'level'),
     [filters]
@@ -233,7 +250,7 @@ export default function CompetitionsPage() {
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filteredItems.length ? (
-          filteredItems.map((item) => <CompetitionCard key={item.id} item={item} />)
+          pageItems.map((item) => <CompetitionCard key={item.id} item={item} />)
         ) : (
           <div className="surface-card rounded-[28px] px-6 py-12 text-center md:col-span-2 xl:col-span-3">
             <Trophy className="mx-auto h-9 w-9 text-slate-300" />
@@ -242,6 +259,22 @@ export default function CompetitionsPage() {
           </div>
         )}
       </section>
+
+      {filteredItems.length > PAGE_SIZE ? (
+        <nav className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-white/80 bg-white/90 px-4 py-3 shadow-soft" aria-label="竞赛列表分页">
+          <div className="text-sm text-slate-500">
+            第 {currentPage} / {pageCount} 页，当前显示 {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredItems.length)} 条
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={currentPage === 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} className="inline-flex h-10 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 disabled:opacity-40">
+              <ChevronLeft className="h-4 w-4" />上一页
+            </button>
+            <button type="button" disabled={currentPage === pageCount} onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))} className="inline-flex h-10 items-center gap-1 rounded-xl bg-brand px-3 text-sm font-semibold text-white disabled:opacity-40">
+              下一页<ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </nav>
+      ) : null}
     </SiteShell>
   );
 }

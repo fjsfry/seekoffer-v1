@@ -1,13 +1,17 @@
 import type { Metadata } from 'next';
 import {
+  ArrowRight,
   CheckCircle2,
   ClipboardList,
   FileSearch,
   HelpCircle,
+  Mail,
+  MessageCircle,
   Target,
   UsersRound
 } from 'lucide-react';
 import { SiteShell } from '@/components/site-shell';
+import { QQ_GROUP_NUMBER, QQ_GROUP_URL } from '@/lib/contact';
 
 export const metadata: Metadata = {
   title: '保研咨询 - 寻鹿 Seekoffer',
@@ -60,6 +64,17 @@ export default function ConsultingPage() {
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">保研咨询</h1>
           <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">把背景、目标、材料和申请节奏整理清楚，形成更稳的下一步动作。</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <a href={QQ_GROUP_URL} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center gap-2 rounded-xl bg-brand px-5 text-sm font-semibold text-white shadow-float">
+              <MessageCircle className="h-4 w-4" />
+              进入咨询交流群
+              <ArrowRight className="h-4 w-4" />
+            </a>
+            <a href="mailto:seekoffer@qq.com?subject=保研咨询申请" className="inline-flex h-12 items-center gap-2 rounded-xl border border-brand/20 bg-white px-5 text-sm font-semibold text-brand">
+              <Mail className="h-4 w-4" />
+              邮件咨询
+            </a>
+          </div>
         </div>
 
         <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
@@ -80,6 +95,19 @@ export default function ConsultingPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-[30px] bg-brand px-6 py-7 text-white shadow-float sm:px-8">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold">先说明问题，再判断是否需要服务</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-white/75">准备本科院校、排名区间、目标方向和当前申请清单。我们会先确认问题是否适合通过咨询解决，不做夸张承诺。</p>
+          </div>
+          <a href={QQ_GROUP_URL} target="_blank" rel="noreferrer" className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-brand">
+            联系寻鹿 · QQ 群 {QQ_GROUP_NUMBER}
+            <ArrowRight className="h-4 w-4" />
+          </a>
         </div>
       </section>
 

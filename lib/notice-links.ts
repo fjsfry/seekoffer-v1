@@ -1,10 +1,12 @@
 import type { PublicNoticeProject } from './mock-data';
+import { baseNoticeProjects } from './notice-source';
 
 type NoticeLinkProject = Pick<PublicNoticeProject, 'applyLink' | 'sourceLink'>;
 
 const APPLICATION_ONLY_LINK_PATTERN =
   /(wjx|wenjuan|jinshuju|questionnaire|survey|docs\.qq\.com\/form|feishu\.cn\/share\/base\/form|forms?\.|\/forms?\/|\/form\/|\/survey\/|\/questionnaire\/|\/collect\/)/i;
 const AGGREGATOR_LINK_PATTERN = /baoyantongzhi\.com\/notice|seekoffer\.com\.cn\/notices/i;
+const STATIC_NOTICE_IDS = new Set(baseNoticeProjects.map((project) => project.id));
 
 function normalizeExternalLink(value: string | undefined | null) {
   const link = String(value || '').trim();
@@ -57,11 +59,18 @@ export function getNoticeApplicationLink(project: NoticeLinkProject) {
 }
 
 export function buildNoticeDetailHref(id: string, returnTo?: string) {
-  const params = new URLSearchParams({ id });
+  const normalizedId = String(id || '').trim();
+  const params = new URLSearchParams();
 
   if (returnTo) {
     params.set('returnTo', returnTo);
   }
 
+  if (STATIC_NOTICE_IDS.has(normalizedId)) {
+    const query = params.toString();
+    return `/notices/${encodeURIComponent(normalizedId)}${query ? `?${query}` : ''}`;
+  }
+
+  params.set('id', normalizedId);
   return `/notices/detail?${params.toString()}`;
 }

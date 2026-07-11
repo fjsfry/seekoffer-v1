@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Ban, CheckCircle2, Clock3, FileText, ShieldAlert, Trash2, UserPlus, UsersRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AdminShell } from '@/components/admin-shell';
@@ -77,6 +77,8 @@ function resolveSectionFromLocation(pathname: string, hash: string): OperationsS
 
 export default function AdminOperationsPage() {
   const pathname = usePathname();
+  const router = useRouter();
+  const isLegacyCrawlerRoute = pathname.includes('/admin/crawlers');
   const [activeSection, setActiveSection] = useState<OperationsSection>('users');
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [feedback, setFeedback] = useState<AdminFeedbackRow[]>([]);
@@ -99,6 +101,11 @@ export default function AdminOperationsPage() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
+    if (isLegacyCrawlerRoute) {
+      router.replace('/admin/dashboard');
+      return;
+    }
+
     const syncSection = () => {
       setActiveSection(resolveSectionFromLocation(pathname, window.location.hash));
     };
@@ -116,7 +123,15 @@ export default function AdminOperationsPage() {
     };
     // The operations console loads once on mount; child actions refresh data explicitly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [isLegacyCrawlerRoute, pathname, router]);
+
+  if (isLegacyCrawlerRoute) {
+    return (
+      <AdminShell title="正在返回数据概览" description="旧版运维入口已合并到当前运营工作台。">
+        <AdminActionBanner>正在跳转到数据概览，请稍候。</AdminActionBanner>
+      </AdminShell>
+    );
+  }
 
   async function loadOperationsData(
     overrides: Partial<{
