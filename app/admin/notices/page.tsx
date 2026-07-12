@@ -131,7 +131,7 @@ export default function AdminNoticesPage() {
     }
 
     const dangerous = status === 'deleted' || status === 'rejected';
-    if (dangerous && !window.confirm(`确认要处理 ${ids.length} 条通知吗？该操作会写入后台日志。`)) {
+    if (dangerous && !window.confirm(`确认要处理 ${ids.length} 条通知吗？`)) {
       return;
     }
 
@@ -148,7 +148,7 @@ export default function AdminNoticesPage() {
 
       const nextPage = rows.length === ids.length && page > 1 ? page - 1 : page;
       window.localStorage.setItem('seekoffer-admin-notice-version', String(Date.now()));
-      setMessage('操作成功：通知展示状态已更新，前台会按最新状态展示。');
+      setMessage('通知状态已更新。');
       await loadNotices({ page: nextPage });
     } catch (error) {
       setMessage(getAdminErrorMessage(error, '通知操作失败，请稍后重试。'));
@@ -512,7 +512,7 @@ export default function AdminNoticesPage() {
                     value={reviewNote}
                     onChange={(event) => setReviewNote(event.target.value)}
                     className="mt-3 min-h-[140px] w-full rounded-lg border border-slate-200 p-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
-                    placeholder="记录核验结果、下架原因、驳回原因等，操作会写入日志。"
+                    placeholder="填写核验结果、下架原因或驳回原因。"
                   />
                 </div>
 
@@ -544,7 +544,7 @@ export default function AdminNoticesPage() {
             ) : (
               <div className="p-5">
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm leading-7 text-slate-500">
-                  从左侧通知列表点击“查看”，这里会展示审核详情、来源入口、审核备注和发布操作。
+                  请选择一条通知查看详情。
                 </div>
               </div>
             )}

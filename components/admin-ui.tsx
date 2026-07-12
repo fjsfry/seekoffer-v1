@@ -36,7 +36,6 @@ const statusToneMap: Record<string, string> = {
 export function AdminPanel({
   title,
   eyebrow,
-  description,
   action,
   children,
   className = ''
@@ -50,13 +49,12 @@ export function AdminPanel({
 }) {
   return (
     <section className={adminClassNames('min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_12px_34px_rgba(15,23,42,0.045)]', className)}>
-      {title || action || eyebrow || description ? (
+      {title || action || eyebrow ? (
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
-          {title || eyebrow || description ? (
+          {title || eyebrow ? (
             <div>
               {eyebrow ? <div className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">{eyebrow}</div> : null}
               {title ? <h2 className="text-base font-semibold text-slate-950">{title}</h2> : null}
-              {description ? <p className="mt-1 max-w-3xl line-clamp-2 text-sm leading-6 text-slate-500">{description}</p> : null}
             </div>
           ) : (
             <span />
@@ -79,7 +77,6 @@ export function AdminMetricCard({ metric, icon: Icon }: { metric: AdminMetric; i
         <div className="min-w-0 flex-1">
           <div className="text-xs font-semibold text-slate-500">{metric.label}</div>
           <div className="mt-0.5 text-2xl font-semibold tracking-tight text-slate-950">{metric.value}</div>
-          <div className="mt-1 line-clamp-1 text-xs leading-5 text-slate-500" title={metric.hint}>{metric.hint}</div>
         </div>
       </div>
     </div>
@@ -290,7 +287,6 @@ export function AdminSelectionBar({
 
 export function AdminEmptyState({
   title,
-  description,
   action,
   icon: Icon
 }: {
@@ -308,7 +304,6 @@ export function AdminEmptyState({
           </div>
         ) : null}
         <div className="text-sm font-semibold text-slate-800">{title}</div>
-        <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
         {action ? <div className="mt-5">{action}</div> : null}
       </div>
     </div>

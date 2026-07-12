@@ -4,7 +4,6 @@ import {
   Activity,
   ArrowRight,
   Bell,
-  CheckCircle2,
   ClipboardList,
   Download,
   RefreshCw,
@@ -75,9 +74,8 @@ export default function AdminDashboardPage() {
   const [pendingNotices, setPendingNotices] = useState<AdminNoticeRow[]>([]);
   const [pendingOffers, setPendingOffers] = useState<AdminOfferRow[]>([]);
   const [latestFeedback, setLatestFeedback] = useState<AdminFeedbackRow[]>([]);
-  const [message, setMessage] = useState('正在更新运营数据...');
+  const [message, setMessage] = useState('');
   const [dataError, setDataError] = useState('');
-  const [lastLoadedAt, setLastLoadedAt] = useState('');
 
   async function loadDashboard() {
     try {
@@ -103,8 +101,7 @@ export default function AdminDashboardPage() {
       setPendingOffers(offers.offers.filter((item) => item.review_status === 'pending' || item.reports_count > 0).slice(0, 5).map(mapOfferApiRow));
       setLatestFeedback(feedback.feedback.map(mapFeedbackApiRow));
       setDataError('');
-      setLastLoadedAt(new Date().toISOString());
-      setMessage('数据已更新，待办、趋势和访问情况已准备好。');
+      setMessage('');
     } catch (error) {
       const errorMessage = getAdminErrorMessage(error, '数据暂时无法更新，请稍后重试。');
       setOverviewMetrics(emptyOverview);
@@ -114,7 +111,7 @@ export default function AdminDashboardPage() {
       setPendingOffers([]);
       setLatestFeedback([]);
       setDataError(errorMessage);
-      setMessage(`数据暂时无法更新：${errorMessage}`);
+      setMessage(errorMessage);
     }
   }
 
@@ -180,28 +177,6 @@ export default function AdminDashboardPage() {
       tone: pendingTotal > 0 ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'
     }
   ];
-  const operationStatusRows = [
-    {
-      label: '数据同步',
-      value: dataHealthy ? '正常' : '需要刷新',
-      detail: lastLoadedAt ? `最近更新 ${formatBeijingDateTime(lastLoadedAt)}` : '等待首次同步'
-    },
-    {
-      label: '用户与内容',
-      value: `通知 ${formatNumber(overviewMetrics.totalNotices)} / Offer ${formatNumber(overviewMetrics.totalOffers)}`,
-      detail: `累计用户 ${formatNumber(totalAudienceUsers)}，其中注册用户 ${formatNumber(overviewMetrics.totalUsers)}`
-    },
-    {
-      label: '审核积压',
-      value: `通知 ${formatNumber(overviewMetrics.pendingNotices)} / Offer ${formatNumber(overviewMetrics.pendingOffers)} / 反馈 ${formatNumber(overviewMetrics.pendingFeedback)}`,
-      detail: pendingTotal > 0 ? '建议优先处理公开展示相关内容' : '暂无积压任务'
-    },
-    {
-      label: '账号风控',
-      value: overviewMetrics.bannedUsers + overviewMetrics.restrictedUsers > 0 ? `封禁 ${formatNumber(overviewMetrics.bannedUsers)} / 限制 ${formatNumber(overviewMetrics.restrictedUsers)}` : '无告警',
-      detail: '异常账号与高风险行为会在这里汇总'
-    }
-  ];
   function exportDashboardSnapshot() {
     const payload = {
       generatedAt: new Date().toISOString(),
@@ -234,13 +209,10 @@ export default function AdminDashboardPage() {
                   {pendingTotal > 0 ? `待处理 ${formatNumber(pendingTotal)} 项` : '暂无积压'}
                 </span>
               </div>
-              <p className={adminClassNames('mt-1 line-clamp-1 text-sm', dataHealthy ? 'text-slate-500' : 'text-rose-600')} title={message}>{message}</p>
+              {message ? <p className="mt-1 line-clamp-1 text-sm text-rose-600">{message}</p> : null}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            <span className="mr-1 text-xs font-medium text-slate-400">
-              {lastLoadedAt ? `更新于 ${formatBeijingDateTime(lastLoadedAt)}` : '等待首次同步'}
-            </span>
             <button
               type="button"
               onClick={() => void loadDashboard()}
@@ -279,9 +251,6 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="mt-6 text-5xl font-semibold text-slate-950 sm:text-6xl">{formatNumber(totalAudienceUsers)}</div>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-              按独立使用标识统计，包含未注册用户与注册账号；同一浏览器标识只累计一次。
-            </p>
 
             <dl className="mt-7 grid grid-cols-3 divide-x divide-slate-100 border-t border-slate-100 pt-5">
               <div className="pr-4">
@@ -320,7 +289,6 @@ export default function AdminDashboardPage() {
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
               <div className="h-full rounded-full bg-blue-500" style={{ width: `${registrationConversion}%` }} />
             </div>
-            <p className="mt-3 text-sm leading-6 text-slate-500">注册账号可跨设备同步申请清单、日程和导师联系人。</p>
 
             <dl className="mt-6 grid grid-cols-3 gap-3 border-t border-slate-100 pt-5">
               <div>
@@ -358,7 +326,6 @@ export default function AdminDashboardPage() {
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-medium text-slate-400">{item.label}</span>
                   <span className="mt-0.5 block text-2xl font-semibold text-slate-950">{item.value}</span>
-                  <span className="mt-0.5 block truncate text-xs text-slate-400">{item.hint}</span>
                 </span>
                 <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-teal-700" />
               </Link>
@@ -395,7 +362,6 @@ export default function AdminDashboardPage() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold text-slate-800">{item.label}</span>
-                      <span className="mt-1 block truncate text-xs text-slate-400">{item.hint}</span>
                     </span>
                     <span className="text-xl font-semibold text-slate-950">{formatNumber(item.value)}</span>
                     <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-teal-700" />
@@ -409,28 +375,7 @@ export default function AdminDashboardPage() {
           </AdminPanel>
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-2">
-          <AdminPanel
-            title="运营状态"
-            description="把系统健康度和关键规模集中在一处，减少重复信息。"
-            action={<Link href="/admin/settings" className="text-sm font-semibold text-teal-700">系统详情 →</Link>}
-          >
-            <div className="divide-y divide-slate-100 px-5">
-              {operationStatusRows.map((item) => (
-                <div key={item.label} className="flex items-start justify-between gap-4 py-4">
-                  <span className="flex min-w-0 gap-3">
-                    <CheckCircle2 className={adminClassNames('mt-0.5 h-4 w-4 shrink-0', dataHealthy ? 'text-emerald-600' : 'text-rose-600')} />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold text-slate-800">{item.label}</span>
-                      <span className="mt-1 block truncate text-xs text-slate-400">{item.detail}</span>
-                    </span>
-                  </span>
-                  <span className={adminClassNames('shrink-0 text-right text-sm font-semibold', dataHealthy ? 'text-teal-700' : 'text-rose-700')}>{item.value}</span>
-                </div>
-              ))}
-            </div>
-          </AdminPanel>
-
+        <section>
           <AdminPanel
             title="内容增长"
             description="近 7 日通知与 Offer 内容新增情况。"
@@ -465,13 +410,11 @@ export default function AdminDashboardPage() {
         <section className="grid gap-5 xl:grid-cols-2">
           <VisitorPanel
             title="实时在线用户"
-            description={`最近 ${analytics.metrics.activeWindowMinutes} 分钟内仍在使用前台的用户`}
             rows={analytics.onlineVisitors}
             empty="当前暂无在线用户。"
           />
           <VisitorPanel
             title="最近活跃用户"
-            description="按最后活跃时间排序，帮助判断产品使用节奏"
             rows={analytics.recentVisitors}
             empty="暂无用户活跃记录。"
           />
@@ -715,26 +658,19 @@ function mapFeedbackApiRow(row: FeedbackApiRow): AdminFeedbackRow {
 
 function VisitorPanel({
   title,
-  description,
   rows,
   empty
 }: {
   title: string;
-  description: string;
   rows: AdminVisitorRow[];
   empty: string;
 }) {
   return (
-    <AdminPanel
-      title={title}
-      action={<span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">自动刷新 30s</span>}
-    >
-      <div className="px-5 pb-2 pt-4 text-sm text-slate-500">{description}</div>
+    <AdminPanel title={title}>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[680px] text-left text-sm">
           <thead className="bg-slate-50 text-xs font-semibold text-slate-500">
             <tr>
-              <th className="px-4 py-3">用户标识</th>
               <th className="px-4 py-3">当前位置</th>
               <th className="px-4 py-3">最后活跃</th>
               <th className="px-4 py-3">访问次数</th>
@@ -745,9 +681,6 @@ function VisitorPanel({
           <tbody>
             {rows.map((row, index) => (
               <tr key={row.visitor_id} className={adminClassNames('border-t border-slate-100', index % 2 === 1 && 'bg-slate-50/40')}>
-                <td className="px-4 py-3 font-mono text-xs text-slate-600" title={row.visitor_id}>
-                  {shortVisitorId(row.visitor_id)}
-                </td>
                 <td className="max-w-[260px] truncate px-4 py-3 text-slate-700" title={row.last_title || row.last_path}>
                   <div className="font-medium text-slate-800">{row.last_path || '/'}</div>
                   <div className="truncate text-xs text-slate-400">{row.last_title || '未记录标题'}</div>
@@ -764,11 +697,6 @@ function VisitorPanel({
       {!rows.length ? <div className="border-t border-slate-100 px-5 py-8 text-center text-sm text-slate-500">{empty}</div> : null}
     </AdminPanel>
   );
-}
-
-function shortVisitorId(value: string) {
-  if (!value) return '-';
-  return `${value.slice(0, 8)}...${value.slice(-6)}`;
 }
 
 function formatRelativeTime(value: string) {

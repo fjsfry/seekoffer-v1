@@ -64,7 +64,7 @@ export default function AdminOffersPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
-  const [message, setMessage] = useState('正在读取 Offer 圈审核队列。');
+  const [message, setMessage] = useState('');
   const [pending, setPending] = useState('');
   const [selectedPost, setSelectedPost] = useState<AdminOfferRow | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -107,7 +107,7 @@ export default function AdminOffersPage() {
       setMetrics(data.metrics);
       setFilters(nextFilters);
       setSelectedIds([]);
-      setMessage(`当前筛选共 ${data.total} 条内容，前台与后台使用同一审核口径。`);
+      setMessage('');
       setSelectedPost((current) => {
         if (!current) return null;
         return mappedRows.find((item) => item.id === current.id) || null;
@@ -121,15 +121,15 @@ export default function AdminOffersPage() {
   }
 
   async function updatePostStatus(id: string, status: string, note: string) {
-    if ((status === 'deleted' || status === 'hidden') && !window.confirm('确认执行该操作吗？操作结果会同步到前台并写入后台日志。')) {
+    if ((status === 'deleted' || status === 'hidden') && !window.confirm('确认执行该操作吗？')) {
       return;
     }
 
     setPending(`${status}:${id}`);
     try {
       await invokeAdminApi({ resource: 'offers', action: 'update_status', id, status, note });
-      setMessage('内容状态已更新，前台展示与后台审核记录会保持一致。');
       await loadPosts();
+      setMessage('内容状态已更新。');
     } catch (error) {
       setMessage(getAdminErrorMessage(error, '内容处理失败，请稍后重试。'));
     } finally {
@@ -143,7 +143,7 @@ export default function AdminOffersPage() {
       return;
     }
 
-    if ((status === 'deleted' || status === 'hidden') && !window.confirm(`确认处理 ${selectedIds.length} 条内容吗？操作会写入后台日志。`)) {
+    if ((status === 'deleted' || status === 'hidden') && !window.confirm(`确认处理 ${selectedIds.length} 条内容吗？`)) {
       return;
     }
 
@@ -154,8 +154,8 @@ export default function AdminOffersPage() {
           invokeAdminApi({ resource: 'offers', action: 'update_status', id, status, note })
         )
       );
-      setMessage(`已完成 ${selectedIds.length} 条内容的批量处理。`);
       await loadPosts();
+      setMessage(`已完成 ${selectedIds.length} 条内容的批量处理。`);
     } catch (error) {
       setMessage(getAdminErrorMessage(error, '批量处理失败，请稍后重试。'));
     } finally {
@@ -222,11 +222,13 @@ export default function AdminOffersPage() {
         ))}
       </div>
 
-      <div className="mt-5">
-        <AdminActionBanner tone={isError ? 'danger' : 'info'}>
-          {message}
-        </AdminActionBanner>
-      </div>
+      {message ? (
+        <div className="mt-5">
+          <AdminActionBanner tone={isError ? 'danger' : 'info'}>
+            {message}
+          </AdminActionBanner>
+        </div>
+      ) : null}
 
       <AdminPanel
         className="mt-5"
@@ -469,7 +471,7 @@ export default function AdminOffersPage() {
                   <AdminButton disabled={Boolean(pending)} onClick={() => updatePostStatus(selectedPost.id, 'approved', '审核通过社区内容')}>
                     通过并展示
                   </AdminButton>
-                  <AdminButton tone="secondary" disabled={Boolean(pending)} onClick={() => updatePostStatus(selectedPost.id, 'hidden', '后台隐藏社区内容')}>
+                  <AdminButton tone="secondary" disabled={Boolean(pending)} onClick={() => updatePostStatus(selectedPost.id, 'hidden', '隐藏社区内容')}>
                     隐藏内容
                   </AdminButton>
                   <AdminButton tone="danger" disabled={Boolean(pending)} onClick={() => updatePostStatus(selectedPost.id, 'deleted', '删除社区内容')}>

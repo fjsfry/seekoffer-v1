@@ -1,17 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  AlertTriangle,
-  Bell,
-  ClipboardList,
-  Flag,
-  LayoutDashboard,
-  Settings,
-  ShieldCheck,
-  UsersRound
-} from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { AdminActionBanner, AdminButton, AdminPanel, adminClassNames } from '@/components/admin-ui';
 import { AdminShell } from '@/components/admin-shell';
 import { getAdminErrorMessage, invokeAdminApi } from '@/lib/admin-api';
@@ -35,8 +25,6 @@ type AdminSettingRow = {
 type SettingDefinition = {
   key: AdminSettingKey;
   title: string;
-  description: string;
-  risk: string;
   type: 'boolean' | 'number';
   defaultValue: AdminSettingValue;
   confirmWhenDisabled?: string;
@@ -46,8 +34,6 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'content_review_enabled',
     title: '内容审核',
-    description: '开启后，用户发布的通知和社区内容需要经过后台审核后再进入公开区域。',
-    risk: '关闭后，用户内容可能绕过人工审核直接进入业务流程。',
     type: 'boolean',
     defaultValue: true,
     confirmWhenDisabled: '确认关闭内容审核吗？这会降低公开内容的安全边界。'
@@ -55,8 +41,6 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'offer_submit_enabled',
     title: 'Offer 提交通道',
-    description: '控制用户是否可以提交 Offer 动态，适合在社区审核规则未完善时临时关闭。',
-    risk: '关闭后，前台用户将无法继续提交 Offer 动态。',
     type: 'boolean',
     defaultValue: true,
     confirmWhenDisabled: '确认关闭 Offer 提交通道吗？用户将无法继续发布 Offer 动态。'
@@ -64,8 +48,6 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'report_alert_enabled',
     title: '举报提醒',
-    description: '开启后，新的举报和纠错会进入后台提醒队列，便于运营及时处理。',
-    risk: '关闭后，举报仍会入库，但后台提醒链路会变弱。',
     type: 'boolean',
     defaultValue: true,
     confirmWhenDisabled: '确认关闭举报提醒吗？这可能延迟风险内容处理。'
@@ -73,8 +55,6 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'operation_log_retention_days',
     title: '操作日志保留天数',
-    description: '后台关键操作日志的保留周期，用于审计、追责和异常排查。',
-    risk: '建议至少保留 180 天；过短会削弱后续审计能力。',
     type: 'number',
     defaultValue: 180
   }
@@ -84,16 +64,6 @@ const defaultSettings = Object.fromEntries(
   settingDefinitions.map((item) => [item.key, item.defaultValue])
 ) as Record<AdminSettingKey, AdminSettingValue>;
 
-const adminChannels = [
-  { href: '/admin/dashboard', label: '数据概览', hint: '指标、趋势与运营总览', icon: LayoutDashboard },
-  { href: '/admin/notices', label: '通知管理', hint: '通知审核、发布与下架', icon: Bell },
-  { href: '/admin/offers', label: 'Offer 池管理', hint: 'Offer 审核与风险处理', icon: ClipboardList },
-  { href: '/admin/users', label: '用户管理', hint: '账号状态、限制与备注', icon: UsersRound },
-  { href: '/admin/feedback', label: '反馈举报', hint: '反馈闭环与举报处置', icon: Flag },
-  { href: '/admin/logs', label: '操作日志', hint: '审计、导出与追踪', icon: ShieldCheck },
-  { href: '/admin/settings', label: '系统设置', hint: '权限、安全与开关', icon: Settings }
-];
-
 const roleRows = [
   ['超级管理员', '全部后台通道', '设置、封禁、删除、导出', '仅限核心负责人'],
   ['运营管理员', '内容、用户、反馈、日志', '限制用户、处理举报', '适合日常运营'],
@@ -101,51 +71,23 @@ const roleRows = [
   ['只读管理员', '数据概览与日志', '无写操作', '适合观察和审计']
 ];
 
-function formatUpdatedAt(value: string) {
-  if (!value) {
-    return '尚未更新';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-}
-
 function normalizeSettingRows(rows: AdminSettingRow[]) {
   const nextSettings = { ...defaultSettings };
-  const nextMeta: Record<string, Pick<AdminSettingRow, 'description' | 'updated_by' | 'updated_at'>> = {};
 
   for (const row of rows) {
     if (row.key in nextSettings) {
       nextSettings[row.key] = row.value;
-      nextMeta[row.key] = {
-        description: row.description,
-        updated_by: row.updated_by,
-        updated_at: row.updated_at
-      };
     }
   }
 
-  return { nextSettings, nextMeta };
+  return nextSettings;
 }
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<Record<AdminSettingKey, AdminSettingValue>>(defaultSettings);
-  const [settingMeta, setSettingMeta] = useState<Record<string, Pick<AdminSettingRow, 'description' | 'updated_by' | 'updated_at'>>>({});
   const [retentionDraft, setRetentionDraft] = useState(String(defaultSettings.operation_log_retention_days));
-  const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<AdminSettingKey | null>(null);
   const [message, setMessage] = useState('');
-  const [lastCheckedAt, setLastCheckedAt] = useState('');
 
   const disabledWarnings = useMemo(
     () =>
@@ -158,22 +100,17 @@ export default function AdminSettingsPage() {
   }, []);
 
   async function loadSettings() {
-    setLoading(true);
     try {
       const response = await invokeAdminApi<{ settings: AdminSettingRow[] }>({
         resource: 'settings',
         action: 'list'
       });
-      const { nextSettings, nextMeta } = normalizeSettingRows(response.settings || []);
+      const nextSettings = normalizeSettingRows(response.settings || []);
       setSettings(nextSettings);
-      setSettingMeta(nextMeta);
       setRetentionDraft(String(nextSettings.operation_log_retention_days));
-      setLastCheckedAt(new Date().toLocaleString('zh-CN'));
       setMessage('');
     } catch (error) {
       setMessage(getAdminErrorMessage(error, '系统设置读取失败，请稍后重试。'));
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -205,18 +142,10 @@ export default function AdminSettingsPage() {
       });
       const row = response.setting;
       setSettings((current) => ({ ...current, [key]: row.value }));
-      setSettingMeta((current) => ({
-        ...current,
-        [key]: {
-          description: row.description,
-          updated_by: row.updated_by,
-          updated_at: row.updated_at
-        }
-      }));
       if (key === 'operation_log_retention_days') {
         setRetentionDraft(String(row.value));
       }
-      setMessage(`${definition.title} 已更新，并写入后台操作日志。`);
+      setMessage(`${definition.title} 已更新。`);
     } catch (error) {
       setMessage(getAdminErrorMessage(error, `${definition.title} 更新失败。`));
     } finally {
@@ -240,15 +169,12 @@ export default function AdminSettingsPage() {
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
               <div>
                 <div className="font-semibold">当前有关键保护通道处于关闭状态</div>
-                <p className="mt-1 leading-6">
-                  {disabledWarnings.map((item) => item.title).join('、')} 已关闭。请确认这是临时运营策略，而不是误操作。
-                </p>
               </div>
             </div>
           </section>
         ) : null}
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <section>
           <AdminPanel title="基础配置">
             <div className="divide-y divide-slate-100">
               {settingDefinitions.map((definition) => (
@@ -256,7 +182,6 @@ export default function AdminSettingsPage() {
                   key={definition.key}
                   definition={definition}
                   value={settings[definition.key]}
-                  meta={settingMeta[definition.key]}
                   saving={savingKey === definition.key}
                   retentionDraft={retentionDraft}
                   onRetentionDraftChange={setRetentionDraft}
@@ -266,42 +191,7 @@ export default function AdminSettingsPage() {
             </div>
           </AdminPanel>
 
-          <AdminPanel title="保护状态" action={<button type="button" className="text-sm font-semibold text-teal-700" onClick={loadSettings} disabled={loading}>{loading ? '检查中' : '重新检查'}</button>}>
-            <div className="space-y-3 p-5 text-sm">
-              <HealthRow label="登录校验" value="已开启" good />
-              <HealthRow label="变更权限" value="核心管理员" good />
-              <HealthRow label="访问保护" value="已启用" good />
-              <HealthRow label="最近检查" value={lastCheckedAt || '等待检查'} good={Boolean(lastCheckedAt)} />
-            </div>
-          </AdminPanel>
         </section>
-
-        <AdminPanel title="运营通道">
-          <div className="grid gap-4 p-5 md:grid-cols-2 2xl:grid-cols-4">
-            {adminChannels.map((channel) => {
-              const Icon = channel.icon;
-
-              return (
-                <Link
-                  key={channel.href}
-                  href={channel.href}
-                  className="group rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition group-hover:bg-blue-100 group-hover:text-blue-700">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
-                      可进入
-                    </span>
-                  </div>
-                  <div className="mt-4 text-base font-semibold text-slate-950">{channel.label}</div>
-                  <p className="mt-2 line-clamp-1 text-sm text-slate-500">{channel.hint}</p>
-                </Link>
-              );
-            })}
-          </div>
-        </AdminPanel>
 
         <AdminPanel title="角色权限矩阵">
           <div className="overflow-x-auto">
@@ -336,7 +226,6 @@ export default function AdminSettingsPage() {
 function SettingControl({
   definition,
   value,
-  meta,
   saving,
   retentionDraft,
   onRetentionDraftChange,
@@ -344,7 +233,6 @@ function SettingControl({
 }: {
   definition: SettingDefinition;
   value: AdminSettingValue;
-  meta?: Pick<AdminSettingRow, 'description' | 'updated_by' | 'updated_at'>;
   saving: boolean;
   retentionDraft: string;
   onRetentionDraftChange: (value: string) => void;
@@ -367,10 +255,6 @@ function SettingControl({
               {enabled ? '已开启' : '已关闭'}
             </span>
           ) : null}
-        </div>
-        <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500" title={definition.risk}>{definition.description}</p>
-        <div className="mt-2 text-xs text-slate-400">
-          最近更新：{formatUpdatedAt(meta?.updated_at || '')}
         </div>
       </div>
 
@@ -414,15 +298,6 @@ function SettingControl({
           </AdminButton>
         </div>
       )}
-    </div>
-  );
-}
-
-function HealthRow({ label, value, good }: { label: string; value: string; good: boolean }) {
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 px-3 py-2">
-      <span className="text-slate-500">{label}</span>
-      <span className={adminClassNames('font-semibold', good ? 'text-emerald-700' : 'text-amber-700')}>{value}</span>
     </div>
   );
 }

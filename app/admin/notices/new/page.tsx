@@ -34,7 +34,7 @@ export default function AdminNewNoticePage() {
       'seekoffer-admin-notice-draft',
       JSON.stringify({ ...form, savedAt: new Date().toISOString() })
     );
-    setMessage('草稿已保存到当前浏览器。正式发布仍需要提交审核并通过后台审核。');
+    setMessage('草稿已保存。');
   }
 
   async function submitNotice() {

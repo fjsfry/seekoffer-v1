@@ -45,7 +45,8 @@ const checks = [
     assert: (source) =>
       !/from ['"]\.\.\/crawlers\/page['"]/.test(source) &&
       /resource:\s*['"]settings['"]/.test(source) &&
-      /adminChannels/.test(source) &&
+      /settingDefinitions/.test(source) &&
+      /roleRows/.test(source) &&
       /operation_log_retention_days/.test(source)
   },
   {

@@ -29,13 +29,6 @@ const operationsSectionTitles: Record<OperationsSection, string> = {
   settings: '系统设置'
 };
 
-const operationsSectionDescriptions: Record<OperationsSection, string> = {
-  users: '查看账号状态、活跃情况与风险记录。',
-  feedback: '集中处理反馈、举报与纠错工单。',
-  logs: '审计关键操作并排查异常行为。',
-  settings: '管理角色权限与运营安全策略。'
-};
-
 const defaultUserFilters = {
   userId: '',
   query: '',
@@ -208,13 +201,13 @@ export default function AdminOperationsPage() {
   }
 
   async function updateUserStatus(id: string, status: string, note: string) {
-    if ((status === 'banned' || status === 'restricted') && !window.confirm('确认调整该用户状态吗？该操作会写入后台日志。')) {
+    if ((status === 'banned' || status === 'restricted') && !window.confirm('确认调整该用户状态吗？')) {
       return;
     }
 
     try {
       await invokeAdminApi({ resource: 'users', action: 'update_status', id, status, note });
-      setMessage('用户状态已更新，并写入操作日志。');
+      setMessage('用户状态已更新。');
       await loadOperationsData();
     } catch (error) {
       setMessage(getAdminErrorMessage(error, '用户状态更新失败。'));
@@ -224,7 +217,7 @@ export default function AdminOperationsPage() {
   async function updateFeedbackStatus(id: string, status: string, note: string) {
     try {
       await invokeAdminApi({ resource: 'feedback', action: 'update_status', id, status, note });
-      setMessage('反馈/举报状态已更新，并写入操作日志。');
+      setMessage('反馈/举报状态已更新。');
       await loadOperationsData();
     } catch (error) {
       setMessage(getAdminErrorMessage(error, '反馈处理失败。'));
@@ -234,14 +227,14 @@ export default function AdminOperationsPage() {
   async function updateSetting(key: string, value: unknown) {
     try {
       await invokeAdminApi({ resource: 'settings', action: 'update', key, value });
-      setMessage('系统设置已更新，并写入操作日志。');
+      setMessage('系统设置已更新。');
     } catch (error) {
       setMessage(getAdminErrorMessage(error, '系统设置更新失败。'));
     }
   }
 
   return (
-    <AdminShell title={operationsSectionTitles[activeSection]} description={operationsSectionDescriptions[activeSection]}>
+    <AdminShell title={operationsSectionTitles[activeSection]}>
       <div className="min-w-0 space-y-6">
         {message ? <AdminActionBanner tone={message.includes('失败') || message.includes('无法') ? 'danger' : 'info'}>{message}</AdminActionBanner> : null}
         {activeSection === 'users' ? (
@@ -333,13 +326,13 @@ function UsersView({
   function startUserNote(user: AdminUserRow) {
     setSelectedUserId(user.id);
     setNoteDraft('');
-    onNotify(`请在右侧为 ${user.nickname} 填写后台备注，保存后会写入操作日志。`);
+    onNotify(`请为 ${user.nickname} 填写备注。`);
   }
 
   function saveUserNote(user: AdminUserRow) {
     const note = noteDraft.trim();
     if (!note) {
-      onNotify('请先填写后台备注内容。');
+      onNotify('请先填写备注。');
       return;
     }
     onUpdateUserStatus(user.id, userStatusToApi(user.status), note);
@@ -377,7 +370,7 @@ function UsersView({
               onClick={() => {
                 setDraftFilters(defaultUserFilters);
                 onApplyFilters(defaultUserFilters);
-                onNotify('用户筛选条件已重置，并重新加载列表。');
+                onNotify('用户筛选已重置。');
               }}
             >
               重置
@@ -426,8 +419,8 @@ function UsersView({
                       <td className="px-5 py-4">
                         <div className="flex gap-3 font-medium">
                           <button className="text-blue-600" onClick={() => previewUser(user)}>详情</button>
-                          <button className="text-blue-600" onClick={() => onUpdateUserStatus(user.id, 'restricted', '后台限制用户提交')}>限制</button>
-                          <button className="text-blue-600" onClick={() => onUpdateUserStatus(user.id, 'banned', '后台封禁用户')}>封禁</button>
+                          <button className="text-blue-600" onClick={() => onUpdateUserStatus(user.id, 'restricted', '限制用户提交')}>限制</button>
+                          <button className="text-blue-600" onClick={() => onUpdateUserStatus(user.id, 'banned', '封禁用户')}>封禁</button>
                           <button className="text-blue-600" onClick={() => startUserNote(user)}>备注</button>
                         </div>
                       </td>
@@ -437,7 +430,7 @@ function UsersView({
                   <tr className="border-t border-slate-100">
                     <td colSpan={11} className="px-5 py-14 text-center">
                       <div className="mx-auto max-w-sm rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
-                        暂无用户数据。请确认管理员登录状态有效，或稍后刷新重试。
+                        暂无用户数据。
                       </div>
                     </td>
                   </tr>
@@ -482,7 +475,7 @@ function UsersView({
                 value={noteDraft}
                 onChange={(event) => setNoteDraft(event.target.value)}
                 className="mt-5 h-24 w-full rounded-lg border border-slate-200 p-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
-                placeholder="后台备注会写入操作日志，例如：已电话核验、限制原因、用户申诉记录等。"
+                placeholder="例如：已电话核验、限制原因或用户申诉情况。"
               />
               <button className="mt-3 text-sm font-semibold text-blue-600" onClick={() => saveUserNote(selectedUser)}>编辑备注</button>
             </>
@@ -617,14 +610,14 @@ function FeedbackView({
       <AdminPanel title="处理工作台">
         <div className="p-5 text-sm text-slate-600">
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
-            {selectedFeedback ? '已载入所选工单详情，可继续处理或关闭。' : '请选择一条记录查看详情并进行处理'}
+            {selectedFeedback ? '可继续处理或关闭。' : '请选择一条记录。'}
           </div>
           <DetailList
             items={[
               ['反馈类型', selectedFeedback?.type || '-'],
               ['关联模块', selectedFeedback?.module || '-'],
               ['提交内容', selectedFeedback?.content || '-'],
-              ['建议处理方式', selectedFeedback ? '核验关联内容后更新处理状态，并保留操作日志。' : '-']
+              ['建议处理方式', selectedFeedback ? '核验关联内容后更新处理状态。' : '-']
             ]}
           />
           <textarea className="mt-5 h-36 w-full rounded-lg border border-slate-200 p-3 text-sm outline-none" placeholder="请输入处理备注（选填）" />
@@ -782,13 +775,12 @@ function SettingsView({
   onNotify: (message: string) => void;
 }) {
   function roleMessage(role: string) {
-    onNotify(`${role} 权限说明已更新到当前矩阵。管理员名单和角色变更由超级管理员统一维护。`);
+    onNotify(`${role} 权限说明已更新。`);
   }
 
   return (
     <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-6">
-        <OperationsMaturityChecklist />
         <AdminPanel title="角色权限">
           <SimpleTable
             columns={['角色', '权限范围', '高危权限', '成员数', '操作']}
@@ -806,41 +798,11 @@ function SettingsView({
   );
 }
 
-function OperationsMaturityChecklist() {
-  const checks = [
-    ['数据可用', '用户、反馈、日志均展示最新运营记录，避免依赖过期页面。', '已接入'],
-    ['权限留痕', '封禁、限制、处理反馈、修改设置等关键操作会写入操作日志。', '已启用'],
-    ['审核闭环', '反馈举报拥有待处理、处理中、已解决、已关闭的完整状态链路。', '已完善'],
-    ['发布保护', '内容审核、Offer 提交、举报提醒与日志保留都集中在系统设置中管理。', '可配置']
-  ];
-
-  return (
-    <section className="grid gap-4 md:grid-cols-2">
-      {checks.map(([title, description, status]) => (
-        <div key={title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold text-slate-950">{title}</div>
-              <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
-            </div>
-            <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
-              {status}
-            </span>
-          </div>
-        </div>
-      ))}
-    </section>
-  );
-}
-
 function SettingsCard({ onUpdateSetting }: { onUpdateSetting?: (key: string, value: unknown) => void }) {
   if (!onUpdateSetting) {
     return (
       <AdminPanel title="审计规则 / 基础配置">
         <div className="space-y-4 p-5 text-sm">
-          <p className="leading-6 text-slate-500">
-            后台开关、日志保留天数和审核策略统一在系统设置页管理。当前侧栏只保留入口，避免分散配置。
-          </p>
           <Link
             href="/admin/settings"
             className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700"
@@ -862,12 +824,9 @@ function SettingsCard({ onUpdateSetting }: { onUpdateSetting?: (key: string, val
   return (
     <AdminPanel title="基础配置">
       <div className="space-y-5 p-5">
-        {settings.map(([key, title, description, value]) => (
+        {settings.map(([key, title, , value]) => (
           <div key={title} className="flex items-center justify-between gap-4 border-b border-slate-100 pb-5 last:border-b-0 last:pb-0">
-            <div>
-              <div className="font-semibold text-slate-950">{title}</div>
-              <div className="mt-1 text-sm text-slate-500">{description}</div>
-            </div>
+            <div className="font-semibold text-slate-950">{title}</div>
             <button
               type="button"
               className="h-7 w-12 rounded-full bg-blue-600 p-1"

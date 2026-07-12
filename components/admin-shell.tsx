@@ -26,7 +26,6 @@ import {
 } from 'lucide-react';
 import { refreshAdminSession, signOutAdmin, watchAdminSession, type AdminSession } from '@/lib/admin-session';
 import { getAdminErrorMessage, invokeAdminApi } from '@/lib/admin-api';
-import packageJson from '../package.json';
 import { adminClassNames } from './admin-ui';
 
 const adminNavItems = [
@@ -87,8 +86,6 @@ const emptyShellStatus: ShellStatus = {
   lastCheckedAt: ''
 };
 
-const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || packageJson.version;
-
 function getRoleName(role: string) {
   const map: Record<string, string> = {
     super_admin: '超级管理员',
@@ -102,10 +99,10 @@ function getRoleName(role: string) {
 
 function AdminAuthGate({
   title,
-  description
+  showLogin = false
 }: {
   title: string;
-  description: string;
+  showLogin?: boolean;
 }) {
   return (
     <main className="min-h-screen bg-[#f6f8fb] px-5 py-8 text-slate-900">
@@ -114,13 +111,14 @@ function AdminAuthGate({
           <ShieldCheck className="h-8 w-8" />
         </div>
         <h1 className="mt-6 text-2xl font-semibold text-slate-950">{title}</h1>
-        <p className="mt-3 text-sm leading-7 text-slate-500">{description}</p>
-        <Link
-          href="/admin/login"
-          className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-semibold text-white"
-        >
-          进入后台登录
-        </Link>
+        {showLogin ? (
+          <Link
+            href="/admin/login"
+            className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-semibold text-white"
+          >
+            进入后台登录
+          </Link>
+        ) : null}
       </section>
     </main>
   );
@@ -128,7 +126,6 @@ function AdminAuthGate({
 
 export function AdminShell({
   title,
-  description,
   children
 }: {
   title: string;
@@ -265,29 +262,17 @@ export function AdminShell({
 
   if (!sessionReady) {
     return (
-      <AdminAuthGate
-        title="正在校验后台会话"
-        description="正在确认你的管理员权限。通过校验后会加载运营导航、用户数据和审核工具。"
-      />
+      <AdminAuthGate title="正在加载" />
     );
   }
 
   if (!session) {
     return (
-      <AdminAuthGate
-        title="请先登录运营后台"
-        description="运营后台只面向授权成员开放。未登录时不会展示用户、反馈、记录和设置入口。"
-      />
+      <AdminAuthGate title="请先登录" showLogin />
     );
   }
 
   const pendingCount = shellStatus.pendingNotices + shellStatus.pendingOffers + shellStatus.pendingFeedback;
-  const lastCheckedLabel = shellStatus.lastCheckedAt
-    ? new Date(shellStatus.lastCheckedAt).toLocaleTimeString('zh-CN', {
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    : '待检测';
   const reminderHref =
     shellStatus.pendingNotices > 0
       ? '/admin/notices'
@@ -296,7 +281,6 @@ export function AdminShell({
         : shellStatus.pendingFeedback > 0
           ? '/admin/feedback'
           : '/admin/logs';
-  const systemHealthy = !shellStatus.error;
   const renderNavItems = (onNavigate?: () => void, compact = false) =>
     adminNavItems.map((item) => {
       const Icon = item.icon;
@@ -359,50 +343,19 @@ export function AdminShell({
           {renderNavItems(undefined, sidebarCollapsed)}
         </nav>
 
-        <div className={adminClassNames('absolute bottom-5', sidebarCollapsed ? 'left-3 right-3' : 'left-5 right-5')}>
-          {sidebarCollapsed ? (
-            <div className="grid gap-2">
-              <button
-                type="button"
-                onClick={toggleSidebar}
-                className="flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-teal-200 hover:text-teal-800"
-                aria-label="展开左侧导航"
-                title="展开导航"
-              >
-                <PanelLeftOpen className="h-5 w-5" />
-              </button>
-              <Link
-                href="/admin/settings"
-                className={adminClassNames(
-                  'relative flex h-11 items-center justify-center rounded-xl border',
-                  systemHealthy ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-rose-100 bg-rose-50 text-rose-700'
-                )}
-                aria-label={systemHealthy ? '工作台运行正常' : '工作台需要关注'}
-                title={systemHealthy ? '工作台运行正常' : '工作台需要关注'}
-              >
-                <ShieldCheck className="h-5 w-5" />
-                {pendingCount > 0 ? <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{pendingCount > 99 ? '99+' : pendingCount}</span> : null}
-              </Link>
-            </div>
-          ) : (
-          <div className={adminClassNames('rounded-2xl border p-4', systemHealthy ? 'border-emerald-100 bg-emerald-50/80' : 'border-rose-100 bg-rose-50/80')}>
-            <div className={adminClassNames('flex items-center gap-2 text-sm font-semibold', systemHealthy ? 'text-emerald-700' : 'text-rose-700')}>
-              <ShieldCheck className="h-4 w-4" />
-              {shellStatus.loading ? '正在更新工作台状态' : systemHealthy ? '工作台运行正常' : '工作台需要关注'}
-            </div>
-            <dl className="mt-3 space-y-2 text-xs">
-              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">数据同步</dt><dd className={adminClassNames('font-semibold', systemHealthy ? 'text-emerald-700' : 'text-rose-700')}>{shellStatus.loading ? '同步中' : systemHealthy ? '正常' : '异常'}</dd></div>
-              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">实时在线</dt><dd className="font-semibold text-slate-700">{shellStatus.onlineVisitors}</dd></div>
-              <div className="flex items-center justify-between gap-3"><dt className="text-slate-500">待处理</dt><dd className="font-semibold text-slate-700">{pendingCount}</dd></div>
-              <div className={adminClassNames('flex items-center justify-between gap-3 border-t pt-2', systemHealthy ? 'border-emerald-100' : 'border-rose-100')}><dt className="text-slate-500">最近检查</dt><dd className="font-semibold text-slate-700">{lastCheckedLabel}</dd></div>
-            </dl>
-            {shellStatus.error ? <p className="mt-3 line-clamp-2 text-xs text-rose-600">{shellStatus.error}</p> : null}
-            <Link href="/admin/settings" className="mt-3 inline-flex text-xs font-semibold text-blue-700">
-              查看运营设置 →
-            </Link>
+        {sidebarCollapsed ? (
+          <div className="absolute bottom-5 left-3 right-3">
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="flex h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-teal-200 hover:text-teal-800"
+              aria-label="展开左侧导航"
+              title="展开导航"
+            >
+              <PanelLeftOpen className="h-5 w-5" />
+            </button>
           </div>
-          )}
-        </div>
+        ) : null}
       </aside>
 
       {mobileNavOpen ? (
@@ -434,14 +387,6 @@ export function AdminShell({
             <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-5">
               {renderNavItems(() => setMobileNavOpen(false))}
             </nav>
-            <div className="border-t border-slate-100 p-4">
-              <div className={adminClassNames('rounded-2xl border p-4 text-sm', systemHealthy ? 'border-emerald-100 bg-emerald-50/80' : 'border-rose-100 bg-rose-50/80')}>
-                <div className={adminClassNames('font-semibold', systemHealthy ? 'text-emerald-700' : 'text-rose-700')}>
-                  {shellStatus.loading ? '正在更新工作台状态' : systemHealthy ? '工作台运行正常' : '工作台需要关注'}
-                </div>
-                <div className="mt-2 text-xs text-slate-500">待处理 {pendingCount} 条 · v{appVersion}</div>
-              </div>
-            </div>
           </aside>
         </div>
       ) : null}
@@ -468,7 +413,6 @@ export function AdminShell({
             </button>
             <div className="min-w-0">
               <h1 className="truncate text-xl font-semibold tracking-tight text-slate-950 lg:text-2xl">{title}</h1>
-              {description ? <p className="mt-1 line-clamp-1 text-sm text-slate-500">{description}</p> : null}
             </div>
           </div>
 
@@ -575,7 +519,6 @@ export function AdminShell({
                 <ShieldCheck className="h-8 w-8" />
               </div>
               <h2 className="mt-6 text-2xl font-semibold text-slate-950">请先登录运营后台</h2>
-              <p className="mt-3 text-sm leading-7 text-slate-500">登录后可处理通知、Offer、用户反馈和操作记录，关键动作都会留痕。</p>
               <Link
                 href="/admin/login"
                 className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-semibold text-white"

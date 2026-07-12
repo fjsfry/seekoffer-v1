@@ -69,10 +69,6 @@ export default function AdminLoginPage() {
           <h1 className="mt-6 max-w-2xl text-3xl font-semibold tracking-tight text-slate-950 lg:text-4xl">
             让运营数据、内容审核和风险处理保持清晰。
           </h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
-            登录后按角色进入对应工作区，关键操作自动保留记录。
-          </p>
-
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             {[
               [BarChart3, '增长与访问'],
@@ -94,8 +90,6 @@ export default function AdminLoginPage() {
             后台登录
           </div>
           <h2 className="mt-4 text-2xl font-semibold text-slate-950">进入运营工作台</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-500">使用已授权的管理员账号。</p>
-
           <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-slate-800">管理员邮箱</span>
@@ -129,9 +123,6 @@ export default function AdminLoginPage() {
           </form>
 
           {error ? <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
-          <div className="mt-6 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
-            无法登录时，请联系超级管理员核验权限。
-          </div>
         </section>
       </div>
     </main>
