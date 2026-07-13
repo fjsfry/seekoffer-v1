@@ -232,76 +232,75 @@ export default function AdminDashboardPage() {
           </div>
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(380px,0.85fr)]">
-          <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.045)] lg:p-7">
-            <div className="absolute inset-y-0 left-0 w-1 bg-teal-700" />
-            <div className="flex flex-wrap items-start justify-between gap-4">
+        <section className="grid gap-5 xl:grid-cols-2">
+          <article className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.05)] lg:p-7">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-50 text-teal-800 ring-1 ring-teal-100">
-                  <UsersRound className="h-5 w-5" />
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-50 text-teal-800 ring-1 ring-inset ring-teal-100">
+                  <UsersRound className="h-6 w-6" />
                 </span>
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-700">用户规模</div>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-950">累计用户</h2>
-                </div>
+                <h2 className="text-lg font-semibold text-slate-950">累计用户</h2>
               </div>
-              <span className="rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-                今日新增 {formatNumber(analytics.metrics.todayVisitors)}
+              <span className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-100">
+                今日活跃 {formatNumber(analytics.metrics.todayVisitors)}
               </span>
             </div>
 
-            <div className="mt-6 text-5xl font-semibold text-slate-950 sm:text-6xl">{formatNumber(totalAudienceUsers)}</div>
+            <div className="mt-8 text-6xl font-semibold leading-none text-slate-950 tabular-nums">{formatNumber(totalAudienceUsers)}</div>
 
-            <dl className="mt-7 grid grid-cols-3 divide-x divide-slate-100 border-t border-slate-100 pt-5">
+            <dl className="mt-8 grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-100 pt-5">
               <div className="pr-4">
-                <dt className="text-xs text-slate-400">今日活跃</dt>
-                <dd className="mt-1 text-xl font-semibold text-slate-900">{formatNumber(analytics.metrics.todayVisitors)}</dd>
+                <dd className="text-xl font-semibold text-slate-950 tabular-nums">{formatNumber(analytics.metrics.todayVisitors)}</dd>
+                <dt className="mt-1 text-sm text-slate-500">今日活跃</dt>
               </div>
               <div className="px-4">
-                <dt className="text-xs text-slate-400">今日浏览</dt>
-                <dd className="mt-1 text-xl font-semibold text-slate-900">{formatNumber(analytics.metrics.todayPageViews)}</dd>
+                <dd className="text-xl font-semibold text-slate-950 tabular-nums">{formatNumber(analytics.metrics.todayPageViews)}</dd>
+                <dt className="mt-1 text-sm text-slate-500">今日浏览</dt>
               </div>
               <div className="pl-4">
-                <dt className="text-xs text-slate-400">实时在线</dt>
-                <dd className="mt-1 text-xl font-semibold text-slate-900">{formatNumber(analytics.metrics.onlineVisitors)}</dd>
+                <dd className="text-xl font-semibold text-slate-950 tabular-nums">{formatNumber(analytics.metrics.onlineVisitors)}</dd>
+                <dt className="mt-1 text-sm text-slate-500">实时在线</dt>
               </div>
             </dl>
           </article>
 
-          <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.045)] lg:p-7">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+          <article className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.05)] lg:p-7">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
-                  <UserPlus className="h-5 w-5" />
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-100">
+                  <UserPlus className="h-6 w-6" />
                 </span>
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">账号增长</div>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-950">注册用户</h2>
-                </div>
+                <h2 className="text-lg font-semibold text-slate-950">注册用户</h2>
               </div>
-              <div className="text-right">
-                <div className="text-xs font-medium text-slate-400">注册转化率</div>
-                <div className="mt-1 text-xl font-semibold text-teal-800">{registrationConversion.toFixed(1)}%</div>
-              </div>
+              <span className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 ring-1 ring-inset ring-blue-100">
+                转化率 {registrationConversion.toFixed(1)}%
+              </span>
             </div>
 
-            <div className="mt-6 text-5xl font-semibold text-slate-950 sm:text-6xl">{formatNumber(overviewMetrics.totalUsers)}</div>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full rounded-full bg-blue-500" style={{ width: `${registrationConversion}%` }} />
+            <div className="mt-8 text-6xl font-semibold leading-none text-slate-950 tabular-nums">{formatNumber(overviewMetrics.totalUsers)}</div>
+            <div
+              className="mt-6 h-1.5 overflow-hidden rounded-full bg-slate-100"
+              role="progressbar"
+              aria-label="注册转化率"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Number(registrationConversion.toFixed(1))}
+            >
+              <div className="h-full rounded-full bg-blue-600" style={{ width: `${registrationConversion}%` }} />
             </div>
 
-            <dl className="mt-6 grid grid-cols-3 gap-3 border-t border-slate-100 pt-5">
-              <div>
-                <dt className="text-xs text-slate-400">今日注册</dt>
-                <dd className="mt-1 text-lg font-semibold text-slate-900">{formatNumber(overviewMetrics.todayUsers)}</dd>
+            <dl className="mt-6 grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-100 pt-5">
+              <div className="pr-4">
+                <dd className="text-xl font-semibold text-slate-950 tabular-nums">{formatNumber(overviewMetrics.todayUsers)}</dd>
+                <dt className="mt-1 text-sm text-slate-500">今日注册</dt>
               </div>
-              <div>
-                <dt className="text-xs text-slate-400">近 7 日新增</dt>
-                <dd className="mt-1 text-lg font-semibold text-slate-900">{formatNumber(recentRegistrations)}</dd>
+              <div className="px-4">
+                <dd className="text-xl font-semibold text-slate-950 tabular-nums">{formatNumber(recentRegistrations)}</dd>
+                <dt className="mt-1 text-sm text-slate-500">近 7 日新增</dt>
               </div>
-              <div>
-                <dt className="text-xs text-slate-400">正常账号</dt>
-                <dd className="mt-1 text-lg font-semibold text-slate-900">{formatNumber(overviewMetrics.normalUsers)}</dd>
+              <div className="pl-4">
+                <dd className="text-xl font-semibold text-slate-950 tabular-nums">{formatNumber(overviewMetrics.normalUsers)}</dd>
+                <dt className="mt-1 text-sm text-slate-500">正常账号</dt>
               </div>
             </dl>
           </article>
