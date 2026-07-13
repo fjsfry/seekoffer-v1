@@ -1,0 +1,13 @@
+{
+  "name": "seekoffer-wechat-daily-digest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build the daily SeekOffer notice digest and save it to the WeChat Official Account draft box.",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "sharp": "0.34.5"
+  }
+}

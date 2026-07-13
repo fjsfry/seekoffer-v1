@@ -1,4 +1,5 @@
 {
+  "version": "2.0",
   "envId": "cloudbase-4gonuep215f23af4",
   "app": {
     "serviceName": "seekoffer-web",
@@ -8,7 +9,22 @@
     "outputDir": ".next-web"
   },
   "functionRoot": "./functions",
-  "functions": [],
+  "functions": [
+    {
+      "name": "wechat-daily-digest",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 120,
+      "memorySize": 512,
+      "triggers": [
+        {
+          "name": "wechat-daily-2130",
+          "type": "timer",
+          "config": "0 30 21 * * * *"
+        }
+      ]
+    }
+  ],
   "ai": {
     "defaultAgent": "codex",
     "agents": {

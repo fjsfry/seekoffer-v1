@@ -82,6 +82,7 @@ const defaultNoticeListState: NoticeListUrlState = {
   progress: '全部',
   deadlineQuick: '全部',
   fresh: '全部',
+  publishDate: '',
   projectType: '全部',
   noticeKind: '全部',
   year: '2026',
@@ -243,6 +244,7 @@ type NoticeListFilterValues = {
   progress: ProgressFilter;
   deadlineQuick: DeadlineQuickFilter;
   fresh: FreshFilter;
+  publishDate: string;
   projectType: string;
   noticeKind: string;
   year: string;
@@ -297,6 +299,7 @@ function buildNoticeFilterKey(values: NoticeListFilterValues) {
     values.progress,
     values.deadlineQuick,
     values.fresh,
+    values.publishDate,
     values.projectType,
     values.noticeKind,
     values.year,
@@ -320,6 +323,7 @@ function parseNoticeListUrlState(params: SearchParamReader) {
     progress: pickAllowedValue(readFirstSearchParam(params, 'status', 'progress'), progressOptions, '全部'),
     deadlineQuick: pickAllowedValue(readFirstSearchParam(params, 'deadline'), deadlineQuickOptions, '全部'),
     fresh: pickAllowedValue(readFirstSearchParam(params, 'fresh', 'new'), freshOptions, '全部'),
+    publishDate: readFirstSearchParam(params, 'date', 'publishDate'),
     projectType: pickAllowedValue(readFirstSearchParam(params, 'type'), projectTypeOptions, '全部'),
     noticeKind: pickAllowedValue(readFirstSearchParam(params, 'kind', 'noticeKind'), noticeKindOptions, '全部'),
     year: readFirstSearchParam(params, 'year') || '2026',
@@ -350,6 +354,7 @@ function buildNoticeListHref(values: NoticeListFilterValues, page: number, advan
   appendSearchParam(params, 'status', values.progress, '全部');
   appendSearchParam(params, 'deadline', values.deadlineQuick, '全部');
   appendSearchParam(params, 'fresh', values.fresh, '全部');
+  appendSearchParam(params, 'date', values.publishDate);
   appendSearchParam(params, 'type', values.projectType, '全部');
   appendSearchParam(params, 'kind', values.noticeKind, '全部');
   appendSearchParam(params, 'year', values.year, '2026');
@@ -482,6 +487,7 @@ function NoticesPageContent() {
   const [progress, setProgress] = useState<ProgressFilter>(initialNoticeState.progress);
   const [deadlineQuick, setDeadlineQuick] = useState<DeadlineQuickFilter>(initialNoticeState.deadlineQuick);
   const [fresh, setFresh] = useState<FreshFilter>(initialNoticeState.fresh);
+  const [publishDate, setPublishDate] = useState(initialNoticeState.publishDate);
   const [projectType, setProjectType] = useState(initialNoticeState.projectType);
   const [noticeKind, setNoticeKind] = useState(initialNoticeState.noticeKind);
   const [year, setYear] = useState(initialNoticeState.year);
@@ -503,6 +509,7 @@ function NoticesPageContent() {
       progress,
       deadlineQuick,
       fresh,
+      publishDate,
       projectType,
       noticeKind,
       year,
@@ -519,6 +526,7 @@ function NoticesPageContent() {
       progress,
       deadlineQuick,
       fresh,
+      publishDate,
       projectType,
       noticeKind,
       year,
@@ -628,6 +636,7 @@ function NoticesPageContent() {
               ? ['today', 'within3days'].includes(getDeadlineLevelFromDate(item.deadlineDate))
               : ['today', 'within3days', 'within7days'].includes(getDeadlineLevelFromDate(item.deadlineDate));
       const matchesFresh = fresh === '全部' ? true : item.publishDate === todayInBeijing;
+      const matchesPublishDate = publishDate ? item.publishDate === publishDate : true;
       const matchesYear = year === '全部' ? true : String(item.year) === year;
       const matchesKeyword =
         !noticeKeyword ||
@@ -646,6 +655,7 @@ function NoticesPageContent() {
         matchesProgressState &&
         matchesDeadlineQuick &&
         matchesFresh &&
+        matchesPublishDate &&
         matchesYear &&
         matchesKeyword
       );
@@ -664,6 +674,7 @@ function NoticesPageContent() {
     progress,
     deadlineQuick,
     fresh,
+    publishDate,
     projectType,
     noticeKind,
     year,
@@ -823,6 +834,7 @@ function NoticesPageContent() {
     setProgress(defaultNoticeListState.progress);
     setDeadlineQuick(defaultNoticeListState.deadlineQuick);
     setFresh(defaultNoticeListState.fresh);
+    setPublishDate(defaultNoticeListState.publishDate);
     setProjectType(defaultNoticeListState.projectType);
     setNoticeKind(defaultNoticeListState.noticeKind);
     setYear(defaultNoticeListState.year);
