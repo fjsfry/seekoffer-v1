@@ -1,0 +1,26 @@
+{
+  "artifact": "SeekOffer WeChat Daily Digest v3",
+  "generatedAt": "2026-07-14T07:17:55.095Z",
+  "targetDate": "2026-07-13",
+  "noticeCount": 8,
+  "includedCount": 8,
+  "omittedCount": 0,
+  "title": "7月13日｜先核对近期报名节点",
+  "sourceUrl": "https://www.seekoffer.com.cn/notices/?date=2026-07-13&year=2026&sort=publish",
+  "dimensions": {
+    "previewWidth": 390,
+    "coverWidth": 900,
+    "coverHeight": 383
+  },
+  "renderer": "editorial HTML with optional OpenAI copy and a deterministic JPEG cover",
+  "generatedLayers": [],
+  "editorial": {
+    "source": "codex",
+    "model": "chatgpt-plus-scheduled",
+    "fallbackReason": ""
+  },
+  "provenance": {
+    "content": "CloudBase production dry-run using Supabase notice records",
+    "fonts": "Lato and a SeekOffer subset of Noto Sans SC from Google Fonts, licensed under SIL Open Font License 1.1"
+  }
+}

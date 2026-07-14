@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -80,7 +80,7 @@ function findDigestResult(value, seen = new Set()) {
   return null;
 }
 
-function invokeCloudPreview(targetDate) {
+function invokeCloudPreview(targetDate, editorial = undefined) {
   const executable = process.platform === 'win32' ? process.execPath : 'npx';
   const npxArguments = process.platform === 'win32'
     ? [path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js')]
@@ -95,7 +95,7 @@ function invokeCloudPreview(targetDate) {
     'invoke',
     'wechat-daily-digest',
     '--params',
-    JSON.stringify({ dryRun: true, targetDate }),
+    JSON.stringify({ dryRun: true, targetDate, ...(editorial ? { editorial } : {}) }),
     '--json'
   ], {
     cwd: repositoryRoot,
@@ -189,11 +189,15 @@ function buildPreviewDocument(result, coverFilename) {
 }
 
 const targetDate = validateDate(readArgument('--target-date', '2026-07-13'));
+const editorialFile = readArgument('--editorial-file');
+const editorial = editorialFile
+  ? JSON.parse(await readFile(path.resolve(repositoryRoot, editorialFile), 'utf8'))
+  : undefined;
 const outputDirectory = path.resolve(
   repositoryRoot,
   readArgument('--out', 'docs/previews/wechat-daily-digest-v3')
 );
-const result = invokeCloudPreview(targetDate);
+const result = invokeCloudPreview(targetDate, editorial);
 const coverFilename = `cover-${targetDate}.jpg`;
 const cover = await renderCoverJpeg({ targetDate, noticeCount: Number(result.noticeCount) });
 const preview = buildPreviewDocument(result, coverFilename);
