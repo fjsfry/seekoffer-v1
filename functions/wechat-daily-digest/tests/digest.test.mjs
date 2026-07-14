@@ -82,6 +82,74 @@ test('supports a fixture-only dry run without secrets or network access', async 
   assert.equal(result.editorial.source, 'rules');
 });
 
+test('returns a fact-only editorial brief for a Codex scheduled task', async () => {
+  const result = await runDailyDigest({
+    event: {
+      dryRun: true,
+      includeEditorialBrief: true,
+      targetDate: '2026-07-13',
+      notices
+    },
+    env: {},
+    fetchImpl: () => {
+      throw new Error('network should not be called');
+    }
+  });
+
+  assert.equal(result.editorialBrief.targetDate, '2026-07-13');
+  assert.equal(result.editorialBrief.noticeCount, 2);
+  assert.deepEqual(
+    result.editorialBrief.notices.map((notice) => notice.id),
+    ['n-1', 'n-2']
+  );
+  assert.ok(result.editorialBrief.notices.every((notice) => !('sourceLink' in notice)));
+});
+
+test('accepts a validated Codex editorial override without calling OpenAI', async () => {
+  const result = await runDailyDigest({
+    event: {
+      dryRun: true,
+      targetDate: '2026-07-13',
+      notices,
+      editorial: {
+        titleHook: '先看申请节奏变化',
+        lead: '今天的更新覆盖预推免和开放日，建议先查看截止时间较近的项目，再根据申请阶段核对院校原文中的资格与材料要求。',
+        selectedNoticeIds: ['n-2', 'n-1']
+      }
+    },
+    env: { OPENAI_API_KEY: 'must-not-be-used' },
+    fetchImpl: () => {
+      throw new Error('network should not be called');
+    }
+  });
+
+  assert.equal(result.article.title, '7月13日｜先看申请节奏变化');
+  assert.equal(result.editorial.source, 'codex');
+  assert.equal(result.editorial.model, 'chatgpt-plus-scheduled');
+});
+
+test('rejects an invalid Codex editorial override', async () => {
+  await assert.rejects(
+    runDailyDigest({
+      event: {
+        dryRun: true,
+        targetDate: '2026-07-13',
+        notices,
+        editorial: {
+          titleHook: '重磅速看',
+          lead: '今天的更新覆盖预推免和开放日，建议先查看报名时间，再根据申请阶段核对院校原文中的资格条件与材料要求。',
+          selectedNoticeIds: ['not-a-real-notice']
+        }
+      },
+      env: {},
+      fetchImpl: () => {
+        throw new Error('network should not be called');
+      }
+    }),
+    (error) => error?.code === 'invalid_editorial_override'
+  );
+});
+
 test('uses GPT structured output for restrained editorial copy', async () => {
   const calls = [];
   const editorialOutput = {

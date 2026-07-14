@@ -38,6 +38,14 @@ const EDITORIAL_SCHEMA = {
   required: ['titleHook', 'lead', 'selectedNoticeIds']
 };
 
+export class EditorialValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'EditorialValidationError';
+    this.code = 'invalid_editorial_override';
+  }
+}
+
 function compactText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
@@ -143,8 +151,47 @@ function validateEditorial(candidate, fallback, notices) {
   };
 }
 
-function buildEditorialInput(notices, targetDate, categoryCounts) {
-  return JSON.stringify({
+export function createProvidedEditorial({ candidate, notices, targetDate, categoryCounts = {} }) {
+  const fallback = buildFallbackEditorial({ notices, targetDate, categoryCounts });
+  const allowedKeys = new Set(['titleHook', 'lead', 'selectedNoticeIds']);
+  const candidateKeys = candidate && typeof candidate === 'object' && !Array.isArray(candidate)
+    ? Object.keys(candidate)
+    : [];
+  const inputIds = Array.isArray(candidate?.selectedNoticeIds)
+    ? candidate.selectedNoticeIds.map(compactText)
+    : [];
+  const validated = validateEditorial(candidate, fallback, notices);
+  const titleHook = compactText(candidate?.titleHook);
+  const lead = compactText(candidate?.lead);
+  const exactIds = inputIds.length >= 1
+    && inputIds.length <= 3
+    && inputIds.every((id, index) => id && inputIds.indexOf(id) === index)
+    && inputIds.every((id, index) => validated.selectedNoticeIds[index] === id)
+    && validated.selectedNoticeIds.length === inputIds.length;
+  const exactShape = candidateKeys.length === 3
+    && candidateKeys.every((key) => allowedKeys.has(key))
+    && typeof candidate.titleHook === 'string'
+    && typeof candidate.lead === 'string'
+    && Array.isArray(candidate.selectedNoticeIds)
+    && candidate.selectedNoticeIds.every((id) => typeof id === 'string');
+
+  if (!exactShape || validated.titleHook !== titleHook || validated.lead !== lead || !exactIds) {
+    throw new EditorialValidationError(
+      'Codex editorial input must contain a restrained titleHook, lead, and 1-3 valid selectedNoticeIds'
+    );
+  }
+
+  return {
+    source: 'codex',
+    model: 'chatgpt-plus-scheduled',
+    responseId: '',
+    fallbackReason: '',
+    ...validated
+  };
+}
+
+export function buildEditorialBrief({ notices, targetDate, categoryCounts = {} }) {
+  return {
     targetDate,
     noticeCount: notices.length,
     categoryCounts,
@@ -157,7 +204,11 @@ function buildEditorialInput(notices, targetDate, categoryCounts) {
       deadline: notice.deadlineDate,
       daysUntilDeadline: deadlineDays(notice.deadlineDate, targetDate)
     }))
-  });
+  };
+}
+
+function buildEditorialInput(notices, targetDate, categoryCounts) {
+  return JSON.stringify(buildEditorialBrief({ notices, targetDate, categoryCounts }));
 }
 
 export async function createEditorialPlan({ notices, targetDate, categoryCounts, fetchImpl, env = {} }) {

@@ -2,7 +2,12 @@ import { PassThrough } from 'node:stream';
 import { createReadStream } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as PImage from 'pureimage';
-import { buildFallbackEditorial, createEditorialPlan } from './editorial-core.mjs';
+import {
+  buildEditorialBrief,
+  buildFallbackEditorial,
+  createEditorialPlan,
+  createProvidedEditorial
+} from './editorial-core.mjs';
 
 const CATEGORY_ORDER = ['预推免', '夏令营', '开放日与宣讲', '名单与结果', '其他通知'];
 const DEFAULT_SITE_URL = 'https://www.seekoffer.com.cn';
@@ -596,6 +601,9 @@ export async function runDailyDigest({
   const targetDate = resolveTargetDate(event, now);
   const dryRun = booleanValue(event.dryRun ?? event.dry_run ?? env.WECHAT_DAILY_DRY_RUN);
   const force = booleanValue(event.force);
+  const includeEditorialBrief = booleanValue(event.includeEditorialBrief ?? event.include_editorial_brief);
+  const hasEditorialOverride = event.editorial !== undefined || event.editorial_override !== undefined;
+  const editorialOverride = event.editorial ?? event.editorial_override;
   const suppliedNotices = dryRun && Array.isArray(event.notices) ? event.notices : null;
   const rawNotices = suppliedNotices || await fetchDailyNotices(fetchImpl, env, targetDate);
   const digestOptions = {
@@ -621,17 +629,24 @@ export async function runDailyDigest({
     }
   }
 
-  const editorial = await createEditorialPlan({
-    notices: baselineDigest.notices,
-    targetDate,
-    categoryCounts: baselineDigest.categoryCounts,
-    fetchImpl,
-    env
-  });
+  const editorial = hasEditorialOverride
+    ? createProvidedEditorial({
+        candidate: editorialOverride,
+        notices: baselineDigest.notices,
+        targetDate,
+        categoryCounts: baselineDigest.categoryCounts
+      })
+    : await createEditorialPlan({
+        notices: baselineDigest.notices,
+        targetDate,
+        categoryCounts: baselineDigest.categoryCounts,
+        fetchImpl,
+        env
+      });
   const digest = buildDailyDigest(rawNotices, targetDate, { ...digestOptions, editorial });
 
   if (dryRun) {
-    return {
+    const result = {
       ok: true,
       dryRun: true,
       targetDate,
@@ -651,6 +666,14 @@ export async function runDailyDigest({
         fallbackReason: editorial.fallbackReason
       }
     };
+    if (includeEditorialBrief) {
+      result.editorialBrief = buildEditorialBrief({
+        notices: baselineDigest.notices,
+        targetDate,
+        categoryCounts: baselineDigest.categoryCounts
+      });
+    }
+    return result;
   }
 
   const lockPayload = {

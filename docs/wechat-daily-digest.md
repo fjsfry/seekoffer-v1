@@ -24,6 +24,27 @@ GitHub Actions 每小时同步
 - 提示词禁止“重磅、速看、干货、上岸、码住”等自媒体套话，也禁止感叹号、表情符号和英文栏目名。
 - 版式采用暖白底、深绿强调、细分隔线和留白，不使用渐变、大面积深色、胶囊标签或卡片堆叠。
 
+## Plus/Codex 定时润色
+
+为了复用 ChatGPT Plus 中的 Codex 用量，而不是调用按量计费的 OpenAI API，生产流程采用双层定时：
+
+1. CloudBase 每天 21:30 先生成规则编辑版草稿，保证电脑关机或 Codex 用量不足时也不会断更。
+2. Codex 桌面端每天 21:35 读取当日公开通知事实，生成克制的标题、导语和优先阅读项。
+3. 云函数严格校验 Codex 返回的三个字段和通知 ID，再原位更新 21:30 的同一篇草稿。
+4. Codex 定时任务不调用 OpenAI Platform API，不删除草稿，也不执行最终发布。
+
+本地协作目录 `.wechat-codex/` 已加入 `.gitignore`。值班任务使用以下命令：
+
+```powershell
+# 生成只包含公开事实的编辑简报
+npm run wechat:codex:brief
+
+# Codex 在 .wechat-codex/editorial-YYYY-MM-DD.json 写入结构化编辑意见后，原位更新草稿
+npm run wechat:codex:publish
+```
+
+编辑文件必须且只能包含 `titleHook`、`lead`、`selectedNoticeIds`。云函数会拒绝自媒体套话、越界长度、未知通知 ID、重复 ID 或额外字段。
+
 ## CloudBase 函数环境变量
 
 在 CloudBase 控制台的函数配置中设置，禁止写入代码或 GitHub：
@@ -32,10 +53,10 @@ GitHub Actions 每小时同步
 - `SUPABASE_SERVICE_ROLE_KEY`：Supabase 服务端密钥
 - `WECHAT_MP_APP_ID`：公众号 AppID
 - `WECHAT_MP_APP_SECRET`：公众号 AppSecret
-- `OPENAI_API_KEY`：OpenAI API 密钥；缺失时自动使用规则编辑版
 
 可选：
 
+- `OPENAI_API_KEY`：仅在不用 Plus/Codex 定时任务、改走 OpenAI Platform API 时设置
 - `OPENAI_EDITORIAL_MODEL`：默认 `gpt-5.4-mini`
 - `OPENAI_EDITORIAL_TIMEOUT_MS`：默认 `25000`
 - `SEEKOFFER_SITE_URL`：默认 `https://www.seekoffer.com.cn`

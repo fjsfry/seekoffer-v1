@@ -10,6 +10,8 @@
     "test": "vitest run",
     "test:wechat-digest": "node --test functions/wechat-daily-digest/tests/*.test.mjs",
     "preview:wechat-digest": "node scripts/render-wechat-digest-preview.mjs",
+    "wechat:codex:brief": "node scripts/run-wechat-codex-editor.mjs brief",
+    "wechat:codex:publish": "node scripts/run-wechat-codex-editor.mjs publish",
     "check": "npm run typecheck && npm run lint && npm run test && npm run test:wechat-digest && npm run audit:admin-security",
     "audit:admin-security": "node ./scripts/audit-admin-security.mjs",
     "start": "next start",
