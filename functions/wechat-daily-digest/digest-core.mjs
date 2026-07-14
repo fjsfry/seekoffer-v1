@@ -15,6 +15,7 @@ const DEFAULT_MAX_CONTENT_CHARS = 18_000;
 const WECHAT_STABLE_TOKEN_URL = 'https://api.weixin.qq.com/cgi-bin/stable_token';
 const WECHAT_UPLOAD_MATERIAL_URL = 'https://api.weixin.qq.com/cgi-bin/material/add_material';
 const WECHAT_ADD_DRAFT_URL = 'https://api.weixin.qq.com/cgi-bin/draft/add';
+const WECHAT_UPDATE_DRAFT_URL = 'https://api.weixin.qq.com/cgi-bin/draft/update';
 
 export class DigestError extends Error {
   constructor(code, message, details = undefined) {
@@ -587,6 +588,21 @@ async function uploadCover(fetchImpl, accessToken, digest) {
   return payload.media_id;
 }
 
+function buildWechatArticle(env, digest, thumbMediaId) {
+  return {
+    article_type: 'news',
+    title: digest.title,
+    author: compactText(env.WECHAT_DAILY_AUTHOR) || '寻鹿SeekOffer',
+    digest: digest.digest,
+    content: digest.content,
+    content_source_url: digest.sourceUrl,
+    thumb_media_id: thumbMediaId,
+    show_cover_pic: 1,
+    need_open_comment: 0,
+    only_fans_can_comment: 0
+  };
+}
+
 async function addWechatDraft(fetchImpl, accessToken, env, digest, thumbMediaId) {
   const url = `${WECHAT_ADD_DRAFT_URL}?access_token=${encodeURIComponent(accessToken)}`;
   const payload = await requestJson(
@@ -596,20 +612,7 @@ async function addWechatDraft(fetchImpl, accessToken, env, digest, thumbMediaId)
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        articles: [
-          {
-            article_type: 'news',
-            title: digest.title,
-            author: compactText(env.WECHAT_DAILY_AUTHOR) || '寻鹿SeekOffer',
-            digest: digest.digest,
-            content: digest.content,
-            content_source_url: digest.sourceUrl,
-            thumb_media_id: thumbMediaId,
-            show_cover_pic: 1,
-            need_open_comment: 0,
-            only_fans_can_comment: 0
-          }
-        ]
+        articles: [buildWechatArticle(env, digest, thumbMediaId)]
       })
     },
     'wechat_draft_failed'
@@ -623,6 +626,33 @@ async function addWechatDraft(fetchImpl, accessToken, env, digest, thumbMediaId)
     );
   }
   return payload.media_id;
+}
+
+async function updateWechatDraft(fetchImpl, accessToken, env, digest, thumbMediaId, mediaId) {
+  const url = `${WECHAT_UPDATE_DRAFT_URL}?access_token=${encodeURIComponent(accessToken)}`;
+  const payload = await requestJson(
+    fetchImpl,
+    url,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        media_id: mediaId,
+        index: 0,
+        articles: buildWechatArticle(env, digest, thumbMediaId)
+      })
+    },
+    'wechat_draft_update_failed'
+  );
+
+  if (Number(payload?.errcode || 0) !== 0) {
+    throw new DigestError(
+      String(payload?.errcode || 'wechat_draft_update_failed'),
+      compactText(payload?.errmsg) || 'WeChat did not update the draft',
+      payload
+    );
+  }
+  return mediaId;
 }
 
 function booleanValue(value) {
@@ -728,7 +758,10 @@ export async function runDailyDigest({
   try {
     const accessToken = await getWechatAccessToken(fetchImpl, env);
     const thumbMediaId = compactText(env.WECHAT_MP_THUMB_MEDIA_ID) || await uploadCover(fetchImpl, accessToken, digest);
-    const mediaId = await addWechatDraft(fetchImpl, accessToken, env, digest, thumbMediaId);
+    const existingMediaId = compactText(existing?.wechat_media_id);
+    const mediaId = existing && force && existingMediaId
+      ? await updateWechatDraft(fetchImpl, accessToken, env, digest, thumbMediaId, existingMediaId)
+      : await addWechatDraft(fetchImpl, accessToken, env, digest, thumbMediaId);
 
     await updatePublication(fetchImpl, env, targetDate, {
       status: 'drafted',

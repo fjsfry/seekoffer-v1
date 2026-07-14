@@ -135,3 +135,54 @@ test('runs the complete Supabase-to-WeChat draft workflow', async () => {
   assert.equal(calls.filter((call) => call.method === 'PATCH').length, 1);
   assert.ok(calls.some((call) => call.url.includes('/cgi-bin/draft/add?')));
 });
+
+test('updates an existing WeChat draft in place when force is enabled', async () => {
+  const calls = [];
+  const existingMediaId = 'existing-draft-media-id';
+  const json = (value, status = 200) => new Response(JSON.stringify(value), {
+    status,
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  const fetchImpl = async (input, options = {}) => {
+    const url = String(input);
+    const method = options.method || 'GET';
+    calls.push({ url, method, body: options.body });
+
+    if (url.includes('/rest/v1/notices?')) return json(notices);
+    if (url.includes('/rest/v1/wechat_daily_publications?') && method === 'GET') {
+      return json([{ status: 'drafted', notice_count: 2, wechat_media_id: existingMediaId }]);
+    }
+    if (url.includes('/rest/v1/wechat_daily_publications?') && method === 'PATCH') {
+      return new Response(null, { status: 204 });
+    }
+    if (url.endsWith('/cgi-bin/stable_token')) return json({ access_token: 'test-access-token' });
+    if (url.includes('/cgi-bin/material/add_material?')) return json({ media_id: 'updated-thumb-media-id' });
+    if (url.includes('/cgi-bin/draft/update?')) {
+      const body = JSON.parse(options.body);
+      assert.equal(body.media_id, existingMediaId);
+      assert.equal(body.index, 0);
+      assert.match(body.articles.content, /SEEK OFFER · DAILY BRIEF/);
+      assert.equal(body.articles.thumb_media_id, 'updated-thumb-media-id');
+      return json({ errcode: 0, errmsg: 'ok' });
+    }
+
+    throw new Error(`Unexpected request: ${method} ${url}`);
+  };
+
+  const result = await runDailyDigest({
+    event: { targetDate: '2026-07-13', force: true },
+    env: {
+      SUPABASE_URL: 'https://example.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY: 'test-service-role-key',
+      WECHAT_MP_APP_ID: 'test-app-id',
+      WECHAT_MP_APP_SECRET: 'test-app-secret'
+    },
+    fetchImpl
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.mediaId, existingMediaId);
+  assert.ok(calls.some((call) => call.url.includes('/cgi-bin/draft/update?')));
+  assert.ok(!calls.some((call) => call.url.includes('/cgi-bin/draft/add?')));
+});
