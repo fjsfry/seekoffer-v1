@@ -1,6 +1,15 @@
-import { deflateSync } from 'node:zlib';
+import { PassThrough } from 'node:stream';
+import { fileURLToPath } from 'node:url';
+import * as PImage from 'pureimage';
 
 const CATEGORY_ORDER = ['预推免', '夏令营', '开放日与宣讲', '名单与结果', '其他通知'];
+const CATEGORY_META = {
+  预推免: { accent: '#b68443', soft: '#fbf6ed', kicker: 'PRE-RECOMMENDATION' },
+  夏令营: { accent: '#2f7c7a', soft: '#edf7f6', kicker: 'SUMMER PROGRAM' },
+  开放日与宣讲: { accent: '#6877a8', soft: '#f1f3fa', kicker: 'OPEN DAY & SESSION' },
+  名单与结果: { accent: '#a4534d', soft: '#fbf1f0', kicker: 'RESULT & ADMISSION' },
+  其他通知: { accent: '#647687', soft: '#f2f5f7', kicker: 'OTHER UPDATES' }
+};
 const DEFAULT_SITE_URL = 'https://www.seekoffer.com.cn';
 const DEFAULT_MAX_CONTENT_CHARS = 18_000;
 const WECHAT_STABLE_TOKEN_URL = 'https://api.weixin.qq.com/cgi-bin/stable_token';
@@ -140,26 +149,61 @@ function normalizeNotices(notices, targetDate) {
   });
 }
 
+function getDeadlineMeta(deadlineDate, targetDate) {
+  const match = compactText(deadlineDate).match(/20\d{2}-\d{2}-\d{2}/);
+  if (!match) {
+    return { label: '截止时间', color: '#52697a', background: '#eef3f6', urgent: false };
+  }
+
+  const deadline = Date.parse(`${match[0]}T23:59:59+08:00`);
+  const start = Date.parse(`${targetDate}T00:00:00+08:00`);
+  const remainingDays = Math.floor((deadline - start) / 86_400_000);
+
+  if (remainingDays < 0) {
+    return { label: '已截止', color: '#7f8c97', background: '#eef1f3', urgent: false };
+  }
+  if (remainingDays === 0) {
+    return { label: '今日截止', color: '#a33f35', background: '#fff0ed', urgent: true };
+  }
+  if (remainingDays <= 3) {
+    return { label: `${remainingDays}天内截止`, color: '#9a5f1f', background: '#fff5e6', urgent: true };
+  }
+
+  return { label: '报名截止', color: '#52697a', background: '#eef3f6', urgent: false };
+}
+
 function buildCategoryHeader(category, count) {
+  const position = CATEGORY_ORDER.indexOf(category) + 1;
+  const meta = CATEGORY_META[category] || CATEGORY_META.其他通知;
   return [
-    '<section style="margin:26px 0 12px;">',
-    `<p style="margin:0;font-size:18px;font-weight:700;color:#102a43;">${escapeHtml(category)}`,
-    `<span style="margin-left:8px;font-size:12px;font-weight:500;color:#537188;">${count} 条</span></p>`,
-    '<div style="width:40px;height:3px;margin-top:7px;background:#c18a49;border-radius:999px;"></div>',
+    '<section style="margin:30px 0 14px;padding:0 0 10px;border-bottom:1px solid #dfe6eb;">',
+    `<p style="margin:0 0 3px;font-size:10px;line-height:1.4;letter-spacing:0.16em;color:${meta.accent};">${String(position).padStart(2, '0')} / ${meta.kicker}</p>`,
+    `<p style="margin:0;font-size:20px;line-height:1.45;font-weight:700;color:#102a43;">${escapeHtml(category)}`,
+    `<span style="display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;background:${meta.soft};font-size:11px;font-weight:500;color:${meta.accent};vertical-align:2px;">${count} 条</span></p>`,
     '</section>'
   ].join('');
 }
 
-function buildNoticeCard(notice, index) {
-  const identity = notice.departmentName
-    ? `${notice.schoolName} · ${notice.departmentName}`
-    : notice.schoolName;
+function buildNoticeCard(notice, index, targetDate) {
+  const meta = CATEGORY_META[notice.category] || CATEGORY_META.其他通知;
+  const deadline = getDeadlineMeta(notice.deadlineDate, targetDate);
+  const department = notice.departmentName
+    ? `<p style="margin:3px 0 0;font-size:12px;line-height:1.6;color:#7b8b98;">${escapeHtml(notice.departmentName)}</p>`
+    : '';
 
   return [
-    '<section style="margin:0 0 12px;padding:14px 15px;border:1px solid #e8edf1;border-radius:10px;background:#ffffff;">',
-    `<p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#17324d;">${index}. ${escapeHtml(identity)}</p>`,
-    `<p style="margin:0 0 7px;font-size:14px;line-height:1.75;color:#34495e;">${escapeHtml(notice.projectName)}</p>`,
-    `<p style="margin:0;font-size:13px;color:#9a5f1f;"><strong>截止：</strong>${escapeHtml(notice.deadlineDate)}</p>`,
+    '<section style="margin:0 0 15px;border:1px solid #e3e9ed;border-radius:12px;background:#ffffff;overflow:hidden;">',
+    `<section style="height:4px;background:${meta.accent};font-size:0;line-height:0;">&nbsp;</section>`,
+    '<section style="padding:16px 16px 15px;">',
+    `<p style="margin:0;font-size:12px;line-height:1.5;color:${meta.accent};letter-spacing:0.08em;">NO. ${String(index).padStart(2, '0')}</p>`,
+    `<p style="margin:5px 0 0;font-size:17px;line-height:1.55;font-weight:700;color:#17324d;">${escapeHtml(notice.schoolName)}</p>`,
+    department,
+    `<p style="margin:11px 0 0;font-size:14px;line-height:1.78;color:#3e5060;">${escapeHtml(notice.projectName)}</p>`,
+    '<section style="margin-top:13px;padding-top:11px;border-top:1px solid #edf1f3;">',
+    `<span style="display:inline-block;margin-right:7px;padding:2px 8px;border-radius:999px;background:${deadline.background};font-size:11px;line-height:1.7;font-weight:700;color:${deadline.color};">${deadline.label}</span>`,
+    `<span style="font-size:12px;line-height:1.7;color:#667887;">${escapeHtml(notice.deadlineDate)}</span>`,
+    '</section>',
+    '</section>',
     '</section>'
   ].join('');
 }
@@ -191,15 +235,28 @@ export function buildDailyDigest(rawNotices, targetDate, options = {}) {
   const title = `${formatMonthDay(targetDate)}保研通知汇总｜新增${notices.length}条`;
   const categorySummary = categories.length ? categories.join('、') : '保研通知';
   const digest = `${formatMonthDay(targetDate)}新增${notices.length}条，涵盖${categorySummary}。院校要求可能调整，请以原通知为准。`;
+  const urgentCount = notices.filter((notice) => getDeadlineMeta(notice.deadlineDate, targetDate).urgent).length;
+  const summaryChips = categories.map((category) => {
+    const meta = CATEGORY_META[category] || CATEGORY_META.其他通知;
+    return `<span style="display:inline-block;margin:4px 6px 0 0;padding:4px 9px;border-radius:999px;background:${meta.soft};font-size:11px;line-height:1.7;color:${meta.accent};">${escapeHtml(category)} · ${categoryCounts[category]}</span>`;
+  }).join('');
   const header = [
-    '<section style="font-size:15px;line-height:1.8;color:#2f4050;letter-spacing:0.02em;">',
-    '<section style="padding:18px 16px;border-radius:12px;background:#f5f1e8;">',
-    `<p style="margin:0 0 4px;font-size:13px;color:#8a6a42;">SEEK OFFER DAILY · ${escapeHtml(targetDate)}</p>`,
-    `<p style="margin:0;font-size:20px;font-weight:700;color:#17324d;">今日新增 ${notices.length} 条保研通知</p>`,
-    '<p style="margin:8px 0 0;font-size:13px;color:#617487;">已按通知类型整理；申请条件、时间和材料请以院校原文为准。</p>',
-    '</section>'
+    '<section style="font-size:15px;line-height:1.8;color:#2f4050;letter-spacing:0.01em;word-break:break-word;">',
+    '<section style="padding:24px 20px 22px;border-radius:14px;background:#102a43;">',
+    `<p style="margin:0;font-size:11px;line-height:1.5;letter-spacing:0.18em;color:#d9b878;">SEEK OFFER · DAILY BRIEF</p>`,
+    `<p style="margin:15px 0 0;font-size:15px;line-height:1.5;color:#c5d3dc;">${escapeHtml(formatMonthDay(targetDate))}信息更新</p>`,
+    `<p style="margin:2px 0 0;line-height:1.2;color:#ffffff;"><strong style="font-size:46px;font-weight:700;">${notices.length}</strong><span style="margin-left:7px;font-size:18px;">条保研通知</span></p>`,
+    '<p style="margin:13px 0 0;font-size:12px;line-height:1.7;color:#aebfc9;">按申请阶段整理，帮助你快速判断优先级与截止时间。</p>',
+    '</section>',
+    '<section style="margin-top:14px;padding:15px 16px;border:1px solid #e3e9ed;border-radius:11px;background:#f8fafb;">',
+    '<p style="margin:0;font-size:13px;font-weight:700;color:#17324d;">今日速览</p>',
+    `<p style="margin:5px 0 0;line-height:1.8;">${summaryChips || '<span style="font-size:12px;color:#7b8b98;">今日暂无新增分类</span>'}</p>`,
+    '</section>',
+    urgentCount > 0
+      ? `<section style="margin-top:12px;padding:12px 14px;border-left:4px solid #b15b4f;border-radius:8px;background:#fff3f0;"><p style="margin:0;font-size:13px;line-height:1.75;color:#8d4037;"><strong>截止提醒：</strong>今日有 ${urgentCount} 条通知将在 3 天内截止，请优先核对。</p></section>`
+      : ''
   ].join('');
-  const footerReserve = 900;
+  const footerReserve = 1_500;
   let content = header;
   let currentCategory = '';
   let includedCount = 0;
@@ -208,7 +265,7 @@ export function buildDailyDigest(rawNotices, targetDate, options = {}) {
     const categoryHeader = notice.category === currentCategory
       ? ''
       : buildCategoryHeader(notice.category, categoryCounts[notice.category]);
-    const card = buildNoticeCard(notice, includedCount + 1);
+    const card = buildNoticeCard(notice, includedCount + 1, targetDate);
 
     if (content.length + categoryHeader.length + card.length + footerReserve > maxContentChars) {
       break;
@@ -225,11 +282,15 @@ export function buildDailyDigest(rawNotices, targetDate, options = {}) {
   }
 
   content += [
-    '<section style="margin-top:24px;padding:15px;border-radius:10px;background:#eef4f6;">',
-    '<p style="margin:0 0 5px;font-weight:700;color:#17324d;">使用提醒</p>',
-    '<p style="margin:0;font-size:13px;color:#52697a;">通知可能临时调整或提前关闭，请尽早打开院校原文核对，并自行确认报名资格。</p>',
+    '<section style="margin-top:28px;padding:17px 16px;border-top:3px solid #b68443;border-radius:10px;background:#f6f8f9;">',
+    '<p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#17324d;">阅读前请确认</p>',
+    '<p style="margin:0;font-size:12px;line-height:1.8;color:#667887;">院校通知可能临时调整、补充或提前关闭。申请前请打开官方原文，核对报名资格、材料要求与最终截止时间。</p>',
     '</section>',
-    '<p style="margin:24px 0 0;text-align:center;font-size:12px;color:#93a1ad;">寻鹿 SeekOffer · 让保研信息更清晰</p>',
+    '<section style="margin-top:14px;padding:20px 16px;border-radius:12px;background:#17324d;text-align:center;">',
+    '<p style="margin:0;font-size:16px;line-height:1.6;font-weight:700;color:#ffffff;">查看完整通知与官方入口</p>',
+    '<p style="margin:6px 0 0;font-size:12px;line-height:1.7;color:#bdccd5;">点击文末「阅读原文」，进入当日通知列表</p>',
+    '</section>',
+    '<p style="margin:22px 0 0;text-align:center;font-size:10px;line-height:1.8;letter-spacing:0.16em;color:#9aa8b2;">SEEK OFFER · 保研信息每日更新</p>',
     '</section>'
   ].join('');
 
@@ -246,37 +307,6 @@ export function buildDailyDigest(rawNotices, targetDate, options = {}) {
     contentLength: content.length,
     sourceUrl
   };
-}
-
-export function buildCoverSvg(digest) {
-  const safeDate = escapeHtml(digest.targetDate);
-  const safeCount = escapeHtml(String(digest.noticeCount));
-
-  return `
-    <svg width="900" height="383" viewBox="0 0 900 383" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#102a43"/>
-          <stop offset="1" stop-color="#2e5968"/>
-        </linearGradient>
-        <linearGradient id="gold" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stop-color="#d7ae6f"/>
-          <stop offset="1" stop-color="#f0d9a8"/>
-        </linearGradient>
-      </defs>
-      <rect width="900" height="383" rx="28" fill="url(#bg)"/>
-      <circle cx="820" cy="52" r="170" fill="#ffffff" opacity="0.04"/>
-      <circle cx="770" cy="350" r="120" fill="#d7ae6f" opacity="0.08"/>
-      <rect x="62" y="60" width="74" height="8" rx="4" fill="url(#gold)"/>
-      <text x="62" y="125" font-family="Arial, sans-serif" font-size="26" font-weight="700" letter-spacing="5" fill="#f0d9a8">SEEK OFFER</text>
-      <text x="62" y="203" font-family="Arial, sans-serif" font-size="56" font-weight="800" letter-spacing="2" fill="#ffffff">DAILY BRIEF</text>
-      <text x="66" y="260" font-family="Arial, sans-serif" font-size="24" font-weight="500" letter-spacing="3" fill="#c8d8df">${safeDate}</text>
-      <rect x="610" y="132" width="220" height="124" rx="22" fill="#ffffff" opacity="0.10"/>
-      <text x="720" y="195" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="800" fill="#ffffff">${safeCount}</text>
-      <text x="720" y="230" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="3" fill="#f0d9a8">NEW NOTICES</text>
-      <text x="62" y="335" font-family="Arial, sans-serif" font-size="15" letter-spacing="2" fill="#9fb5c0">seekoffer.com.cn</text>
-    </svg>
-  `.trim();
 }
 
 function supabaseHeaders(env, extra = {}) {
@@ -414,182 +444,130 @@ async function getWechatAccessToken(fetchImpl, env) {
   return payload.access_token;
 }
 
-const PIXEL_FONT = {
-  ' ': ['00000', '00000', '00000', '00000', '00000', '00000', '00000'],
-  '-': ['00000', '00000', '00000', '11111', '00000', '00000', '00000'],
-  '.': ['00000', '00000', '00000', '00000', '00000', '01100', '01100'],
-  '0': ['01110', '10001', '10011', '10101', '11001', '10001', '01110'],
-  '1': ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
-  '2': ['01110', '10001', '00001', '00010', '00100', '01000', '11111'],
-  '3': ['11110', '00001', '00001', '01110', '00001', '00001', '11110'],
-  '4': ['00010', '00110', '01010', '10010', '11111', '00010', '00010'],
-  '5': ['11111', '10000', '10000', '11110', '00001', '00001', '11110'],
-  '6': ['01110', '10000', '10000', '11110', '10001', '10001', '01110'],
-  '7': ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
-  '8': ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
-  '9': ['01110', '10001', '10001', '01111', '00001', '00001', '01110'],
-  A: ['01110', '10001', '10001', '11111', '10001', '10001', '10001'],
-  B: ['11110', '10001', '10001', '11110', '10001', '10001', '11110'],
-  C: ['01111', '10000', '10000', '10000', '10000', '10000', '01111'],
-  D: ['11110', '10001', '10001', '10001', '10001', '10001', '11110'],
-  E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
-  F: ['11111', '10000', '10000', '11110', '10000', '10000', '10000'],
-  I: ['11111', '00100', '00100', '00100', '00100', '00100', '11111'],
-  K: ['10001', '10010', '10100', '11000', '10100', '10010', '10001'],
-  L: ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
-  M: ['10001', '11011', '10101', '10101', '10001', '10001', '10001'],
-  N: ['10001', '11001', '10101', '10011', '10001', '10001', '10001'],
-  O: ['01110', '10001', '10001', '10001', '10001', '10001', '01110'],
-  R: ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
-  S: ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
-  T: ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
-  V: ['10001', '10001', '10001', '10001', '10001', '01010', '00100'],
-  W: ['10001', '10001', '10001', '10101', '10101', '10101', '01010'],
-  Y: ['10001', '10001', '01010', '00100', '00100', '00100', '00100']
-};
+const COVER_FONT_REGULAR_PATH = fileURLToPath(new URL('./assets/Lato-Regular.ttf', import.meta.url));
+const COVER_FONT_BLACK_PATH = fileURLToPath(new URL('./assets/Lato-Black.ttf', import.meta.url));
+let coverFontPromise;
 
-let crcTable;
-
-function getCrcTable() {
-  if (crcTable) return crcTable;
-  crcTable = Array.from({ length: 256 }, (_, index) => {
-    let value = index;
-    for (let bit = 0; bit < 8; bit += 1) {
-      value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : (value >>> 1);
-    }
-    return value >>> 0;
-  });
-  return crcTable;
-}
-
-function crc32(buffer) {
-  const table = getCrcTable();
-  let crc = 0xffffffff;
-  for (const byte of buffer) {
-    crc = table[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+function ensureCoverFont() {
+  if (!coverFontPromise) {
+    coverFontPromise = Promise.all([
+      PImage.registerFont(COVER_FONT_REGULAR_PATH, 'Lato').load(),
+      PImage.registerFont(COVER_FONT_BLACK_PATH, 'Lato Black').load()
+    ]);
   }
-  return (crc ^ 0xffffffff) >>> 0;
+  return coverFontPromise;
 }
 
-function pngChunk(type, data) {
-  const typeBuffer = Buffer.from(type, 'ascii');
-  const chunk = Buffer.allocUnsafe(data.length + 12);
-  chunk.writeUInt32BE(data.length, 0);
-  typeBuffer.copy(chunk, 4);
-  data.copy(chunk, 8);
-  chunk.writeUInt32BE(crc32(Buffer.concat([typeBuffer, data])), data.length + 8);
-  return chunk;
-}
-
-function fillRect(pixels, width, height, x, y, rectWidth, rectHeight, color, alpha = 1) {
-  const startX = Math.max(0, Math.floor(x));
-  const startY = Math.max(0, Math.floor(y));
-  const endX = Math.min(width, Math.ceil(x + rectWidth));
-  const endY = Math.min(height, Math.ceil(y + rectHeight));
-
-  for (let py = startY; py < endY; py += 1) {
-    for (let px = startX; px < endX; px += 1) {
-      const offset = (py * width + px) * 4;
-      pixels[offset] = Math.round(pixels[offset] * (1 - alpha) + color[0] * alpha);
-      pixels[offset + 1] = Math.round(pixels[offset + 1] * (1 - alpha) + color[1] * alpha);
-      pixels[offset + 2] = Math.round(pixels[offset + 2] * (1 - alpha) + color[2] * alpha);
-      pixels[offset + 3] = 255;
-    }
+function drawTrackedText(context, text, x, y, spacing) {
+  let cursor = x;
+  for (const character of String(text)) {
+    context.fillText(character, cursor, y);
+    cursor += context.measureText(character).width + spacing;
   }
 }
 
-function pixelTextWidth(text, scale) {
-  return Math.max(0, String(text).length * 6 * scale - scale);
+function drawStrongText(context, text, x, y) {
+  context.fillText(text, x, y);
+  context.fillText(text, x + 1, y);
 }
 
-function drawPixelText(pixels, width, height, text, x, y, scale, color) {
-  let cursorX = x;
-  for (const character of String(text).toUpperCase()) {
-    const glyph = PIXEL_FONT[character] || PIXEL_FONT[' '];
-    glyph.forEach((row, rowIndex) => {
-      for (let columnIndex = 0; columnIndex < row.length; columnIndex += 1) {
-        if (row[columnIndex] === '1') {
-          fillRect(
-            pixels,
-            width,
-            height,
-            cursorX + columnIndex * scale,
-            y + rowIndex * scale,
-            scale,
-            scale,
-            color
-          );
-        }
-      }
-    });
-    cursorX += 6 * scale;
-  }
+function drawRoundedRect(context, x, y, width, height, radius) {
+  const safeRadius = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.moveTo(x + safeRadius, y);
+  context.lineTo(x + width - safeRadius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+  context.lineTo(x + width, y + height - safeRadius);
+  context.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+  context.lineTo(x + safeRadius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+  context.lineTo(x, y + safeRadius);
+  context.quadraticCurveTo(x, y, x + safeRadius, y);
+  context.closePath();
 }
 
-function encodePng(width, height, pixels) {
-  const scanlineSize = width * 4 + 1;
-  const scanlines = Buffer.allocUnsafe(scanlineSize * height);
+function fillCoverGradient(context, width, height) {
   for (let y = 0; y < height; y += 1) {
-    const scanlineOffset = y * scanlineSize;
-    scanlines[scanlineOffset] = 0;
-    pixels.copy(scanlines, scanlineOffset + 1, y * width * 4, (y + 1) * width * 4);
+    const progress = y / Math.max(1, height - 1);
+    const red = Math.round(12 + 18 * progress);
+    const green = Math.round(34 + 40 * progress);
+    const blue = Math.round(55 + 39 * progress);
+    context.fillStyle = `rgb(${red},${green},${blue})`;
+    context.fillRect(0, y, width, 1);
   }
-
-  const header = Buffer.alloc(13);
-  header.writeUInt32BE(width, 0);
-  header.writeUInt32BE(height, 4);
-  header[8] = 8;
-  header[9] = 6;
-  header[10] = 0;
-  header[11] = 0;
-  header[12] = 0;
-
-  return Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    pngChunk('IHDR', header),
-    pngChunk('IDAT', deflateSync(scanlines, { level: 9 })),
-    pngChunk('IEND', Buffer.alloc(0))
-  ]);
 }
 
-export function renderCoverPng(digest) {
+export async function renderCoverPng(digest) {
+  await ensureCoverFont();
   const width = 900;
   const height = 383;
-  const pixels = Buffer.allocUnsafe(width * height * 4);
+  const canvas = PImage.make(width, height);
+  const context = canvas.getContext('2d');
+  fillCoverGradient(context, width, height);
 
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const progress = (x + y) / (width + height - 2);
-      const offset = (y * width + x) * 4;
-      pixels[offset] = Math.round(16 + 30 * progress);
-      pixels[offset + 1] = Math.round(42 + 47 * progress);
-      pixels[offset + 2] = Math.round(67 + 37 * progress);
-      pixels[offset + 3] = 255;
-    }
+  context.strokeStyle = 'rgba(255,255,255,0.045)';
+  context.lineWidth = 1;
+  for (let x = 30; x < width; x += 54) {
+    context.beginPath();
+    context.moveTo(x, 0);
+    context.lineTo(x, height);
+    context.stroke();
   }
 
-  fillRect(pixels, width, height, 62, 60, 74, 8, [240, 217, 168]);
-  fillRect(pixels, width, height, 610, 132, 220, 124, [255, 255, 255], 0.1);
-  drawPixelText(pixels, width, height, 'SEEK OFFER', 62, 99, 4, [240, 217, 168]);
-  drawPixelText(pixels, width, height, 'DAILY BRIEF', 62, 158, 8, [255, 255, 255]);
-  drawPixelText(pixels, width, height, digest.targetDate, 66, 248, 4, [200, 216, 223]);
-  drawPixelText(pixels, width, height, 'NEW NOTICES', 650, 224, 2, [240, 217, 168]);
-  drawPixelText(pixels, width, height, 'SEEKOFFER.COM.CN', 62, 328, 2, [159, 181, 192]);
+  context.fillStyle = 'rgba(255,255,255,0.035)';
+  context.beginPath();
+  context.arc(812, 32, 196, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = 'rgba(222,182,112,0.065)';
+  context.beginPath();
+  context.arc(760, 374, 150, 0, Math.PI * 2);
+  context.fill();
 
-  const countText = String(digest.noticeCount);
-  const countScale = countText.length >= 3 ? 7 : 9;
-  drawPixelText(
-    pixels,
-    width,
-    height,
-    countText,
-    720 - pixelTextWidth(countText, countScale) / 2,
-    153,
-    countScale,
-    [255, 255, 255]
-  );
+  context.fillStyle = '#d9b878';
+  context.fillRect(53, 49, 5, 278);
+  context.font = "14pt 'Lato'";
+  drawTrackedText(context, 'SEEK OFFER', 82, 72, 4);
+  context.fillStyle = '#ffffff';
+  context.font = "58pt 'Lato Black'";
+  drawStrongText(context, 'DAILY', 78, 163);
+  drawStrongText(context, 'DIGEST', 78, 231);
+  context.fillStyle = '#b8ced8';
+  context.font = "14pt 'Lato'";
+  drawTrackedText(context, 'POSTGRADUATE RECOMMENDATION', 82, 276, 1.35);
+  context.fillStyle = '#d9b878';
+  context.font = "14pt 'Lato'";
+  drawTrackedText(context, digest.targetDate.replaceAll('-', ' · '), 82, 328, 2.2);
 
-  return encodePng(width, height, pixels);
+  drawRoundedRect(context, 646, 65, 198, 250, 24);
+  context.fillStyle = 'rgba(255,255,255,0.075)';
+  context.fill();
+  context.strokeStyle = 'rgba(255,255,255,0.18)';
+  context.lineWidth = 1;
+  context.stroke();
+
+  const countText = String(digest.noticeCount).padStart(2, '0');
+  context.font = "82pt 'Lato Black'";
+  const countWidth = context.measureText(countText).width;
+  context.fillStyle = '#ffffff';
+  drawStrongText(context, countText, 745 - countWidth / 2, 188);
+  context.fillStyle = '#d9b878';
+  context.font = "12pt 'Lato'";
+  const label = 'NEW NOTICES';
+  const labelWidth = context.measureText(label).width;
+  context.fillText(label, 745 - labelWidth / 2, 232);
+  context.fillStyle = 'rgba(255,255,255,0.22)';
+  context.fillRect(685, 255, 120, 1);
+  context.fillStyle = '#b8ced8';
+  context.font = "10pt 'Lato'";
+  const todayLabel = 'DAILY UPDATE';
+  const todayWidth = context.measureText(todayLabel).width;
+  context.fillText(todayLabel, 745 - todayWidth / 2, 285);
+
+  const stream = new PassThrough();
+  const chunks = [];
+  stream.on('data', (chunk) => chunks.push(chunk));
+  await PImage.encodePNGToStream(canvas, stream);
+  return Buffer.concat(chunks);
 }
 
 async function uploadCover(fetchImpl, accessToken, digest) {

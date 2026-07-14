@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  buildCoverSvg,
   buildDailyDigest,
   classifyNotice,
   getBeijingDateString,
@@ -53,21 +52,16 @@ test('builds bounded WeChat HTML and an exact-date source URL', () => {
   assert.equal(digest.noticeCount, 2);
   assert.equal(digest.includedCount, 2);
   assert.match(digest.title, /7月13日保研通知汇总/);
-  assert.match(digest.content, /南开大学 · 软件学院/);
+  assert.match(digest.content, /南开大学/);
+  assert.match(digest.content, /软件学院/);
+  assert.match(digest.content, /今日速览/);
+  assert.match(digest.content, /查看完整通知与官方入口/);
   assert.doesNotMatch(digest.content, /2026年南开大学软件学院2027年/);
   assert.equal(
     digest.sourceUrl,
     'https://www.seekoffer.com.cn/notices/?date=2026-07-13&year=2026&sort=publish'
   );
   assert.ok(digest.contentLength < 8_000);
-});
-
-test('renders an ASCII-only cover SVG for predictable server fonts', () => {
-  const digest = buildDailyDigest(notices, '2026-07-13');
-  const svg = buildCoverSvg(digest);
-  assert.match(svg, /DAILY BRIEF/);
-  assert.match(svg, /2026-07-13/);
-  assert.match(svg, />2</);
 });
 
 test('supports a fixture-only dry run without secrets or network access', async () => {
@@ -82,7 +76,8 @@ test('supports a fixture-only dry run without secrets or network access', async 
   assert.equal(result.ok, true);
   assert.equal(result.dryRun, true);
   assert.equal(result.noticeCount, 2);
-  assert.match(result.article.content, /今日新增 2 条保研通知/);
+  assert.match(result.article.content, />2<\/strong><span[^>]*>条保研通知/);
+  assert.match(result.article.content, /SEEK OFFER · DAILY BRIEF/);
 });
 
 test('runs the complete Supabase-to-WeChat draft workflow', async () => {

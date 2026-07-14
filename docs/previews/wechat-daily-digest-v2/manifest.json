@@ -1,0 +1,21 @@
+{
+  "artifact": "SeekOffer WeChat Daily Digest v2",
+  "generatedAt": "2026-07-14T03:51:24.319Z",
+  "targetDate": "2026-07-13",
+  "noticeCount": 8,
+  "includedCount": 8,
+  "omittedCount": 0,
+  "title": "7月13日保研通知汇总｜新增8条",
+  "sourceUrl": "https://www.seekoffer.com.cn/notices/?date=2026-07-13&year=2026&sort=publish",
+  "dimensions": {
+    "previewWidth": 390,
+    "coverWidth": 900,
+    "coverHeight": 383
+  },
+  "renderer": "deterministic HTML and PureImage cover",
+  "generatedLayers": [],
+  "provenance": {
+    "content": "CloudBase production dry-run using Supabase notice records",
+    "font": "Lato from Google Fonts, licensed under SIL Open Font License 1.1"
+  }
+}
