@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { renderCoverPng } from '../functions/wechat-daily-digest/digest-core.mjs';
+import { renderCoverJpeg } from '../functions/wechat-daily-digest/digest-core.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, '..');
@@ -191,14 +191,14 @@ function buildPreviewDocument(result, coverFilename) {
 const targetDate = validateDate(readArgument('--target-date', '2026-07-13'));
 const outputDirectory = path.resolve(
   repositoryRoot,
-  readArgument('--out', 'docs/previews/wechat-daily-digest-v2')
+  readArgument('--out', 'docs/previews/wechat-daily-digest-v3')
 );
 const result = invokeCloudPreview(targetDate);
-const coverFilename = `cover-${targetDate}.png`;
-const cover = await renderCoverPng({ targetDate, noticeCount: Number(result.noticeCount) });
+const coverFilename = `cover-${targetDate}.jpg`;
+const cover = await renderCoverJpeg({ targetDate, noticeCount: Number(result.noticeCount) });
 const preview = buildPreviewDocument(result, coverFilename);
 const manifest = {
-  artifact: 'SeekOffer WeChat Daily Digest v2',
+  artifact: 'SeekOffer WeChat Daily Digest v3',
   generatedAt: new Date().toISOString(),
   targetDate,
   noticeCount: Number(result.noticeCount),
@@ -207,11 +207,12 @@ const manifest = {
   title: result.article.title,
   sourceUrl: result.article.sourceUrl,
   dimensions: { previewWidth: 390, coverWidth: 900, coverHeight: 383 },
-  renderer: 'deterministic HTML and PureImage cover',
+  renderer: 'editorial HTML with optional OpenAI copy and a deterministic JPEG cover',
   generatedLayers: [],
+  editorial: result.editorial || { source: 'unknown', model: '', fallbackReason: '' },
   provenance: {
     content: 'CloudBase production dry-run using Supabase notice records',
-    font: 'Lato from Google Fonts, licensed under SIL Open Font License 1.1'
+    fonts: 'Lato and a SeekOffer subset of Noto Sans SC from Google Fonts, licensed under SIL Open Font License 1.1'
   }
 };
 

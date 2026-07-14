@@ -51,11 +51,12 @@ test('builds bounded WeChat HTML and an exact-date source URL', () => {
 
   assert.equal(digest.noticeCount, 2);
   assert.equal(digest.includedCount, 2);
-  assert.match(digest.title, /7月13日保研通知汇总/);
+  assert.equal(digest.title, '7月13日｜预推免申请陆续开放');
   assert.match(digest.content, /南开大学/);
   assert.match(digest.content, /软件学院/);
-  assert.match(digest.content, /今日速览/);
-  assert.match(digest.content, /查看完整通知与官方入口/);
+  assert.match(digest.content, /先看这几条/);
+  assert.match(digest.content, /文末「阅读原文」可查看全部通知与官方链接/);
+  assert.doesNotMatch(digest.content, /DAILY BRIEF|PRE-RECOMMENDATION|font-size:46px/);
   assert.doesNotMatch(digest.content, /2026年南开大学软件学院2027年/);
   assert.equal(
     digest.sourceUrl,
@@ -76,8 +77,49 @@ test('supports a fixture-only dry run without secrets or network access', async 
   assert.equal(result.ok, true);
   assert.equal(result.dryRun, true);
   assert.equal(result.noticeCount, 2);
-  assert.match(result.article.content, />2<\/strong><span[^>]*>条保研通知/);
-  assert.match(result.article.content, /SEEK OFFER · DAILY BRIEF/);
+  assert.match(result.article.content, /今日收录 2 条/);
+  assert.match(result.article.content, /寻鹿 SeekOffer/);
+  assert.equal(result.editorial.source, 'rules');
+});
+
+test('uses GPT structured output for restrained editorial copy', async () => {
+  const calls = [];
+  const editorialOutput = {
+    titleHook: '先核对申请时间',
+    lead: '今天的更新以预推免和开放日为主，建议先核对各项目的报名时间，再根据申请阶段查看院校原文。',
+    selectedNoticeIds: ['n-2', 'n-1']
+  };
+
+  const result = await runDailyDigest({
+    event: { dryRun: true, targetDate: '2026-07-13', notices },
+    env: {
+      OPENAI_API_KEY: 'test-openai-key',
+      OPENAI_EDITORIAL_MODEL: 'gpt-5.4-mini'
+    },
+    fetchImpl: async (input, options = {}) => {
+      const url = String(input);
+      calls.push({ url, options });
+      assert.equal(url, 'https://api.openai.com/v1/responses');
+      const body = JSON.parse(options.body);
+      assert.equal(body.model, 'gpt-5.4-mini');
+      assert.equal(body.reasoning.effort, 'none');
+      assert.equal(body.text.format.type, 'json_schema');
+      assert.equal(body.text.format.strict, true);
+      return new Response(JSON.stringify({
+        id: 'resp_test_editorial',
+        output: [{
+          type: 'message',
+          content: [{ type: 'output_text', text: JSON.stringify(editorialOutput) }]
+        }]
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(result.article.title, '7月13日｜先核对申请时间');
+  assert.equal(result.editorial.source, 'openai');
+  assert.equal(result.editorial.model, 'gpt-5.4-mini');
+  assert.match(result.article.content, /中南大学/);
 });
 
 test('runs the complete Supabase-to-WeChat draft workflow', async () => {
@@ -104,11 +146,10 @@ test('runs the complete Supabase-to-WeChat draft workflow', async () => {
     if (url.includes('/cgi-bin/material/add_material?')) {
       assert.ok(options.body instanceof FormData);
       const media = options.body.get('media');
-      assert.equal(media.type, 'image/png');
+      assert.equal(media.type, 'image/jpeg');
       const bytes = Buffer.from(await media.arrayBuffer());
-      assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
-      assert.equal(bytes.readUInt32BE(16), 900);
-      assert.equal(bytes.readUInt32BE(20), 383);
+      assert.deepEqual([...bytes.subarray(0, 3)], [255, 216, 255]);
+      assert.deepEqual([...bytes.subarray(-2)], [255, 217]);
       return json({ media_id: 'test-thumb-media-id' });
     }
     if (url.includes('/cgi-bin/draft/add?')) return json({ media_id: 'test-draft-media-id' });
@@ -162,7 +203,7 @@ test('updates an existing WeChat draft in place when force is enabled', async ()
       const body = JSON.parse(options.body);
       assert.equal(body.media_id, existingMediaId);
       assert.equal(body.index, 0);
-      assert.match(body.articles.content, /SEEK OFFER · DAILY BRIEF/);
+      assert.match(body.articles.content, /寻鹿 SeekOffer/);
       assert.equal(body.articles.thumb_media_id, 'updated-thumb-media-id');
       return json({ errcode: 0, errmsg: 'ok' });
     }

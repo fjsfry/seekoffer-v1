@@ -8,12 +8,21 @@ SeekOffer 每小时同步公开通知后，由 CloudBase 云函数在每天 21:3
 GitHub Actions 每小时同步
   -> Supabase notices
   -> CloudBase 定时函数 wechat-daily-digest
+  -> OpenAI Responses API（标题、导语、优先阅读项）
   -> 微信永久封面素材
   -> 微信草稿箱
   -> Supabase wechat_daily_publications 运行日志
 ```
 
 `wechat_daily_publications.digest_date` 是唯一键。定时器重复触发时，只有第一个实例能取得当天执行锁，避免生成重复草稿。
+
+## 编辑原则
+
+- GPT 只负责标题钩子、导语和 1–3 条优先阅读项，不生成 HTML。
+- 学校、项目、分类、截止时间和原文链接始终来自数据库，由确定性程序渲染。
+- GPT 使用严格 JSON Schema；输出不合法、超时或密钥缺失时，自动回退到规则编辑，不影响当天草稿。
+- 提示词禁止“重磅、速看、干货、上岸、码住”等自媒体套话，也禁止感叹号、表情符号和英文栏目名。
+- 版式采用暖白底、深绿强调、细分隔线和留白，不使用渐变、大面积深色、胶囊标签或卡片堆叠。
 
 ## CloudBase 函数环境变量
 
@@ -23,9 +32,12 @@ GitHub Actions 每小时同步
 - `SUPABASE_SERVICE_ROLE_KEY`：Supabase 服务端密钥
 - `WECHAT_MP_APP_ID`：公众号 AppID
 - `WECHAT_MP_APP_SECRET`：公众号 AppSecret
+- `OPENAI_API_KEY`：OpenAI API 密钥；缺失时自动使用规则编辑版
 
 可选：
 
+- `OPENAI_EDITORIAL_MODEL`：默认 `gpt-5.4-mini`
+- `OPENAI_EDITORIAL_TIMEOUT_MS`：默认 `25000`
 - `SEEKOFFER_SITE_URL`：默认 `https://www.seekoffer.com.cn`
 - `WECHAT_DAILY_AUTHOR`：默认 `寻鹿SeekOffer`
 - `WECHAT_MP_THUMB_MEDIA_ID`：固定封面永久素材 ID；留空时每天自动生成并上传封面
@@ -36,7 +48,7 @@ GitHub Actions 每小时同步
 
 1. 在公众号后台生成 AppSecret，不要复制到聊天、源码或 GitHub。
 2. CloudBase 云函数默认出口 IP 不固定。先给函数启用固定出口 IP，再将该 IP 添加到公众号“设置与开发 → 基本配置 → IP 白名单”。
-3. 当前个人主体账号支持新增草稿，但不支持发布接口；每天到草稿箱检查并手动发布。
+3. 当前个人主体账号支持新增和更新草稿，但不支持发布接口；每天到草稿箱检查并手动发布。
 
 ## 部署与联调
 
@@ -57,9 +69,9 @@ tcb fn invoke wechat-daily-digest --params '{"dryRun":true,"targetDate":"2026-07
 tcb fn invoke wechat-daily-digest --params '{"targetDate":"2026-07-13"}' --json
 ```
 
-正式联调成功后，在 Supabase 中应出现 `status = 'drafted'` 的当天记录，公众号草稿箱应出现对应文章。失败时记录为 `failed`，`error_code` 和 `error_message` 用于定位微信错误码。
+正式联调成功后，Supabase 中应出现 `status = 'drafted'` 的当天记录，公众号草稿箱应出现对应文章。失败时记录为 `failed`，`error_code` 和 `error_message` 用于定位微信错误码。
 
-需要人工重跑同一天时，传入 `force: true`。这会再创建一份草稿，只能用于明确的人工修复：
+需要人工重跑同一天时传入 `force: true`。如果当天已有草稿，会原位更新该草稿，不会新增重复项：
 
 ```powershell
 tcb fn invoke wechat-daily-digest --params '{"targetDate":"2026-07-13","force":true}' --json

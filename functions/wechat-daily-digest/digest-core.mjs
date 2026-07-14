@@ -1,15 +1,10 @@
 import { PassThrough } from 'node:stream';
+import { createReadStream } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as PImage from 'pureimage';
+import { buildFallbackEditorial, createEditorialPlan } from './editorial-core.mjs';
 
 const CATEGORY_ORDER = ['预推免', '夏令营', '开放日与宣讲', '名单与结果', '其他通知'];
-const CATEGORY_META = {
-  预推免: { accent: '#b68443', soft: '#fbf6ed', kicker: 'PRE-RECOMMENDATION' },
-  夏令营: { accent: '#2f7c7a', soft: '#edf7f6', kicker: 'SUMMER PROGRAM' },
-  开放日与宣讲: { accent: '#6877a8', soft: '#f1f3fa', kicker: 'OPEN DAY & SESSION' },
-  名单与结果: { accent: '#a4534d', soft: '#fbf1f0', kicker: 'RESULT & ADMISSION' },
-  其他通知: { accent: '#647687', soft: '#f2f5f7', kicker: 'OTHER UPDATES' }
-};
 const DEFAULT_SITE_URL = 'https://www.seekoffer.com.cn';
 const DEFAULT_MAX_CONTENT_CHARS = 18_000;
 const WECHAT_STABLE_TOKEN_URL = 'https://api.weixin.qq.com/cgi-bin/stable_token';
@@ -77,6 +72,16 @@ export function resolveTargetDate(event = {}, now = new Date()) {
 function formatMonthDay(targetDate) {
   const [, month, day] = targetDate.split('-');
   return `${Number(month)}月${Number(day)}日`;
+}
+
+function formatFullDate(targetDate) {
+  const [year, month, day] = targetDate.split('-');
+  return `${year}年${Number(month)}月${Number(day)}日`;
+}
+
+function formatCompactDeadline(deadlineDate) {
+  const match = compactText(deadlineDate).match(/20\d{2}-(\d{2})-(\d{2})/);
+  return match ? `${Number(match[1])}月${Number(match[2])}日` : '时间见原文';
 }
 
 function normalizeDeadline(value) {
@@ -174,37 +179,54 @@ function getDeadlineMeta(deadlineDate, targetDate) {
 }
 
 function buildCategoryHeader(category, count) {
-  const position = CATEGORY_ORDER.indexOf(category) + 1;
-  const meta = CATEGORY_META[category] || CATEGORY_META.其他通知;
   return [
-    '<section style="margin:30px 0 14px;padding:0 0 10px;border-bottom:1px solid #dfe6eb;">',
-    `<p style="margin:0 0 3px;font-size:10px;line-height:1.4;letter-spacing:0.16em;color:${meta.accent};">${String(position).padStart(2, '0')} / ${meta.kicker}</p>`,
-    `<p style="margin:0;font-size:20px;line-height:1.45;font-weight:700;color:#102a43;">${escapeHtml(category)}`,
-    `<span style="display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;background:${meta.soft};font-size:11px;font-weight:500;color:${meta.accent};vertical-align:2px;">${count} 条</span></p>`,
+    '<section style="margin:34px 0 8px;padding:0 0 9px;border-bottom:1px solid #d9dedb;">',
+    `<p style="margin:0;padding-left:10px;border-left:3px solid #2f6f68;font-size:19px;line-height:1.5;font-weight:700;color:#1f2b2a;">${escapeHtml(category)}`,
+    `<span style="margin-left:7px;font-size:12px;font-weight:400;color:#8b9692;">${count} 条</span></p>`,
     '</section>'
   ].join('');
 }
 
 function buildNoticeCard(notice, index, targetDate) {
-  const meta = CATEGORY_META[notice.category] || CATEGORY_META.其他通知;
   const deadline = getDeadlineMeta(notice.deadlineDate, targetDate);
   const department = notice.departmentName
-    ? `<p style="margin:3px 0 0;font-size:12px;line-height:1.6;color:#7b8b98;">${escapeHtml(notice.departmentName)}</p>`
+    ? `<span style="color:#7c8783;"> · ${escapeHtml(notice.departmentName)}</span>`
     : '';
+  const deadlineColor = deadline.urgent ? '#a55445' : '#58706a';
 
   return [
-    '<section style="margin:0 0 15px;border:1px solid #e3e9ed;border-radius:12px;background:#ffffff;overflow:hidden;">',
-    `<section style="height:4px;background:${meta.accent};font-size:0;line-height:0;">&nbsp;</section>`,
-    '<section style="padding:16px 16px 15px;">',
-    `<p style="margin:0;font-size:12px;line-height:1.5;color:${meta.accent};letter-spacing:0.08em;">NO. ${String(index).padStart(2, '0')}</p>`,
-    `<p style="margin:5px 0 0;font-size:17px;line-height:1.55;font-weight:700;color:#17324d;">${escapeHtml(notice.schoolName)}</p>`,
-    department,
-    `<p style="margin:11px 0 0;font-size:14px;line-height:1.78;color:#3e5060;">${escapeHtml(notice.projectName)}</p>`,
-    '<section style="margin-top:13px;padding-top:11px;border-top:1px solid #edf1f3;">',
-    `<span style="display:inline-block;margin-right:7px;padding:2px 8px;border-radius:999px;background:${deadline.background};font-size:11px;line-height:1.7;font-weight:700;color:${deadline.color};">${deadline.label}</span>`,
-    `<span style="font-size:12px;line-height:1.7;color:#667887;">${escapeHtml(notice.deadlineDate)}</span>`,
-    '</section>',
-    '</section>',
+    '<section style="margin:0;padding:18px 0 17px;border-bottom:1px solid #edf0ee;">',
+    `<p style="margin:0 0 6px;font-size:11px;line-height:1.4;color:#b2b8b5;letter-spacing:0.08em;">${String(index).padStart(2, '0')}</p>`,
+    `<p style="margin:0;font-size:16px;line-height:1.55;font-weight:700;color:#1e2c2a;">${escapeHtml(notice.schoolName)}</p>`,
+    `<p style="margin:3px 0 0;font-size:12px;line-height:1.65;color:#687571;">${escapeHtml(notice.category)}${department}</p>`,
+    `<p style="margin:10px 0 0;font-size:14px;line-height:1.85;color:#364440;">${escapeHtml(notice.projectName)}</p>`,
+    `<p style="margin:8px 0 0;font-size:12px;line-height:1.6;color:${deadlineColor};">${deadline.label} · ${escapeHtml(notice.deadlineDate)}</p>`,
+    '</section>'
+  ].join('');
+}
+
+function buildEditorialPicks(editorial, notices, targetDate) {
+  const byId = new Map(notices.map((notice) => [notice.id, notice]));
+  const selected = editorial.selectedNoticeIds.map((id) => byId.get(id)).filter(Boolean);
+  if (!selected.length) return '';
+
+  const rows = selected.map((notice, index) => {
+    const deadline = getDeadlineMeta(notice.deadlineDate, targetDate);
+    const color = deadline.urgent ? '#a55445' : '#60736d';
+    return [
+      `<p style="margin:${index ? '13px' : '10px'} 0 0;font-size:13px;line-height:1.75;color:#35433f;">`,
+      `<span style="color:#9aa39f;">${['一', '二', '三'][index]}、</span>`,
+      `<strong style="font-weight:700;color:#1f2b2a;">${escapeHtml(notice.schoolName)}</strong>`,
+      `<span style="color:${color};"> · ${formatCompactDeadline(notice.deadlineDate)}${deadline.urgent ? '截止' : ''}</span>`,
+      `<br><span style="padding-left:22px;color:#687571;">${escapeHtml(notice.projectName)}</span>`,
+      '</p>'
+    ].join('');
+  }).join('');
+
+  return [
+    '<section style="margin:26px 0 8px;padding:17px 0;border-top:1px solid #d9dedb;border-bottom:1px solid #d9dedb;">',
+    '<p style="margin:0;font-size:15px;line-height:1.5;font-weight:700;color:#2f6f68;">先看这几条</p>',
+    rows,
     '</section>'
   ].join('');
 }
@@ -233,29 +255,22 @@ export function buildDailyDigest(rawNotices, targetDate, options = {}) {
   );
   const categories = CATEGORY_ORDER.filter((category) => categoryCounts[category] > 0);
   const sourceUrl = `${siteUrl}/notices/?date=${encodeURIComponent(targetDate)}&year=${targetDate.slice(0, 4)}&sort=publish`;
-  const title = `${formatMonthDay(targetDate)}保研通知汇总｜新增${notices.length}条`;
-  const categorySummary = categories.length ? categories.join('、') : '保研通知';
-  const digest = `${formatMonthDay(targetDate)}新增${notices.length}条，涵盖${categorySummary}。院校要求可能调整，请以原通知为准。`;
-  const urgentCount = notices.filter((notice) => getDeadlineMeta(notice.deadlineDate, targetDate).urgent).length;
-  const summaryChips = categories.map((category) => {
-    const meta = CATEGORY_META[category] || CATEGORY_META.其他通知;
-    return `<span style="display:inline-block;margin:4px 6px 0 0;padding:4px 9px;border-radius:999px;background:${meta.soft};font-size:11px;line-height:1.7;color:${meta.accent};">${escapeHtml(category)} · ${categoryCounts[category]}</span>`;
-  }).join('');
+  const editorial = options.editorial || buildFallbackEditorial({ notices, targetDate, categoryCounts });
+  const title = `${formatMonthDay(targetDate)}｜${compactText(editorial.titleHook) || '今天有哪些新通知'}`;
+  const digest = compactText(editorial.lead)
+    || `${formatMonthDay(targetDate)}整理了 ${notices.length} 条院校通知，具体要求请以院校原文为准。`;
+  const summaryText = categories.length
+    ? categories.map((category) => `${category} ${categoryCounts[category]} 条`).join(' · ')
+    : '今天暂无新增分类';
   const header = [
-    '<section style="font-size:15px;line-height:1.8;color:#2f4050;letter-spacing:0.01em;word-break:break-word;">',
-    '<section style="padding:24px 20px 22px;border-radius:14px;background:#102a43;">',
-    `<p style="margin:0;font-size:11px;line-height:1.5;letter-spacing:0.18em;color:#d9b878;">SEEK OFFER · DAILY BRIEF</p>`,
-    `<p style="margin:15px 0 0;font-size:15px;line-height:1.5;color:#c5d3dc;">${escapeHtml(formatMonthDay(targetDate))}信息更新</p>`,
-    `<p style="margin:2px 0 0;line-height:1.2;color:#ffffff;"><strong style="font-size:46px;font-weight:700;">${notices.length}</strong><span style="margin-left:7px;font-size:18px;">条保研通知</span></p>`,
-    '<p style="margin:13px 0 0;font-size:12px;line-height:1.7;color:#aebfc9;">按申请阶段整理，帮助你快速判断优先级与截止时间。</p>',
+    '<section style="font-size:15px;line-height:1.8;color:#35433f;letter-spacing:0.01em;word-break:break-word;">',
+    '<section style="padding:3px 0 19px;border-bottom:1px solid #d9dedb;">',
+    '<p style="margin:0;font-size:13px;line-height:1.5;font-weight:700;color:#2f6f68;">寻鹿 SeekOffer</p>',
+    `<p style="margin:7px 0 0;font-size:12px;line-height:1.5;color:#8a9692;">${escapeHtml(formatFullDate(targetDate))} · 保研信息整理</p>`,
     '</section>',
-    '<section style="margin-top:14px;padding:15px 16px;border:1px solid #e3e9ed;border-radius:11px;background:#f8fafb;">',
-    '<p style="margin:0;font-size:13px;font-weight:700;color:#17324d;">今日速览</p>',
-    `<p style="margin:5px 0 0;line-height:1.8;">${summaryChips || '<span style="font-size:12px;color:#7b8b98;">今日暂无新增分类</span>'}</p>`,
-    '</section>',
-    urgentCount > 0
-      ? `<section style="margin-top:12px;padding:12px 14px;border-left:4px solid #b15b4f;border-radius:8px;background:#fff3f0;"><p style="margin:0;font-size:13px;line-height:1.75;color:#8d4037;"><strong>截止提醒：</strong>今日有 ${urgentCount} 条通知将在 3 天内截止，请优先核对。</p></section>`
-      : ''
+    `<p style="margin:22px 0 0;font-size:16px;line-height:1.95;color:#263431;">${escapeHtml(digest)}</p>`,
+    `<p style="margin:16px 0 0;font-size:12px;line-height:1.75;color:#7c8783;">今日收录 ${notices.length} 条 · ${escapeHtml(summaryText)}</p>`,
+    buildEditorialPicks(editorial, notices, targetDate)
   ].join('');
   const footerReserve = 1_500;
   let content = header;
@@ -279,19 +294,16 @@ export function buildDailyDigest(rawNotices, targetDate, options = {}) {
 
   const omittedCount = notices.length - includedCount;
   if (omittedCount > 0) {
-    content += `<p style="margin:18px 0;padding:12px 14px;border-radius:8px;background:#fff7ea;color:#8a5a1f;">篇幅有限，另有 ${omittedCount} 条通知未在正文展开，点击“阅读原文”可查看完整列表。</p>`;
+    content += `<p style="margin:20px 0;padding:12px 0;border-top:1px solid #d9dedb;border-bottom:1px solid #d9dedb;color:#7a6650;">篇幅有限，另有 ${omittedCount} 条通知未在正文展开，点击“阅读原文”可查看完整列表。</p>`;
   }
 
   content += [
-    '<section style="margin-top:28px;padding:17px 16px;border-top:3px solid #b68443;border-radius:10px;background:#f6f8f9;">',
-    '<p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#17324d;">阅读前请确认</p>',
-    '<p style="margin:0;font-size:12px;line-height:1.8;color:#667887;">院校通知可能临时调整、补充或提前关闭。申请前请打开官方原文，核对报名资格、材料要求与最终截止时间。</p>',
+    '<section style="margin-top:32px;padding:18px 0 0;border-top:1px solid #d9dedb;">',
+    '<p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#2f6f68;">说明</p>',
+    '<p style="margin:0;font-size:12px;line-height:1.85;color:#74807c;">院校通知可能临时调整、补充或提前关闭。申请前请打开官方原文，核对报名资格、材料要求和最终截止时间。</p>',
     '</section>',
-    '<section style="margin-top:14px;padding:20px 16px;border-radius:12px;background:#17324d;text-align:center;">',
-    '<p style="margin:0;font-size:16px;line-height:1.6;font-weight:700;color:#ffffff;">查看完整通知与官方入口</p>',
-    '<p style="margin:6px 0 0;font-size:12px;line-height:1.7;color:#bdccd5;">点击文末「阅读原文」，进入当日通知列表</p>',
-    '</section>',
-    '<p style="margin:22px 0 0;text-align:center;font-size:10px;line-height:1.8;letter-spacing:0.16em;color:#9aa8b2;">SEEK OFFER · 保研信息每日更新</p>',
+    '<p style="margin:25px 0 0;padding:14px 0;border-top:1px solid #edf0ee;border-bottom:1px solid #edf0ee;text-align:center;font-size:13px;line-height:1.75;color:#2f6f68;">文末「阅读原文」可查看全部通知与官方链接</p>',
+    '<p style="margin:24px 0 0;text-align:center;font-size:10px;line-height:1.8;color:#a0aaa6;">寻鹿 SeekOffer · 保研信息每日整理</p>',
     '</section>'
   ].join('');
 
@@ -306,7 +318,8 @@ export function buildDailyDigest(rawNotices, targetDate, options = {}) {
     digest: digest.slice(0, 120),
     content,
     contentLength: content.length,
-    sourceUrl
+    sourceUrl,
+    editorial
   };
 }
 
@@ -447,6 +460,7 @@ async function getWechatAccessToken(fetchImpl, env) {
 
 const COVER_FONT_REGULAR_PATH = fileURLToPath(new URL('./assets/Lato-Regular.ttf', import.meta.url));
 const COVER_FONT_BLACK_PATH = fileURLToPath(new URL('./assets/Lato-Black.ttf', import.meta.url));
+const COVER_TEMPLATE_PATH = fileURLToPath(new URL('./assets/cover-template.png', import.meta.url));
 let coverFontPromise;
 
 function ensureCoverFont() {
@@ -459,122 +473,32 @@ function ensureCoverFont() {
   return coverFontPromise;
 }
 
-function drawTrackedText(context, text, x, y, spacing) {
-  let cursor = x;
-  for (const character of String(text)) {
-    context.fillText(character, cursor, y);
-    cursor += context.measureText(character).width + spacing;
-  }
-}
-
-function drawStrongText(context, text, x, y) {
-  context.fillText(text, x, y);
-  context.fillText(text, x + 1, y);
-}
-
-function drawRoundedRect(context, x, y, width, height, radius) {
-  const safeRadius = Math.min(radius, width / 2, height / 2);
-  context.beginPath();
-  context.moveTo(x + safeRadius, y);
-  context.lineTo(x + width - safeRadius, y);
-  context.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
-  context.lineTo(x + width, y + height - safeRadius);
-  context.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
-  context.lineTo(x + safeRadius, y + height);
-  context.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
-  context.lineTo(x, y + safeRadius);
-  context.quadraticCurveTo(x, y, x + safeRadius, y);
-  context.closePath();
-}
-
-function fillCoverGradient(context, width, height) {
-  for (let y = 0; y < height; y += 1) {
-    const progress = y / Math.max(1, height - 1);
-    const red = Math.round(12 + 18 * progress);
-    const green = Math.round(34 + 40 * progress);
-    const blue = Math.round(55 + 39 * progress);
-    context.fillStyle = `rgb(${red},${green},${blue})`;
-    context.fillRect(0, y, width, 1);
-  }
-}
-
-export async function renderCoverPng(digest) {
+export async function renderCoverJpeg(digest) {
   await ensureCoverFont();
-  const width = 900;
-  const height = 383;
-  const canvas = PImage.make(width, height);
+  const canvas = await PImage.decodePNGFromStream(createReadStream(COVER_TEMPLATE_PATH));
   const context = canvas.getContext('2d');
-  fillCoverGradient(context, width, height);
 
-  context.strokeStyle = 'rgba(255,255,255,0.045)';
-  context.lineWidth = 1;
-  for (let x = 30; x < width; x += 54) {
-    context.beginPath();
-    context.moveTo(x, 0);
-    context.lineTo(x, height);
-    context.stroke();
-  }
-
-  context.fillStyle = 'rgba(255,255,255,0.035)';
-  context.beginPath();
-  context.arc(812, 32, 196, 0, Math.PI * 2);
-  context.fill();
-  context.fillStyle = 'rgba(222,182,112,0.065)';
-  context.beginPath();
-  context.arc(760, 374, 150, 0, Math.PI * 2);
-  context.fill();
-
-  context.fillStyle = '#d9b878';
-  context.fillRect(53, 49, 5, 278);
-  context.font = "14pt 'Lato'";
-  drawTrackedText(context, 'SEEK OFFER', 82, 72, 4);
-  context.fillStyle = '#ffffff';
-  context.font = "58pt 'Lato Black'";
-  drawStrongText(context, 'DAILY', 78, 163);
-  drawStrongText(context, 'DIGEST', 78, 231);
-  context.fillStyle = '#b8ced8';
-  context.font = "14pt 'Lato'";
-  drawTrackedText(context, 'POSTGRADUATE RECOMMENDATION', 82, 276, 1.35);
-  context.fillStyle = '#d9b878';
-  context.font = "14pt 'Lato'";
-  drawTrackedText(context, digest.targetDate.replaceAll('-', ' · '), 82, 328, 2.2);
-
-  drawRoundedRect(context, 646, 65, 198, 250, 24);
-  context.fillStyle = 'rgba(255,255,255,0.075)';
-  context.fill();
-  context.strokeStyle = 'rgba(255,255,255,0.18)';
-  context.lineWidth = 1;
-  context.stroke();
-
+  const [, month, day] = digest.targetDate.split('-');
+  context.fillStyle = '#1f2b2a';
+  context.font = '72pt Lato Black';
+  context.fillText(`${month}.${day}`, 62, 190);
   const countText = String(digest.noticeCount).padStart(2, '0');
-  context.font = "82pt 'Lato Black'";
+  context.font = '68pt Lato Black';
   const countWidth = context.measureText(countText).width;
-  context.fillStyle = '#ffffff';
-  drawStrongText(context, countText, 745 - countWidth / 2, 188);
-  context.fillStyle = '#d9b878';
-  context.font = "12pt 'Lato'";
-  const label = 'NEW NOTICES';
-  const labelWidth = context.measureText(label).width;
-  context.fillText(label, 745 - labelWidth / 2, 232);
-  context.fillStyle = 'rgba(255,255,255,0.22)';
-  context.fillRect(685, 255, 120, 1);
-  context.fillStyle = '#b8ced8';
-  context.font = "10pt 'Lato'";
-  const todayLabel = 'DAILY UPDATE';
-  const todayWidth = context.measureText(todayLabel).width;
-  context.fillText(todayLabel, 745 - todayWidth / 2, 285);
+  context.fillStyle = '#1f2b2a';
+  context.fillText(countText, 750 - countWidth / 2, 220);
 
   const stream = new PassThrough();
   const chunks = [];
   stream.on('data', (chunk) => chunks.push(chunk));
-  await PImage.encodePNGToStream(canvas, stream);
+  await PImage.encodeJPEGToStream(canvas, stream, 92);
   return Buffer.concat(chunks);
 }
 
 async function uploadCover(fetchImpl, accessToken, digest) {
-  const coverBuffer = await renderCoverPng(digest);
+  const coverBuffer = await renderCoverJpeg(digest);
   const form = new FormData();
-  form.append('media', new Blob([coverBuffer], { type: 'image/png' }), `seekoffer-${digest.targetDate}.png`);
+  form.append('media', new Blob([coverBuffer], { type: 'image/jpeg' }), `seekoffer-${digest.targetDate}.jpg`);
   const url = `${WECHAT_UPLOAD_MATERIAL_URL}?access_token=${encodeURIComponent(accessToken)}&type=image`;
   const payload = await requestJson(fetchImpl, url, { method: 'POST', body: form }, 'wechat_cover_upload_failed');
 
@@ -674,10 +598,37 @@ export async function runDailyDigest({
   const force = booleanValue(event.force);
   const suppliedNotices = dryRun && Array.isArray(event.notices) ? event.notices : null;
   const rawNotices = suppliedNotices || await fetchDailyNotices(fetchImpl, env, targetDate);
-  const digest = buildDailyDigest(rawNotices, targetDate, {
+  const digestOptions = {
     siteUrl: env.SEEKOFFER_SITE_URL || env.NEXT_PUBLIC_SITE_URL,
     maxContentChars: env.WECHAT_DAILY_MAX_CONTENT_CHARS
+  };
+  const baselineDigest = buildDailyDigest(rawNotices, targetDate, digestOptions);
+
+  let existing = null;
+  if (!dryRun) {
+    requireEnv(env, ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'WECHAT_MP_APP_ID', 'WECHAT_MP_APP_SECRET']);
+    existing = await getExistingPublication(fetchImpl, env, targetDate);
+
+    if (existing && !force) {
+      return {
+        ok: existing.status === 'drafted' || existing.status === 'skipped',
+        skipped: true,
+        reason: `already_${existing.status}`,
+        targetDate,
+        noticeCount: Number(existing.notice_count || 0),
+        mediaId: compactText(existing.wechat_media_id)
+      };
+    }
+  }
+
+  const editorial = await createEditorialPlan({
+    notices: baselineDigest.notices,
+    targetDate,
+    categoryCounts: baselineDigest.categoryCounts,
+    fetchImpl,
+    env
   });
+  const digest = buildDailyDigest(rawNotices, targetDate, { ...digestOptions, editorial });
 
   if (dryRun) {
     return {
@@ -693,21 +644,12 @@ export async function runDailyDigest({
         content: digest.content,
         contentLength: digest.contentLength,
         sourceUrl: digest.sourceUrl
+      },
+      editorial: {
+        source: editorial.source,
+        model: editorial.model,
+        fallbackReason: editorial.fallbackReason
       }
-    };
-  }
-
-  requireEnv(env, ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'WECHAT_MP_APP_ID', 'WECHAT_MP_APP_SECRET']);
-  const existing = await getExistingPublication(fetchImpl, env, targetDate);
-
-  if (existing && !force) {
-    return {
-      ok: existing.status === 'drafted' || existing.status === 'skipped',
-      skipped: true,
-      reason: `already_${existing.status}`,
-      targetDate,
-      noticeCount: Number(existing.notice_count || 0),
-      mediaId: compactText(existing.wechat_media_id)
     };
   }
 
@@ -726,7 +668,11 @@ export async function runDailyDigest({
     metadata: {
       omittedCount: digest.omittedCount,
       categoryCounts: digest.categoryCounts,
-      forced: force
+      forced: force,
+      editorialSource: editorial.source,
+      editorialModel: editorial.model,
+      editorialFallbackReason: editorial.fallbackReason,
+      openaiResponseId: editorial.responseId
     }
   };
 
@@ -779,7 +725,9 @@ export async function runDailyDigest({
       omittedCount: digest.omittedCount,
       mediaId,
       thumbMediaId,
-      articleTitle: digest.title
+      articleTitle: digest.title,
+      editorialSource: editorial.source,
+      editorialModel: editorial.model
     };
   } catch (error) {
     const code = compactText(error?.code) || 'unexpected_error';
