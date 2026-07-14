@@ -1,4 +1,3 @@
-import { AnalyticsPreferenceControl } from '@/components/analytics-preference-control';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { QQ_GROUP_NUMBER } from '@/lib/contact';
@@ -18,7 +17,7 @@ const privacySections = [
   },
   {
     title: '匿名访问统计',
-    body: '只有在你同意后，网站才会创建匿名访问设备标识，并记录页面路径、页面标题、来源页面、语言、时区、访问次数和在线状态，用于判断页面是否易用和发现运行异常。该标识不是注册账号，也不用于识别你的真实身份；你可以随时关闭。'
+    body: '网站会进行匿名访问统计，并创建随机设备标识，记录页面路径、页面标题、来源页面、语言、时区、访问次数和在线状态，用于判断页面是否易用和发现运行异常。匿名统计不需要用户另行同意，不包含姓名、手机号、邮箱或工作台内容，不用于识别真实身份、广告画像、与本服务无关的商业营销或向无关第三方披露。'
   },
   {
     title: '本机保存与云端同步',
@@ -52,7 +51,7 @@ export default function PrivacyPage() {
       <PageSectionTitle
         eyebrow="Privacy Policy"
         title="隐私政策"
-        subtitle="所有数据规则集中在这里说明：收集什么、为什么使用、保存多久，以及你如何管理自己的信息。更新日期：2026 年 7 月 11 日。"
+        subtitle="所有数据规则集中在这里说明：收集什么、为什么使用、保存多久，以及你如何管理自己的信息。更新日期：2026 年 7 月 14 日。"
       />
 
       <section className="surface-card rounded-[30px] p-6 sm:p-7">
@@ -69,10 +68,6 @@ export default function PrivacyPage() {
               <p className="mt-3 text-sm leading-8 text-slate-600">{section.body}</p>
             </section>
           ))}
-        </div>
-
-        <div className="mt-5">
-          <AnalyticsPreferenceControl />
         </div>
 
         <p className="mt-5 text-xs leading-6 text-slate-400">

@@ -1,9 +1,8 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { SUPABASE_URL } from '@/lib/supabase-env';
-import { ANALYTICS_PREFERENCE_EVENT, readAnalyticsPreference } from '@/lib/privacy-preference';
 
 const visitorStorageKey = 'seekoffer-visitor-id';
 const sessionStorageKey = 'seekoffer-session-id';
@@ -78,17 +77,9 @@ function sendPresence(eventType: 'pageview' | 'heartbeat', pathname: string) {
 
 export function VisitorPresenceTracker() {
   const pathname = usePathname() || '/';
-  const [analyticsAllowed, setAnalyticsAllowed] = useState(false);
 
   useEffect(() => {
-    const updatePreference = () => setAnalyticsAllowed(readAnalyticsPreference() === 'accepted');
-    updatePreference();
-    window.addEventListener(ANALYTICS_PREFERENCE_EVENT, updatePreference);
-    return () => window.removeEventListener(ANALYTICS_PREFERENCE_EVENT, updatePreference);
-  }, []);
-
-  useEffect(() => {
-    if (pathname.startsWith('/admin') || !analyticsAllowed) return;
+    if (pathname.startsWith('/admin')) return;
 
     sendPresence('pageview', pathname);
     const interval = window.setInterval(() => sendPresence('heartbeat', pathname), 45_000);
@@ -108,7 +99,7 @@ export function VisitorPresenceTracker() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('pagehide', handlePageHide);
     };
-  }, [analyticsAllowed, pathname]);
+  }, [pathname]);
 
   return null;
 }

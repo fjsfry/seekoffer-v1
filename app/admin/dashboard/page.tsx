@@ -146,7 +146,7 @@ export default function AdminDashboardPage() {
   const secondaryMetrics = [
     {
       href: '/admin/dashboard',
-      label: '今日活跃',
+      label: '今日新增访客',
       value: formatNumber(analytics.metrics.todayVisitors),
       hint: `实时在线 ${formatNumber(analytics.metrics.onlineVisitors)}`,
       icon: Activity,
@@ -242,7 +242,7 @@ export default function AdminDashboardPage() {
                 <h2 className="text-lg font-semibold text-slate-950">累计用户</h2>
               </div>
               <span className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-100">
-                今日活跃 {formatNumber(analytics.metrics.todayVisitors)}
+                今日新增 {formatNumber(analytics.metrics.todayVisitors)}
               </span>
             </div>
 
@@ -251,7 +251,7 @@ export default function AdminDashboardPage() {
             <dl className="mt-8 grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-100 pt-5">
               <div className="pr-4">
                 <dd className="text-xl font-semibold text-slate-950 tabular-nums">{formatNumber(analytics.metrics.todayVisitors)}</dd>
-                <dt className="mt-1 text-sm text-slate-500">今日活跃</dt>
+                <dt className="mt-1 text-sm text-slate-500">新增访客</dt>
               </div>
               <div className="px-4">
                 <dd className="text-xl font-semibold text-slate-950 tabular-nums">{formatNumber(analytics.metrics.todayPageViews)}</dd>

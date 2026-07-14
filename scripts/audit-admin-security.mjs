@@ -130,11 +130,11 @@ const checks = [
       !/review_note/.test(source)
   },
   {
-    name: 'Anonymous analytics only starts after an explicit preference',
+    name: 'Anonymous analytics excludes administration pages and direct account identifiers',
     file: 'components/visitor-presence-tracker.tsx',
     assert: (source) =>
-      /readAnalyticsPreference\(\) === 'accepted'/.test(source) &&
-      /!analyticsAllowed/.test(source)
+      /pathname\.startsWith\('\/admin'\)/.test(source) &&
+      !/\b(?:email|phone|userId)\b/.test(source)
   }
 ];
 
