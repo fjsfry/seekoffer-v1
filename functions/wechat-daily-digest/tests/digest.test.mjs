@@ -108,6 +108,12 @@ test('runs the complete Supabase-to-WeChat draft workflow', async () => {
     if (url.endsWith('/cgi-bin/stable_token')) return json({ access_token: 'test-access-token' });
     if (url.includes('/cgi-bin/material/add_material?')) {
       assert.ok(options.body instanceof FormData);
+      const media = options.body.get('media');
+      assert.equal(media.type, 'image/png');
+      const bytes = Buffer.from(await media.arrayBuffer());
+      assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+      assert.equal(bytes.readUInt32BE(16), 900);
+      assert.equal(bytes.readUInt32BE(20), 383);
       return json({ media_id: 'test-thumb-media-id' });
     }
     if (url.includes('/cgi-bin/draft/add?')) return json({ media_id: 'test-draft-media-id' });

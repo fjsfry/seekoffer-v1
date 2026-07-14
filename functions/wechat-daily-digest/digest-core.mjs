@@ -1,3 +1,5 @@
+import { deflateSync } from 'node:zlib';
+
 const CATEGORY_ORDER = ['预推免', '夏令营', '开放日与宣讲', '名单与结果', '其他通知'];
 const DEFAULT_SITE_URL = 'https://www.seekoffer.com.cn';
 const DEFAULT_MAX_CONTENT_CHARS = 18_000;
@@ -412,10 +414,182 @@ async function getWechatAccessToken(fetchImpl, env) {
   return payload.access_token;
 }
 
-async function renderCoverPng(digest) {
-  const sharpModule = await import('sharp');
-  const sharp = sharpModule.default;
-  return sharp(Buffer.from(buildCoverSvg(digest))).png({ compressionLevel: 9 }).toBuffer();
+const PIXEL_FONT = {
+  ' ': ['00000', '00000', '00000', '00000', '00000', '00000', '00000'],
+  '-': ['00000', '00000', '00000', '11111', '00000', '00000', '00000'],
+  '.': ['00000', '00000', '00000', '00000', '00000', '01100', '01100'],
+  '0': ['01110', '10001', '10011', '10101', '11001', '10001', '01110'],
+  '1': ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+  '2': ['01110', '10001', '00001', '00010', '00100', '01000', '11111'],
+  '3': ['11110', '00001', '00001', '01110', '00001', '00001', '11110'],
+  '4': ['00010', '00110', '01010', '10010', '11111', '00010', '00010'],
+  '5': ['11111', '10000', '10000', '11110', '00001', '00001', '11110'],
+  '6': ['01110', '10000', '10000', '11110', '10001', '10001', '01110'],
+  '7': ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
+  '8': ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
+  '9': ['01110', '10001', '10001', '01111', '00001', '00001', '01110'],
+  A: ['01110', '10001', '10001', '11111', '10001', '10001', '10001'],
+  B: ['11110', '10001', '10001', '11110', '10001', '10001', '11110'],
+  C: ['01111', '10000', '10000', '10000', '10000', '10000', '01111'],
+  D: ['11110', '10001', '10001', '10001', '10001', '10001', '11110'],
+  E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
+  F: ['11111', '10000', '10000', '11110', '10000', '10000', '10000'],
+  I: ['11111', '00100', '00100', '00100', '00100', '00100', '11111'],
+  K: ['10001', '10010', '10100', '11000', '10100', '10010', '10001'],
+  L: ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
+  M: ['10001', '11011', '10101', '10101', '10001', '10001', '10001'],
+  N: ['10001', '11001', '10101', '10011', '10001', '10001', '10001'],
+  O: ['01110', '10001', '10001', '10001', '10001', '10001', '01110'],
+  R: ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
+  S: ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
+  T: ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
+  V: ['10001', '10001', '10001', '10001', '10001', '01010', '00100'],
+  W: ['10001', '10001', '10001', '10101', '10101', '10101', '01010'],
+  Y: ['10001', '10001', '01010', '00100', '00100', '00100', '00100']
+};
+
+let crcTable;
+
+function getCrcTable() {
+  if (crcTable) return crcTable;
+  crcTable = Array.from({ length: 256 }, (_, index) => {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : (value >>> 1);
+    }
+    return value >>> 0;
+  });
+  return crcTable;
+}
+
+function crc32(buffer) {
+  const table = getCrcTable();
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc = table[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data) {
+  const typeBuffer = Buffer.from(type, 'ascii');
+  const chunk = Buffer.allocUnsafe(data.length + 12);
+  chunk.writeUInt32BE(data.length, 0);
+  typeBuffer.copy(chunk, 4);
+  data.copy(chunk, 8);
+  chunk.writeUInt32BE(crc32(Buffer.concat([typeBuffer, data])), data.length + 8);
+  return chunk;
+}
+
+function fillRect(pixels, width, height, x, y, rectWidth, rectHeight, color, alpha = 1) {
+  const startX = Math.max(0, Math.floor(x));
+  const startY = Math.max(0, Math.floor(y));
+  const endX = Math.min(width, Math.ceil(x + rectWidth));
+  const endY = Math.min(height, Math.ceil(y + rectHeight));
+
+  for (let py = startY; py < endY; py += 1) {
+    for (let px = startX; px < endX; px += 1) {
+      const offset = (py * width + px) * 4;
+      pixels[offset] = Math.round(pixels[offset] * (1 - alpha) + color[0] * alpha);
+      pixels[offset + 1] = Math.round(pixels[offset + 1] * (1 - alpha) + color[1] * alpha);
+      pixels[offset + 2] = Math.round(pixels[offset + 2] * (1 - alpha) + color[2] * alpha);
+      pixels[offset + 3] = 255;
+    }
+  }
+}
+
+function pixelTextWidth(text, scale) {
+  return Math.max(0, String(text).length * 6 * scale - scale);
+}
+
+function drawPixelText(pixels, width, height, text, x, y, scale, color) {
+  let cursorX = x;
+  for (const character of String(text).toUpperCase()) {
+    const glyph = PIXEL_FONT[character] || PIXEL_FONT[' '];
+    glyph.forEach((row, rowIndex) => {
+      for (let columnIndex = 0; columnIndex < row.length; columnIndex += 1) {
+        if (row[columnIndex] === '1') {
+          fillRect(
+            pixels,
+            width,
+            height,
+            cursorX + columnIndex * scale,
+            y + rowIndex * scale,
+            scale,
+            scale,
+            color
+          );
+        }
+      }
+    });
+    cursorX += 6 * scale;
+  }
+}
+
+function encodePng(width, height, pixels) {
+  const scanlineSize = width * 4 + 1;
+  const scanlines = Buffer.allocUnsafe(scanlineSize * height);
+  for (let y = 0; y < height; y += 1) {
+    const scanlineOffset = y * scanlineSize;
+    scanlines[scanlineOffset] = 0;
+    pixels.copy(scanlines, scanlineOffset + 1, y * width * 4, (y + 1) * width * 4);
+  }
+
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  header[9] = 6;
+  header[10] = 0;
+  header[11] = 0;
+  header[12] = 0;
+
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', deflateSync(scanlines, { level: 9 })),
+    pngChunk('IEND', Buffer.alloc(0))
+  ]);
+}
+
+export function renderCoverPng(digest) {
+  const width = 900;
+  const height = 383;
+  const pixels = Buffer.allocUnsafe(width * height * 4);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const progress = (x + y) / (width + height - 2);
+      const offset = (y * width + x) * 4;
+      pixels[offset] = Math.round(16 + 30 * progress);
+      pixels[offset + 1] = Math.round(42 + 47 * progress);
+      pixels[offset + 2] = Math.round(67 + 37 * progress);
+      pixels[offset + 3] = 255;
+    }
+  }
+
+  fillRect(pixels, width, height, 62, 60, 74, 8, [240, 217, 168]);
+  fillRect(pixels, width, height, 610, 132, 220, 124, [255, 255, 255], 0.1);
+  drawPixelText(pixels, width, height, 'SEEK OFFER', 62, 99, 4, [240, 217, 168]);
+  drawPixelText(pixels, width, height, 'DAILY BRIEF', 62, 158, 8, [255, 255, 255]);
+  drawPixelText(pixels, width, height, digest.targetDate, 66, 248, 4, [200, 216, 223]);
+  drawPixelText(pixels, width, height, 'NEW NOTICES', 650, 224, 2, [240, 217, 168]);
+  drawPixelText(pixels, width, height, 'SEEKOFFER.COM.CN', 62, 328, 2, [159, 181, 192]);
+
+  const countText = String(digest.noticeCount);
+  const countScale = countText.length >= 3 ? 7 : 9;
+  drawPixelText(
+    pixels,
+    width,
+    height,
+    countText,
+    720 - pixelTextWidth(countText, countScale) / 2,
+    153,
+    countScale,
+    [255, 255, 255]
+  );
+
+  return encodePng(width, height, pixels);
 }
 
 async function uploadCover(fetchImpl, accessToken, digest) {
