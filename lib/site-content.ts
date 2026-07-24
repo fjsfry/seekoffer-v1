@@ -1,5 +1,3 @@
-import { QQ_GROUP_URL } from './contact';
-
 export const heroSellingPoints = [
   {
     title: '通知不再四处找',
@@ -62,8 +60,7 @@ export const footerColumns = [
       { label: '知识/经验中心', href: '/knowledge' },
       { label: '保研咨询', href: '/consulting' },
       { label: '使用指南', href: '/guide' },
-      { label: '常见问题', href: '/faq' },
-      { label: '加入 QQ 群', href: QQ_GROUP_URL, external: true }
+      { label: '常见问题', href: '/faq' }
     ]
   },
   {
