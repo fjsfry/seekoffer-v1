@@ -32,6 +32,7 @@ type NoticePayload = {
   history_records?: unknown[];
   admin_status?: string;
   admin_review_note?: string;
+  admin_deleted_at?: string | null;
 };
 
 type IngestBody = {
@@ -58,7 +59,7 @@ function normalizeNotice(notice: NoticePayload) {
     school_name: String(notice.school_name || '').trim(),
     department_name: String(notice.department_name || '').trim(),
     project_name: String(notice.project_name || '').trim(),
-    project_type: String(notice.project_type || '').trim() || '夏令营',
+    project_type: String(notice.project_type || '').trim() || '推免',
     discipline: String(notice.discipline || '').trim(),
     publish_date: String(notice.publish_date || '').trim(),
     deadline_date: String(notice.deadline_date || '').trim(),
@@ -84,7 +85,8 @@ function normalizeNotice(notice: NoticePayload) {
     change_log: Array.isArray(notice.change_log) ? notice.change_log : [],
     history_records: Array.isArray(notice.history_records) ? notice.history_records : [],
     admin_status: adminStatus,
-    admin_review_note: String(notice.admin_review_note || '').trim()
+    admin_review_note: String(notice.admin_review_note || '').trim(),
+    admin_deleted_at: null
   };
 }
 
@@ -169,12 +171,20 @@ Deno.serve(async (request) => {
     }
   });
 
-  const existingById = new Map<string, { admin_status?: string; admin_reviewed_by?: string; admin_deleted_at?: string | null }>();
+  const existingById = new Map<
+    string,
+    {
+      admin_status?: string;
+      admin_reviewed_by?: string;
+      admin_review_note?: string;
+      admin_deleted_at?: string | null;
+    }
+  >();
   for (let index = 0; index < notices.length; index += 1000) {
     const batchIds = notices.slice(index, index + 1000).map((notice) => notice.id);
     const { data: existingRows, error: existingError } = await supabase
       .from('notices')
-      .select('id,admin_status,admin_reviewed_by,admin_deleted_at')
+      .select('id,admin_status,admin_reviewed_by,admin_review_note,admin_deleted_at')
       .in('id', batchIds);
 
     if (existingError) {
@@ -203,9 +213,14 @@ Deno.serve(async (request) => {
       ...notice,
       admin_status: existing.admin_status,
       is_private: true,
-      admin_review_note: notice.admin_review_note || 'preserved_manual_moderation'
+      admin_review_note: existing.admin_review_note || notice.admin_review_note || 'preserved_manual_moderation',
+      admin_deleted_at: existing.admin_deleted_at || null
     };
   });
+  const restoredAutoDeleted = noticesForUpsert.filter((notice) => {
+    const existing = existingById.get(notice.id);
+    return Boolean(existing?.admin_deleted_at && !String(existing.admin_reviewed_by || '').trim());
+  }).length;
 
   const { error: noticeError } = await supabase.from('notices').upsert(noticesForUpsert, {
     onConflict: 'id'
@@ -229,7 +244,8 @@ Deno.serve(async (request) => {
       skippedOutdatedDeadline: normalizedNotices.length - publishableNotices.length,
       dedupedNotices: notices.length,
       publishedNotices: noticesForUpsert.filter((notice) => notice.admin_status === 'published' && !notice.is_private).length,
-      privateNotices: noticesForUpsert.filter((notice) => notice.is_private).length
+      privateNotices: noticesForUpsert.filter((notice) => notice.is_private).length,
+      restoredAutoDeleted
     }
   });
 
@@ -239,6 +255,7 @@ Deno.serve(async (request) => {
     noticesSkipped: normalizedNotices.length - publishableNotices.length,
     noticesUpserted: noticesForUpsert.length,
     noticesPublished: noticesForUpsert.filter((notice) => notice.admin_status === 'published' && !notice.is_private).length,
-    noticesPrivate: noticesForUpsert.filter((notice) => notice.is_private).length
+    noticesPrivate: noticesForUpsert.filter((notice) => notice.is_private).length,
+    restoredAutoDeleted
   });
 });

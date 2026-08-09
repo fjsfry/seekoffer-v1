@@ -122,8 +122,7 @@ export function getNoticeQualityTier(project: PublicNoticeProject): NoticeQualit
     hasDirtyText(project) ||
     hasBodyLikeTitle(project) ||
     hasBrokenPublicIdentity(project) ||
-    hasBrokenDepartmentIdentity(project) ||
-    !hasValidDeadline(project)
+    hasBrokenDepartmentIdentity(project)
   ) {
     return 'p0';
   }
@@ -132,7 +131,7 @@ export function getNoticeQualityTier(project: PublicNoticeProject): NoticeQualit
     return 'p1';
   }
 
-  if (!compactText(project.schoolName) || !compactText(project.sourceLink)) {
+  if (!hasValidDeadline(project) || !compactText(project.sourceLink)) {
     return 'p2';
   }
 
@@ -140,7 +139,12 @@ export function getNoticeQualityTier(project: PublicNoticeProject): NoticeQualit
 }
 
 export function shouldShowInMainNoticeFlow(project: PublicNoticeProject) {
-  return getNoticeQualityTier(project) === 'clean';
+  const tier = getNoticeQualityTier(project);
+  if (tier === 'p0' || tier === 'p1') {
+    return false;
+  }
+
+  return Boolean(compactText(project.sourceLink));
 }
 
 export function filterMainNoticeProjects(projects: PublicNoticeProject[]) {

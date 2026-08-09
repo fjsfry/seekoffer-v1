@@ -1,13 +1,14 @@
 import type { PublicNoticeProject } from './mock-data';
 
-const SOURCE_SITE_PATTERN = /保研通知网|保研信息网/g;
+const SOURCE_SITE_PATTERN = /保研信息通知网|保研通知网|保研信息网|星刻保研/g;
 const ORIGINAL_NOTICE_PATTERN = /原文通知|原通知|官网原文|原文/g;
 
 export function publicNoticeCopy(value: string | undefined | null) {
   return String(value || '')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(SOURCE_SITE_PATTERN, '公开通知')
+    .replace(/已合并重复来源：[^；。]+[；。]?/g, '已完成重复信息合并。')
+    .replace(SOURCE_SITE_PATTERN, '寻鹿整理')
     .replace(ORIGINAL_NOTICE_PATTERN, '完整通知')
     .replace(/来源说明|来源链接/g, '整理说明')
     .replace(/该项目由公开通知同步，?/g, '')

@@ -1,8 +1,17 @@
 import http from 'node:http';
 import https from 'node:https';
+import {
+  areLikelyDuplicateNotices,
+  extractDeadlineFromText as extractDeadlineFromTextCore,
+  inferNoticeKind,
+  inferProjectType as inferProjectTypeCore,
+  normalizeComparableUrl
+} from './notice-sync-core.mjs';
 
 const PRIMARY_API_BASE_URL = process.env.API_BASE_URL || 'https://ajqwsiasyqyi.sealosgzg.site';
 const SECONDARY_API_BASE_URL = process.env.BAOYANWANG_API_BASE_URL || 'http://api.baoyanwang.com.cn/api/v1';
+const XINGKE_DATA_URL = process.env.XINGKE_DATA_URL || 'https://www.xingkebaoyan.com/data.json';
+const BAOYANNEWS_LIST_URL = process.env.BAOYANNEWS_LIST_URL || 'https://www.baoyannews.com/notices';
 const SUPABASE_PROJECT_REF = process.env.SUPABASE_PROJECT_REF || '';
 const SUPABASE_INGEST_URL =
   process.env.SUPABASE_INGEST_URL ||
@@ -51,6 +60,18 @@ const SECONDARY_REPAIR_DETAIL_IDS = unique([
 const SECONDARY_DETAIL_DELAY_MS = Math.max(0, Number(process.env.SECONDARY_DETAIL_DELAY_MS || 120));
 const SECONDARY_MISSING_DEADLINE_MAX_DETAILS =
   parseOptionalInteger(process.env.SECONDARY_MISSING_DEADLINE_MAX_DETAILS) || (IS_INCREMENTAL_SYNC ? 20 : 80);
+const ENABLE_XINGKE_SOURCE = !/^(?:0|false|no)$/i.test(process.env.ENABLE_XINGKE_SOURCE || 'true');
+const ENABLE_BAOYANNEWS_SOURCE = !/^(?:0|false|no)$/i.test(process.env.ENABLE_BAOYANNEWS_SOURCE || 'true');
+const INCREMENTAL_LOOKBACK_DAYS = Math.max(1, Number(process.env.INCREMENTAL_LOOKBACK_DAYS || 10));
+const XINGKE_MAX_RECORDS = parseOptionalInteger(process.env.XINGKE_MAX_RECORDS);
+const BAOYANNEWS_MAX_PAGES =
+  parseOptionalInteger(process.env.BAOYANNEWS_MAX_PAGES) || (IS_INCREMENTAL_SYNC ? 4 : 150);
+const BAOYANNEWS_PAGE_DELAY_MS = Math.max(0, Number(process.env.BAOYANNEWS_PAGE_DELAY_MS || 80));
+const OFFICIAL_REPAIR_MAX_DETAILS =
+  parseOptionalInteger(process.env.OFFICIAL_REPAIR_MAX_DETAILS) || (IS_INCREMENTAL_SYNC ? 30 : 240);
+const OFFICIAL_REPAIR_CONCURRENCY = Math.max(1, Number(process.env.OFFICIAL_REPAIR_CONCURRENCY || 4));
+const OFFICIAL_REPAIR_DELAY_MS = Math.max(0, Number(process.env.OFFICIAL_REPAIR_DELAY_MS || 80));
+const INGEST_BATCH_SIZE = Math.max(50, Number(process.env.INGEST_BATCH_SIZE || 500));
 const DRY_RUN = /^1|true|yes$/i.test(process.env.DRY_RUN || '');
 
 const TITLE_BODY_START_PATTERNS = [
@@ -95,6 +116,13 @@ const SECONDARY_HEADERS = {
   Accept: 'application/json, text/plain, */*',
   'Accept-Language': 'zh-CN,zh;q=0.9',
   Referer: 'http://pc.baoyanwang.com.cn/articles?category=%E4%BF%9D%E7%A0%94%E4%BF%A1%E6%81%AF'
+};
+
+const DISCOVERY_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  Accept: 'application/json, text/html,application/xhtml+xml',
+  'Accept-Language': 'zh-CN,zh;q=0.9'
 };
 
 const MATERIAL_KEYWORDS = [
@@ -375,14 +403,7 @@ function unique(items) {
 }
 
 function inferProjectType(...values) {
-  const text = values.map(normalizeSpace).join(' ');
-  if (/开放日|科创营|科学营|夏令营|暑期学校|交流营/.test(text)) return '夏令营';
-  if (/预推免|推免预报名|预接收|预报名.*推免|接收推荐免试(?:研究生)?预报名|推荐免试(?:研究生)?预报名/.test(text)) return '预推免';
-  if (/正式推免|九推|全国推免系统|推免服务系统|接收推免|接收推荐免试|推免.*复试|推荐免试.*复试|复试录取/.test(text)) {
-    return '正式推免';
-  }
-  if (/导师直招|直博生|直博/.test(text)) return '导师直招';
-  return '夏令营';
+  return inferProjectTypeCore(...values);
 }
 
 function inferDiscipline(value, title) {
@@ -439,6 +460,7 @@ function buildTags(record, text, discipline, materials) {
   if (text.includes('面试')) tags.push('需面试');
   if (materials.length >= 5) tags.push('材料较多');
   if (text.includes('导师')) tags.push('导师联系');
+  tags.push(inferNoticeKind(text));
 
   return unique(tags).slice(0, 8);
 }
@@ -486,29 +508,8 @@ function isSuspiciousTitle(value) {
   return TITLE_BODY_START_PATTERNS.some((pattern) => pattern.test(title));
 }
 
-function extractDeadlineFromText(text) {
-  const source = normalizeSpace(text);
-  if (!source) {
-    return '';
-  }
-
-  const labeledPatterns = [
-    /(?:报名|申请|提交材料|网上报名)?截止(?:时间|日期)?[:：为至到\s]*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)/i,
-    /(?:报名|申请)时间[:：]?\s*20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?.{0,12}?(?:至|到|-|—|~)\s*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)/i,
-    /(?:报名|申请|提交|材料|系统|邮箱|纸质材料|电子材料).{0,24}?(?:于|在|至|到|截止至|截止到)\s*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)\s*(?:前|之前|截止)?/i,
-    /(?:请于|须于|需于|应于|务必于)\s*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)\s*(?:前|之前|截止前)/i,
-    /(?:截至|截止到|截止至)\s*(20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s*\d{1,2}[:：]\d{2})?)/i
-  ];
-
-  for (const pattern of labeledPatterns) {
-    const match = source.match(pattern);
-    const deadline = normalizeDateTime(match?.[1] || '', '23:59');
-    if (deadline) {
-      return deadline;
-    }
-  }
-
-  return '';
+function extractDeadlineFromText(text, referenceDate = '') {
+  return extractDeadlineFromTextCore(text, referenceDate);
 }
 
 function normalizeCanonicalText(value) {
@@ -534,6 +535,13 @@ function normalizeCanonicalText(value) {
   }
 
   return text.replace(/[\s\p{P}\p{S}]/gu, '');
+}
+
+function isFuturePublishDate(value) {
+  const date = normalizeDate(value);
+  if (!date) return false;
+  const tomorrow = formatDateTimeInChina(new Date(Date.now() + 24 * 60 * 60 * 1000)).slice(0, 10);
+  return date > tomorrow;
 }
 
 function assessNoticeQuality(notice, extraReasons = []) {
@@ -579,6 +587,10 @@ function assessNoticeQuality(notice, extraReasons = []) {
     reasons.push('missing_deadline');
   }
 
+  if (isFuturePublishDate(notice.publish_date)) {
+    reasons.push('future_publish_date');
+  }
+
   if (isSuspiciousTitle(notice.project_name)) {
     reasons.push('suspicious_or_body_like_title');
   }
@@ -602,8 +614,13 @@ function assessNoticeQuality(notice, extraReasons = []) {
     return { tier: 'hidden', adminStatus: 'hidden', reasons: unique(reasons) };
   }
 
-  if (reasons.length) {
+  const blockingReviewReasons = reasons.filter((reason) => reason !== 'missing_deadline');
+  if (blockingReviewReasons.length) {
     return { tier: 'needs_review', adminStatus: 'pending', reasons: unique(reasons) };
+  }
+
+  if (reasons.length) {
+    return { tier: 'needs_repair', adminStatus: 'published', reasons: unique(reasons) };
   }
 
   return { tier: 'clean', adminStatus: 'published', reasons: [] };
@@ -618,7 +635,7 @@ function applyQualityGate(notice, extraReasons = []) {
     admin_status: quality.adminStatus,
     admin_review_note: reviewNote,
     is_private: quality.adminStatus !== 'published',
-    is_verified: quality.adminStatus === 'published',
+    is_verified: quality.adminStatus === 'published' && Boolean(notice.is_verified),
     quality_tier: quality.tier,
     quality_reasons: quality.reasons
   };
@@ -647,13 +664,16 @@ function buildPrimaryProject(record, detail = {}, targetYear = TARGET_YEAR) {
   const publishDate = normalizeDate(detail.publishTime || record.publishTime) || nowDateText();
   const deadlineDate =
     normalizeDateTime(detail.endTime || record.endTime) ||
-    extractDeadlineFromText(`${title} ${plainText}`) ||
+    extractDeadlineFromText(`${title} ${plainText}`, publishDate) ||
     '';
   const eventStartDate = normalizeDate(detail.startTime || record.startTime);
   const eventEndDate = normalizeDate(detail.endTime || record.endTime);
   const deadlineLevel = inferDeadlineLevel(deadlineDate);
   const discipline = inferDiscipline(detail.majorType || record.majorType, title);
   const materials = extractMaterialsFromText(plainText || title);
+  const officialUrl = normalizeSpace(detail.websiteUrl || record.websiteUrl);
+  const tags = buildTags(detail || record, plainText || title, discipline, materials);
+  if (!deadlineDate) tags.push('截止待确认');
 
   return {
     id: `baoyantongzhi-${recordId}`,
@@ -667,14 +687,14 @@ function buildPrimaryProject(record, detail = {}, targetYear = TARGET_YEAR) {
     deadline_date: deadlineDate,
     event_start_date: eventStartDate,
     event_end_date: eventEndDate,
-    apply_link: normalizeSpace(detail.websiteUrl || record.websiteUrl) || PRIMARY_WEB_DETAIL_URL.replace('{id}', String(recordId)),
-    source_link: PRIMARY_WEB_DETAIL_URL.replace('{id}', String(recordId)),
+    apply_link: officialUrl || PRIMARY_WEB_DETAIL_URL.replace('{id}', String(recordId)),
+    source_link: officialUrl || PRIMARY_WEB_DETAIL_URL.replace('{id}', String(recordId)),
     requirements: extractRequirementsFromText(textLines, plainText || title),
     materials_required: materials,
     exam_interview_info: extractExamInfoFromText(plainText),
     contact_info: extractContactInfo(plainText),
-    remarks: '由保研通知网自动同步，建议结合官网原文再次确认时间、材料和资格要求。',
-    tags: buildTags(detail || record, plainText || title, discipline, materials),
+    remarks: '寻鹿已整理关键信息，请以院校公开页面的最新说明为准。',
+    tags: unique(tags),
     status: inferStatus(deadlineLevel),
     deadline_level: deadlineLevel,
     year: targetYear,
@@ -808,12 +828,15 @@ function buildSecondaryProject(record, targetYear = TARGET_YEAR) {
   const title = cleanTitle(contentMeta.summary || record.title, 140) || cleanTitle(record.title, 100);
   const summaryText = [title, contentMeta.summary, normalizeSpace(record.description)].filter(Boolean).join(' ');
   const publishDate = normalizeDate(record.updated_time || record.updated_at || record.created_at) || nowDateText();
-  const deadlineDate = normalizeDateTime(record.sign_up_end || record.end_time) || extractDeadlineFromText(summaryText);
+  const deadlineDate =
+    normalizeDateTime(record.sign_up_end || record.end_time) || extractDeadlineFromText(summaryText, publishDate);
   const eventStartDate = normalizeDate(record.start_time || record.sign_up_start);
   const eventEndDate = normalizeDate(record.end_time || record.sign_up_end);
   const deadlineLevel = inferDeadlineLevel(deadlineDate);
   const discipline = inferDiscipline(pickFirst(record.major, record.academy_major, record.subject), title);
   const materials = extractMaterialsFromText(summaryText);
+  const tags = buildTags(record, summaryText, discipline, materials);
+  if (!deadlineDate) tags.push('截止待确认');
 
   return {
     id: `baoyanwang-${record.id}`,
@@ -834,8 +857,8 @@ function buildSecondaryProject(record, targetYear = TARGET_YEAR) {
     materials_required: materials,
     exam_interview_info: extractExamInfoFromText(summaryText),
     contact_info: extractContactInfo(summaryText, record.sign_up_email),
-    remarks: shorten([normalizeSpace(record.rule), normalizeSpace(record.description)].filter(Boolean).join('；'), 500),
-    tags: buildTags(record, summaryText, discipline, materials),
+    remarks: '寻鹿已整理关键信息，请以院校公开页面的最新说明为准。',
+    tags: unique(tags),
     status: inferStatus(deadlineLevel),
     deadline_level: deadlineLevel,
     year: targetYear,
@@ -853,26 +876,154 @@ function buildSecondaryProject(record, targetYear = TARGET_YEAR) {
   };
 }
 
-function normalizeFingerprint(value) {
-  return normalizeSpace(value)
-    .toLowerCase()
-    .replace(/https?:\/\//g, '')
-    .replace(/[【】（）()\-\s·、，,.:：]/g, '');
+function isRecordWithinLookback(...values) {
+  if (!IS_INCREMENTAL_SYNC) return true;
+
+  const cutoff = Date.now() - INCREMENTAL_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+  return values.some((value) => {
+    const text = normalizeSpace(value);
+    if (!text) return false;
+    const timestampText = /^20\d{2}-\d{2}-\d{2}$/.test(text)
+      ? `${text}T00:00:00+08:00`
+      : text.includes('T')
+        ? text
+        : `${text.replace(' ', 'T')}+08:00`;
+    const timestamp = new Date(timestampText).getTime();
+    return Number.isFinite(timestamp) && timestamp >= cutoff;
+  });
+}
+
+function hasTargetYearSignal(targetYear, ...values) {
+  return values.map(normalizeSpace).join(' ').includes(String(targetYear));
+}
+
+function buildXingkeProject(record, targetYear = TARGET_YEAR) {
+  const title = cleanTitle(record.title || record.name, 140);
+  const publishDate = normalizeDate(record.created_at || record.updated_at) || nowDateText();
+  const summaryText = [title, record.description, record.category, record.category_tag].map(normalizeSpace).filter(Boolean).join(' ');
+  const deadlineDate =
+    normalizeDateTime(record.signup_end || record.signup_end_text) ||
+    extractDeadlineFromText(summaryText, publishDate);
+  const eventStartDate = normalizeDate(record.event_start || record.signup_start);
+  const eventEndDate = normalizeDate(record.event_end || record.signup_end);
+  const deadlineLevel = inferDeadlineLevel(deadlineDate);
+  const discipline = inferDiscipline(
+    pickFirst(record.major, record.subject, record.disciplines, record.category),
+    title
+  );
+  const materials = extractMaterialsFromText(summaryText);
+  const officialUrl = pickFirst(record.url, record.official_url);
+  const tags = buildTags(record, summaryText, discipline, materials);
+  if (!deadlineDate) tags.push('截止待确认');
+
+  return {
+    id: `xingke-${normalizeSpace(record.id || record.public_id)}`,
+    school_name: pickFirst(record.school, record.school_name) || '待识别学校',
+    department_name: pickFirst(record.department, record.college_name, record.academy) || '待补充院系',
+    project_name: title,
+    project_type: inferProjectType(record.category_tag, record.category, title),
+    discipline,
+    publish_date: publishDate,
+    deadline_date: deadlineDate,
+    event_start_date: eventStartDate,
+    event_end_date: eventEndDate,
+    apply_link: officialUrl,
+    source_link: officialUrl,
+    requirements: shorten(record.description, 1000) || '请查看院校公开页面中的申请要求。',
+    materials_required: materials,
+    exam_interview_info: extractExamInfoFromText(summaryText),
+    contact_info: extractContactInfo(summaryText),
+    remarks: '寻鹿已整理关键信息，请以院校公开页面的最新说明为准。',
+    tags: unique(tags),
+    status: inferStatus(deadlineLevel),
+    deadline_level: deadlineLevel,
+    year: targetYear,
+    source_site: '星刻保研',
+    collected_at: nowText(),
+    updated_at: nowText(),
+    last_checked_at: nowText(),
+    last_checked_source: '星刻保研',
+    is_verified: false,
+    change_log: [],
+    history_records: [],
+    reminder_7d_sent: false,
+    reminder_3d_sent: false,
+    reminder_1d_sent: false
+  };
+}
+
+function buildBaoyanNewsProject(record, targetYear = TARGET_YEAR) {
+  const title = cleanTitle(record.title, 140);
+  const publishDate = normalizeDate(record.publish_date || record.updated_at || record.created_at) || nowDateText();
+  const summaryText = [title, record.summary, record.notice_type, record.major].map(normalizeSpace).filter(Boolean).join(' ');
+  const deadlineDate =
+    normalizeDateTime(record.application_deadline_at) || extractDeadlineFromText(summaryText, publishDate);
+  const eventStartDate = normalizeDate(record.event_start_at || record.application_start_at);
+  const eventEndDate = normalizeDate(record.event_end_at || record.application_deadline_at);
+  const deadlineLevel = inferDeadlineLevel(deadlineDate);
+  const discipline = inferDiscipline(
+    pickFirst(record.discipline_category, record.major, record.major_type),
+    title
+  );
+  const materials = extractMaterialsFromText(summaryText);
+  const officialUrl = pickFirst(record.original_url, record.official_url);
+  const tags = buildTags(
+    {
+      level: [record.is_985 ? '985' : '', record.is_211 ? '211' : '', record.is_double_first_class ? '双一流' : ''],
+      province: record.province
+    },
+    summaryText,
+    discipline,
+    materials
+  );
+  if (!deadlineDate) tags.push('截止待确认');
+
+  return {
+    id: `baoyannews-${normalizeSpace(record.public_id || record.id)}`,
+    school_name: pickFirst(record.school_name, record.school) || '待识别学校',
+    department_name: pickFirst(record.college_name, record.department_name, record.department) || '待补充院系',
+    project_name: title,
+    project_type: inferProjectType(record.notice_type, title),
+    discipline,
+    publish_date: publishDate,
+    deadline_date: deadlineDate,
+    event_start_date: eventStartDate,
+    event_end_date: eventEndDate,
+    apply_link: officialUrl,
+    source_link: officialUrl,
+    requirements: shorten(record.summary, 1000) || '请查看院校公开页面中的申请要求。',
+    materials_required: materials,
+    exam_interview_info: extractExamInfoFromText(summaryText),
+    contact_info: extractContactInfo(summaryText),
+    remarks: '寻鹿已整理关键信息，请以院校公开页面的最新说明为准。',
+    tags: unique(tags),
+    status: inferStatus(deadlineLevel),
+    deadline_level: deadlineLevel,
+    year: targetYear,
+    source_site: '保研信息通知网',
+    collected_at: nowText(),
+    updated_at: nowText(),
+    last_checked_at: nowText(),
+    last_checked_source: '保研信息通知网',
+    is_verified: false,
+    change_log: [],
+    history_records: [],
+    reminder_7d_sent: false,
+    reminder_3d_sent: false,
+    reminder_1d_sent: false
+  };
 }
 
 function buildFingerprints(project) {
-  const deadlineDay = normalizeSpace(project.deadline_date).slice(0, 10);
+  const sourceUrl = normalizeComparableUrl(project.source_link);
   const school = normalizeCanonicalText(project.school_name);
   const department = normalizeCanonicalText(project.department_name);
   const title = normalizeCanonicalText(project.project_name);
+  const projectType = normalizeCanonicalText(project.project_type);
 
   return unique([
-    normalizeFingerprint(project.source_link),
-    normalizeFingerprint(project.apply_link),
-    deadlineDay && school && department ? `identity:${school}|${department}|${deadlineDay}` : '',
-    deadlineDay && school && title ? `title:${school}|${title.slice(0, 28)}|${deadlineDay}` : '',
-    normalizeFingerprint(`${project.school_name}|${project.department_name}|${project.project_name}`),
-    normalizeFingerprint(`${project.school_name}|${project.project_name}`)
+    sourceUrl ? `source:${sourceUrl}` : '',
+    school && department && title && projectType ? `exact:${school}|${department}|${title}|${projectType}` : ''
   ]).filter(Boolean);
 }
 
@@ -926,10 +1077,7 @@ function choosePublishDate(current, candidate) {
 function mergeDuplicateProjectData(canonical, duplicate) {
   const canonicalSource = normalizeSpace(canonical.source_site);
   const duplicateSource = normalizeSpace(duplicate.source_site);
-  const duplicateSourceLink = normalizeSpace(duplicate.source_link || duplicate.apply_link);
-  const mergeNote = duplicateSource
-    ? `已合并重复来源：${duplicateSource}${duplicateSourceLink ? `（${duplicateSourceLink}）` : ''}`
-    : '';
+  const mergeNote = duplicateSource ? '已完成重复信息合并。' : '';
 
   return {
     ...canonical,
@@ -968,15 +1116,16 @@ function mergeDuplicateProjectData(canonical, duplicate) {
   };
 }
 
-function mergeProjects(primaryProjects, secondaryProjects) {
+function mergeProjects(...projectGroups) {
   const fingerprints = new Map();
+  const schoolCandidates = new Map();
   const merged = [];
   const ids = new Set();
   let skippedSecondaryDuplicates = 0;
   let skippedDuplicateIds = 0;
   let skippedQuality = 0;
 
-  for (const project of [...primaryProjects, ...secondaryProjects]) {
+  for (const project of projectGroups.flat()) {
     if (!project.id || !project.school_name || !project.project_name) {
       skippedQuality += 1;
       continue;
@@ -987,9 +1136,25 @@ function mergeProjects(primaryProjects, secondaryProjects) {
       continue;
     }
 
-    const duplicate = buildFingerprints(project)
+    let duplicate = buildFingerprints(project)
       .map((fingerprint) => fingerprints.get(fingerprint))
       .find(Boolean);
+
+    if (!duplicate) {
+      const schoolKey = normalizeCanonicalText(project.school_name);
+      const candidates = schoolCandidates.get(schoolKey) || [];
+      const candidateIndex = candidates.find((index) => {
+        const candidate = merged[index];
+        return candidate && candidate.admin_status !== 'hidden' && areLikelyDuplicateNotices(candidate, project);
+      });
+      if (candidateIndex !== undefined) {
+        duplicate = {
+          id: merged[candidateIndex].id,
+          source_site: merged[candidateIndex].source_site,
+          index: candidateIndex
+        };
+      }
+    }
 
     if (duplicate) {
       skippedSecondaryDuplicates += 1;
@@ -1025,6 +1190,8 @@ function mergeProjects(primaryProjects, secondaryProjects) {
     ids.add(project.id);
 
     if (gatedProject.admin_status !== 'hidden') {
+      const schoolKey = normalizeCanonicalText(gatedProject.school_name);
+      schoolCandidates.set(schoolKey, [...(schoolCandidates.get(schoolKey) || []), projectIndex]);
       buildFingerprints(gatedProject).forEach((fingerprint) => {
         if (!fingerprints.has(fingerprint)) {
           fingerprints.set(fingerprint, {
@@ -1084,7 +1251,19 @@ async function requestJson(baseUrl, path, params = {}, headers = {}, attempt = 0
   }
 }
 
-function requestJsonWithNode(url, headers = {}) {
+function decodeResponseBuffer(buffer, contentType = '') {
+  const charset = normalizeSpace(contentType.match(/charset=([^;\s]+)/i)?.[1]).toLowerCase();
+  if (/gbk|gb2312|gb18030/.test(charset)) {
+    try {
+      return new TextDecoder('gbk').decode(buffer);
+    } catch {
+      return buffer.toString('utf8');
+    }
+  }
+  return buffer.toString('utf8');
+}
+
+function requestTextWithNode(url, headers = {}, redirectCount = 0) {
   return new Promise((resolve, reject) => {
     const client = url.protocol === 'http:' ? http : https;
     const request = client.request(
@@ -1096,6 +1275,17 @@ function requestJsonWithNode(url, headers = {}) {
       },
       (response) => {
         const statusCode = Number(response.statusCode || 0);
+        const location = normalizeSpace(response.headers.location);
+        if (statusCode >= 300 && statusCode < 400 && location) {
+          response.resume();
+          if (redirectCount >= 5) {
+            reject(new Error(`Too many redirects: ${url.toString()}`));
+            return;
+          }
+          resolve(requestTextWithNode(new URL(location, url), headers, redirectCount + 1));
+          return;
+        }
+
         const chunks = [];
         let totalBytes = 0;
 
@@ -1109,18 +1299,13 @@ function requestJsonWithNode(url, headers = {}) {
         });
 
         response.on('end', () => {
-          const text = Buffer.concat(chunks).toString('utf8');
+          const text = decodeResponseBuffer(Buffer.concat(chunks), String(response.headers['content-type'] || ''));
 
           if (statusCode < 200 || statusCode >= 300) {
             reject(new Error(`Request failed with status ${statusCode}: ${url.toString()} ${text.slice(0, 300)}`));
             return;
           }
-
-          try {
-            resolve(JSON.parse(text));
-          } catch (error) {
-            reject(new Error(`Invalid JSON from ${url.toString()}: ${error instanceof Error ? error.message : String(error)}`));
-          }
+          resolve(text);
         });
       }
     );
@@ -1133,10 +1318,21 @@ function requestJsonWithNode(url, headers = {}) {
   });
 }
 
+async function requestJsonWithNode(url, headers = {}) {
+  const text = await requestTextWithNode(url, headers);
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(`Invalid JSON from ${url.toString()}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 async function fetchPrimaryNoticeRecords(year) {
   const records = [];
   let current = 1;
   let totalPages = 1;
+  let expectedTotal = 0;
+  let emptyPage = null;
 
   while (current <= totalPages) {
     if (PRIMARY_MAX_PAGES && current > PRIMARY_MAX_PAGES) {
@@ -1181,6 +1377,12 @@ async function fetchPrimaryNoticeRecords(year) {
     );
     const data = payload.data || {};
     const batch = Array.isArray(data.records) ? data.records : [];
+    expectedTotal = Number(data.total || expectedTotal || 0);
+    if (!batch.length) {
+      emptyPage = current;
+      logEvent('primary_page_fetch_empty', { page: current, totalPages, expectedTotal, totalRecords: records.length });
+      break;
+    }
     records.push(...batch);
 
     totalPages = Number(data.pages || totalPages || 1);
@@ -1193,6 +1395,16 @@ async function fetchPrimaryNoticeRecords(year) {
     current += 1;
   }
 
+  Object.defineProperty(records, 'fetchMeta', {
+    value: {
+      expectedTotal,
+      expectedPages: totalPages,
+      returnedRows: records.length,
+      emptyPage,
+      intentionallyLimited: Boolean(PRIMARY_MAX_PAGES)
+    },
+    enumerable: false
+  });
   return records;
 }
 
@@ -1494,6 +1706,284 @@ async function buildSecondaryProjects(records) {
   };
 }
 
+function normalizeDiscoveryPayload(payload) {
+  const candidates = [payload?.items, payload?.data?.items, payload?.data, payload?.records, payload?.list];
+  return candidates.find(Array.isArray) || [];
+}
+
+async function fetchXingkeNoticeRecords(targetYear) {
+  if (!ENABLE_XINGKE_SOURCE) return [];
+
+  const url = new URL(XINGKE_DATA_URL);
+  url.searchParams.set('t', String(Date.now()));
+  logEvent('xingke_fetch_started', { url: url.origin + url.pathname });
+  const payload = await requestJsonWithNode(url, DISCOVERY_HEADERS);
+  const records = normalizeDiscoveryPayload(payload)
+    .filter((record) =>
+      hasTargetYearSignal(
+        targetYear,
+        record.title,
+        record.signup_start,
+        record.signup_end,
+        record.event_start,
+        record.event_end,
+        record.created_at,
+        record.updated_at
+      )
+    )
+    .filter((record) => isRecordWithinLookback(record.updated_at, record.created_at, record.signup_start))
+    .sort((left, right) =>
+      normalizeSpace(right.updated_at || right.created_at).localeCompare(normalizeSpace(left.updated_at || left.created_at))
+    );
+  const limited = XINGKE_MAX_RECORDS ? records.slice(0, XINGKE_MAX_RECORDS) : records;
+  logEvent('xingke_fetch_finished', {
+    sourceRecords: normalizeDiscoveryPayload(payload).length,
+    targetRecords: records.length,
+    selectedRecords: limited.length
+  });
+  return limited;
+}
+
+function extractNextDataPayload(html) {
+  const match = String(html || '').match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  if (!match?.[1]) return null;
+  return safeJsonParse(decodeHtmlEntities(match[1]), null);
+}
+
+function normalizeBaoyanNewsPage(payload) {
+  const pageProps = payload?.props?.pageProps || {};
+  const noticePayload = pageProps.notices || {};
+  const candidates = [
+    Array.isArray(noticePayload) ? noticePayload : null,
+    noticePayload.items,
+    noticePayload.records,
+    pageProps.data?.notices,
+    pageProps.data?.items,
+    pageProps.items
+  ];
+  const records = candidates.find(Array.isArray) || [];
+  const total = Number(
+    noticePayload.total ||
+      pageProps.total ||
+      pageProps.data?.total ||
+      pageProps.pagination?.total ||
+      pageProps.meta?.total ||
+      records.length
+  );
+  const pageSize = Number(
+    noticePayload.pageSize ||
+      noticePayload.page_size ||
+      pageProps.pageSize ||
+      pageProps.data?.pageSize ||
+      pageProps.pagination?.pageSize ||
+      pageProps.meta?.pageSize ||
+      20
+  );
+  return { records, total, pageSize };
+}
+
+async function fetchBaoyanNewsRecords(targetYear) {
+  if (!ENABLE_BAOYANNEWS_SOURCE) return [];
+
+  const records = [];
+  const seenIds = new Set();
+  let expectedPages = BAOYANNEWS_MAX_PAGES;
+
+  for (let page = 1; page <= Math.min(expectedPages, BAOYANNEWS_MAX_PAGES); page += 1) {
+    const url = new URL(BAOYANNEWS_LIST_URL);
+    url.searchParams.set('page', String(page));
+    logEvent('baoyannews_page_fetch_started', { page });
+    const html = await requestTextWithNode(url, DISCOVERY_HEADERS);
+    const payload = extractNextDataPayload(html);
+    if (!payload) throw new Error(`Missing __NEXT_DATA__ on ${url.toString()}`);
+
+    const normalized = normalizeBaoyanNewsPage(payload);
+    if (page === 1 && normalized.total > 0) {
+      expectedPages = Math.max(1, Math.ceil(normalized.total / Math.max(1, normalized.pageSize)));
+    }
+
+    let added = 0;
+    for (const record of normalized.records) {
+      const id = normalizeSpace(record.public_id || record.id);
+      if (!id || seenIds.has(id)) continue;
+      seenIds.add(id);
+      if (
+        Number(record.year) !== targetYear &&
+        !hasTargetYearSignal(
+          targetYear,
+          record.title,
+          record.publish_date,
+          record.application_deadline_at,
+          record.event_start_at,
+          record.event_end_at
+        )
+      ) {
+        continue;
+      }
+      if (!isRecordWithinLookback(record.updated_at, record.created_at, record.publish_date)) continue;
+      records.push(record);
+      added += 1;
+    }
+
+    logEvent('baoyannews_page_fetch_finished', {
+      page,
+      records: normalized.records.length,
+      added,
+      totalRecords: records.length,
+      expectedPages
+    });
+    if (!normalized.records.length || normalized.records.length < normalized.pageSize) break;
+    if (BAOYANNEWS_PAGE_DELAY_MS > 0) await sleep(BAOYANNEWS_PAGE_DELAY_MS);
+  }
+
+  return records;
+}
+
+function buildXingkeProjects(records) {
+  return records.map((record) => buildXingkeProject(record, TARGET_YEAR));
+}
+
+function buildBaoyanNewsProjects(records) {
+  return records.map((record) => buildBaoyanNewsProject(record, TARGET_YEAR));
+}
+
+function isSafePublicUrl(value) {
+  const text = normalizeSpace(value);
+  if (!text) return false;
+  try {
+    const url = new URL(text);
+    if (!/^https?:$/.test(url.protocol) || url.username || url.password) return false;
+    const hostname = url.hostname.toLowerCase();
+    if (
+      hostname === 'localhost' ||
+      hostname === '::1' ||
+      hostname.endsWith('.local') ||
+      /^(?:127\.|10\.|169\.254\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)/.test(hostname)
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isDiscoveryHost(value) {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return [
+      'baoyantongzhi.com',
+      'baoyanwang.com.cn',
+      'xingkebaoyan.com',
+      'baoyannews.com'
+    ].some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+  } catch {
+    return false;
+  }
+}
+
+function getPublicVerificationUrl(project) {
+  return [project.apply_link, project.source_link]
+    .map(normalizeSpace)
+    .find((value) => isSafePublicUrl(value) && !isDiscoveryHost(value)) || '';
+}
+
+function inferDepartmentFromPublicText(project, lines) {
+  const source = [project.project_name, ...lines.slice(0, 30)].join(' ');
+  const candidates = source.match(
+    /[\u4e00-\u9fffA-Za-z0-9（）()·]{2,32}(?:学院|研究院|研究所|医院|学部|系|中心|实验室|书院|基地)/g
+  ) || [];
+  return candidates
+    .map((value) => normalizeSpace(value).replace(/^.*?(?:大学|科学院|研究院)[·\s—-]*/, ''))
+    .find((value) => value.length >= 3 && value.length <= 32 && value !== project.school_name) || '';
+}
+
+async function enrichProjectsFromPublicPages(projects) {
+  const indexedCandidates = projects
+    .map((project, index) => ({ project, index, url: getPublicVerificationUrl(project) }))
+    .filter(({ project, url }) => url && (!normalizeSpace(project.deadline_date) || isWeakDepartmentName(project.department_name)))
+    .sort((left, right) => {
+      const deadlinePriority = Number(!normalizeSpace(right.project.deadline_date)) - Number(!normalizeSpace(left.project.deadline_date));
+      if (deadlinePriority) return deadlinePriority;
+      return normalizeSpace(right.project.publish_date).localeCompare(normalizeSpace(left.project.publish_date));
+    })
+    .slice(0, OFFICIAL_REPAIR_MAX_DETAILS);
+
+  if (!indexedCandidates.length) {
+    return { projects, requested: 0, fetched: 0, repairedDeadline: 0, repairedDepartment: 0, failures: [] };
+  }
+
+  logEvent('public_page_enrichment_started', {
+    requested: indexedCandidates.length,
+    concurrency: OFFICIAL_REPAIR_CONCURRENCY
+  });
+  const failures = [];
+  let fetched = 0;
+  let repairedDeadline = 0;
+  let repairedDepartment = 0;
+  const enriched = [...projects];
+
+  await mapWithConcurrency(indexedCandidates, OFFICIAL_REPAIR_CONCURRENCY, async ({ project, index, url }) => {
+    try {
+      const html = await requestTextWithNode(new URL(url), DISCOVERY_HEADERS);
+      const lines = htmlToTextLines(html);
+      const plainText = lines.join('\n');
+      const deadline = normalizeSpace(project.deadline_date) || extractDeadlineFromText(plainText, project.publish_date);
+      const department = isWeakDepartmentName(project.department_name)
+        ? inferDepartmentFromPublicText(project, lines) || project.department_name
+        : project.department_name;
+      if (!normalizeSpace(project.deadline_date) && deadline) repairedDeadline += 1;
+      if (isWeakDepartmentName(project.department_name) && !isWeakDepartmentName(department)) repairedDepartment += 1;
+      fetched += 1;
+
+      const materials = extractMaterialsFromText(plainText);
+      const contact = extractContactInfo(plainText);
+      const tags = unique([
+        ...(project.tags || []).filter((tag) => tag !== '截止待确认'),
+        '公开页已核验',
+        !deadline ? '截止待确认' : ''
+      ]);
+      enriched[index] = {
+        ...project,
+        department_name: department,
+        deadline_date: deadline,
+        deadline_level: inferDeadlineLevel(deadline),
+        status: inferStatus(inferDeadlineLevel(deadline)),
+        source_link: url,
+        apply_link: normalizeSpace(project.apply_link) || url,
+        materials_required:
+          materials.length && !materials.includes('以原通知材料要求为准') ? materials : project.materials_required,
+        contact_info: isGenericContactInfo(project.contact_info) ? contact : project.contact_info,
+        tags,
+        remarks: '寻鹿已整理关键信息，请以院校公开页面的最新说明为准。',
+        last_checked_at: nowText(),
+        last_checked_source: new URL(url).hostname,
+        is_verified: true
+      };
+    } catch (error) {
+      failures.push({ id: project.id, url, error: toErrorMessage(error) });
+    }
+
+    if (OFFICIAL_REPAIR_DELAY_MS > 0) await sleep(OFFICIAL_REPAIR_DELAY_MS);
+  });
+
+  logEvent('public_page_enrichment_finished', {
+    requested: indexedCandidates.length,
+    fetched,
+    repairedDeadline,
+    repairedDepartment,
+    failed: failures.length
+  });
+  return {
+    projects: enriched,
+    requested: indexedCandidates.length,
+    fetched,
+    repairedDeadline,
+    repairedDepartment,
+    failures
+  };
+}
+
 async function pushProjectsToSupabase(projects, summary) {
   if (DRY_RUN) {
     return {
@@ -1512,38 +2002,72 @@ async function pushProjectsToSupabase(projects, summary) {
     throw new Error('SUPABASE_INGEST_SECRET or SEEKOFFER_INGEST_SECRET is not configured.');
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(SUPABASE_INGEST_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-seekoffer-ingest-secret': SUPABASE_INGEST_SECRET
-      },
-      body: JSON.stringify({
-        source: SUPABASE_INGEST_SOURCE,
-        notices: projects,
-        summary
-      }),
-      signal: controller.signal
-    });
-
-    const rawText = await response.text();
-    const payload = safeJsonParse(rawText, {
-      status: response.status,
-      body: rawText
-    });
-
-    if (!response.ok) {
-      throw new Error(`Supabase ingest failed with status ${response.status}: ${JSON.stringify(payload)}`);
-    }
-
-    return payload;
-  } finally {
-    clearTimeout(timeout);
+  const batches = [];
+  for (let index = 0; index < projects.length; index += INGEST_BATCH_SIZE) {
+    batches.push(projects.slice(index, index + INGEST_BATCH_SIZE));
   }
+
+  const aggregate = {
+    ok: true,
+    batchCount: batches.length,
+    noticesReceived: 0,
+    noticesSkipped: 0,
+    noticesUpserted: 0,
+    noticesPublished: 0,
+    noticesPrivate: 0,
+    restoredAutoDeleted: 0
+  };
+
+  for (let index = 0; index < batches.length; index += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(SUPABASE_INGEST_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-seekoffer-ingest-secret': SUPABASE_INGEST_SECRET
+        },
+        body: JSON.stringify({
+          source: SUPABASE_INGEST_SOURCE,
+          notices: batches[index],
+          summary: {
+            ...summary,
+            ingestBatch: index + 1,
+            ingestBatchCount: batches.length
+          }
+        }),
+        signal: controller.signal
+      });
+
+      const rawText = await response.text();
+      const payload = safeJsonParse(rawText, {
+        status: response.status,
+        body: rawText
+      });
+      if (!response.ok) {
+        throw new Error(
+          `Supabase ingest batch ${index + 1}/${batches.length} failed with status ${response.status}: ${JSON.stringify(payload)}`
+        );
+      }
+
+      aggregate.noticesReceived += Number(payload?.noticesReceived || batches[index].length);
+      aggregate.noticesSkipped += Number(payload?.noticesSkipped || 0);
+      aggregate.noticesUpserted += Number(payload?.noticesUpserted || 0);
+      aggregate.noticesPublished += Number(payload?.noticesPublished || 0);
+      aggregate.noticesPrivate += Number(payload?.noticesPrivate || 0);
+      aggregate.restoredAutoDeleted += Number(payload?.restoredAutoDeleted || 0);
+      logEvent('supabase_ingest_batch_finished', {
+        batch: index + 1,
+        batchCount: batches.length,
+        notices: batches[index].length
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  return aggregate;
 }
 
 function countBy(items, picker) {
@@ -1570,16 +2094,37 @@ function getSecondaryRecordPublishDate(record) {
   return normalizeDate(record.updated_time || record.updated_at || record.created_at || record.sign_up_start);
 }
 
-function buildSourceStats(primaryRecords, secondaryRecords) {
+function getXingkeRecordPublishDate(record) {
+  return normalizeDate(record.updated_at || record.created_at || record.signup_start);
+}
+
+function getBaoyanNewsRecordPublishDate(record) {
+  return normalizeDate(record.publish_date || record.updated_at || record.created_at);
+}
+
+function buildSourceStats(primaryRecords, secondaryRecords, xingkeRecords = [], baoyanNewsRecords = []) {
   const primaryDates = primaryRecords.map(getPrimaryRecordPublishDate).filter(Boolean);
   const secondaryDates = secondaryRecords.map(getSecondaryRecordPublishDate).filter(Boolean);
+  const xingkeDates = xingkeRecords.map(getXingkeRecordPublishDate).filter(Boolean);
+  const baoyanNewsDates = baoyanNewsRecords.map(getBaoyanNewsRecordPublishDate).filter(Boolean);
 
   return {
-    maxSourcePublishDate: maxDateText([...primaryDates, ...secondaryDates]),
+    maxSourcePublishDate: maxDateText([...primaryDates, ...secondaryDates, ...xingkeDates, ...baoyanNewsDates]),
     maxPrimaryPublishDate: maxDateText(primaryDates),
     maxSecondaryPublishDate: maxDateText(secondaryDates),
+    maxXingkePublishDate: maxDateText(xingkeDates),
+    maxBaoyanNewsPublishDate: maxDateText(baoyanNewsDates),
+    sourceCounts: {
+      primary: primaryRecords.length,
+      secondary: secondaryRecords.length,
+      xingke: xingkeRecords.length,
+      baoyanNews: baoyanNewsRecords.length
+    },
+    primaryFetchMeta: primaryRecords.fetchMeta || null,
     primaryDateHistogram: countBy(primaryDates, (date) => date),
-    secondaryDateHistogram: countBy(secondaryDates, (date) => date)
+    secondaryDateHistogram: countBy(secondaryDates, (date) => date),
+    xingkeDateHistogram: countBy(xingkeDates, (date) => date),
+    baoyanNewsDateHistogram: countBy(baoyanNewsDates, (date) => date)
   };
 }
 
@@ -1589,6 +2134,9 @@ function buildQualityStats(projects) {
   const longPublishedTitles = published.filter((project) => normalizeSpace(project.project_name).length > 140);
   const weakSchoolProjects = projects.filter((project) => isWeakSchoolName(project.school_name));
   const publishedWeakSchoolProjects = published.filter((project) => isWeakSchoolName(project.school_name));
+  const tomorrowText = formatDateTimeInChina(new Date(Date.now() + 24 * 60 * 60 * 1000)).slice(0, 10);
+  const futurePublishedProjects = projects.filter((project) => getProjectPublishDate(project) > tomorrowText);
+  const publishedMissingDeadlineProjects = published.filter((project) => !normalizeSpace(project.deadline_date));
 
   return {
     byAdminStatus: countBy(projects, (project) => project.admin_status),
@@ -1605,6 +2153,10 @@ function buildQualityStats(projects) {
     publishedWeakSchoolCount: publishedWeakSchoolProjects.length,
     publishedWeakSchoolIds: publishedWeakSchoolProjects.slice(0, 10).map((project) => project.id),
     missingDeadlineCount: projects.filter((project) => !normalizeSpace(project.deadline_date)).length,
+    publishedMissingDeadlineCount: publishedMissingDeadlineProjects.length,
+    publishedMissingDeadlineIds: publishedMissingDeadlineProjects.slice(0, 10).map((project) => project.id),
+    futurePublishDateCount: futurePublishedProjects.length,
+    futurePublishDateIds: futurePublishedProjects.slice(0, 10).map((project) => project.id),
     duplicateHiddenCount: projects.filter((project) => project.quality_reasons?.some((reason) => reason === 'duplicate_notice')).length,
     reviewSamples: projects
       .filter((project) => project.admin_status !== 'published')
@@ -1651,8 +2203,22 @@ function assessSyncHealth(sourceStats, qualityStats) {
     warnings.push('duplicates_hidden');
   }
 
-  if (qualityStats.missingDeadlineCount > 0) {
-    warnings.push('missing_deadline_routed_to_review');
+  if (qualityStats.publishedMissingDeadlineCount > 0) {
+    warnings.push('published_deadlines_pending_confirmation');
+  }
+
+  if (qualityStats.futurePublishDateCount > 0) {
+    warnings.push('future_publish_dates_detected');
+  }
+
+  const primaryFetchMeta = sourceStats.primaryFetchMeta;
+  if (
+    primaryFetchMeta &&
+    !primaryFetchMeta.intentionallyLimited &&
+    primaryFetchMeta.expectedTotal > primaryFetchMeta.returnedRows &&
+    primaryFetchMeta.emptyPage
+  ) {
+    warnings.push('primary_incomplete_pagination');
   }
 
   return {
@@ -1675,6 +2241,12 @@ async function runSync() {
         primaryMaxPages: PRIMARY_MAX_PAGES || 'all',
         primaryMaxDetails: PRIMARY_MAX_DETAILS || 'all',
         secondaryMaxPages: SECONDARY_MAX_PAGES,
+        xingkeEnabled: ENABLE_XINGKE_SOURCE,
+        baoyanNewsEnabled: ENABLE_BAOYANNEWS_SOURCE,
+        baoyanNewsMaxPages: BAOYANNEWS_MAX_PAGES,
+        incrementalLookbackDays: INCREMENTAL_LOOKBACK_DAYS,
+        officialRepairMaxDetails: OFFICIAL_REPAIR_MAX_DETAILS,
+        ingestBatchSize: INGEST_BATCH_SIZE,
         secondaryRepairDetailIds: SECONDARY_REPAIR_DETAIL_IDS,
         requestTimeoutMs: REQUEST_TIMEOUT_MS,
         dryRun: DRY_RUN,
@@ -1758,9 +2330,47 @@ async function runSync() {
     });
   }
 
+  let xingkeRecords = [];
+  let xingkeProjects = [];
+  try {
+    xingkeRecords = await fetchXingkeNoticeRecords(TARGET_YEAR);
+    xingkeProjects = buildXingkeProjects(xingkeRecords);
+  } catch (error) {
+    const message = toErrorMessage(error);
+    sourceErrors.push({
+      source: 'xingke',
+      sourceSite: '星刻保研',
+      stage: 'xingke_fetch',
+      error: message
+    });
+    logEvent('source_fetch_failed', { source: 'xingke', sourceSite: '星刻保研', error: message });
+  }
+
+  let baoyanNewsRecords = [];
+  let baoyanNewsProjects = [];
+  try {
+    baoyanNewsRecords = await fetchBaoyanNewsRecords(TARGET_YEAR);
+    baoyanNewsProjects = buildBaoyanNewsProjects(baoyanNewsRecords);
+  } catch (error) {
+    const message = toErrorMessage(error);
+    sourceErrors.push({
+      source: 'baoyannews',
+      sourceSite: '保研信息通知网',
+      stage: 'baoyannews_fetch',
+      error: message
+    });
+    logEvent('source_fetch_failed', { source: 'baoyannews', sourceSite: '保研信息通知网', error: message });
+  }
+
+  const publicPageEnrichment = await enrichProjectsFromPublicPages([
+    ...primaryProjects,
+    ...secondaryProjects,
+    ...xingkeProjects,
+    ...baoyanNewsProjects
+  ]);
+
   const { merged, skippedSecondaryDuplicates, skippedDuplicateIds, skippedQuality } = mergeProjects(
-    primaryProjects,
-    secondaryProjects
+    publicPageEnrichment.projects
   );
 
   if (!merged.length) {
@@ -1771,7 +2381,7 @@ async function runSync() {
     );
   }
 
-  const sourceStats = buildSourceStats(primaryNoticeRecords, secondaryRecords);
+  const sourceStats = buildSourceStats(primaryListRecords, secondaryRecords, xingkeRecords, baoyanNewsRecords);
   const qualityStats = buildQualityStats(merged);
   const health = assessSyncHealth(sourceStats, qualityStats);
   if (sourceErrors.length) {
@@ -1782,6 +2392,9 @@ async function runSync() {
   }
   if (secondaryMissingDeadlineFailures.length) {
     health.warnings.push('secondary_missing_deadline_detail_failed');
+  }
+  if (publicPageEnrichment.failures.length) {
+    health.warnings.push('public_page_enrichment_partially_failed');
   }
 
   if (!health.ok) {
@@ -1820,6 +2433,19 @@ async function runSync() {
     secondaryMissingDeadlineFailed: secondaryMissingDeadlineFailures.length,
     secondaryMissingDeadlineFailures: secondaryMissingDeadlineFailures.slice(0, 10),
     secondaryParsed: secondaryProjects.length,
+    xingkeEnabled: ENABLE_XINGKE_SOURCE,
+    xingkeFetched: xingkeRecords.length,
+    xingkeParsed: xingkeProjects.length,
+    baoyanNewsEnabled: ENABLE_BAOYANNEWS_SOURCE,
+    baoyanNewsMaxPages: BAOYANNEWS_MAX_PAGES,
+    baoyanNewsFetched: baoyanNewsRecords.length,
+    baoyanNewsParsed: baoyanNewsProjects.length,
+    publicPageEnrichmentRequested: publicPageEnrichment.requested,
+    publicPageEnrichmentFetched: publicPageEnrichment.fetched,
+    publicPageDeadlineRepaired: publicPageEnrichment.repairedDeadline,
+    publicPageDepartmentRepaired: publicPageEnrichment.repairedDepartment,
+    publicPageEnrichmentFailed: publicPageEnrichment.failures.length,
+    publicPageEnrichmentFailures: publicPageEnrichment.failures.slice(0, 10),
     secondarySkippedAsDuplicate: skippedSecondaryDuplicates,
     skippedDuplicateIds,
     skippedQuality,
@@ -1838,7 +2464,9 @@ async function runSync() {
     source: SUPABASE_INGEST_SOURCE,
     ...summary,
     noticesReceived: Number(ingestResult?.noticesReceived || merged.length),
-    noticesUpserted: Number(ingestResult?.noticesUpserted || 0)
+    noticesUpserted: Number(ingestResult?.noticesUpserted || 0),
+    ingestBatchCount: Number(ingestResult?.batchCount || 1),
+    restoredAutoDeleted: Number(ingestResult?.restoredAutoDeleted || 0)
   };
 
   console.log(JSON.stringify(result, null, 2));

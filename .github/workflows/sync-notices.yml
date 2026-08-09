@@ -12,6 +12,10 @@ on:
     paths:
       - '.github/workflows/sync-notices.yml'
       - 'scripts/sync-baoyan-notices-to-supabase.mjs'
+      - 'scripts/notice-sync-core.mjs'
+      - 'lib/notice-quality.ts'
+      - 'tests/notice-sync-core.test.mjs'
+      - 'tests/notice-quality.test.ts'
       - 'supabase/functions/ingest-notices/**'
   workflow_dispatch:
     inputs:
@@ -49,7 +53,7 @@ jobs:
   sync:
     name: Sync public notices
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
 
@@ -61,6 +65,13 @@ jobs:
       PRIMARY_MAX_DETAILS: ${{ github.event.inputs.primary_max_details }}
       PRIMARY_DETAIL_CONCURRENCY: '6'
       PRIMARY_DETAIL_DELAY_MS: '50'
+      ENABLE_XINGKE_SOURCE: 'true'
+      ENABLE_BAOYANNEWS_SOURCE: 'true'
+      INCREMENTAL_LOOKBACK_DAYS: '10'
+      BAOYANNEWS_PAGE_DELAY_MS: '80'
+      OFFICIAL_REPAIR_CONCURRENCY: '4'
+      OFFICIAL_REPAIR_DELAY_MS: '80'
+      INGEST_BATCH_SIZE: '500'
       REQUEST_TIMEOUT_MS: '15000'
       MAX_RATE_LIMIT_RETRY_AFTER_SECONDS: '30'
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
