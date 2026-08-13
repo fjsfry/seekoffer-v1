@@ -42,6 +42,15 @@ export function normalizeSyncText(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim();
 }
 
+export function getXingkePublishTimestamp(record) {
+  return normalizeSyncText(record?.created_at || record?.updated_at || record?.signup_start);
+}
+
+export function isRetryableIngestStatus(status) {
+  const code = Number(status);
+  return code === 408 || code === 425 || code === 429 || (code >= 500 && code <= 599);
+}
+
 export function inferProjectType(...values) {
   const text = values.map(normalizeSyncText).join(' ');
 

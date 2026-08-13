@@ -180,8 +180,8 @@ Deno.serve(async (request) => {
       admin_deleted_at?: string | null;
     }
   >();
-  for (let index = 0; index < notices.length; index += 1000) {
-    const batchIds = notices.slice(index, index + 1000).map((notice) => notice.id);
+  for (let index = 0; index < notices.length; index += 100) {
+    const batchIds = notices.slice(index, index + 100).map((notice) => notice.id);
     const { data: existingRows, error: existingError } = await supabase
       .from('notices')
       .select('id,admin_status,admin_reviewed_by,admin_review_note,admin_deleted_at')
