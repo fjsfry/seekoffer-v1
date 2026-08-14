@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   areLikelyDuplicateNotices,
   extractDeadlineFromText,
+  getIngestRetryDelayMs,
   getXingkePublishTimestamp,
   inferProjectType,
-  isRetryableIngestStatus
+  isRetryableIngestStatus,
+  parseRetryAfterMs
 } from '../scripts/notice-sync-core.mjs';
 
 function project(overrides = {}) {
@@ -89,6 +91,27 @@ describe('ingest retry policy', () => {
     expect(isRetryableIngestStatus(400)).toBe(false);
     expect(isRetryableIngestStatus(401)).toBe(false);
     expect(isRetryableIngestStatus(403)).toBe(false);
+  });
+
+  it('honors Retry-After while keeping exponential backoff bounded', () => {
+    expect(parseRetryAfterMs('10')).toBe(10000);
+    expect(
+      getIngestRetryDelayMs({
+        attempt: 2,
+        baseDelayMs: 2000,
+        maxDelayMs: 30000,
+        randomValue: 0,
+        retryAfter: '10'
+      })
+    ).toBe(10000);
+    expect(
+      getIngestRetryDelayMs({
+        attempt: 8,
+        baseDelayMs: 2000,
+        maxDelayMs: 30000,
+        randomValue: 1
+      })
+    ).toBe(30000);
   });
 });
 

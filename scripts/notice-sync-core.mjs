@@ -51,6 +51,35 @@ export function isRetryableIngestStatus(status) {
   return code === 408 || code === 425 || code === 429 || (code >= 500 && code <= 599);
 }
 
+export function parseRetryAfterMs(value, nowMs = Date.now()) {
+  const text = normalizeSyncText(value);
+  if (!text) return 0;
+
+  const seconds = Number(text);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.round(seconds * 1000);
+  }
+
+  const dateMs = Date.parse(text);
+  return Number.isFinite(dateMs) ? Math.max(0, dateMs - Number(nowMs || Date.now())) : 0;
+}
+
+export function getIngestRetryDelayMs({
+  attempt,
+  baseDelayMs = 1_000,
+  maxDelayMs = 30_000,
+  randomValue = Math.random(),
+  retryAfter = ''
+} = {}) {
+  const normalizedAttempt = Math.max(1, Math.floor(Number(attempt) || 1));
+  const normalizedBase = Math.max(100, Number(baseDelayMs) || 1_000);
+  const normalizedMax = Math.max(normalizedBase, Number(maxDelayMs) || 30_000);
+  const exponential = Math.min(normalizedMax, normalizedBase * 2 ** (normalizedAttempt - 1));
+  const jitter = Math.floor(exponential * 0.2 * Math.max(0, Math.min(1, Number(randomValue) || 0)));
+  const retryAfterMs = parseRetryAfterMs(retryAfter);
+  return Math.min(normalizedMax, Math.max(exponential + jitter, retryAfterMs));
+}
+
 export function inferProjectType(...values) {
   const text = values.map(normalizeSyncText).join(' ');
 

@@ -4,6 +4,7 @@ import {
   areLikelyDuplicateNotices,
   extractDeadlineFromText as extractDeadlineFromTextCore,
   getXingkePublishTimestamp,
+  getIngestRetryDelayMs,
   inferNoticeKind,
   inferProjectType as inferProjectTypeCore,
   isRetryableIngestStatus,
@@ -31,6 +32,10 @@ const SECONDARY_LIST_ENDPOINT = '/articles';
 const SECONDARY_DETAIL_ENDPOINT = '/articles/{id}';
 
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 30000);
+const INGEST_REQUEST_TIMEOUT_MS = Math.max(
+  REQUEST_TIMEOUT_MS,
+  Number(process.env.INGEST_REQUEST_TIMEOUT_MS || 60000)
+);
 const MAX_RATE_LIMIT_RETRY_AFTER_SECONDS = Number(process.env.MAX_RATE_LIMIT_RETRY_AFTER_SECONDS || 30);
 const PRIMARY_PAGE_SIZE = Number(process.env.PRIMARY_PAGE_SIZE || 40);
 const DEFAULT_INCREMENTAL_PRIMARY_MAX_PAGES = 2;
@@ -76,6 +81,10 @@ const OFFICIAL_REPAIR_DELAY_MS = Math.max(0, Number(process.env.OFFICIAL_REPAIR_
 const INGEST_BATCH_SIZE = Math.min(200, Math.max(25, parseOptionalInteger(process.env.INGEST_BATCH_SIZE) || 100));
 const INGEST_MAX_ATTEMPTS = Math.min(5, Math.max(1, parseOptionalInteger(process.env.INGEST_MAX_ATTEMPTS) || 3));
 const INGEST_RETRY_BASE_DELAY_MS = Math.max(100, Number(process.env.INGEST_RETRY_BASE_DELAY_MS || 1000));
+const INGEST_RETRY_MAX_DELAY_MS = Math.max(
+  INGEST_RETRY_BASE_DELAY_MS,
+  Number(process.env.INGEST_RETRY_MAX_DELAY_MS || 30000)
+);
 const DRY_RUN = /^1|true|yes$/i.test(process.env.DRY_RUN || '');
 
 const TITLE_BODY_START_PATTERNS = [
@@ -1993,7 +2002,7 @@ async function postIngestBatch(notices, summary, batchIndex, batchCount) {
 
   for (let attempt = 1; attempt <= INGEST_MAX_ATTEMPTS; attempt += 1) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), INGEST_REQUEST_TIMEOUT_MS);
 
     try {
       const response = await fetch(SUPABASE_INGEST_URL, {
@@ -2025,20 +2034,35 @@ async function postIngestBatch(notices, summary, batchIndex, batchCount) {
         `Supabase ingest batch ${batchIndex}/${batchCount} failed with status ${response.status}: ${JSON.stringify(payload)}`
       );
       error.retryable = isRetryableIngestStatus(response.status);
+      error.retryAfter = response.headers.get('retry-after') || '';
       throw error;
     } catch (error) {
-      lastError = error;
-      const retryable = error?.retryable !== false;
-      if (!retryable || attempt === INGEST_MAX_ATTEMPTS) throw error;
+      const normalizedError =
+        error?.name === 'AbortError'
+          ? Object.assign(
+              new Error(
+                `Supabase ingest batch ${batchIndex}/${batchCount} timed out after ${INGEST_REQUEST_TIMEOUT_MS}ms.`
+              ),
+              { retryable: true }
+            )
+          : error;
+      lastError = normalizedError;
+      const retryable = normalizedError?.retryable !== false;
+      if (!retryable || attempt === INGEST_MAX_ATTEMPTS) throw normalizedError;
 
-      const delayMs = INGEST_RETRY_BASE_DELAY_MS * attempt;
+      const delayMs = getIngestRetryDelayMs({
+        attempt,
+        baseDelayMs: INGEST_RETRY_BASE_DELAY_MS,
+        maxDelayMs: INGEST_RETRY_MAX_DELAY_MS,
+        retryAfter: normalizedError?.retryAfter || ''
+      });
       logEvent('supabase_ingest_batch_retry', {
         batch: batchIndex,
         batchCount,
         attempt,
         nextAttempt: attempt + 1,
         delayMs,
-        error: toErrorMessage(error)
+        error: toErrorMessage(normalizedError)
       });
       await sleep(delayMs);
     } finally {
@@ -2280,6 +2304,8 @@ async function runSync() {
         officialRepairMaxDetails: OFFICIAL_REPAIR_MAX_DETAILS,
         ingestBatchSize: INGEST_BATCH_SIZE,
         ingestMaxAttempts: INGEST_MAX_ATTEMPTS,
+        ingestRequestTimeoutMs: INGEST_REQUEST_TIMEOUT_MS,
+        ingestRetryMaxDelayMs: INGEST_RETRY_MAX_DELAY_MS,
         secondaryRepairDetailIds: SECONDARY_REPAIR_DETAIL_IDS,
         requestTimeoutMs: REQUEST_TIMEOUT_MS,
         dryRun: DRY_RUN,
