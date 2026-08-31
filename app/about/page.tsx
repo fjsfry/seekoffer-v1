@@ -6,7 +6,7 @@ import { aboutOriginParagraphs, aboutPrinciples, aboutVisionParagraphs } from '@
 
 const productStats = [
   { label: '通知整理', value: '持续更新', icon: BellRing },
-  { label: '申请管理', value: '工作台', icon: ClipboardList },
+  { label: '申请管理', value: '全部申请', icon: ClipboardList },
   { label: '交流反馈', value: '社区共建', icon: Users }
 ];
 
@@ -43,22 +43,24 @@ const productPromises = [
 export default function AboutPage() {
   return (
     <SiteShell>
+      <div className="desktop-secondary-page desktop-about-page desktop-reading-page space-y-8 lg:space-y-10">
       <PageSectionTitle
         eyebrow="About Seekoffer"
         title="关于寻鹿"
         subtitle="寻鹿 Seekoffer 是面向保研申请全流程的信息整理与申请管理平台。我们希望把分散通知、截止节点、材料准备和交流反馈，整理成更清晰的申请路径。页面更新于 2026 年 7 月 11 日。"
+        level="h1"
       />
 
-      <section className="page-hero min-h-0 px-6 py-8 md:px-8 lg:px-10">
+      <section className="desktop-secondary-header page-hero min-h-0 px-6 py-8 md:px-8 lg:px-10">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-3 py-1 text-xs font-semibold text-brand shadow-sm">
               <Route className="h-4 w-4" />
-              保研申请工作台
+              全部申请
             </div>
-            <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-ink md:text-5xl">
+            <h2 className="mt-5 max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-ink md:text-5xl">
               把信息整理清楚，把申请推进下去
-            </h1>
+            </h2>
             <div className="mt-5 grid gap-4 text-sm leading-8 text-slate-600">
               {aboutOriginParagraphs.slice(0, 2).map((item) => (
                 <p key={item}>{item}</p>
@@ -180,6 +182,7 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
+      </div>
     </SiteShell>
   );
 }

@@ -10,10 +10,15 @@ const eslintConfig = [
     ignores: [
       '.next/**',
       '.next-web/**',
+      '.next-desktop/**',
+      '.next-desktop-dev/**',
+      '.wechat-codex/**',
+      'artifacts/**',
       'node_modules/**',
       'node_modules_corrupt_*/**',
       'out/**',
       'build/**',
+      'src-tauri/target/**',
       'hosting-dist/**',
       'supabase/**',
       'next-env.d.ts'

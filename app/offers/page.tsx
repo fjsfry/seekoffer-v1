@@ -1,6 +1,7 @@
 'use client';
 
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -21,6 +22,7 @@ import {
   X
 } from 'lucide-react';
 import { SiteShell } from '@/components/site-shell';
+import { useAccessibleModal } from '@/hooks/use-accessible-modal';
 import { useUserSessionState } from '@/hooks/use-user-session';
 import { openAuthModal, writeAuthIntent } from '@/lib/auth-intent';
 import {
@@ -291,19 +293,19 @@ export default function OffersPage() {
 
   return (
     <SiteShell>
-      <section className="overflow-hidden rounded-[28px] border border-white/80 bg-white/90 px-6 py-7 shadow-soft sm:px-8 lg:px-10">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
+      <section className="desktop-offers-header overflow-hidden rounded-[28px] border border-white/80 bg-white/90 px-6 py-7 shadow-soft sm:px-8 lg:px-10">
+        <div className="desktop-offers-header-row flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="desktop-offers-heading max-w-2xl">
+            <div className="desktop-offers-eyebrow inline-flex items-center gap-2 text-sm font-semibold text-brand">
               <HeartHandshake className="h-4 w-4" />
               真实申请交流
             </div>
-            <h1 className="mt-3 text-3xl font-black tracking-normal text-ink sm:text-4xl">Offer 圈</h1>
-            <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+            <h1 className="desktop-offers-title mt-3 text-3xl font-black tracking-normal text-ink sm:text-4xl">Offer 圈</h1>
+            <p className="desktop-offers-subtitle mt-3 text-sm leading-7 text-slate-600 sm:text-base">
               分享录取、放弃与候补进展，也可以围绕选校、材料和面试发起讨论。用户投稿与官方整理会明确区分。
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="desktop-offers-metrics grid grid-cols-3 gap-2 sm:gap-3">
             <Metric label="公开动态" value={loading ? '—' : String(offerPosts.length)} />
             <Metric label="近 7 天更新" value={loading ? '—' : String(recentCount)} />
             <Metric label="覆盖院校" value={loading ? '—' : String(schoolCount)} />
@@ -311,11 +313,11 @@ export default function OffersPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="min-w-0 space-y-5">
-          <div className="rounded-[24px] border border-white/80 bg-white/95 p-4 shadow-soft sm:p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Offer 圈内容类型">
+      <section className="desktop-offers-layout grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="desktop-offers-feed-column min-w-0 space-y-5">
+          <div className="desktop-offers-toolbar rounded-[24px] border border-white/80 bg-white/95 p-4 shadow-soft sm:p-5">
+            <div className="desktop-offers-toolbar-row flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="desktop-offers-tabs inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Offer 圈内容类型">
                 <TabButton
                   active={activeTab === 'offers'}
                   label={`Offer 动态 ${offerPosts.length}`}
@@ -327,7 +329,7 @@ export default function OffersPage() {
                   onClick={() => setActiveTab('discussions')}
                 />
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="desktop-offers-toolbar-actions flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={openDiscussionComposer}
@@ -346,7 +348,7 @@ export default function OffersPage() {
               </div>
             </div>
 
-            <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+            <div className="desktop-offers-search mt-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
               <Search className="h-4 w-4 text-slate-400" />
               <input
                 value={keyword}
@@ -361,7 +363,7 @@ export default function OffersPage() {
               ) : null}
             </div>
 
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="内容筛选">
+            <div className="desktop-offers-filters mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="内容筛选">
               {activeTab === 'offers'
                 ? (['全部', ...offerResultTypes] as const).map((item) => (
                     <FilterButton key={item} active={resultFilter === item} onClick={() => setResultFilter(item)}>
@@ -403,7 +405,7 @@ export default function OffersPage() {
               }
             />
           ) : (
-            <div className="space-y-3">
+            <div className="desktop-offers-feed-list space-y-3">
               {filteredPosts.map((post) => (
                 <FeedCard key={post.id} post={post} onOpen={() => setSelectedPost(post)} />
               ))}
@@ -411,8 +413,8 @@ export default function OffersPage() {
           )}
         </div>
 
-        <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
-          <div className="rounded-[20px] border border-white/80 bg-white/95 p-5 shadow-soft">
+        <aside className="desktop-offers-aside space-y-4 xl:sticky xl:top-24 xl:self-start">
+          <div className="desktop-offers-aside-section rounded-[20px] border border-white/80 bg-white/95 p-5 shadow-soft">
             <div className="flex items-center gap-2 font-bold text-ink">
               <ShieldCheck className="h-5 w-5 text-brand" />
               社区准则
@@ -423,7 +425,7 @@ export default function OffersPage() {
               <li><strong className="text-slate-900">保持可纠错</strong><br />发现失实或过期内容，可直接提交反馈。</li>
             </ul>
           </div>
-          <div className="rounded-[20px] border border-brand/10 bg-brand px-5 py-5 text-white shadow-soft">
+          <div className="desktop-offers-aside-section desktop-offers-aside-tip rounded-[20px] border border-brand/10 bg-brand px-5 py-5 text-white shadow-soft">
             <Sparkles className="h-5 w-5" />
             <h2 className="mt-3 font-bold">先说明背景，再提出问题</h2>
             <p className="mt-2 text-sm leading-6 text-white/75">学校层次、排名区间、目标方向和当前进度越清楚，越容易获得有效回复。</p>
@@ -472,7 +474,7 @@ export default function OffersPage() {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-[88px] rounded-2xl border border-slate-200 bg-white px-3 py-3 text-center sm:min-w-[112px] sm:px-4">
+    <div className="desktop-offers-metric min-w-[88px] rounded-2xl border border-slate-200 bg-white px-3 py-3 text-center sm:min-w-[112px] sm:px-4">
       <div className="text-xs text-slate-500">{label}</div>
       <div className="mt-1 text-xl font-black text-ink sm:text-2xl">{value}</div>
     </div>
@@ -486,7 +488,7 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`h-10 rounded-lg px-4 text-sm font-semibold transition ${active ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+      className={`desktop-offers-tab h-10 rounded-lg px-4 text-sm font-semibold transition ${active ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
     >
       {label}
     </button>
@@ -499,7 +501,7 @@ function FilterButton({ active, onClick, children }: { active: boolean; onClick:
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`h-9 shrink-0 rounded-lg px-3 text-sm font-semibold transition ${active ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-brand/10 hover:text-brand'}`}
+      className={`desktop-offers-filter h-9 shrink-0 rounded-lg px-3 text-sm font-semibold transition ${active ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-brand/10 hover:text-brand'}`}
     >
       {children}
     </button>
@@ -509,14 +511,14 @@ function FilterButton({ active, onClick, children }: { active: boolean; onClick:
 function FeedCard({ post, onOpen }: { post: PublicOffer; onOpen: () => void }) {
   const author = getOfferAuthorLabel(post);
   return (
-    <article className="rounded-[20px] border border-white/80 bg-white/95 p-5 shadow-soft transition hover:-translate-y-0.5 hover:shadow-card sm:p-6">
-      <button type="button" onClick={onOpen} className="w-full text-left" aria-label={`打开${post.title || `${post.schoolName} ${post.result}`}详情`}>
+    <article className="desktop-offers-feed-row rounded-[20px] border border-white/80 bg-white/95 p-5 shadow-soft transition hover:-translate-y-0.5 hover:shadow-card sm:p-6">
+      <button type="button" onClick={onOpen} className="desktop-offers-feed-trigger w-full text-left" aria-label={`打开${post.title || `${post.schoolName} ${post.result}`}详情`}>
         <div className="flex gap-4">
-          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-black ${post.isOfficial ? 'bg-brand text-white' : 'bg-brand/10 text-brand'}`}>
+          <div className={`desktop-offers-avatar flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-black ${post.isOfficial ? 'bg-brand text-white' : 'bg-brand/10 text-brand'}`}>
             {getOfferAvatar(author)}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <div className="desktop-offers-feed-meta flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span className="font-semibold text-slate-900">{author}</span>
               {post.isOfficial ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-1 font-semibold text-brand"><BadgeCheck className="h-3 w-3" />官方整理</span>
@@ -545,8 +547,8 @@ function FeedCard({ post, onOpen }: { post: PublicOffer; onOpen: () => void }) {
             {post.undergraduateBackground ? (
               <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">本科背景：{post.undergraduateBackground}</div>
             ) : null}
-            <p className="mt-3 line-clamp-3 text-sm leading-7 text-slate-600">{post.content}</p>
-            <div className="mt-4 flex items-center gap-5 text-xs font-medium text-slate-500">
+            <p className="desktop-offers-feed-content mt-3 line-clamp-3 text-sm leading-7 text-slate-600">{post.content}</p>
+            <div className="desktop-offers-feed-actions mt-4 flex items-center gap-5 text-xs font-medium text-slate-500">
               <span className="inline-flex items-center gap-1.5"><MessageCircle className="h-4 w-4" />{post.commentsCount} 条回复</span>
               <span className="inline-flex items-center gap-1.5"><Bell className="h-4 w-4" />{post.followsCount} 人关注</span>
               <span className="ml-auto inline-flex items-center gap-1 font-semibold text-brand">查看交流 <ArrowRight className="h-4 w-4" /></span>
@@ -560,7 +562,7 @@ function FeedCard({ post, onOpen }: { post: PublicOffer; onOpen: () => void }) {
 
 function StatePanel({ icon: Icon, title, description, action }: { icon: typeof MessageCircle; title: string; description: string; action: React.ReactNode }) {
   return (
-    <div className="rounded-[20px] border border-dashed border-slate-200 bg-white/90 px-6 py-16 text-center shadow-soft">
+    <div className="desktop-offers-state desktop-section-state rounded-[20px] border border-dashed border-slate-200 bg-white/90 px-6 py-16 text-center shadow-soft">
       <Icon className="mx-auto h-8 w-8 text-brand" />
       <h2 className="mt-4 text-lg font-bold text-ink">{title}</h2>
       <p className="mx-auto mt-2 max-w-xl text-sm leading-7 text-slate-500">{description}</p>
@@ -571,9 +573,17 @@ function StatePanel({ icon: Icon, title, description, action }: { icon: typeof M
 
 function FeedSkeleton() {
   return (
-    <div className="space-y-3" aria-label="正在加载 Offer 圈">
+    <div className="desktop-offers-loading space-y-3" role="status" aria-live="polite" aria-label="正在加载 Offer 圈">
+      <span className="desktop-offers-loading-label hidden">正在加载最新动态</span>
       {[0, 1, 2].map((item) => (
-        <div key={item} className="h-48 animate-pulse rounded-[20px] border border-white/80 bg-white/80 shadow-soft" />
+        <div key={item} className="desktop-offers-loading-row h-48 rounded-[20px] border border-white/80 bg-white/80 shadow-soft" aria-hidden="true">
+          <span className="desktop-offers-loading-avatar hidden" />
+          <span className="desktop-offers-loading-copy hidden">
+            <i />
+            <i />
+            <i />
+          </span>
+        </div>
       ))}
     </div>
   );
@@ -602,22 +612,92 @@ type PostDialogProps = {
   onReport: (event: FormEvent<HTMLFormElement>) => void;
 };
 
+function useDialogExit(onClose: () => void, blocked = false) {
+  const [visible, setVisible] = useState(false);
+  const closeTimerRef = useRef<number | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setVisible(true));
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+    };
+  }, []);
+
+  const requestClose = useCallback(() => {
+    if (blocked || closeTimerRef.current !== null) return;
+    const desktopSurface = document.documentElement.classList.contains('seekoffer-desktop-surface');
+    const reduceMotion =
+      document.documentElement.dataset.desktopReduceMotion === 'true' ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    setVisible(false);
+    if (!desktopSurface || reduceMotion) {
+      onCloseRef.current();
+      return;
+    }
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null;
+      onCloseRef.current();
+    }, 120);
+  }, [blocked]);
+
+  return { visible, requestClose };
+}
+
 function PostDialog(props: PostDialogProps) {
   const { post } = props;
-  return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/40 p-0 backdrop-blur-sm sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="offer-dialog-title">
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-[24px] bg-white shadow-2xl sm:rounded-[24px]">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
+  const titleId = useId();
+  const reportReasonRef = useRef<HTMLTextAreaElement>(null);
+  const reportTriggerRef = useRef<HTMLButtonElement>(null);
+  const reportWasOpenRef = useRef(props.reportOpen);
+  const { visible, requestClose } = useDialogExit(props.onClose);
+  const { dialogRef, overlayRef, handleModalKeyDown } = useAccessibleModal(requestClose);
+
+  useEffect(() => {
+    if (props.reportOpen) {
+      reportReasonRef.current?.focus({ preventScroll: true });
+    } else if (reportWasOpenRef.current) {
+      reportTriggerRef.current?.focus({ preventScroll: true });
+    }
+    reportWasOpenRef.current = props.reportOpen;
+  }, [props.reportOpen]);
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      ref={overlayRef}
+      className="desktop-offer-dialog fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/40 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+      data-state={visible ? 'open' : 'closed'}
+      aria-hidden={visible ? undefined : true}
+      onKeyDown={handleModalKeyDown}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) requestClose();
+      }}
+      data-modal-overlay="offer-detail"
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="desktop-offer-dialog-panel max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-[24px] bg-white shadow-2xl outline-none sm:rounded-[24px]"
+        data-state={visible ? 'open' : 'closed'}
+      >
+        <div className="desktop-offer-dialog-header sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
           <div>
             <div className="text-xs font-semibold text-brand">{post.contentType === 'discussion' ? post.category : `${post.result} · ${post.projectType}`}</div>
-            <h2 id="offer-dialog-title" className="mt-1 line-clamp-1 font-bold text-ink">{post.title || `${post.schoolName} ${post.major}`}</h2>
+            <h2 id={titleId} className="mt-1 line-clamp-1 font-bold text-ink">{post.title || `${post.schoolName} ${post.major}`}</h2>
           </div>
-          <button type="button" onClick={props.onClose} className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200" aria-label="关闭详情">
+          <button type="button" onClick={requestClose} data-modal-initial-focus className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200" aria-label="关闭详情">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="space-y-6 px-5 py-6 sm:px-7">
+        <div className="desktop-offer-dialog-body space-y-6 px-5 py-6 sm:px-7">
           <div>
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
               <span className="font-semibold text-slate-900">{getOfferAuthorLabel(post)}</span>
@@ -628,27 +708,27 @@ function PostDialog(props: PostDialogProps) {
             <p className="mt-4 whitespace-pre-wrap text-[15px] leading-8 text-slate-700">{post.content}</p>
           </div>
 
-          <div className="flex flex-wrap gap-2 border-y border-slate-100 py-4">
+          <div className="desktop-offer-dialog-actions flex flex-wrap gap-2 border-y border-slate-100 py-4">
             <button type="button" onClick={props.onFollow} disabled={props.followPending} className={`inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold ${props.followed ? 'bg-brand text-white' : 'bg-slate-100 text-slate-700'}`}>
               {props.followPending ? <Loader2 className="h-4 w-4 animate-spin" /> : props.followed ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
               {props.followed ? '取消关注' : '关注讨论'}
             </button>
-            <button type="button" onClick={props.onReportOpen} className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-600 hover:bg-rose-50 hover:text-rose-600">
+            <button ref={reportTriggerRef} type="button" onClick={props.onReportOpen} aria-expanded={props.reportOpen} aria-controls="offer-report-form" className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-600 hover:bg-rose-50 hover:text-rose-600">
               <Flag className="h-4 w-4" />反馈问题
             </button>
           </div>
 
           {props.reportOpen ? (
-            <form onSubmit={props.onReport} className="rounded-xl border border-rose-100 bg-rose-50/60 p-4">
+            <form id="offer-report-form" onSubmit={props.onReport} className="desktop-offer-report-form rounded-xl border border-rose-100 bg-rose-50/60 p-4">
               <label className="text-sm font-semibold text-slate-800" htmlFor="offer-report-reason">请说明需要核查的问题</label>
-              <textarea id="offer-report-reason" value={props.reportReason} onChange={(event) => props.onReportReason(event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-rose-100 bg-white px-3 py-2 text-sm outline-none focus:border-rose-300" placeholder="例如：内容已经过期、描述与官方通知不一致" />
+              <textarea ref={reportReasonRef} id="offer-report-reason" value={props.reportReason} onChange={(event) => props.onReportReason(event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-rose-100 bg-white px-3 py-2 text-sm outline-none focus:border-rose-300" placeholder="例如：内容已经过期、描述与官方通知不一致" />
               <button disabled={props.reportPending} className="mt-2 inline-flex h-9 items-center gap-2 rounded-lg bg-rose-600 px-3 text-sm font-semibold text-white disabled:opacity-60">
                 {props.reportPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}提交反馈
               </button>
             </form>
           ) : null}
 
-          <div>
+          <div className="desktop-offer-comments">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-ink">交流回复</h3>
               <span className="text-xs text-slate-500">{props.comments.length} 条</span>
@@ -670,7 +750,7 @@ function PostDialog(props: PostDialogProps) {
           </div>
 
           {props.memberUserId ? (
-            <form onSubmit={props.onReply} className="rounded-xl border border-slate-200 p-3">
+            <form onSubmit={props.onReply} className="desktop-offer-reply-form rounded-xl border border-slate-200 p-3">
               <textarea value={props.replyText} onChange={(event) => props.onReplyText(event.target.value)} rows={3} className="w-full resize-none bg-transparent text-sm leading-6 outline-none placeholder:text-slate-400" placeholder="友善交流，避免发布个人敏感信息" />
               <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
                 <span className="text-xs text-slate-400">回复将匿名展示</span>
@@ -686,7 +766,8 @@ function PostDialog(props: PostDialogProps) {
           {props.actionMessage ? <div className="text-sm font-medium text-brand" role="status">{props.actionMessage}</div> : null}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -700,15 +781,41 @@ function DiscussionDialog({ form, pending, message, onChange, onClose, onSubmit 
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
-  return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/40 p-0 backdrop-blur-sm sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="discussion-dialog-title">
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-[24px] bg-white shadow-2xl sm:rounded-[24px]">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-7">
-          <div><div className="text-xs font-semibold text-brand">讨论广场</div><h2 id="discussion-dialog-title" className="mt-1 text-lg font-bold text-ink">发起一个清晰的问题</h2></div>
-          <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500" aria-label="关闭发布讨论"><X className="h-5 w-5" /></button>
+  const titleId = useId();
+  const privacyId = useId();
+  const { visible, requestClose } = useDialogExit(onClose, pending);
+  const { dialogRef, overlayRef, handleModalKeyDown } = useAccessibleModal(requestClose);
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      ref={overlayRef}
+      className="desktop-discussion-dialog fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/40 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+      data-state={visible ? 'open' : 'closed'}
+      aria-hidden={visible ? undefined : true}
+      onKeyDown={handleModalKeyDown}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) requestClose();
+      }}
+      data-modal-overlay="discussion-composer"
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={privacyId}
+        tabIndex={-1}
+        className="desktop-discussion-dialog-panel max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-[24px] bg-white shadow-2xl outline-none sm:rounded-[24px]"
+        data-state={visible ? 'open' : 'closed'}
+      >
+        <div className="desktop-discussion-dialog-header flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-7">
+          <div><div className="text-xs font-semibold text-brand">讨论广场</div><h2 id={titleId} className="mt-1 text-lg font-bold text-ink">发起一个清晰的问题</h2></div>
+          <button type="button" onClick={requestClose} className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500" aria-label="关闭发布讨论"><X className="h-5 w-5" /></button>
         </div>
-        <form onSubmit={onSubmit} className="space-y-4 px-5 py-6 sm:px-7">
-          <label className="block text-sm font-semibold text-slate-700">标题<input value={form.title} onChange={(event) => onChange({ title: event.target.value })} maxLength={120} className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-brand" placeholder="例如：计算机方向夏令营如何安排投递梯度？" /></label>
+        <form onSubmit={onSubmit} className="desktop-discussion-form space-y-4 px-5 py-6 sm:px-7">
+          <label className="block text-sm font-semibold text-slate-700">标题<input data-modal-initial-focus value={form.title} onChange={(event) => onChange({ title: event.target.value })} maxLength={120} className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-brand" placeholder="例如：计算机方向夏令营如何安排投递梯度？" /></label>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-semibold text-slate-700">相关院校<input value={form.schoolName} onChange={(event) => onChange({ schoolName: event.target.value })} maxLength={80} className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-brand" placeholder="通用问题可填“通用讨论”" /></label>
             <label className="block text-sm font-semibold text-slate-700">专业方向<input value={form.major} onChange={(event) => onChange({ major: event.target.value })} maxLength={80} className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-brand" placeholder="例如 计算机科学" /></label>
@@ -716,13 +823,14 @@ function DiscussionDialog({ form, pending, message, onChange, onClose, onSubmit 
           <label className="block text-sm font-semibold text-slate-700">讨论分类<select value={form.category} onChange={(event) => onChange({ category: event.target.value as OfferDiscussionCategory })} className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-brand">{offerDiscussionCategories.map((category) => <option key={category}>{category}</option>)}</select></label>
           <label className="block text-sm font-semibold text-slate-700">问题背景<textarea value={form.content} onChange={(event) => onChange({ content: event.target.value })} maxLength={1200} rows={6} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm leading-7 outline-none focus:border-brand" placeholder="说明你的本科背景、当前进度、已经确认的信息和最需要讨论的问题。" /></label>
           <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={form.isAnonymous} onChange={(event) => onChange({ isAnonymous: event.target.checked })} className="h-4 w-4 rounded border-slate-300 text-brand" />公开展示时匿名</label>
-          <div className="rounded-xl bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500"><ShieldCheck className="mr-1 inline h-4 w-4 text-brand" />提交后先核验再公开。请勿上传手机号、身份证、邮箱或未脱敏材料。</div>
+          <div id={privacyId} className="rounded-xl bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500"><ShieldCheck className="mr-1 inline h-4 w-4 text-brand" />提交后先核验再公开。请勿上传手机号、身份证、邮箱或未脱敏材料。</div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-brand" role="status">{message}</div>
             <button disabled={pending} className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand px-5 text-sm font-semibold text-white disabled:opacity-60">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}提交审核</button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

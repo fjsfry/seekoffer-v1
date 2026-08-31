@@ -21,13 +21,13 @@ import { applicationColumnPresets, statusDefinitions } from '@/lib/mock-data';
 
 export const metadata: Metadata = {
   title: '使用指南 - Seekoffer',
-  description: '5 分钟上手 Seekoffer：从通知库筛选项目、查看详情、加入申请表到使用工作台管理材料和截止时间。',
+  description: '5 分钟上手 Seekoffer：从通知库筛选项目、查看详情、加入申请到在全部申请中管理材料和截止时间。',
   alternates: {
     canonical: '/guide'
   },
   openGraph: {
     title: 'Seekoffer 使用指南',
-    description: '从查保研通知、看详情到加入申请工作台的完整使用路径。',
+    description: '从查保研通知、看详情到加入申请的完整使用路径。',
     url: '/guide',
     siteName: '寻鹿 Seekoffer',
     images: ['/logo.png'],
@@ -55,18 +55,18 @@ const onboardingSteps = [
   },
   {
     step: '03',
-    title: '加入申请表',
-    description: '对感兴趣的项目点击“加入申请表”。登录后，这条通知会进入你的个人工作台。',
-    action: '打开工作台',
-    href: '/me',
+    title: '加入申请',
+    description: '对感兴趣的项目点击“加入申请”。登录后，这条通知会进入全部申请。',
+    action: '打开全部申请',
+    href: '/',
     icon: ClipboardList
   },
   {
     step: '04',
-    title: '在工作台推进',
+    title: '在全部申请中推进',
     description: '统一维护申请状态、优先级、材料进度、备注和截止提醒，避免遗漏关键节点。',
-    action: '查看工作台',
-    href: '/me',
+    action: '查看全部申请',
+    href: '/',
     icon: LayoutDashboard
   },
   {
@@ -84,8 +84,8 @@ const pageGuides = [
   {
     title: '通知库',
     status: '已上线',
-    description: '用来找项目、筛选截止时间、查看详情和加入申请表。建议先从这里开始。',
-    tips: ['优先看 7 天内截止', '提交前核对学校页面', '感兴趣就加入申请表'],
+    description: '用来找项目、筛选截止时间、查看详情和加入申请。建议先从这里开始。',
+    tips: ['优先看 7 天内截止', '提交前核对学校页面', '感兴趣就加入申请'],
     href: '/notices',
     icon: Bell
   },
@@ -98,11 +98,11 @@ const pageGuides = [
     icon: FileCheck2
   },
   {
-    title: '申请工作台',
+    title: '全部申请',
     status: '登录可用',
     description: '用来保存目标项目、记录状态、材料进度和优先级，替代零散 Excel 与备忘录。',
     tips: ['统一状态口径', '材料拆项勾选', '按截止时间推进'],
-    href: '/me',
+    href: '/',
     icon: ClipboardList
   },
   {
@@ -132,8 +132,8 @@ const pageGuides = [
 ] as const;
 
 const productStatus = [
-  ['通知库', '已上线', '支持搜索、筛选、详情页、学校页面核对和加入工作台。'],
-  ['申请工作台', '登录可用', '支持保存项目、状态管理、优先级和材料进度维护。'],
+  ['通知库', '已上线', '支持搜索、筛选、详情页、学校页面核对和加入申请。'],
+  ['全部申请', '登录可用', '支持保存项目、状态管理、优先级和材料进度维护。'],
   ['院校库 / 资源库', '已上线', '作为高频入口和辅助工具，帮助你快速回访官方页面。'],
   ['Offer 圈', '核验开放', '登录用户可提交动态和申请讨论，核验通过后公开展示，并支持举报纠错。'],
   ['竞赛库', '已上线', '按赛事等级、专业类别和截止节点整理背景提升入口。'],
@@ -143,13 +143,14 @@ const productStatus = [
 export default function GuidePage() {
   return (
     <SiteShell>
-      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
+      <div className="desktop-secondary-page desktop-guide-page space-y-8 lg:space-y-10">
+      <section className="desktop-secondary-header page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">使用指南</h1>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">从通知筛选、详情核对到加入工作台，按步骤完成核心流程。</p>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">从通知筛选、详情核对到加入申请，按步骤完成核心流程。</p>
         </div>
 
-        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+        <div className="desktop-secondary-summary mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
           {[
             ['查通知', Search],
             ['看详情', ExternalLink],
@@ -167,7 +168,7 @@ export default function GuidePage() {
         </div>
       </section>
 
-      <section className="surface-card rounded-[34px] p-6 md:p-8">
+      <section className="desktop-reading-section surface-card rounded-[34px] p-6 md:p-8">
         <PageSectionTitle
           eyebrow="新手路径"
           title="第一次使用，按这 5 步走"
@@ -206,7 +207,7 @@ export default function GuidePage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <section className="desktop-guide-layout grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="surface-card rounded-[34px] p-6 md:p-8">
           <PageSectionTitle
             eyebrow="页面说明"
@@ -252,7 +253,7 @@ export default function GuidePage() {
             <div className="mt-5 grid gap-3 text-sm leading-7 text-slate-600">
               <div className="rounded-2xl bg-slate-50 px-4 py-3">正式报名、材料要求和截止时间，请在提交前核对学校页面与报名系统。</div>
               <div className="rounded-2xl bg-slate-50 px-4 py-3">“完整通知”和“报名入口”是两个不同按钮，报名入口可能是问卷或系统。</div>
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">工作台需要登录后使用，未登录时只能浏览公开内容。</div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">全部申请需要登录后使用，未登录时只能浏览公开内容。</div>
             </div>
           </section>
 
@@ -262,7 +263,7 @@ export default function GuidePage() {
               需要帮助？
             </div>
             <p className="mt-4 text-sm leading-7 text-slate-600">
-              使用中遇到数据错误、入口打不开、项目无法加入申请表等问题，可以加入 QQ 群 {QQ_GROUP_NUMBER} 反馈。
+              使用中遇到数据错误、入口打不开、项目无法加入申请等问题，可以加入 QQ 群 {QQ_GROUP_NUMBER} 反馈。
             </p>
             <a
               href={QQ_GROUP_URL}
@@ -277,7 +278,7 @@ export default function GuidePage() {
         </aside>
       </section>
 
-      <section className="surface-card rounded-[34px] p-6 md:p-8">
+      <section className="desktop-reading-section surface-card rounded-[34px] p-6 md:p-8">
         <PageSectionTitle
           eyebrow="功能状态"
           title="功能状态说明"
@@ -303,12 +304,12 @@ export default function GuidePage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+      <section className="desktop-guide-reference-grid grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <div className="surface-card rounded-[34px] p-6 md:p-8">
           <PageSectionTitle
-            eyebrow="工作台"
-            title="工作台字段怎么填"
-            subtitle="如果你已经把通知加入申请表，可以按下面这些字段维护。字段越统一，后续筛选、提醒和复盘越清楚。"
+            eyebrow="全部申请"
+            title="申请字段怎么填"
+            subtitle="如果你已经把通知加入申请，可以按下面这些字段维护。字段越统一，后续筛选、提醒和复盘越清楚。"
           />
           <div className="grid gap-3">
             {applicationColumnPresets.slice(0, 7).map((column) => (
@@ -330,7 +331,7 @@ export default function GuidePage() {
           <PageSectionTitle
             eyebrow="状态口径"
             title="申请状态怎么理解"
-            subtitle="统一状态可以避免工作台变成又一个杂乱备忘录。建议只在关键节点更新状态。"
+            subtitle="统一状态可以避免申请管理变成又一个杂乱备忘录。建议只在关键节点更新状态。"
           />
           <div className="grid gap-3">
             {statusDefinitions.map((item) => (
@@ -343,7 +344,7 @@ export default function GuidePage() {
           </div>
         </div>
       </section>
-
+      </div>
     </SiteShell>
   );
 }

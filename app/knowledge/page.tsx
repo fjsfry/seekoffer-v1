@@ -46,13 +46,14 @@ const navCards = [
 export default function KnowledgePage() {
   return (
     <SiteShell>
-      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
+      <div className="desktop-secondary-page desktop-knowledge-page space-y-8 lg:space-y-10">
+      <section className="desktop-secondary-header page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">知识/经验中心</h1>
           <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">系统整理保研时间线、黑话词典、阶段区别、材料指南和面试题。</p>
         </div>
 
-        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+        <nav className="desktop-secondary-summary mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center" aria-label="知识中心章节">
           {navCards.slice(0, 3).map((item) => {
             const Icon = item.icon;
 
@@ -71,10 +72,10 @@ export default function KnowledgePage() {
               </Link>
             );
           })}
-        </div>
+        </nav>
       </section>
 
-      <section id="timeline" className="surface-card scroll-mt-24 rounded-[34px] p-6 lg:p-8">
+      <section id="timeline" className="desktop-reading-section surface-card scroll-mt-24 rounded-[34px] p-6 lg:p-8">
         <SectionTitle icon={CalendarDays} title="保研时间线" description="把全年节奏拆成可执行阶段，避免只在通知爆发时被动补材料。" />
         <div className="mt-7 grid gap-4 lg:grid-cols-5">
           {timelineSteps.map((step) => (
@@ -94,7 +95,7 @@ export default function KnowledgePage() {
         </div>
       </section>
 
-      <section id="glossary" className="surface-card scroll-mt-24 rounded-[34px] p-6 lg:p-8">
+      <section id="glossary" className="desktop-reading-section surface-card scroll-mt-24 rounded-[34px] p-6 lg:p-8">
         <SectionTitle icon={BookOpenCheck} title="黑话词典" description="先理解这些词，才能更准确判断通知、经验贴和同学交流里的真实含义。" />
         <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {glossaryTerms.map(([term, detail]) => (
@@ -106,7 +107,7 @@ export default function KnowledgePage() {
         </div>
       </section>
 
-      <section id="comparison" className="surface-card scroll-mt-24 rounded-[34px] p-6 lg:p-8">
+      <section id="comparison" className="desktop-reading-section surface-card scroll-mt-24 rounded-[34px] p-6 lg:p-8">
         <SectionTitle icon={Layers3} title="夏令营 / 预推免 / 九推区别" description="三类入口不是互斥关系，而是申请节奏里的连续窗口。" />
         <div className="mt-7 grid gap-4 lg:grid-cols-3">
           {stageComparison.map((item) => (
@@ -122,7 +123,7 @@ export default function KnowledgePage() {
         </div>
       </section>
 
-      <section id="materials" className="surface-card scroll-mt-24 rounded-[34px] p-6 lg:p-8">
+      <section id="materials" className="desktop-reading-section surface-card scroll-mt-24 rounded-[34px] p-6 lg:p-8">
         <SectionTitle icon={FileText} title="材料指南" description="材料不是越多越好，关键是可验证、能复用、能按院校方向快速调整。" />
         <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {materialGuide.map((item) => (
@@ -141,7 +142,7 @@ export default function KnowledgePage() {
         </div>
       </section>
 
-      <section id="interview" className="surface-card scroll-mt-24 rounded-[34px] p-6 lg:p-8">
+      <section id="interview" className="desktop-reading-section surface-card scroll-mt-24 rounded-[34px] p-6 lg:p-8">
         <SectionTitle icon={MessageSquareText} title="面试题框架" description="不要只背答案，先把问题分组，再准备能支撑回答的经历和证据。" />
         <div className="mt-7 grid gap-4 md:grid-cols-2">
           {interviewQuestionGroups.map((group) => (
@@ -163,6 +164,7 @@ export default function KnowledgePage() {
           ))}
         </div>
       </section>
+      </div>
     </SiteShell>
   );
 }

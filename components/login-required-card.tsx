@@ -6,12 +6,14 @@ import { ArrowRight, BellRing, CheckSquare2, ClipboardList, LockKeyhole, Sparkle
 import { openAuthModal, type AuthIntent, writeAuthIntent } from '@/lib/auth-intent';
 import type { AuthRequirement } from '@/lib/user-session';
 
+const isDesktopSurface = process.env.NEXT_PUBLIC_SEEKOFFER_SURFACE === 'desktop';
+
 export function LoginRequiredCard({
   title = '别再用 Excel 追保研截止了',
-  description = '免费创建申请表，把目标项目、材料进度、今日待办和截止提醒放到一个工作台里。通知库仍可直接浏览，登录后才能保存你的申请计划。',
+  description = '免费创建申请表，把目标项目、材料进度、今日待办和截止提醒集中到全部申请。通知库仍可直接浏览，登录后才能保存你的申请计划。',
   intent,
   requiredAuth = 'session',
-  actionLabel = '免费进入工作台',
+  actionLabel = '进入全部申请',
   showPreview = true
 }: {
   title?: string;
@@ -22,6 +24,12 @@ export function LoginRequiredCard({
   showPreview?: boolean;
 }) {
   const pathname = usePathname();
+
+  // Desktop authentication is owned by DesktopAuthGate. Never mount the
+  // website's in-page login promotion inside the authenticated app shell.
+  if (isDesktopSurface) {
+    return null;
+  }
 
   function handleOpenLogin() {
     const nextIntent =
@@ -85,7 +93,7 @@ function WorkbenchPreview() {
     <div className="relative z-10 rounded-[30px] border border-slate-100 bg-white/90 p-5 shadow-soft backdrop-blur">
       <div className="absolute inset-x-6 top-1/2 z-20 -translate-y-1/2 rounded-2xl border border-white/70 bg-white/80 px-5 py-4 text-center shadow-soft backdrop-blur">
         <Sparkles className="mx-auto h-5 w-5 text-brand" />
-        <div className="mt-2 text-sm font-semibold text-ink">登录后解锁完整工作台</div>
+        <div className="mt-2 text-sm font-semibold text-ink">登录后查看全部申请</div>
         <div className="mt-1 text-xs text-slate-500">保存、提醒、同步都会自动开启</div>
       </div>
       <div className="pointer-events-none absolute inset-0 z-10 rounded-[30px] bg-white/20 backdrop-blur-[1.5px]" />

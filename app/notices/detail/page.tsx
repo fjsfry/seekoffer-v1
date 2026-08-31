@@ -36,10 +36,12 @@ function NoticeDetailContent() {
     id: string;
     project: PublicNoticeProject | null;
     message: string;
+    state: 'empty' | 'error';
   }>({
     id: '',
     project: null,
-    message: ''
+    message: '',
+    state: 'empty'
   });
 
   const remoteReady = remoteState.id === id;
@@ -64,7 +66,8 @@ function NoticeDetailContent() {
         setRemoteState({
           id,
           project: matchedProject ? sanitizeNoticeForPublicView(matchedProject) : null,
-          message: matchedProject ? '' : '当前通知库没有找到这条记录，可能已合并、更新或下线。'
+          message: matchedProject ? '' : '当前通知库没有找到这条记录，可能已合并、更新或下线。',
+          state: 'empty'
         });
       })
       .catch(() => {
@@ -72,7 +75,8 @@ function NoticeDetailContent() {
           setRemoteState({
             id,
             project: null,
-            message: '通知详情加载失败，请返回通知库重新打开，或加入 QQ 群反馈。'
+            message: '通知详情加载失败，请返回通知库重新打开，或加入 QQ 群反馈。',
+            state: 'error'
           });
         }
       });
@@ -93,9 +97,9 @@ function NoticeDetailContent() {
   if (loading) {
     return (
       <DetailShell title="正在加载通知详情" subtitle="正在读取最新整理结果，请稍等。">
-        <section className="surface-card rounded-[34px] p-8">
-          <div className="flex flex-col items-center justify-center gap-5 text-center">
-            <LoaderCircle className="h-8 w-8 animate-spin text-brand" />
+        <section className="desktop-notice-detail-state desktop-notice-detail-state--loading surface-card rounded-[34px] p-8">
+          <div className="desktop-notice-detail-state-content flex flex-col items-center justify-center gap-5 text-center">
+            <LoaderCircle className="desktop-notice-detail-state-icon h-8 w-8 animate-spin text-brand" />
             <p className="max-w-xl text-sm leading-7 text-slate-600">
               如果这条通知刚刚更新，详情页可能需要几秒钟同步。
             </p>
@@ -108,7 +112,7 @@ function NoticeDetailContent() {
   if (!project) {
     return (
       <DetailShell title="通知详情暂不可用" subtitle={message || '这条通知暂时无法打开。'}>
-        <EmptyDetailState href={returnHref} label="返回通知库" />
+        <EmptyDetailState href={returnHref} label="返回通知库" state={remoteState.state} />
       </DetailShell>
     );
   }
@@ -131,22 +135,35 @@ function DetailShell({
 }) {
   return (
     <SiteShell>
-      <PageSectionTitle eyebrow="通知详情" title={title} subtitle={subtitle} level="h1" />
-      {children}
+      <div className="desktop-notice-detail-state-page">
+        <PageSectionTitle eyebrow="通知详情" title={title} subtitle={subtitle} level="h1" />
+        {children}
+      </div>
     </SiteShell>
   );
 }
 
-function EmptyDetailState({ href, label }: { href: string; label: string }) {
+function EmptyDetailState({
+  href,
+  label,
+  state = 'empty'
+}: {
+  href: string;
+  label: string;
+  state?: 'empty' | 'error';
+}) {
+  const stateClassName =
+    state === 'error' ? 'desktop-notice-detail-state--error' : 'desktop-notice-detail-state--empty';
+
   return (
-    <section className="surface-card rounded-[34px] p-8">
-      <div className="flex flex-col items-center justify-center gap-5 text-center">
+    <section className={`desktop-notice-detail-state ${stateClassName} surface-card rounded-[34px] p-8`}>
+      <div className="desktop-notice-detail-state-content flex flex-col items-center justify-center gap-5 text-center">
         <p className="max-w-xl text-sm leading-7 text-slate-600">
           页面没有继续停留在异常状态。你可以先回到通知库重新选择，也可以加入 QQ 群告诉我们。
         </p>
         <Link
           href={href}
-          className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
+          className="desktop-notice-detail-state-action inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
         >
           {label}
           <ArrowRight className="h-4 w-4" />
@@ -160,9 +177,13 @@ export default function NoticeDetailQueryPage() {
   return (
     <Suspense
       fallback={
-        <SiteShell>
-          <PageSectionTitle eyebrow="通知详情" title="正在打开通知详情" subtitle="正在准备详情页，请稍等。" level="h1" />
-        </SiteShell>
+        <DetailShell title="正在打开通知详情" subtitle="正在准备详情页，请稍等。">
+          <section className="desktop-notice-detail-state desktop-notice-detail-state--loading hidden surface-card rounded-[34px] p-8">
+            <div className="desktop-notice-detail-state-content flex flex-col items-center justify-center gap-5 text-center">
+              <LoaderCircle className="desktop-notice-detail-state-icon h-8 w-8 animate-spin text-brand" />
+            </div>
+          </section>
+        </DetailShell>
       }
     >
       <NoticeDetailContent />

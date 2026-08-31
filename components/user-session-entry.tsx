@@ -12,7 +12,7 @@ export function UserSessionEntry() {
   const pathname = usePathname();
   const { ready, session } = useUserSessionState();
   const [pendingAction, setPendingAction] = useState<'logout' | ''>('');
-  const workbenchActive = pathname === '/me' || pathname.startsWith('/me/') || pathname === '/applications';
+  const workbenchActive = pathname === '/';
 
   function handleOpenLogin() {
     const intent = {
@@ -79,7 +79,7 @@ export function UserSessionEntry() {
   return (
     <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
       <Link
-        href="/me"
+        href="/"
         className={`inline-flex h-10 items-center gap-2 rounded-xl px-3 pr-4 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 md:h-11 md:px-3 md:pr-4 ${
           workbenchActive
             ? 'bg-brand/[0.08] text-brand ring-1 ring-brand/15'
@@ -89,7 +89,7 @@ export function UserSessionEntry() {
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand/10 text-brand md:h-8 md:w-8">
           <LayoutGrid className="h-4 w-4" />
         </span>
-        <span className="max-w-[7.5rem] truncate">{session.profile.nickname ? `${session.profile.nickname}的工作台` : '工作台'}</span>
+        <span className="max-w-[7.5rem] truncate">全部申请</span>
       </Link>
 
       {session.authProvider === 'anonymous' ? (

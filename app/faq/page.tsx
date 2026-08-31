@@ -8,13 +8,13 @@ import { absoluteUrl, jsonLdScript } from '@/lib/seo';
 
 export const metadata: Metadata = {
   title: '常见问题 - Seekoffer',
-  description: 'Seekoffer 常见问题：新手使用、通知数据、账号工作台、功能说明与反馈渠道说明。',
+  description: 'Seekoffer 常见问题：新手使用、通知数据、全部申请、功能说明与反馈渠道说明。',
   alternates: {
     canonical: '/faq'
   },
   openGraph: {
     title: 'Seekoffer 常见问题',
-  description: '保研通知、申请工作台、通知整理和反馈方式常见问题。',
+  description: '保研通知、全部申请、通知整理和反馈方式常见问题。',
     url: '/faq',
     siteName: '寻鹿 Seekoffer',
     images: ['/logo.png'],
@@ -42,14 +42,15 @@ export default function FaqPage() {
 
   return (
     <SiteShell>
+      <div className="desktop-secondary-page desktop-faq-page space-y-8 lg:space-y-10">
       <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(faqJsonLd)} />
-      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
+      <section className="desktop-secondary-header page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">常见问题</h1>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">集中说明通知整理、报名入口、工作台保存和反馈方式。</p>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">集中说明通知整理、报名入口、全部申请保存和反馈方式。</p>
         </div>
 
-        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+        <div className="desktop-secondary-summary mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
           {[
             ['新手使用', HelpCircle],
             ['数据说明', Search],
@@ -67,14 +68,14 @@ export default function FaqPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <section className="desktop-faq-layout grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid gap-6">
           {faqGroups.map((group) => (
-            <section key={group.id} id={group.id} className="surface-card scroll-mt-28 rounded-[34px] p-6 md:p-8">
+            <section key={group.id} id={group.id} className="desktop-faq-group surface-card scroll-mt-28 rounded-[34px] p-6 md:p-8">
               <PageSectionTitle eyebrow="问题分类" title={group.title} subtitle={group.description} />
-              <div className="grid gap-4">
+              <div className="desktop-faq-list grid gap-4">
                 {group.items.map((item) => (
-                  <div key={item.question} className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-sm">
+                  <article key={item.question} className="desktop-faq-item rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-sm">
                     <div className="flex items-start gap-3">
                       <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-cream text-brand">
                         <HelpCircle className="h-4 w-4" />
@@ -84,21 +85,21 @@ export default function FaqPage() {
                         <p className="mt-3 text-sm leading-7 text-slate-600">{item.answer}</p>
                       </div>
                     </div>
-                  </div>
+                  </article>
                 ))}
               </div>
             </section>
           ))}
         </div>
 
-        <aside className="grid content-start gap-6">
+        <aside className="desktop-faq-aside grid content-start gap-6">
           <section className="surface-card rounded-[34px] p-6">
             <div className="inline-flex items-center gap-2 text-sm font-semibold text-brand">
               <Search className="h-4 w-4" />
               推荐排查顺序
             </div>
             <div className="mt-5 grid gap-3 text-sm leading-7 text-slate-600">
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">先确认是否已经登录，工作台和加入申请表都需要账号状态。</div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">先确认是否已经登录，全部申请和加入申请都需要账号状态。</div>
               <div className="rounded-2xl bg-slate-50 px-4 py-3">再确认完整通知与报名入口是否为同一个页面，部分院校会分开设置。</div>
               <div className="rounded-2xl bg-slate-50 px-4 py-3">最后通过 QQ 群或反馈入口提交截图，方便我们复现问题。</div>
             </div>
@@ -134,6 +135,7 @@ export default function FaqPage() {
           </section>
         </aside>
       </section>
+      </div>
     </SiteShell>
   );
 }

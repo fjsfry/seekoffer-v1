@@ -45,8 +45,8 @@ export function AuthActionBridge() {
             return;
           }
 
-          if (!intent.returnTo && pathname !== '/me') {
-            router.push('/me');
+          if (!intent.returnTo && pathname !== '/') {
+            router.push('/');
           }
 
           return;

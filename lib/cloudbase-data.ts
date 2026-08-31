@@ -2,7 +2,7 @@
 
 import { getSupabaseBrowserClient } from './supabase-browser';
 import { getDeadlineLevelFromDate, getPublicStatusForDeadlineLevel } from './deadline-display';
-import { getUserSession, type UserProfile, updateUserProfile } from './user-session';
+import { getUserSession, type UserProfile, type UserSession, updateUserProfile } from './user-session';
 import {
   materialChecklistDefinitions,
   type DeadlineLevel,
@@ -15,18 +15,43 @@ import {
 import { filterMainNoticeProjects } from './notice-quality';
 import { baseNoticeProjects } from './notice-source';
 import { canCreateMoreApplications } from './billing-api';
+import { createKeyedSyncRetryCoordinator } from './keyed-sync-retry';
 
 const APPLICATION_STORAGE_KEY = 'seekoffer-my-application-table';
 const MANUAL_PROJECT_STORAGE_KEY = 'seekoffer-manual-projects';
 const APPLICATION_EVENT_NAME = 'seekoffer-applications-updated';
+const WORKSPACE_STORAGE_VERSION = 2;
 const NOTICE_TARGET_YEAR = 2026;
 const PUBLIC_NOTICE_QUERY_LIMIT = 5000;
 const PUBLIC_NOTICE_QUERY_PAGE_SIZE = 1000;
 
+export type WorkspaceStorageOwner =
+  | {
+      kind: 'member';
+      userId: string;
+    }
+  | {
+      kind: 'anonymous';
+    }
+  | {
+      kind: 'local';
+    };
+
 type StoredPayload<T> = {
+  version: typeof WORKSPACE_STORAGE_VERSION;
+  owner: WorkspaceStorageOwner;
   updatedAt: string;
   items: T[];
 };
+
+type ParsedStoredPayload<T> = {
+  version: number | null;
+  owner: WorkspaceStorageOwner | null;
+  updatedAt: string;
+  items: T[];
+};
+
+type WorkspaceSessionIdentity = Pick<UserSession, 'loggedIn' | 'authProvider' | 'userId'>;
 
 export type ApplicationRow = {
   item: UserProjectRecord;
@@ -76,7 +101,88 @@ function normalizeStringArray(input: unknown) {
     : [];
 }
 
-function readStoragePayload<T>(storageKey: string): StoredPayload<T> | null {
+function normalizeWorkspaceStorageOwner(value: unknown): WorkspaceStorageOwner | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.kind === 'member') {
+    const userId = typeof record.userId === 'string' ? record.userId.trim() : '';
+    return userId ? { kind: 'member', userId } : null;
+  }
+
+  if (record.kind === 'anonymous') {
+    return { kind: 'anonymous' };
+  }
+
+  if (record.kind === 'local') {
+    return { kind: 'local' };
+  }
+
+  return null;
+}
+
+export function getWorkspaceStorageOwner(
+  session: WorkspaceSessionIdentity | null | undefined
+): WorkspaceStorageOwner {
+  if (session?.loggedIn && session.authProvider === 'anonymous') {
+    return { kind: 'anonymous' };
+  }
+
+  const userId = typeof session?.userId === 'string' ? session.userId.trim() : '';
+  if (session?.loggedIn && session.authProvider !== 'anonymous' && userId) {
+    return {
+      kind: 'member',
+      userId
+    };
+  }
+
+  return { kind: 'local' };
+}
+
+function getWorkspaceStorageSuffix(owner: WorkspaceStorageOwner) {
+  return owner.kind === 'member' ? owner.userId : owner.kind;
+}
+
+function getWorkspaceStorageKeysForOwner(owner: WorkspaceStorageOwner) {
+  const suffix = getWorkspaceStorageSuffix(owner);
+
+  return {
+    owner,
+    applications: `${APPLICATION_STORAGE_KEY}:${suffix}`,
+    manualProjects: `${MANUAL_PROJECT_STORAGE_KEY}:${suffix}`
+  };
+}
+
+export function getWorkspaceStorageKeys(session: WorkspaceSessionIdentity | null | undefined) {
+  return getWorkspaceStorageKeysForOwner(getWorkspaceStorageOwner(session));
+}
+
+export function workspaceStorageOwnersMatch(
+  left: WorkspaceStorageOwner | null,
+  right: WorkspaceStorageOwner
+) {
+  if (!left || left.kind !== right.kind) {
+    return false;
+  }
+
+  return left.kind !== 'member' || (right.kind === 'member' && left.userId === right.userId);
+}
+
+function getRecordUserIdForOwner(owner: WorkspaceStorageOwner) {
+  if (owner.kind === 'member') {
+    return owner.userId;
+  }
+
+  return owner.kind === 'anonymous' ? 'anonymous-user' : 'local-user';
+}
+
+function getCurrentWorkspaceStorageContext() {
+  return getWorkspaceStorageKeys(getUserSession());
+}
+
+function readStoragePayload<T>(storageKey: string): ParsedStoredPayload<T> | null {
   if (!canUseBrowserStorage()) {
     return null;
   }
@@ -87,18 +193,27 @@ function readStoragePayload<T>(storageKey: string): StoredPayload<T> | null {
       return null;
     }
 
-    const parsed = JSON.parse(raw) as StoredPayload<T> | T[];
+    const parsed = JSON.parse(raw) as unknown;
     if (Array.isArray(parsed)) {
       return {
+        version: null,
+        owner: null,
         updatedAt: '',
-        items: parsed
+        items: parsed as T[]
       };
     }
 
-    if (parsed && Array.isArray(parsed.items)) {
+    if (parsed && typeof parsed === 'object') {
+      const record = parsed as Record<string, unknown>;
+      if (!Array.isArray(record.items)) {
+        return null;
+      }
+
       return {
-        updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : '',
-        items: parsed.items
+        version: typeof record.version === 'number' ? record.version : null,
+        owner: normalizeWorkspaceStorageOwner(record.owner),
+        updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : '',
+        items: record.items as T[]
       };
     }
   } catch {
@@ -106,6 +221,80 @@ function readStoragePayload<T>(storageKey: string): StoredPayload<T> | null {
   }
 
   return null;
+}
+
+function persistStoragePayload<T>(
+  storageKey: string,
+  owner: WorkspaceStorageOwner,
+  items: T[],
+  updatedAt: string
+) {
+  if (!canUseBrowserStorage()) {
+    return;
+  }
+
+  window.localStorage.setItem(
+    storageKey,
+    JSON.stringify({
+      version: WORKSPACE_STORAGE_VERSION,
+      owner,
+      updatedAt,
+      items
+    } satisfies StoredPayload<T>)
+  );
+}
+
+export function canMigrateLegacyApplicationItems(items: unknown[], userId: string) {
+  const expectedUserId = userId.trim();
+  if (!expectedUserId || items.length === 0) {
+    return false;
+  }
+
+  return items.every((item) => {
+    if (!item || typeof item !== 'object') {
+      return false;
+    }
+
+    const itemUserId = (item as Record<string, unknown>).userId;
+    return typeof itemUserId === 'string' && itemUserId.trim() === expectedUserId;
+  });
+}
+
+export function canMigrateLegacyManualProjectItems(
+  manualItems: unknown[],
+  applicationItems: unknown[],
+  userId: string
+) {
+  if (
+    manualItems.length === 0 ||
+    !canMigrateLegacyApplicationItems(applicationItems, userId)
+  ) {
+    return false;
+  }
+
+  return manualProjectItemsAreReferenced(manualItems, applicationItems);
+}
+
+function manualProjectItemsAreReferenced(manualItems: unknown[], applicationItems: unknown[]) {
+  const applicationProjectIds = new Set(
+    applicationItems
+      .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+      .map((item) => (typeof item.projectId === 'string' ? item.projectId.trim() : ''))
+      .filter(Boolean)
+  );
+
+  return manualItems.every((item) => {
+    if (!item || typeof item !== 'object') {
+      return false;
+    }
+
+    const projectId = (item as Record<string, unknown>).id;
+    return (
+      typeof projectId === 'string' &&
+      Boolean(projectId.trim()) &&
+      applicationProjectIds.has(projectId.trim())
+    );
+  });
 }
 
 function normalizeProjectStatus(
@@ -171,10 +360,13 @@ function normalizeManualProject(project: Partial<PublicNoticeProject>) {
   } satisfies PublicNoticeProject;
 }
 
-function buildDefaultRecord(projectId: string) {
+function buildDefaultRecord(
+  projectId: string,
+  userId = getRecordUserIdForOwner(getCurrentWorkspaceStorageContext().owner)
+) {
   const base: UserProjectRecord = {
     userProjectId: `user-${projectId}`,
-    userId: getUserSession()?.userId || 'local-user',
+    userId,
     projectId,
     isFavorited: true,
     myStatus: '已收藏',
@@ -199,16 +391,19 @@ function buildDefaultRecord(projectId: string) {
   };
 }
 
-function normalizeRecord(record: Partial<UserProjectRecord>) {
+function normalizeRecord(
+  record: Partial<UserProjectRecord>,
+  fallbackUserId = getRecordUserIdForOwner(getCurrentWorkspaceStorageContext().owner)
+) {
   const base = {
-    ...buildDefaultRecord(String(record.projectId || '')),
+    ...buildDefaultRecord(String(record.projectId || ''), fallbackUserId),
     ...record
   } as UserProjectRecord;
 
   const normalized: UserProjectRecord = {
     ...base,
     userProjectId: String(base.userProjectId || `user-${base.projectId}`),
-    userId: String(base.userId || getUserSession()?.userId || 'local-user'),
+    userId: String(base.userId || fallbackUserId),
     projectId: String(base.projectId || ''),
     isFavorited: Boolean(base.isFavorited),
     myStatus: (base.myStatus || '已收藏') as UserProjectStatus,
@@ -242,82 +437,199 @@ function sortProjectsByFreshness(projects: PublicNoticeProject[]) {
   return [...projects].sort((left, right) => getProjectFreshness(right).localeCompare(getProjectFreshness(left)));
 }
 
-function readStoredManualProjectsPayload() {
-  const payload = readStoragePayload<Partial<PublicNoticeProject>>(MANUAL_PROJECT_STORAGE_KEY);
-  if (!payload) {
-    return {
-      updatedAt: '',
-      items: [] as PublicNoticeProject[]
-    };
+function createEmptyWorkspacePayload<T>(owner: WorkspaceStorageOwner): StoredPayload<T> {
+  return {
+    version: WORKSPACE_STORAGE_VERSION,
+    owner,
+    updatedAt: '',
+    items: []
+  };
+}
+
+function canMigrateLegacyApplicationPayload(
+  payload: ParsedStoredPayload<Partial<UserProjectRecord>>,
+  owner: WorkspaceStorageOwner
+) {
+  if (payload.owner) {
+    if (!workspaceStorageOwnersMatch(payload.owner, owner)) {
+      return false;
+    }
+
+    return (
+      owner.kind !== 'member' ||
+      payload.items.every((item) => {
+        if (!item || typeof item !== 'object') {
+          return false;
+        }
+
+        const itemUserId = (item as Record<string, unknown>).userId;
+        return (
+          typeof itemUserId !== 'string' ||
+          !itemUserId.trim() ||
+          itemUserId.trim() === owner.userId
+        );
+      })
+    );
   }
 
-  return {
-    updatedAt: payload.updatedAt,
-    items: payload.items
+  return (
+    owner.kind === 'member' &&
+    canMigrateLegacyApplicationItems(payload.items, owner.userId)
+  );
+}
+
+function canMigrateLegacyManualProjectPayload(
+  payload: ParsedStoredPayload<Partial<PublicNoticeProject>>,
+  owner: WorkspaceStorageOwner
+) {
+  if (payload.owner && !workspaceStorageOwnersMatch(payload.owner, owner)) {
+    return false;
+  }
+
+  if (owner.kind !== 'member') {
+    return Boolean(payload.owner);
+  }
+
+  const applicationPayload = readStoragePayload<Partial<UserProjectRecord>>(APPLICATION_STORAGE_KEY);
+  if (!applicationPayload) {
+    return false;
+  }
+
+  const applicationOwnerMatches =
+    (!applicationPayload.owner ||
+      workspaceStorageOwnersMatch(applicationPayload.owner, owner)) &&
+    canMigrateLegacyApplicationItems(applicationPayload.items, owner.userId);
+
+  return (
+    applicationOwnerMatches &&
+    manualProjectItemsAreReferenced(payload.items, applicationPayload.items)
+  );
+}
+
+function readStoredManualProjectsPayload(
+  owner = getCurrentWorkspaceStorageContext().owner
+) {
+  const context = getWorkspaceStorageKeysForOwner(owner);
+  const scopedPayload = readStoragePayload<Partial<PublicNoticeProject>>(context.manualProjects);
+  let payload = scopedPayload;
+
+  if (scopedPayload && !workspaceStorageOwnersMatch(scopedPayload.owner, context.owner)) {
+    return createEmptyWorkspacePayload<PublicNoticeProject>(context.owner);
+  }
+
+  if (!payload) {
+    const legacyPayload = readStoragePayload<Partial<PublicNoticeProject>>(MANUAL_PROJECT_STORAGE_KEY);
+    if (legacyPayload && canMigrateLegacyManualProjectPayload(legacyPayload, context.owner)) {
+      payload = legacyPayload;
+    }
+  }
+
+  if (!payload) {
+    return createEmptyWorkspacePayload<PublicNoticeProject>(context.owner);
+  }
+
+  const normalizedItems = payload.items
       .filter((item): item is Partial<PublicNoticeProject> => Boolean(item && typeof item === 'object'))
-      .map((item) => normalizeManualProject(item))
-  };
-}
+      .map((item) => normalizeManualProject(item));
 
-function persistStoredManualProjects(projects: PublicNoticeProject[], updatedAt = nowIsoText(), emit = true) {
-  if (!canUseBrowserStorage()) {
-    return;
-  }
-
-  window.localStorage.setItem(
-    MANUAL_PROJECT_STORAGE_KEY,
-    JSON.stringify({
-      updatedAt,
-      items: projects
-    } satisfies StoredPayload<PublicNoticeProject>)
-  );
-
-  if (emit) {
-    emitApplicationUpdate();
-  }
-}
-
-function readStoredManualProjects() {
-  return readStoredManualProjectsPayload().items;
-}
-
-function readStoredRecordsPayload() {
-  const payload = readStoragePayload<Partial<UserProjectRecord>>(APPLICATION_STORAGE_KEY);
-  if (!payload) {
-    return {
-      updatedAt: '',
-      items: [] as UserProjectRecord[]
-    };
+  if (!scopedPayload) {
+    persistStoragePayload(
+      context.manualProjects,
+      context.owner,
+      normalizedItems,
+      payload.updatedAt || nowIsoText()
+    );
   }
 
   return {
+    version: WORKSPACE_STORAGE_VERSION,
+    owner: context.owner,
     updatedAt: payload.updatedAt,
-    items: payload.items
-      .filter((item): item is Partial<UserProjectRecord> => Boolean(item && typeof item === 'object'))
-      .map((item) => normalizeRecord(item))
+    items: normalizedItems
   };
 }
 
-function persistStoredRecords(records: UserProjectRecord[], updatedAt = nowIsoText(), emit = true) {
-  if (!canUseBrowserStorage()) {
-    return;
-  }
-
-  window.localStorage.setItem(
-    APPLICATION_STORAGE_KEY,
-    JSON.stringify({
-      updatedAt,
-      items: records
-    } satisfies StoredPayload<UserProjectRecord>)
-  );
+function persistStoredManualProjects(
+  projects: PublicNoticeProject[],
+  updatedAt = nowIsoText(),
+  emit = true,
+  owner = getCurrentWorkspaceStorageContext().owner
+) {
+  const context = getWorkspaceStorageKeysForOwner(owner);
+  persistStoragePayload(context.manualProjects, context.owner, projects, updatedAt);
 
   if (emit) {
     emitApplicationUpdate();
   }
 }
 
-function readStoredRecords() {
-  return readStoredRecordsPayload().items;
+function readStoredManualProjects(owner = getCurrentWorkspaceStorageContext().owner) {
+  return readStoredManualProjectsPayload(owner).items;
+}
+
+function readStoredRecordsPayload(owner = getCurrentWorkspaceStorageContext().owner) {
+  const context = getWorkspaceStorageKeysForOwner(owner);
+  const scopedPayload = readStoragePayload<Partial<UserProjectRecord>>(context.applications);
+  let payload = scopedPayload;
+
+  if (scopedPayload && !workspaceStorageOwnersMatch(scopedPayload.owner, context.owner)) {
+    return createEmptyWorkspacePayload<UserProjectRecord>(context.owner);
+  }
+
+  if (!payload) {
+    const legacyPayload = readStoragePayload<Partial<UserProjectRecord>>(APPLICATION_STORAGE_KEY);
+    if (legacyPayload && canMigrateLegacyApplicationPayload(legacyPayload, context.owner)) {
+      payload = legacyPayload;
+    }
+  }
+
+  if (!payload) {
+    return createEmptyWorkspacePayload<UserProjectRecord>(context.owner);
+  }
+
+  const expectedUserId = getRecordUserIdForOwner(context.owner);
+  const normalizedItems = payload.items
+      .filter((item): item is Partial<UserProjectRecord> => Boolean(item && typeof item === 'object'))
+      .map((item) => normalizeRecord(item, expectedUserId))
+      .filter((item) => item.userId === expectedUserId);
+
+  if (!scopedPayload) {
+    persistStoragePayload(
+      context.applications,
+      context.owner,
+      normalizedItems,
+      payload.updatedAt || nowIsoText()
+    );
+  }
+
+  return {
+    version: WORKSPACE_STORAGE_VERSION,
+    owner: context.owner,
+    updatedAt: payload.updatedAt,
+    items: normalizedItems
+  };
+}
+
+function persistStoredRecords(
+  records: UserProjectRecord[],
+  updatedAt = nowIsoText(),
+  emit = true,
+  owner = getCurrentWorkspaceStorageContext().owner
+) {
+  const context = getWorkspaceStorageKeysForOwner(owner);
+  const expectedUserId = getRecordUserIdForOwner(context.owner);
+  const ownedRecords = records
+    .map((record) => normalizeRecord(record, expectedUserId))
+    .filter((record) => record.userId === expectedUserId);
+  persistStoragePayload(context.applications, context.owner, ownedRecords, updatedAt);
+
+  if (emit) {
+    emitApplicationUpdate();
+  }
+}
+
+function readStoredRecords(owner = getCurrentWorkspaceStorageContext().owner) {
+  return readStoredRecordsPayload(owner).items;
 }
 
 function mergeByKey<T>(remoteItems: T[], localItems: T[], getKey: (item: T) => string) {
@@ -368,6 +680,17 @@ function getSupabaseMemberContext() {
     userId: session.userId,
     session
   };
+}
+
+function isActiveWorkspaceMember(userId: string) {
+  return getSupabaseMemberContext()?.userId === userId;
+}
+
+function releaseStaleWorkspaceHydration(userId: string) {
+  if (hydratedWorkspaceUserId === userId) {
+    hydratedWorkspaceUserId = '';
+    hydrateWorkspacePromise = null;
+  }
 }
 
 function mapNoticeRowToProject(row: Record<string, unknown>) {
@@ -495,9 +818,17 @@ function profileHasMeaningfulContent(profile: UserProfile | null | undefined) {
   return Object.values(profile).some((value) => String(value || '').trim());
 }
 
-async function upsertRemoteManualProjects(projects: PublicNoticeProject[]) {
+async function upsertRemoteManualProjects(
+  projects: PublicNoticeProject[],
+  sourceOwner: WorkspaceStorageOwner
+) {
   const context = getSupabaseMemberContext();
-  if (!context || !projects.length) {
+  if (
+    !context ||
+    sourceOwner.kind !== 'member' ||
+    sourceOwner.userId !== context.userId ||
+    !projects.length
+  ) {
     return;
   }
 
@@ -513,14 +844,27 @@ async function upsertRemoteManualProjects(projects: PublicNoticeProject[]) {
   }
 }
 
-async function upsertRemoteApplications(records: UserProjectRecord[]) {
+async function upsertRemoteApplications(
+  records: UserProjectRecord[],
+  sourceOwner: WorkspaceStorageOwner
+) {
   const context = getSupabaseMemberContext();
-  if (!context || !records.length) {
+  if (
+    !context ||
+    sourceOwner.kind !== 'member' ||
+    sourceOwner.userId !== context.userId ||
+    !records.length
+  ) {
+    return;
+  }
+
+  const ownedRecords = records.filter((record) => record.userId === context.userId);
+  if (!ownedRecords.length) {
     return;
   }
 
   const supabase = getSupabaseBrowserClient();
-  const payload = records.map((record) => mapRecordToApplicationUpsert(record, context.userId));
+  const payload = ownedRecords.map((record) => mapRecordToApplicationUpsert(record, context.userId));
   const { error } = await supabase.from('applications').upsert(payload, {
     onConflict: 'user_id,project_id'
   });
@@ -530,18 +874,82 @@ async function upsertRemoteApplications(records: UserProjectRecord[]) {
   }
 }
 
+const manualApplicationSyncCoordinator = createKeyedSyncRetryCoordinator({
+  execute: async (userId) => {
+    if (!isActiveWorkspaceMember(userId)) {
+      return;
+    }
+
+    const storageOwner: WorkspaceStorageOwner = { kind: 'member', userId };
+
+    // Always read the latest durable snapshots at attempt time. This covers a
+    // second local write that lands while the previous request is in flight and
+    // also makes retry safe after transient network or RLS failures.
+    const manualProjects = readStoredManualProjects(storageOwner);
+    const records = readStoredRecords(storageOwner).filter(
+      (record) => record.userId === userId
+    );
+
+    if (!isActiveWorkspaceMember(userId)) {
+      return;
+    }
+
+    await Promise.all([
+      upsertRemoteManualProjects(manualProjects, storageOwner),
+      upsertRemoteApplications(records, storageOwner)
+    ]);
+  },
+  isEligible: (userId) => isActiveWorkspaceMember(userId),
+  retryDelaysMs: [2_000, 10_000, 30_000, 120_000],
+  // A prolonged service incident must not strand a locally durable change.
+  // After the responsive retry window, keep one low-frequency wake-up per
+  // account; an `online` event still retries immediately.
+  exhaustedRetryDelayMs: 10 * 60_000,
+  onError: (_userId, error) => {
+    // Local storage remains authoritative for the pending mutation. The
+    // coordinator retries from those snapshots instead of retaining stale
+    // in-memory request payloads.
+    logWorkspaceSyncWarning('manual-application-add-sync', error);
+  },
+  onSuccess: () => {
+    emitApplicationUpdate();
+  }
+});
+
+let manualApplicationOnlineListenerAttached = false;
+
+function scheduleManualApplicationWorkspaceSync(owner: WorkspaceStorageOwner) {
+  if (owner.kind !== 'member' || !isActiveWorkspaceMember(owner.userId)) {
+    return;
+  }
+
+  if (typeof window !== 'undefined' && !manualApplicationOnlineListenerAttached) {
+    window.addEventListener('online', () => {
+      manualApplicationSyncCoordinator.notifyOnline();
+    });
+    manualApplicationOnlineListenerAttached = true;
+  }
+
+  manualApplicationSyncCoordinator.request(owner.userId);
+}
+
 async function assertApplicationQuota(currentCount: number) {
   const quota = await canCreateMoreApplications(currentCount);
   if (!quota.allowed) {
     throw new Error(
-      `免费版最多可跟进 ${quota.freeLimit} 个申请项目。升级 Pro 后可以无限加入申请表、使用高级提醒和后续导出能力。`
+      `免费版最多可跟进 ${quota.freeLimit} 个申请项目。升级 Pro 后可以无限加入申请、使用高级提醒和后续导出能力。`
     );
   }
 }
 
-async function deleteRemoteApplication(projectId: string) {
+async function deleteRemoteApplication(projectId: string, sourceOwner: WorkspaceStorageOwner) {
   const context = getSupabaseMemberContext();
-  if (!context || !projectId) {
+  if (
+    !context ||
+    sourceOwner.kind !== 'member' ||
+    sourceOwner.userId !== context.userId ||
+    !projectId
+  ) {
     return;
   }
 
@@ -557,9 +965,14 @@ async function deleteRemoteApplication(projectId: string) {
   }
 }
 
-async function deleteRemoteManualProject(projectId: string) {
+async function deleteRemoteManualProject(projectId: string, sourceOwner: WorkspaceStorageOwner) {
   const context = getSupabaseMemberContext();
-  if (!context || !projectId) {
+  if (
+    !context ||
+    sourceOwner.kind !== 'member' ||
+    sourceOwner.userId !== context.userId ||
+    !projectId
+  ) {
     return;
   }
 
@@ -604,9 +1017,9 @@ async function upsertRemoteProfile(profile: UserProfile | null | undefined) {
   }
 }
 
-async function fetchRemoteManualProjects() {
+async function fetchRemoteManualProjects(expectedUserId?: string) {
   const context = getSupabaseMemberContext();
-  if (!context) {
+  if (!context || (expectedUserId && context.userId !== expectedUserId)) {
     return [] as PublicNoticeProject[];
   }
 
@@ -625,9 +1038,9 @@ async function fetchRemoteManualProjects() {
   return (data || []).map((row) => mapNoticeRowToProject(row)).filter(Boolean) as PublicNoticeProject[];
 }
 
-async function fetchRemoteApplications() {
+async function fetchRemoteApplications(expectedUserId?: string) {
   const context = getSupabaseMemberContext();
-  if (!context) {
+  if (!context || (expectedUserId && context.userId !== expectedUserId)) {
     return [] as UserProjectRecord[];
   }
 
@@ -645,9 +1058,9 @@ async function fetchRemoteApplications() {
   return (data || []).map((row) => mapApplicationRowToRecord(row));
 }
 
-async function fetchRemoteProfile() {
+async function fetchRemoteProfile(expectedUserId?: string) {
   const context = getSupabaseMemberContext();
-  if (!context) {
+  if (!context || (expectedUserId && context.userId !== expectedUserId)) {
     return null;
   }
 
@@ -688,13 +1101,26 @@ async function hydrateWorkspaceFromSupabase() {
 
   if (!hydrateWorkspacePromise) {
     hydrateWorkspacePromise = (async () => {
-      const localManualProjects = readStoredManualProjectsPayload().items;
-      const localApplications = readStoredRecordsPayload().items;
+      const storageOwner: WorkspaceStorageOwner = {
+        kind: 'member',
+        userId: context.userId
+      };
+      const localManualPayload = readStoredManualProjectsPayload(storageOwner);
+      const localApplicationPayload = readStoredRecordsPayload(storageOwner);
+      const localManualProjects = localManualPayload.items;
+      const localApplications = localApplicationPayload.items.filter(
+        (record) => record.userId === context.userId
+      );
       const localProfile = getUserSession()?.profile;
 
+      if (!isActiveWorkspaceMember(context.userId)) {
+        releaseStaleWorkspaceHydration(context.userId);
+        return;
+      }
+
       const pushResults = await Promise.allSettled([
-        upsertRemoteManualProjects(localManualProjects),
-        upsertRemoteApplications(localApplications),
+        upsertRemoteManualProjects(localManualProjects, localManualPayload.owner),
+        upsertRemoteApplications(localApplications, localApplicationPayload.owner),
         upsertRemoteProfile(localProfile)
       ]);
 
@@ -704,10 +1130,15 @@ async function hydrateWorkspaceFromSupabase() {
         }
       });
 
+      if (!isActiveWorkspaceMember(context.userId)) {
+        releaseStaleWorkspaceHydration(context.userId);
+        return;
+      }
+
       const [manualProjectsResult, applicationsResult, profileResult] = await Promise.allSettled([
-        fetchRemoteManualProjects(),
-        fetchRemoteApplications(),
-        fetchRemoteProfile()
+        fetchRemoteManualProjects(context.userId),
+        fetchRemoteApplications(context.userId),
+        fetchRemoteProfile(context.userId)
       ]);
 
       if (manualProjectsResult.status === 'rejected') {
@@ -723,18 +1154,28 @@ async function hydrateWorkspaceFromSupabase() {
       }
 
       const remoteManualProjects = manualProjectsResult.status === 'fulfilled' ? manualProjectsResult.value : [];
-      const remoteApplications = applicationsResult.status === 'fulfilled' ? applicationsResult.value : [];
+      const remoteApplications =
+        applicationsResult.status === 'fulfilled'
+          ? applicationsResult.value.filter((record) => record.userId === context.userId)
+          : [];
       const remoteProfile = profileResult.status === 'fulfilled' ? profileResult.value : null;
+
+      if (!isActiveWorkspaceMember(context.userId)) {
+        releaseStaleWorkspaceHydration(context.userId);
+        return;
+      }
 
       persistStoredManualProjects(
         mergeByKey(remoteManualProjects, localManualProjects, (project) => project.id),
         nowIsoText(),
-        false
+        false,
+        storageOwner
       );
       persistStoredRecords(
         mergeByKey(remoteApplications, localApplications, (record) => record.projectId),
         nowIsoText(),
-        false
+        false,
+        storageOwner
       );
 
       if (remoteProfile && profileHasMeaningfulContent(remoteProfile)) {
@@ -744,6 +1185,75 @@ async function hydrateWorkspaceFromSupabase() {
   }
 
   await hydrateWorkspacePromise;
+}
+
+/**
+ * Performs an explicit, account-scoped round trip for the desktop "Sync now"
+ * action. The regular hydration path is intentionally tolerant so the product
+ * can keep working offline; this strict path instead rejects when any required
+ * application-workspace operation fails so Settings can report an honest
+ * success or error state without navigating to the workbench.
+ */
+export async function synchronizeApplicationWorkspace(expectedUserId: string) {
+  const userId = expectedUserId.trim();
+  const context = getSupabaseMemberContext();
+  if (!userId || !context || context.userId !== userId || !isActiveWorkspaceMember(userId)) {
+    throw new Error('The active workspace account changed before synchronization started.');
+  }
+
+  const storageOwner: WorkspaceStorageOwner = { kind: 'member', userId };
+  const localManualPayload = readStoredManualProjectsPayload(storageOwner);
+  const localApplicationPayload = readStoredRecordsPayload(storageOwner);
+  const localManualProjects = localManualPayload.items;
+  const localApplications = localApplicationPayload.items.filter(
+    (record) => record.userId === userId
+  );
+  const localProfile = getUserSession()?.profile;
+
+  await Promise.all([
+    upsertRemoteManualProjects(localManualProjects, localManualPayload.owner),
+    upsertRemoteApplications(localApplications, localApplicationPayload.owner),
+    upsertRemoteProfile(localProfile)
+  ]);
+
+  if (!isActiveWorkspaceMember(userId)) {
+    throw new Error('The active workspace account changed during synchronization.');
+  }
+
+  const [remoteManualProjects, remoteApplications, remoteProfile] = await Promise.all([
+    fetchRemoteManualProjects(userId),
+    fetchRemoteApplications(userId),
+    fetchRemoteProfile(userId)
+  ]);
+
+  if (!isActiveWorkspaceMember(userId)) {
+    throw new Error('The active workspace account changed during synchronization.');
+  }
+
+  persistStoredManualProjects(
+    mergeByKey(remoteManualProjects, localManualProjects, (project) => project.id),
+    nowIsoText(),
+    false,
+    storageOwner
+  );
+  persistStoredRecords(
+    mergeByKey(
+      remoteApplications.filter((record) => record.userId === userId),
+      localApplications,
+      (record) => record.projectId
+    ),
+    nowIsoText(),
+    false,
+    storageOwner
+  );
+
+  if (remoteProfile && profileHasMeaningfulContent(remoteProfile)) {
+    updateUserProfile(remoteProfile);
+  }
+
+  hydratedWorkspaceUserId = userId;
+  hydrateWorkspacePromise = Promise.resolve();
+  emitApplicationUpdate();
 }
 
 async function readRemotePublicNotices() {
@@ -819,9 +1329,9 @@ export async function fetchPublicNotices(options: { refresh?: boolean } = {}) {
   return publicNoticeCachePromise;
 }
 
-async function getAllProjectsAsync() {
+async function getAllProjectsAsync(owner = getCurrentWorkspaceStorageContext().owner) {
   const noticeProjects = await fetchPublicNotices();
-  const manualProjects = readStoredManualProjects();
+  const manualProjects = readStoredManualProjects(owner);
   const projectMap = new Map<string, PublicNoticeProject>();
 
   [...noticeProjects, ...manualProjects].forEach((project) => {
@@ -846,10 +1356,13 @@ export async function fetchUserProjects() {
   return readStoredRecords();
 }
 
-export async function fetchApplicationRows() {
+export async function fetchApplicationRows(expectedUserId?: string) {
+  const owner: WorkspaceStorageOwner = expectedUserId
+    ? { kind: 'member', userId: expectedUserId }
+    : getCurrentWorkspaceStorageContext().owner;
   await hydrateWorkspaceFromSupabase();
-  const records = readStoredRecords();
-  const projects = await getAllProjectsAsync();
+  const records = readStoredRecords(owner);
+  const projects = await getAllProjectsAsync(owner);
   const projectMap = new Map(projects.map((project) => [project.id, project]));
 
   const rows = records.reduce<ApplicationRow[]>((list, item) => {
@@ -863,9 +1376,36 @@ export async function fetchApplicationRows() {
   return rows.sort((left, right) => left.project.deadlineDate.localeCompare(right.project.deadlineDate));
 }
 
+/**
+ * Reads the account-scoped workspace without waiting for the network hydration
+ * pass. The desktop shell uses this as its cold-start snapshot, then performs a
+ * bounded background revalidation through `fetchApplicationRows`.
+ */
+export function readLocalApplicationRows(expectedUserId: string) {
+  const normalizedUserId = expectedUserId.trim();
+  if (!normalizedUserId) return [];
+
+  const owner: WorkspaceStorageOwner = { kind: 'member', userId: normalizedUserId };
+  const records = readStoredRecords(owner);
+  const projectMap = new Map<string, PublicNoticeProject>();
+
+  [...baseNoticeProjects, ...readStoredManualProjects(owner)].forEach((project) => {
+    projectMap.set(project.id, project);
+  });
+
+  return records
+    .reduce<ApplicationRow[]>((rows, item) => {
+      const project = projectMap.get(item.projectId);
+      if (project) rows.push({ item, project });
+      return rows;
+    }, [])
+    .sort((left, right) => left.project.deadlineDate.localeCompare(right.project.deadlineDate));
+}
+
 export async function addProjectToApplicationTable(projectId: string) {
   await hydrateWorkspaceFromSupabase();
-  const current = readStoredRecords();
+  const storageOwner = getCurrentWorkspaceStorageContext().owner;
+  const current = readStoredRecords(storageOwner);
   const existing = current.find((item) => item.projectId === projectId);
 
   if (existing) {
@@ -874,12 +1414,12 @@ export async function addProjectToApplicationTable(projectId: string) {
 
   await assertApplicationQuota(current.length);
 
-  const created = buildDefaultRecord(projectId);
+  const created = buildDefaultRecord(projectId, getRecordUserIdForOwner(storageOwner));
   const nextRecords = [...current, created];
-  persistStoredRecords(nextRecords);
+  persistStoredRecords(nextRecords, nowIsoText(), true, storageOwner);
 
   try {
-    await upsertRemoteApplications(nextRecords);
+    await upsertRemoteApplications(nextRecords, storageOwner);
   } catch (error) {
     // Keep the user action locally even if the remote sync is temporarily
     // blocked by stale notice mirrors, network issues, or RLS changes.
@@ -889,11 +1429,85 @@ export async function addProjectToApplicationTable(projectId: string) {
   return created;
 }
 
-export async function createManualApplicationEntry(input: ManualProjectInput) {
-  await hydrateWorkspaceFromSupabase();
-  const manualProjects = readStoredManualProjects();
-  const existingRecords = readStoredRecords();
-  await assertApplicationQuota(existingRecords.length);
+function assertManualApplicationMemberOwner(
+  owner: WorkspaceStorageOwner,
+  expectedUserId?: string
+): asserts owner is Extract<WorkspaceStorageOwner, { kind: 'member' }> {
+  const normalizedExpectedUserId = expectedUserId?.trim() || '';
+  const ownerMatchesExpected =
+    !normalizedExpectedUserId ||
+    (owner.kind === 'member' && owner.userId === normalizedExpectedUserId);
+
+  if (
+    owner.kind !== 'member' ||
+    !ownerMatchesExpected ||
+    !isActiveWorkspaceMember(owner.userId)
+  ) {
+    throw new Error('登录账号已发生变化，请重新打开添加窗口后再试。');
+  }
+}
+
+function persistManualApplicationWorkspaceAtomically(
+  owner: Extract<WorkspaceStorageOwner, { kind: 'member' }>,
+  manualProjects: PublicNoticeProject[],
+  records: UserProjectRecord[]
+) {
+  if (!canUseBrowserStorage()) {
+    throw new Error('当前设备无法使用本地存储，请检查系统权限后再试。');
+  }
+
+  const storageKeys = getWorkspaceStorageKeysForOwner(owner);
+  const snapshots = [storageKeys.manualProjects, storageKeys.applications].map((key) => ({
+    key,
+    value: window.localStorage.getItem(key)
+  }));
+  const updatedAt = nowIsoText();
+
+  try {
+    persistStoredManualProjects(manualProjects, updatedAt, false, owner);
+    persistStoredRecords(records, updatedAt, false, owner);
+  } catch (error) {
+    // localStorage has no multi-key transaction. Restore the exact serialized
+    // payloads (including owner/version/timestamps) so observers can never see
+    // a half-created manual application.
+    for (const snapshot of snapshots) {
+      try {
+        if (snapshot.value === null) {
+          window.localStorage.removeItem(snapshot.key);
+        } else {
+          window.localStorage.setItem(snapshot.key, snapshot.value);
+        }
+      } catch (rollbackError) {
+        logWorkspaceSyncWarning('manual-application-local-rollback', rollbackError);
+      }
+    }
+
+    throw error;
+  }
+
+  emitApplicationUpdate();
+}
+
+export async function createManualApplicationEntry(
+  input: ManualProjectInput,
+  expectedUserId?: string
+) {
+  // Capture and verify the account before any quota/network await. Manual
+  // entries are never allowed to fall back to anonymous/local workspace keys.
+  const storageOwner = getCurrentWorkspaceStorageContext().owner;
+  assertManualApplicationMemberOwner(storageOwner, expectedUserId);
+  const recordsAtQuotaCheck = readStoredRecords(storageOwner);
+  await assertApplicationQuota(recordsAtQuotaCheck.length);
+
+  // The user may sign out or switch accounts while quota is being checked.
+  // Re-read the active owner and both durable lists before creating either
+  // scoped payload. A hydration or another local edit may have completed while
+  // the quota request was in flight; using the pre-await snapshot would erase
+  // that newer data.
+  const activeOwner = getCurrentWorkspaceStorageContext().owner;
+  assertManualApplicationMemberOwner(activeOwner, storageOwner.userId);
+  const manualProjects = readStoredManualProjects(storageOwner);
+  const existingRecords = readStoredRecords(storageOwner);
 
   const projectId = `custom-${Date.now()}`;
   const timestamp = nowText();
@@ -918,19 +1532,34 @@ export async function createManualApplicationEntry(input: ManualProjectInput) {
     tags: ['手动录入']
   });
 
-  const record = normalizeRecord({
-    ...buildDefaultRecord(project.id),
-    projectId: project.id
-  });
+  const recordUserId = getRecordUserIdForOwner(storageOwner);
+  const record = normalizeRecord(
+    {
+      ...buildDefaultRecord(project.id, recordUserId),
+      projectId: project.id
+    },
+    recordUserId
+  );
 
   const nextManualProjects = [...manualProjects, project];
   const nextRecords = [...existingRecords, record];
-  persistStoredManualProjects(nextManualProjects);
-  persistStoredRecords(nextRecords);
+  persistManualApplicationWorkspaceAtomically(
+    storageOwner,
+    nextManualProjects,
+    nextRecords
+  );
 
-  await Promise.all([upsertRemoteManualProjects(nextManualProjects), upsertRemoteApplications(nextRecords)]);
+  // Return as soon as the account-scoped local transaction is durable. Remote
+  // synchronization is deliberately detached from the user's submit latency.
+  scheduleManualApplicationWorkspaceSync(storageOwner);
 
-  return { item: record, project };
+  return {
+    item: record,
+    project,
+    ownerUserId: storageOwner.userId,
+    synced: false,
+    syncPending: true
+  };
 }
 
 export async function saveUserProfileToWorkspace(profile: UserProfile) {
@@ -945,13 +1574,15 @@ export async function saveUserProfileToWorkspace(profile: UserProfile) {
 
 export async function updateUserProject(userProjectId: string, patch: Partial<UserProjectRecord>) {
   await hydrateWorkspaceFromSupabase();
-  const current = readStoredRecords();
+  const storageOwner = getCurrentWorkspaceStorageContext().owner;
+  const recordUserId = getRecordUserIdForOwner(storageOwner);
+  const current = readStoredRecords(storageOwner);
   const next = current.map((item) => {
     if (item.userProjectId !== userProjectId) {
       return item;
     }
 
-    let merged = normalizeRecord({ ...item, ...patch });
+    let merged = normalizeRecord({ ...item, ...patch, userId: recordUserId }, recordUserId);
 
     if (hasMaterialChecklistPatch(patch)) {
       merged = {
@@ -970,8 +1601,16 @@ export async function updateUserProject(userProjectId: string, patch: Partial<Us
     return merged;
   });
 
-  persistStoredRecords(next);
-  await upsertRemoteApplications(next);
+  persistStoredRecords(next, nowIsoText(), true, storageOwner);
+  try {
+    await upsertRemoteApplications(next, storageOwner);
+  } catch (error) {
+    // An edit is an explicit user action. If the authoritative account write
+    // fails, restore the exact previous local snapshot as well so the UI,
+    // cache, and next launch cannot falsely claim that the edit was saved.
+    persistStoredRecords(current, nowIsoText(), true, storageOwner);
+    throw error;
+  }
 
   return next.find((item) => item.userProjectId === userProjectId) || null;
 }
@@ -979,27 +1618,28 @@ export async function updateUserProject(userProjectId: string, patch: Partial<Us
 export async function deleteUserProject(userProjectId: string) {
   await hydrateWorkspaceFromSupabase();
 
-  const currentRecords = readStoredRecords();
+  const storageOwner = getCurrentWorkspaceStorageContext().owner;
+  const currentRecords = readStoredRecords(storageOwner);
   const target = currentRecords.find((item) => item.userProjectId === userProjectId);
   if (!target) {
     return false;
   }
 
   const nextRecords = currentRecords.filter((item) => item.userProjectId !== userProjectId);
-  const manualProjects = readStoredManualProjects();
+  const manualProjects = readStoredManualProjects(storageOwner);
   const isManualProject = manualProjects.some((project) => project.id === target.projectId);
   const nextManualProjects = isManualProject
     ? manualProjects.filter((project) => project.id !== target.projectId)
     : manualProjects;
 
-  persistStoredRecords(nextRecords);
+  persistStoredRecords(nextRecords, nowIsoText(), true, storageOwner);
   if (isManualProject) {
-    persistStoredManualProjects(nextManualProjects);
+    persistStoredManualProjects(nextManualProjects, nowIsoText(), true, storageOwner);
   }
 
-  await deleteRemoteApplication(target.projectId);
+  await deleteRemoteApplication(target.projectId, storageOwner);
   if (isManualProject) {
-    await deleteRemoteManualProject(target.projectId);
+    await deleteRemoteManualProject(target.projectId, storageOwner);
   }
 
   return true;

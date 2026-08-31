@@ -16,6 +16,7 @@ const staticRoutes = [
   '/offers',
   '/gpa',
   '/consulting',
+  '/pro',
   '/me',
   '/guide',
   '/faq',

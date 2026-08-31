@@ -93,7 +93,7 @@ export function ExternalSiteMark({
 }: {
   source: string;
   label: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   rounded?: 'full' | 'xl';
   variant?: 'auto' | 'badge' | 'image';
   layout?: 'square' | 'landscape';
@@ -118,6 +118,8 @@ export function ExternalSiteMark({
             : 'h-12 w-[4.5rem] text-base'
       : size === 'sm'
         ? 'h-10 w-10 text-sm'
+        : size === '2xl'
+          ? 'h-28 w-28 text-3xl'
         : size === 'xl'
           ? 'h-[4.5rem] w-[4.5rem] text-2xl'
           : size === 'lg'
@@ -147,6 +149,8 @@ export function ExternalSiteMark({
             : 'text-xs'
       : size === 'sm'
         ? 'text-sm'
+        : size === '2xl'
+          ? 'text-3xl'
         : size === 'xl'
           ? 'text-[1.3rem]'
           : size === 'lg'
@@ -155,7 +159,8 @@ export function ExternalSiteMark({
 
   return (
     <div
-      className={`relative flex ${dimensions} ${radius} items-center justify-center overflow-hidden border border-black/5 shadow-sm`}
+      className={`external-site-mark relative flex ${dimensions} ${radius} items-center justify-center overflow-hidden border border-black/5 shadow-sm`}
+      data-mark-kind={shouldUseImage ? 'image' : 'badge'}
       style={
         shouldUseImage
           ? undefined
@@ -172,7 +177,7 @@ export function ExternalSiteMark({
           fill
           unoptimized
           loading={size === 'sm' ? 'lazy' : 'eager'}
-          sizes={layout === 'landscape' ? '120px' : '72px'}
+          sizes={layout === 'landscape' ? '120px' : size === '2xl' ? '112px' : '72px'}
           className={`object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'} ${
             layout === 'landscape' ? 'p-2.5' : 'p-1.5'
           }`}

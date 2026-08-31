@@ -86,12 +86,12 @@ function normalizeProfile(profile?: Partial<UserProfile>) {
   };
 }
 
-function normalizeProvider(provider?: unknown): AuthProviderType {
-  if (provider === 'otp' || provider === 'anonymous') {
+function normalizeProvider(provider?: unknown): AuthProviderType | null {
+  if (provider === 'password' || provider === 'otp' || provider === 'anonymous') {
     return provider;
   }
 
-  return 'password';
+  return null;
 }
 
 export function normalizeEmailIdentifier(value: string) {
@@ -181,7 +181,12 @@ export function isLoggedInSession(session: UserSession | null | undefined) {
 }
 
 export function isMemberSession(session: UserSession | null | undefined) {
-  return Boolean(session?.loggedIn && session.authProvider !== 'anonymous');
+  return Boolean(
+    session?.loggedIn &&
+      session.authProvider !== 'anonymous' &&
+      typeof session.userId === 'string' &&
+      session.userId.trim()
+  );
 }
 
 export function satisfiesAuthRequirement(
@@ -232,7 +237,7 @@ function formatAuthError(error: unknown, fallback: string) {
   }
 
   if (/supabase|environment variables|missing/.test(message)) {
-    return '网页登录配置暂未完成，请稍后再试或联系 Seekoffer。';
+    return '登录服务配置暂未完成，请稍后再试或联系 Seekoffer。';
   }
 
   if (/invalid login credentials|invalid_credentials/.test(message)) {
@@ -336,9 +341,14 @@ export function getUserSession(): UserSession | null {
       return null;
     }
 
+    const authProvider = normalizeProvider(parsed.authProvider);
+    if (!authProvider) {
+      return null;
+    }
+
     return {
       loggedIn: true,
-      authProvider: normalizeProvider(parsed.authProvider),
+      authProvider,
       profile: normalizeProfile(parsed.profile),
       userId: typeof parsed.userId === 'string' ? parsed.userId : null,
       email: typeof parsed.email === 'string' ? parsed.email : '',
@@ -385,7 +395,13 @@ export async function hydrateSupabaseSession() {
   const current = getUserSession();
 
   if (!isSupabaseConfigured()) {
-    return current;
+    if (current?.authProvider === 'anonymous') {
+      return current;
+    }
+    if (current) {
+      writeUserSession(null);
+    }
+    return null;
   }
 
   try {
@@ -440,7 +456,7 @@ function persistMemberSessionFromUser(user: SupabaseUserLike, provider: AuthProv
 
 export async function signInWithPasswordAccount(payload: CredentialsPayload) {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
+    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const identifier = normalizeIdentifier(payload.identifier);
@@ -470,7 +486,7 @@ export async function signInWithPasswordAccount(payload: CredentialsPayload) {
 
 export async function signUpWithPasswordAccount(payload: CredentialsPayload): Promise<PasswordSignUpResult> {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
+    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const identifier = normalizeIdentifier(payload.identifier);
@@ -536,7 +552,7 @@ export async function signUpWithPasswordAccount(payload: CredentialsPayload): Pr
 
 export async function resendSignupConfirmationCode(email: string) {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
+    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const normalizedEmail = normalizeEmailIdentifier(email);
@@ -566,7 +582,7 @@ export async function resendSignupConfirmationCode(email: string) {
 
 export async function sendPasswordResetEmail(email: string) {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
+    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const normalizedEmail = normalizeEmailIdentifier(email);
@@ -592,7 +608,7 @@ export async function sendPasswordResetEmail(email: string) {
 
 export async function verifySignupConfirmationCode(email: string, token: string) {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
+    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const normalizedEmail = normalizeEmailIdentifier(email);
@@ -627,7 +643,7 @@ export async function verifySignupConfirmationCode(email: string, token: string)
 
 export async function sendEmailLoginCode(email: string, options: EmailLoginCodeOptions = {}) {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
+    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const normalizedEmail = normalizeEmailIdentifier(email);
@@ -659,7 +675,7 @@ export async function sendEmailLoginCode(email: string, options: EmailLoginCodeO
 
 export async function verifyEmailLoginCode(email: string, token: string) {
   if (!isSupabaseConfigured()) {
-    throw new Error('网页登录配置暂未完成，请稍后再试或联系 Seekoffer。');
+    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
   }
 
   const normalizedEmail = normalizeEmailIdentifier(email);

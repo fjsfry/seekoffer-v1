@@ -1,7 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
 import Link from 'next/link';
+import {
+  ArrowSync20Regular,
+  BuildingBank20Regular,
+  Checkmark20Regular,
+  Filter20Regular,
+  Warning20Regular
+} from '@fluentui/react-icons';
 import {
   BellRing,
   ChevronDown,
@@ -9,15 +16,11 @@ import {
   ChevronRight,
   Clock3,
   ExternalLink,
-  Filter,
-  GraduationCap,
   MapPin,
-  RotateCcw,
-  Search,
-  SlidersHorizontal,
-  X
+  Search
 } from 'lucide-react';
 import { ExternalSiteMark } from '@/components/external-site-mark';
+import { DesktopStateSurface } from '@/components/desktop-state-surface';
 import { SiteShell } from '@/components/site-shell';
 import { fetchPublicNotices } from '@/lib/cloudbase-data';
 import { collegeDirectory } from '@/lib/college-directory';
@@ -25,14 +28,27 @@ import { buildCollegeNoticeStats } from '@/lib/notice-analytics';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { baseNoticeProjects } from '@/lib/notice-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
+import styles from './colleges.module.css';
 
 const PAGE_SIZE = 16;
+const COLLEGE_VIEW_STORAGE_KEY = 'seekoffer.desktop.colleges.view.v1';
+const isDesktopSurface = process.env.NEXT_PUBLIC_SEEKOFFER_SURFACE === 'desktop';
 const allCityLabel = '全部城市';
 const allGroupLabel = '全部标签';
 const cityOptions = [allCityLabel, ...Array.from(new Set(collegeDirectory.map((item) => item.city)))];
 const groupOptions = [allGroupLabel, '985', '211', '双一流', 'C9', '华五', '国防七子'];
 const hotCities = ['北京', '上海', '南京', '武汉', '广州', '西安', '成都'];
 type SortOption = 'active' | 'notices' | 'updated' | 'name' | 'city';
+type CollegeNoticeSyncStatus = 'loading' | 'online' | 'stale' | 'fallback';
+type StoredCollegeView = {
+  keyword: string;
+  city: string;
+  group: string;
+  page: number;
+  sortBy: SortOption;
+  showAllCities: boolean;
+  scrollTop: number;
+};
 const sortOptions: Array<{ label: string; value: SortOption }> = [
   { label: '报名中最多', value: 'active' },
   { label: '通知最多', value: 'notices' },
@@ -40,6 +56,31 @@ const sortOptions: Array<{ label: string; value: SortOption }> = [
   { label: '按校名排序', value: 'name' },
   { label: '按城市排序', value: 'city' }
 ];
+
+function readStoredCollegeView(): StoredCollegeView | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const parsed = JSON.parse(window.sessionStorage.getItem(COLLEGE_VIEW_STORAGE_KEY) || 'null') as Partial<StoredCollegeView> | null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const nextSort = sortOptions.some((option) => option.value === parsed.sortBy) ? parsed.sortBy : 'active';
+    return {
+      keyword: typeof parsed.keyword === 'string' ? parsed.keyword.slice(0, 120) : '',
+      city: typeof parsed.city === 'string' && cityOptions.includes(parsed.city) ? parsed.city : allCityLabel,
+      group: typeof parsed.group === 'string' && groupOptions.includes(parsed.group) ? parsed.group : allGroupLabel,
+      page: typeof parsed.page === 'number' && Number.isInteger(parsed.page) && parsed.page > 0 ? parsed.page : 1,
+      sortBy: nextSort || 'active',
+      showAllCities: parsed.showAllCities === true,
+      scrollTop: typeof parsed.scrollTop === 'number' && parsed.scrollTop >= 0 ? parsed.scrollTop : 0
+    };
+  } catch {
+    return null;
+  }
+}
+
+function formatSyncTime(value: Date | null) {
+  if (!value) return '刚刚';
+  return value.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+}
 
 function getVisiblePages(currentPage: number, totalPages: number) {
   const start = Math.max(1, currentPage - 1);
@@ -61,6 +102,264 @@ function getVisiblePages(currentPage: number, totalPages: number) {
   return Array.from(new Set(pages));
 }
 
+type CollegeEntry = (typeof collegeDirectory)[number];
+type CollegeStats = ReturnType<typeof buildCollegeNoticeStats>;
+
+function formatDesktopCollegeDate(value?: string) {
+  if (!value) return '更新时间待补充';
+  const match = value.match(/^\d{4}-(\d{2})-(\d{2})$/);
+  return match ? `${Number(match[1])}月${Number(match[2])}日更新` : `${value} 更新`;
+}
+
+function toggleCollegePopover(trigger: HTMLElement, surface: HTMLElement) {
+  if (surface.matches(':popover-open')) {
+    surface.hidePopover();
+    return;
+  }
+  const rect = trigger.getBoundingClientRect();
+  const gutter = 12;
+  const width = Math.min(420, window.innerWidth - gutter * 2);
+  const estimatedHeight = 470;
+  const left = Math.max(gutter, Math.min(rect.right - width, window.innerWidth - width - gutter));
+  const below = rect.bottom + 6;
+  const top = below + estimatedHeight <= window.innerHeight - gutter
+    ? below
+    : Math.max(gutter, rect.top - estimatedHeight - 6);
+  surface.style.setProperty('--college-popover-left', `${left}px`);
+  surface.style.setProperty('--college-popover-top', `${top}px`);
+  surface.style.setProperty('--college-popover-width', `${width}px`);
+  surface.showPopover();
+}
+
+function closeCollegePopover(surface: HTMLElement | null, trigger?: HTMLElement | null) {
+  if (surface?.matches(':popover-open')) surface.hidePopover();
+  window.requestAnimationFrame(() => trigger?.focus());
+}
+
+function useDismissCollegePopover(surfaceRef: RefObject<HTMLElement | null>, open: boolean) {
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event?: Event) => {
+      if (event?.type === 'scroll' && event.target instanceof Node && surfaceRef.current?.contains(event.target)) return;
+      if (surfaceRef.current?.matches(':popover-open')) surfaceRef.current.hidePopover();
+    };
+    document.addEventListener('scroll', dismiss, true);
+    window.addEventListener('resize', dismiss);
+    return () => {
+      document.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('resize', dismiss);
+    };
+  }, [open, surfaceRef]);
+}
+
+function DesktopCollegeFilters({
+  city,
+  group,
+  sortBy,
+  onCityChange,
+  onGroupChange,
+  onSortChange,
+  onReset
+}: {
+  city: string;
+  group: string;
+  sortBy: SortOption;
+  onCityChange: (value: string) => void;
+  onGroupChange: (value: string) => void;
+  onSortChange: (value: SortOption) => void;
+  onReset: () => void;
+}) {
+  const popoverId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const activeCount = Number(city !== allCityLabel) + Number(group !== allGroupLabel) + Number(sortBy !== 'active');
+  useDismissCollegePopover(surfaceRef, open);
+
+  return (
+    <div className={styles.filterAnchor}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={styles.filterTrigger}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={popoverId}
+        onClick={() => {
+          if (triggerRef.current && surfaceRef.current) toggleCollegePopover(triggerRef.current, surfaceRef.current);
+        }}
+      >
+        <Filter20Regular aria-hidden="true" />
+        筛选
+        {activeCount ? <span>{activeCount}</span> : null}
+        <ChevronDown aria-hidden="true" />
+      </button>
+      <div
+        ref={surfaceRef}
+        id={popoverId}
+        popover="auto"
+        role="dialog"
+        aria-modal="false"
+        aria-label="筛选院校"
+        className={styles.filterPopover}
+        onToggle={(event) => setOpen(event.currentTarget.matches(':popover-open'))}
+        onKeyDown={(event) => {
+          if (event.key !== 'Escape') return;
+          event.preventDefault();
+          event.stopPropagation();
+          closeCollegePopover(surfaceRef.current, triggerRef.current);
+        }}
+      >
+        <header>
+          <strong>筛选院校</strong>
+          <span>按城市和院校层次缩小范围。</span>
+        </header>
+        <div className={styles.filterPopoverBody}>
+          <fieldset>
+            <legend>城市</legend>
+            <div className={styles.cityOptionGrid}>
+              {cityOptions.map((item) => (
+                <button key={item} type="button" aria-pressed={city === item} onClick={() => onCityChange(item)}>
+                  {item}
+                  {city === item ? <Checkmark20Regular aria-hidden="true" /> : null}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>院校标签</legend>
+            <div className={styles.groupOptionGrid}>
+              {groupOptions.map((item) => (
+                <button key={item} type="button" aria-pressed={group === item} onClick={() => onGroupChange(item)}>
+                  {item === allGroupLabel ? '全部' : item}
+                  {group === item ? <Checkmark20Regular aria-hidden="true" /> : null}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>排序方式</legend>
+            <div className={styles.sortOptionGrid}>
+              {sortOptions.map((item) => (
+                <button key={item.value} type="button" aria-pressed={sortBy === item.value} onClick={() => onSortChange(item.value)}>
+                  {item.label}
+                  {sortBy === item.value ? <Checkmark20Regular aria-hidden="true" /> : null}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        </div>
+        <footer>
+          <button type="button" onClick={onReset}>清除筛选</button>
+          <button type="button" onClick={() => closeCollegePopover(surfaceRef.current, triggerRef.current)}>完成</button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function DesktopCollegeCard({ item, stats }: { item: CollegeEntry; stats: CollegeStats }) {
+  const hasActiveNotices = stats.active > 0;
+  const hasSchoolNotices = stats.total > 0;
+  const noticeHref = hasSchoolNotices ? `/notices?school=${encodeURIComponent(item.name)}` : '/notices';
+  const noticeActionLabel = hasActiveNotices
+    ? '查看报名通知'
+    : hasSchoolNotices
+      ? '查看历史通知'
+      : '查看全部通知';
+
+  return (
+    <article className={styles.collegeCard}>
+      <div className={styles.collegeLogo}>
+        <ExternalSiteMark source={item.website} label={item.name} size="2xl" rounded="full" />
+      </div>
+      <div className={styles.collegeIdentity}>
+        <div className={styles.collegeTitleLine}>
+          <h2 title={item.name}>{item.name}</h2>
+          <span className={styles.cityBadge}><MapPin aria-hidden="true" />{item.city}</span>
+          {item.groups.slice(0, 2).map((entry) => <span key={entry} className={styles.groupBadge}>{entry}</span>)}
+        </div>
+        <time dateTime={stats.latestPublishDate || undefined}>
+          <Clock3 aria-hidden="true" />
+          {formatDesktopCollegeDate(stats.latestPublishDate)}
+        </time>
+      </div>
+      <div className={styles.collegeStats} data-active={hasActiveNotices ? 'true' : 'false'} aria-label={`${item.name}通知统计`}>
+        <span className={styles.noticeLabel}><BellRing aria-hidden="true" />报名通知</span>
+        <div className={styles.noticePrimary}>
+          <strong>{stats.active}</strong>
+          <span>条正在报名</span>
+        </div>
+        <div className={styles.noticeSecondary}>
+          <span>共 {stats.total} 条</span>
+        </div>
+      </div>
+      <div className={`${styles.collegeActions} desktop-college-card-actions-final`}>
+        <Link className={styles.noticeAction} data-active={hasActiveNotices ? 'true' : 'false'} href={noticeHref}>
+          {noticeActionLabel}
+          <BellRing aria-hidden="true" />
+        </Link>
+        <a href={item.website} target="_blank" rel="noreferrer">
+          学校官网
+          <ExternalLink aria-hidden="true" />
+        </a>
+      </div>
+    </article>
+  );
+}
+
+function DesktopCollegePagination({
+  currentPage,
+  totalPages,
+  visiblePages,
+  jumpPage,
+  onPageChange,
+  onJumpPageChange,
+  onJump
+}: {
+  currentPage: number;
+  totalPages: number;
+  visiblePages: number[];
+  jumpPage: string;
+  onPageChange: (page: number | ((current: number) => number)) => void;
+  onJumpPageChange: (value: string) => void;
+  onJump: () => void;
+}) {
+  return (
+    <nav className={styles.pagination} aria-label="院校库分页">
+      <span>第 {currentPage} / {totalPages} 页</span>
+      <div>
+        <button type="button" onClick={() => onPageChange((current) => Math.max(1, current - 1))} disabled={currentPage === 1} aria-label="上一页">
+          <ChevronLeft aria-hidden="true" />
+        </button>
+        {visiblePages.map((pageNumber) => (
+          <button
+            key={pageNumber}
+            type="button"
+            aria-current={currentPage === pageNumber ? 'page' : undefined}
+            onClick={() => onPageChange(pageNumber)}
+          >
+            {pageNumber}
+          </button>
+        ))}
+        <button type="button" onClick={() => onPageChange((current) => Math.min(totalPages, current + 1))} disabled={currentPage === totalPages} aria-label="下一页">
+          <ChevronRight aria-hidden="true" />
+        </button>
+      </div>
+      <label>
+        <span className={styles.visuallyHidden}>跳转页码</span>
+        <input
+          value={jumpPage}
+          onChange={(event) => onJumpPageChange(event.target.value.replace(/[^\d]/g, ''))}
+          placeholder="页码"
+          inputMode="numeric"
+        />
+        <button type="button" onClick={onJump}>跳转</button>
+      </label>
+    </nav>
+  );
+}
+
 export default function CollegesPage() {
   const [keyword, setKeyword] = useState('');
   const [city, setCity] = useState(allCityLabel);
@@ -69,30 +368,97 @@ export default function CollegesPage() {
   const [jumpPage, setJumpPage] = useState('');
   const [showAllCities, setShowAllCities] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('active');
+  const [viewRestored, setViewRestored] = useState(false);
+  const [noticeSyncStatus, setNoticeSyncStatus] = useState<CollegeNoticeSyncStatus>('loading');
+  const [noticeSyncAttemptedAt, setNoticeSyncAttemptedAt] = useState<Date | null>(null);
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
     filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
   );
+  const pageRef = useRef<HTMLDivElement>(null);
+  const scrollTopRef = useRef(0);
+  const requestSequenceRef = useRef(0);
+  const hasOnlineSnapshotRef = useRef(false);
   const filterKey = `${keyword.trim().toLowerCase()}|${city}|${group}|${sortBy}`;
 
-  useEffect(() => {
-    let active = true;
-
-    fetchPublicNotices()
-      .then((rows) => {
-        if (active) {
-          setProjects(rows.filter((item) => String(item.year) === '2026'));
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setProjects(filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026'));
-        }
-      });
-
-    return () => {
-      active = false;
-    };
+  const loadProjects = useCallback(async () => {
+    const requestSequence = requestSequenceRef.current + 1;
+    requestSequenceRef.current = requestSequence;
+    setNoticeSyncStatus('loading');
+    setNoticeSyncAttemptedAt(new Date());
+    try {
+      const rows = await fetchPublicNotices({ refresh: true });
+      if (requestSequenceRef.current !== requestSequence) return;
+      setProjects(rows.filter((item) => String(item.year) === '2026'));
+      hasOnlineSnapshotRef.current = true;
+      setNoticeSyncStatus('online');
+    } catch {
+      if (requestSequenceRef.current !== requestSequence) return;
+      if (hasOnlineSnapshotRef.current) {
+        setNoticeSyncStatus('stale');
+      } else {
+        setProjects(filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026'));
+        setNoticeSyncStatus('fallback');
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    void loadProjects();
+    return () => {
+      requestSequenceRef.current += 1;
+    };
+  }, [loadProjects]);
+
+  useEffect(() => {
+    const stored = readStoredCollegeView();
+    if (stored) {
+      setKeyword(stored.keyword);
+      setCity(stored.city);
+      setGroup(stored.group);
+      setSortBy(stored.sortBy);
+      setShowAllCities(stored.showAllCities);
+      setPageState({
+        page: stored.page,
+        filterKey: `${stored.keyword.trim().toLowerCase()}|${stored.city}|${stored.group}|${stored.sortBy}`
+      });
+      scrollTopRef.current = stored.scrollTop;
+    }
+    setViewRestored(true);
+  }, []);
+
+  useEffect(() => {
+    if (!viewRestored) return;
+    const scrollContainer = pageRef.current?.closest<HTMLElement>('.desktop-route-content');
+    if (!scrollContainer) return;
+    const frame = window.requestAnimationFrame(() => {
+      scrollContainer.scrollTop = scrollTopRef.current;
+    });
+    const handleScroll = () => {
+      scrollTopRef.current = scrollContainer.scrollTop;
+      try {
+        window.sessionStorage.setItem(
+          COLLEGE_VIEW_STORAGE_KEY,
+          JSON.stringify({
+            keyword,
+            city,
+            group,
+            page: pageState.filterKey === filterKey ? pageState.page : 1,
+            sortBy,
+            showAllCities,
+            scrollTop: scrollTopRef.current
+          } satisfies StoredCollegeView)
+        );
+      } catch {
+        // View restoration is an enhancement; browsing remains available if storage is unavailable.
+      }
+    };
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      handleScroll();
+      scrollContainer.removeEventListener('scroll', handleScroll);
+    };
+  }, [city, filterKey, group, keyword, pageState, showAllCities, sortBy, viewRestored]);
 
   const collegeStats = useMemo(() => {
     return new Map(collegeDirectory.map((item) => [item.name, buildCollegeNoticeStats(projects, item.name)]));
@@ -163,36 +529,6 @@ export default function CollegesPage() {
   const visiblePages = getVisiblePages(currentPage, totalPages);
   const hasActiveFilters =
     Boolean(keyword.trim()) || city !== allCityLabel || group !== allGroupLabel || sortBy !== 'active';
-  const activeFilterItems = [
-    keyword.trim()
-      ? {
-          key: 'keyword',
-          label: `关键词：${keyword.trim()}`,
-          onClear: () => setKeyword('')
-        }
-      : null,
-    city !== allCityLabel
-      ? {
-          key: 'city',
-          label: `城市：${city}`,
-          onClear: () => setCity(allCityLabel)
-        }
-      : null,
-    group !== allGroupLabel
-      ? {
-          key: 'group',
-          label: `标签：${group}`,
-          onClear: () => setGroup(allGroupLabel)
-        }
-      : null,
-    sortBy !== 'active'
-      ? {
-          key: 'sort',
-          label: `排序：${sortOptions.find((item) => item.value === sortBy)?.label ?? '自定义'}`,
-          onClear: () => setSortBy('active')
-        }
-      : null
-  ].filter(Boolean) as Array<{ key: string; label: string; onClear: () => void }>;
 
   function updatePage(nextPage: number | ((currentPage: number) => number)) {
     setPageState((current) => {
@@ -224,232 +560,60 @@ export default function CollegesPage() {
 
   return (
     <SiteShell>
-      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
-        <div>
-          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">院校库</h1>
-          <p className="mt-4 text-base leading-8 text-slate-600">
-            高频目标院校一页直达，按城市、层次和关键词快速筛选，找到学校后直接回到官网核对。
-          </p>
-        </div>
-
-        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
-          {[
-            { label: '收录院校', value: `${collegeDirectory.length}`, icon: GraduationCap },
-            { label: '关联通知', value: `${projects.length}`, icon: BellRing },
-            {
-              label: '报名中',
-              value: `${Array.from(collegeStats.values()).reduce((sum, item) => sum + item.active, 0)}`,
-              icon: Clock3
-            }
-          ].map((item) => {
-            const Icon = item.icon;
-
-            return (
-              <div key={item.label} className="soft-stat-pill rounded-[28px] px-4 py-4">
-                <div className="flex items-center justify-center gap-3 text-center">
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="whitespace-nowrap text-xs text-slate-500">{item.label}</div>
-                    <div className="whitespace-nowrap text-xl font-semibold text-ink">{item.value}</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="hidden">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-5">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-brand">
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              College Finder
+      <div
+        ref={pageRef}
+        className={`desktop-core-page desktop-core-page--scroll ${isDesktopSurface ? styles.page : 'desktop-college-page'}`}
+      >
+      {isDesktopSurface ? (
+        <>
+        <header className={`${styles.pageHeader} desktop-core-page-header desktop-page-header desktop-page-header--directory`}>
+          <div className={`${styles.headerIdentity} desktop-page-header-copy`}>
+            <div className="desktop-page-header-title-row">
+              <h1 className="desktop-page-header-title">院校库</h1>
+              <span className="desktop-page-header-count" aria-live="polite">共 {filteredColleges.length} 所院校</span>
             </div>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-ink">快速定位目标院校</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              先输入学校、城市或官网域名，再用城市与标签收窄范围。筛选结果会即时刷新，方便你快速回到官网核验。
-            </p>
+            <p className="desktop-page-header-subtitle">按城市、院校层次和关键词快速筛选。</p>
           </div>
-
-          <div className="grid grid-cols-3 overflow-hidden rounded-3xl border border-slate-100 bg-slate-50 text-center text-sm shadow-inner">
-            <div className="min-w-24 px-4 py-3">
-              <div className="text-xl font-semibold text-brand">{filteredColleges.length}</div>
-              <div className="mt-1 text-xs text-slate-400">匹配院校</div>
-            </div>
-            <div className="min-w-24 border-x border-white px-4 py-3">
-              <div className="text-xl font-semibold text-ink">{city === allCityLabel ? '不限' : city}</div>
-              <div className="mt-1 text-xs text-slate-400">当前城市</div>
-            </div>
-            <div className="min-w-24 px-4 py-3">
-              <div className="text-xl font-semibold text-ink">{group === allGroupLabel ? '不限' : group}</div>
-              <div className="mt-1 text-xs text-slate-400">院校标签</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-3 xl:grid-cols-[minmax(0,1fr)_220px_180px]">
-          <label className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 transition focus-within:border-brand/35 focus-within:bg-white focus-within:shadow-soft">
-            <Search className="h-4 w-4 text-slate-400" />
-            <input
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder="搜索学校、城市、官网域名或标签"
-              className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
-              aria-label="搜索院校"
+        </header>
+        <section className={`${styles.toolbar} desktop-college-page-toolbar`} aria-label="搜索与筛选院校">
+          <div className={`${styles.headerControls} desktop-college-page-toolbar-controls`}>
+            <label className={`${styles.searchBox} desktop-college-search`}>
+              <Search aria-hidden="true" />
+              <span className={styles.visuallyHidden}>搜索院校</span>
+              <input
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+                placeholder="搜索院校名称"
+              />
+            </label>
+            <DesktopCollegeFilters
+              city={city}
+              group={group}
+              sortBy={sortBy}
+              onCityChange={setCity}
+              onGroupChange={setGroup}
+              onSortChange={setSortBy}
+              onReset={resetFilters}
             />
-          </label>
-
-          <label className="relative">
-            <select
-              value={group}
-              onChange={(event) => setGroup(event.target.value)}
-              className="h-full w-full appearance-none rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 pr-10 text-sm font-semibold text-slate-700 outline-none transition hover:border-brand/20 focus:border-brand/35"
-              aria-label="选择院校标签"
-            >
-              {groupOptions.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          </label>
-
-          <label className="relative">
-            <select
-              value={sortBy}
-              onChange={(event) => setSortBy(event.target.value as SortOption)}
-              className="h-full w-full appearance-none rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 pr-10 text-sm font-semibold text-slate-700 outline-none transition hover:border-brand/20 focus:border-brand/35"
-              aria-label="选择排序方式"
-            >
-              {sortOptions.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          </label>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand/5 px-4 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand">
-              <Filter className="h-3.5 w-3.5" />
-              已选条件
-            </span>
-            {activeFilterItems.length ? (
-              activeFilterItems.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={item.onClear}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-100 transition hover:text-brand"
-                >
-                  {item.label}
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              ))
-            ) : (
-              <span className="text-xs font-medium text-slate-400">未设置筛选，展示全部院校。</span>
-            )}
           </div>
-
-          <button
-            type="button"
-            onClick={resetFilters}
-            disabled={!hasActiveFilters}
-            className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-slate-500 ring-1 ring-slate-100 transition hover:text-brand disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            重置筛选
-          </button>
-        </div>
-
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        </section>
+        </>
+      ) : (
+        <section className="desktop-core-page-header desktop-college-hero page-hero">
           <div>
-            <div className="mb-3 text-xs font-semibold text-slate-400">热门城市</div>
-            <div className="flex flex-wrap gap-2">
-              {[allCityLabel, ...hotCities].map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setCity(item)}
-                  className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${
-                    city === item ? 'bg-brand text-white shadow-soft' : 'bg-slate-100 text-slate-600 hover:bg-brand/10 hover:text-brand'
-                  }`}
-                >
-                  {item === allCityLabel ? '全部城市' : item}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setShowAllCities((current) => !current)}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-500 transition hover:border-brand hover:text-brand"
-              >
-                更多城市
-                <ChevronDown className={`h-4 w-4 transition ${showAllCities ? 'rotate-180' : ''}`} />
-              </button>
-            </div>
+            <h1>院校库</h1>
+            <p>高频目标院校一页直达，按城市、层次和关键词快速筛选，找到学校后直接回到官网核对。</p>
           </div>
+        </section>
+      )}
 
-          <div>
-            <div className="mb-3 text-xs font-semibold text-slate-400">院校标签</div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setGroup(allGroupLabel)}
-                className={`rounded-full px-3 py-2 text-sm font-semibold transition ${
-                  group === allGroupLabel ? 'bg-brand text-white shadow-soft' : 'bg-slate-100 text-slate-600 hover:bg-brand/10 hover:text-brand'
-                }`}
-              >
-                全部标签
-              </button>
-              {groupOptions.slice(1).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setGroup(item)}
-                  className={`rounded-full px-3 py-2 text-sm font-semibold transition ${
-                    group === item ? 'bg-brand text-white shadow-soft' : 'bg-slate-100 text-slate-600 hover:bg-brand/10 hover:text-brand'
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {showAllCities ? (
-          <div className="mt-4 flex max-h-44 flex-wrap gap-2 overflow-auto rounded-3xl border border-slate-100 bg-slate-50 p-3">
-            {cityOptions
-              .filter((item) => item !== allCityLabel && !hotCities.includes(item))
-              .map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setCity(item)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    city === item ? 'bg-brand text-white' : 'bg-white text-slate-500 hover:text-brand'
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
-          </div>
-        ) : null}
-      </section>
-
-      <section className="product-card rounded-[30px] p-5 lg:p-6">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+      {!isDesktopSurface ? (
+      <section className="desktop-college-toolbar product-card rounded-[30px] p-5 lg:p-6">
+        <div className="desktop-college-toolbar-header mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div className="text-sm font-semibold text-slate-600">
-            共 <span className="text-brand">{filteredColleges.length}</span> 所院校
+            {!isDesktopSurface ? '共 ' : null}<span className="text-brand">{filteredColleges.length}</span> 所院校
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="desktop-college-toolbar-actions flex flex-wrap items-center gap-3">
             <label className="relative">
               <select
                 value={sortBy}
@@ -468,32 +632,35 @@ export default function CollegesPage() {
             <button
               type="button"
               onClick={resetFilters}
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-brand hover:text-brand"
+              disabled={!hasActiveFilters}
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-45"
             >
               重置
             </button>
           </div>
         </div>
         <div>
-          <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+          <div className="desktop-college-search flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3">
             <Search className="h-4 w-4 text-slate-400" />
             <input
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
               placeholder="搜索学校、城市、官网域名或标签"
               className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+              aria-label="搜索院校"
             />
           </div>
 
         </div>
 
-        <div className="mt-6">
-          <div className="mb-3 text-xs font-semibold text-slate-400">热门城市</div>
-          <div className="flex flex-wrap gap-2">
+        <div className="desktop-college-filter-group mt-6">
+          <div className="desktop-college-filter-label mb-3 text-xs font-semibold text-slate-400">热门城市</div>
+          <div className="desktop-college-filter-options flex flex-wrap gap-2">
             {[allCityLabel, ...hotCities].map((item) => (
               <button
                 key={item}
                 onClick={() => setCity(item)}
+                aria-pressed={city === item}
                 className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${
                   city === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-brand/8 hover:text-brand'
                 }`}
@@ -504,6 +671,8 @@ export default function CollegesPage() {
             <button
               type="button"
               onClick={() => setShowAllCities((current) => !current)}
+              aria-expanded={showAllCities}
+              aria-controls="desktop-college-more-cities"
               className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-500 hover:border-brand hover:text-brand"
             >
               更多城市
@@ -511,13 +680,14 @@ export default function CollegesPage() {
             </button>
           </div>
           {showAllCities ? (
-            <div className="mt-3 flex max-h-40 flex-wrap gap-2 overflow-auto rounded-2xl bg-slate-50 p-3">
+            <div id="desktop-college-more-cities" className="desktop-college-more-cities mt-3 flex max-h-40 flex-wrap gap-2 overflow-auto rounded-2xl bg-slate-50 p-3">
               {cityOptions
                 .filter((item) => item !== allCityLabel && !hotCities.includes(item))
                 .map((item) => (
                   <button
                     key={item}
                     onClick={() => setCity(item)}
+                    aria-pressed={city === item}
                     className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                       city === item ? 'bg-brand text-white' : 'bg-white text-slate-500 hover:text-brand'
                     }`}
@@ -529,13 +699,14 @@ export default function CollegesPage() {
           ) : null}
         </div>
 
-        <div className="mt-6">
-          <div className="mb-3 text-xs font-semibold text-slate-400">院校标签</div>
-          <div className="flex flex-wrap gap-2">
+        <div className="desktop-college-filter-group mt-6">
+          <div className="desktop-college-filter-label mb-3 text-xs font-semibold text-slate-400">院校标签</div>
+          <div className="desktop-college-filter-options flex flex-wrap gap-2">
             {groupOptions.slice(1).map((item) => (
               <button
                 key={item}
                 onClick={() => setGroup(item)}
+                aria-pressed={group === item}
                 className={`rounded-full px-3 py-2 text-sm font-semibold transition ${
                   group === item ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600'
                 }`}
@@ -545,6 +716,7 @@ export default function CollegesPage() {
             ))}
             <button
               onClick={() => setGroup(allGroupLabel)}
+              aria-pressed={group === allGroupLabel}
               className={`rounded-full px-3 py-2 text-sm font-semibold transition ${
                 group === allGroupLabel ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600'
               }`}
@@ -554,49 +726,78 @@ export default function CollegesPage() {
           </div>
         </div>
       </section>
+      ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      {!isDesktopSurface && noticeSyncStatus === 'loading' ? (
+        <DesktopStateSurface
+          variant="inline"
+          loading
+          ariaBusy
+          icon={<ArrowSync20Regular />}
+          title="正在同步院校通知"
+          detail="列表保持可用，最新统计同步完成后会自动更新。"
+        />
+      ) : noticeSyncStatus === 'stale' || noticeSyncStatus === 'fallback' ? (
+        <DesktopStateSurface
+          variant="inline"
+          tone="stale"
+          icon={<Warning20Regular />}
+          title={noticeSyncStatus === 'stale' ? '本次刷新失败' : '当前显示本地院校数据'}
+          detail={noticeSyncStatus === 'stale'
+            ? `继续展示上次同步成功的院校统计。上次尝试 ${formatSyncTime(noticeSyncAttemptedAt)}。`
+            : `在线通知暂时不可用；本地数据可以继续浏览。上次尝试 ${formatSyncTime(noticeSyncAttemptedAt)}。`}
+          action={(
+            <button type="button" className="desktop-setting-secondary-button" onClick={() => void loadProjects()}>
+              重新同步
+            </button>
+          )}
+        />
+      ) : null}
+
+      {isDesktopSurface ? (
+        <section className={styles.collegeGrid} aria-label="院校筛选结果">
+          {pagedColleges.map((item) => (
+            <DesktopCollegeCard
+              key={item.name}
+              item={item}
+              stats={collegeStats.get(item.name) || buildCollegeNoticeStats(projects, item.name)}
+            />
+          ))}
+        </section>
+      ) : (
+      <section className="desktop-college-grid grid gap-4 xl:grid-cols-2" aria-label="院校筛选结果">
         {pagedColleges.map((item) => {
           const stats = collegeStats.get(item.name) || buildCollegeNoticeStats(projects, item.name);
 
           return (
             <article
               key={item.name}
-              className="surface-card rounded-[26px] p-5 transition hover:-translate-y-1 hover:border-brand/15 hover:shadow-soft"
+              className="desktop-college-card surface-card rounded-[26px] p-5 transition"
             >
               <div className="flex items-start gap-4">
                 <ExternalSiteMark source={item.website} label={item.name} size="lg" rounded="full" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+                  <div className="desktop-college-card-tags flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
                     <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-brand">
                       <MapPin className="h-3.5 w-3.5" />
                       {item.city}
                     </span>
-                    {item.groups.slice(0, 4).map((entry) => (
+                    {item.groups.slice(0, 1).map((entry) => (
                       <span key={entry} className="rounded-full bg-brand/10 px-3 py-1 text-brand">
                         {entry}
                       </span>
                     ))}
                     {stats.latestPublishDate ? (
-                      <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">最近更新 {stats.latestPublishDate}</span>
+                      <small>最近更新 {stats.latestPublishDate}</small>
                     ) : null}
                   </div>
-                  <div className="mt-4 text-2xl font-semibold tracking-tight text-ink">{item.name}</div>
-                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-                    {[
-                      ['总通知', stats.total],
-                      ['报名中', stats.active],
-                      ['夏令营', stats.summer],
-                      ['预推免', stats.pre],
-                      ['近7天', stats.nearDeadline]
-                    ].map(([label, value]) => (
-                      <div key={label} className="rounded-2xl bg-slate-50 px-3 py-3 text-center">
-                        <div className="text-lg font-semibold leading-none text-brand">{value}</div>
-                        <div className="mt-1 text-[11px] font-medium text-slate-500">{label}</div>
-                      </div>
-                    ))}
+                  <div className="desktop-college-card-title">{item.name}</div>
+                  <div className="desktop-college-card-summary" aria-label={`${item.name}通知摘要`}>
+                    <span><strong>{stats.active}</strong> 报名中</span>
+                    <span><strong>{stats.total}</strong> 条通知</span>
+                    <span><strong>{stats.nearDeadline}</strong> 条近 7 天截止</span>
                   </div>
-                  <div className="mt-5 flex flex-wrap gap-3">
+                  <div className="desktop-college-card-actions">
                     <Link
                       href={`/notices?school=${encodeURIComponent(item.name)}`}
                       className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-deep"
@@ -620,15 +821,51 @@ export default function CollegesPage() {
           );
         })}
       </section>
+      )}
 
       {!pagedColleges.length ? (
-        <section className="surface-card rounded-[30px] px-6 py-12 text-center text-sm text-slate-500">
-          当前筛选条件下没有匹配院校，换一个城市、标签或关键词试试看。
-        </section>
+        isDesktopSurface ? (
+        <div className={styles.emptyResult}>
+          <DesktopStateSurface
+            variant="section"
+            icon={<BuildingBank20Regular />}
+            title="没有找到匹配院校"
+            detail="可以换一个城市、院校标签或关键词，也可以清除当前筛选。"
+            action={hasActiveFilters ? (
+              <button type="button" className="desktop-setting-secondary-button" onClick={resetFilters}>
+                清除筛选
+              </button>
+            ) : undefined}
+          />
+        </div>
+        ) : (
+          <DesktopStateSurface
+            variant="section"
+            icon={<BuildingBank20Regular />}
+            title="没有找到匹配院校"
+            detail="可以换一个城市、院校标签或关键词，也可以清除当前筛选。"
+            action={hasActiveFilters ? (
+              <button type="button" className="desktop-setting-secondary-button" onClick={resetFilters}>
+                清除筛选
+              </button>
+            ) : undefined}
+          />
+        )
       ) : null}
 
       {filteredColleges.length ? (
-        <section className="rounded-[30px] bg-white px-5 py-6 shadow-soft">
+        isDesktopSurface ? (
+          <DesktopCollegePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            visiblePages={visiblePages}
+            jumpPage={jumpPage}
+            onPageChange={updatePage}
+            onJumpPageChange={setJumpPage}
+            onJump={handleJumpPage}
+          />
+        ) : (
+        <section className="desktop-route-pagination rounded-[30px] bg-white px-5 py-6 shadow-soft">
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={() => updatePage((current) => Math.max(1, current - 1))}
@@ -664,6 +901,8 @@ export default function CollegesPage() {
               value={jumpPage}
               onChange={(event) => setJumpPage(event.target.value.replace(/[^\d]/g, ''))}
               placeholder="页码"
+              inputMode="numeric"
+              aria-label="跳转页码"
               className="h-12 w-28 rounded-2xl border border-black/5 px-4 text-center text-sm outline-none"
             />
             <button onClick={handleJumpPage} className="h-12 rounded-2xl bg-brand px-5 text-sm font-semibold text-white">
@@ -671,7 +910,9 @@ export default function CollegesPage() {
             </button>
           </div>
         </section>
+        )
       ) : null}
+      </div>
     </SiteShell>
   );
 }

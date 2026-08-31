@@ -1,0 +1,872 @@
+name: Publish SeekOffer desktop update
+
+on:
+  push:
+    tags:
+      - 'desktop-v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing desktop-vX.Y.Z tag to publish'
+        required: true
+        type: string
+
+concurrency:
+  group: desktop-stable-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Verify release source
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      channel: ${{ steps.metadata.outputs.channel }}
+      prerelease: ${{ steps.metadata.outputs.prerelease }}
+      release_tag: ${{ steps.metadata.outputs.release_tag }}
+      release_commit: ${{ steps.metadata.outputs.release_commit }}
+      current_stable_version: ${{ steps.metadata.outputs.current_stable_version }}
+      version: ${{ steps.metadata.outputs.version }}
+    steps:
+      - name: Refuse private update repositories
+        shell: bash
+        env:
+          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          if [ "$REPOSITORY_PRIVATE" = 'true' ]; then
+            echo 'Desktop updater assets must remain publicly downloadable.' >&2
+            exit 1
+          fi
+
+      - name: Checkout repository before tag verification
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Resolve and validate release metadata
+        id: metadata
+        shell: bash
+        env:
+          DISPATCH_TAG: ${{ inputs.release_tag }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          STABLE_MANIFEST_URL: https://seekoffer-desktop-updates.vercel.app/stable/latest.json
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = 'workflow_dispatch' ]; then
+            release_tag="$DISPATCH_TAG"
+          else
+            release_tag="$REF_NAME"
+          fi
+          if [[ ! "$release_tag" =~ ^desktop-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid Stable desktop tag: $release_tag" >&2
+            exit 1
+          fi
+
+          git fetch --force --tags --prune --prune-tags origin
+          tag_ref="refs/tags/$release_tag"
+          git show-ref --verify --quiet "$tag_ref" || {
+            echo "The requested release ref is not an existing Git tag: $tag_ref" >&2
+            exit 1
+          }
+          release_commit="$(git rev-parse "$tag_ref^{commit}")"
+          if [[ ! "$release_commit" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'The release tag did not resolve to one immutable commit.' >&2
+            exit 1
+          fi
+          git checkout --detach "$release_commit"
+          test "$(git rev-parse HEAD)" = "$release_commit" || {
+            echo 'The checked out source does not match the verified release tag commit.' >&2
+            exit 1
+          }
+
+          version="$(node -p "require('./package.json').version")"
+          channel='stable'
+
+          VERSION="$version" RELEASE_TAG="$release_tag" RELEASE_CHANNEL="$channel" \
+            node --input-type=module -e "
+              import {
+                validateDesktopReleaseTag,
+                validateReleaseChannel
+              } from './scripts/desktop-update-manifest.mjs';
+              validateReleaseChannel(process.env.RELEASE_CHANNEL, process.env.VERSION);
+              validateDesktopReleaseTag(process.env.RELEASE_TAG, process.env.VERSION, {
+                required: true
+              });
+            "
+
+          expected_tag="desktop-v${version}"
+          if [ "$release_tag" != "$expected_tag" ]; then
+            echo "Release tag mismatch: got $release_tag, expected $expected_tag" >&2
+            exit 1
+          fi
+          if [[ "$version" == *-* ]]; then
+            echo "Stable channel cannot publish prerelease version $version" >&2
+            exit 1
+          fi
+          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+            echo 'Release checkout is not clean.' >&2
+            exit 1
+          fi
+
+          stable_manifest="$(mktemp)"
+          trap 'rm -f "$stable_manifest"' EXIT
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+            --max-time 30 --output "$stable_manifest" "$STABLE_MANIFEST_URL"
+          current_stable_version="$(
+            VERSION="$version" STABLE_MANIFEST_PATH="$stable_manifest" \
+              node --input-type=module -e "
+                import { readFileSync } from 'node:fs';
+                import {
+                  assertStableDesktopUpgrade,
+                  validateDesktopUpdateManifest
+                } from './scripts/desktop-update-manifest.mjs';
+                const current = JSON.parse(readFileSync(process.env.STABLE_MANIFEST_PATH, 'utf8'));
+                validateDesktopUpdateManifest(current);
+                assertStableDesktopUpgrade(process.env.VERSION, current.version);
+                process.stdout.write(current.version);
+              "
+          )"
+
+          prerelease='false'
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "release_commit=$release_commit" >> "$GITHUB_OUTPUT"
+          echo "current_stable_version=$current_stable_version" >> "$GITHUB_OUTPUT"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+      - name: Install locked frontend dependencies
+        run: npm ci
+
+      - name: Audit locked dependency graph
+        run: npm audit --registry=https://registry.npmjs.org --audit-level=high
+
+      - name: Run release contract tests
+        run: >-
+          npx vitest run
+          tests/desktop-package-release.test.mjs
+          tests/desktop-authenticode-release.test.mjs
+          tests/desktop-update-manifest.test.mjs
+
+      - name: Run desktop release source suite
+        run: npm run test:desktop-release
+
+      - name: Lint application
+        run: npm run lint
+
+      - name: Type-check application
+        run: npm run typecheck
+
+  compile:
+    name: Compile unsigned Windows application
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 90
+    environment:
+      name: desktop-${{ needs.prepare.outputs.channel }}
+    env:
+      SEEKOFFER_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      SEEKOFFER_RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
+      SEEKOFFER_RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+      SEEKOFFER_CURRENT_STABLE_VERSION: ${{ needs.prepare.outputs.current_stable_version }}
+      SEEKOFFER_REQUIRE_RELEASE_TAG: 'true'
+      SEEKOFFER_REQUIRE_CLEAN_SOURCE: 'true'
+      SEEKOFFER_REQUIRE_PUBLIC_REPOSITORY: 'true'
+      SEEKOFFER_REPOSITORY_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - name: Checkout exact release tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_commit }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+
+      - name: Install locked frontend dependencies
+        run: npm ci
+
+      - name: Require public desktop authentication configuration
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:NEXT_PUBLIC_SUPABASE_URL)) {
+            throw 'NEXT_PUBLIC_SUPABASE_URL is not configured in the protected release environment.'
+          }
+          if (
+            [string]::IsNullOrWhiteSpace($env:NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) -and
+            [string]::IsNullOrWhiteSpace($env:NEXT_PUBLIC_SUPABASE_ANON_KEY)
+          ) {
+            throw 'A public Supabase publishable or legacy anon key is required for the desktop export.'
+          }
+
+      - name: Verify locked Rust dependencies
+        shell: pwsh
+        run: |
+          cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+          cargo test --manifest-path src-tauri/Cargo.toml --locked
+
+      - name: Compile desktop application without signing secrets
+        shell: pwsh
+        run: npm run desktop:compile
+
+      - name: Bind unsigned compile payload to the release tag
+        shell: pwsh
+        run: |
+          $executable = (Resolve-Path -LiteralPath 'src-tauri/target/release/seekoffer-desktop.exe').Path
+          $frontendFiles = @(Get-ChildItem -LiteralPath '.next-desktop' -File -Recurse | Sort-Object FullName)
+          if ($frontendFiles.Count -lt 1) {
+            throw 'The desktop frontend export is empty.'
+          }
+          $frontendHashLines = foreach ($file in $frontendFiles) {
+            $relativePath = [IO.Path]::GetRelativePath((Resolve-Path '.').Path, $file.FullName).Replace('\', '/')
+            "$((Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash)  $relativePath"
+          }
+          $frontendDigest = [Convert]::ToHexString(
+            [Security.Cryptography.SHA256]::HashData(
+              [Text.Encoding]::UTF8.GetBytes(($frontendHashLines -join "`n"))
+            )
+          )
+          $compileManifest = [ordered]@{
+            schemaVersion = 1
+            version = $env:SEEKOFFER_RELEASE_VERSION
+            releaseTag = $env:SEEKOFFER_RELEASE_TAG
+            revision = (git rev-parse HEAD).Trim()
+            executableSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $executable).Hash
+            frontendFileCount = $frontendFiles.Count
+            frontendSha256 = $frontendDigest
+          }
+          $compileManifest | ConvertTo-Json | Set-Content -LiteralPath 'desktop-compile-manifest.json' -Encoding utf8
+
+      - name: Upload unsigned compile payload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: seekoffer-desktop-unsigned-${{ needs.prepare.outputs.version }}
+          path: |
+            .next-desktop
+            src-tauri/target/release/seekoffer-desktop.exe
+            desktop-compile-manifest.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 2
+
+  build:
+    name: Bundle and sign Windows updater
+    needs:
+      - prepare
+      - compile
+    runs-on: windows-latest
+    timeout-minutes: 120
+    environment:
+      name: desktop-${{ needs.prepare.outputs.channel }}
+    env:
+      SEEKOFFER_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      SEEKOFFER_RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
+      SEEKOFFER_RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+      SEEKOFFER_CURRENT_STABLE_VERSION: ${{ needs.prepare.outputs.current_stable_version }}
+      SEEKOFFER_REQUIRE_RELEASE_TAG: 'true'
+      SEEKOFFER_REQUIRE_CLEAN_SOURCE: 'true'
+      SEEKOFFER_REQUIRE_PUBLIC_REPOSITORY: 'true'
+      SEEKOFFER_REPOSITORY_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
+      SEEKOFFER_REQUIRE_VALID_AUTHENTICODE: 'true'
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - name: Checkout exact release tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_commit }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+
+      - name: Install locked bundle dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+
+      - name: Download unsigned compile payload from the isolated compile job
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: seekoffer-desktop-unsigned-${{ needs.prepare.outputs.version }}
+          path: ${{ runner.temp }}/seekoffer-unsigned-payload
+
+      - name: Verify and restore unsigned compile payload
+        shell: pwsh
+        env:
+          UNSIGNED_PAYLOAD_DIR: ${{ runner.temp }}/seekoffer-unsigned-payload
+        run: |
+          $payloadRoot = (Resolve-Path -LiteralPath $env:UNSIGNED_PAYLOAD_DIR).Path
+          $compileManifestPath = Join-Path $payloadRoot 'desktop-compile-manifest.json'
+          $compileManifest = Get-Content -LiteralPath $compileManifestPath -Raw | ConvertFrom-Json
+          if (
+            $compileManifest.version -ne $env:SEEKOFFER_RELEASE_VERSION -or
+            $compileManifest.releaseTag -ne $env:SEEKOFFER_RELEASE_TAG -or
+            $compileManifest.revision -ne (git rev-parse HEAD).Trim()
+          ) {
+            throw 'Unsigned compile payload does not match the immutable release source.'
+          }
+
+          $payloadExecutable = Join-Path $payloadRoot 'src-tauri/target/release/seekoffer-desktop.exe'
+          $actualExecutableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $payloadExecutable).Hash
+          if ($actualExecutableHash -ne $compileManifest.executableSha256) {
+            throw 'Unsigned desktop executable hash does not match its compile manifest.'
+          }
+          $payloadFrontend = Join-Path $payloadRoot '.next-desktop'
+          $frontendFiles = @(Get-ChildItem -LiteralPath $payloadFrontend -File -Recurse | Sort-Object FullName)
+          if ($frontendFiles.Count -ne $compileManifest.frontendFileCount) {
+            throw 'Unsigned desktop frontend file count does not match its compile manifest.'
+          }
+          $frontendHashLines = foreach ($file in $frontendFiles) {
+            $relativePath = [IO.Path]::GetRelativePath($payloadRoot, $file.FullName).Replace('\', '/')
+            "$((Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash)  $relativePath"
+          }
+          $frontendDigest = [Convert]::ToHexString(
+            [Security.Cryptography.SHA256]::HashData(
+              [Text.Encoding]::UTF8.GetBytes(($frontendHashLines -join "`n"))
+            )
+          )
+          if ($frontendDigest -ne $compileManifest.frontendSha256) {
+            throw 'Unsigned desktop frontend hash does not match its compile manifest.'
+          }
+
+          Copy-Item -LiteralPath $payloadFrontend -Destination '.next-desktop' -Recurse -Force
+          New-Item -ItemType Directory -Path 'src-tauri/target/release' -Force | Out-Null
+          Copy-Item -LiteralPath $payloadExecutable -Destination 'src-tauri/target/release/seekoffer-desktop.exe' -Force
+
+      - name: Prepare protected Authenticode certificate
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          SEEKOFFER_AUTHENTICODE_EXPECTED_THUMBPRINT: ${{ vars.WINDOWS_CERTIFICATE_THUMBPRINT }}
+          SEEKOFFER_AUTHENTICODE_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
+        run: ./scripts/prepare-windows-signing-certificate.ps1
+
+      - name: Build Tauri-signed and Authenticode-signed NSIS update artifact
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          SEEKOFFER_AUTHENTICODE_PFX_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+            throw 'TAURI_SIGNING_PRIVATE_KEY is not configured in the protected release environment.'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)) {
+            throw 'TAURI_SIGNING_PRIVATE_KEY_PASSWORD is not configured in the protected release environment.'
+          }
+          npm run desktop:bundle
+          if ($LASTEXITCODE -ne 0) {
+            throw "Desktop bundling failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Verify Authenticode signing coverage
+        shell: pwsh
+        run: |
+          $expectedThumbprint = ($env:SEEKOFFER_AUTHENTICODE_EXPECTED_THUMBPRINT -replace '\s', '').ToUpperInvariant()
+          if ($expectedThumbprint -notmatch '^[0-9A-F]{40}$') {
+            throw 'The protected Authenticode thumbprint is invalid.'
+          }
+          $records = @(
+            Get-Content -LiteralPath $env:SEEKOFFER_AUTHENTICODE_AUDIT_LOG |
+              ForEach-Object { $_ | ConvertFrom-Json }
+          )
+          if ($records.Count -lt 2) {
+            throw 'Tauri did not report enough Authenticode-signed artifacts.'
+          }
+          $tauri = Get-Content -LiteralPath src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $installerName = "$($tauri.productName)_$($tauri.version)_x64-setup.exe"
+          foreach ($record in $records) {
+            if ($record.status -ne 'Valid' -or -not $record.timestamped) {
+              throw "Invalid or untimestamped Authenticode audit entry: $($record.file)"
+            }
+            if ($record.thumbprint -ne $expectedThumbprint) {
+              throw "Unexpected Authenticode certificate in audit entry: $($record.file)"
+            }
+            if (
+              [string]::IsNullOrWhiteSpace($record.path) -or
+              [string]::IsNullOrWhiteSpace($record.evidencePath) -or
+              $record.sha256 -notmatch '^[0-9A-F]{64}$'
+            ) {
+              throw "Incomplete Authenticode audit entry: $($record.file)"
+            }
+          }
+
+          $requiredArtifacts = @(
+            (Resolve-Path -LiteralPath 'src-tauri/target/release/seekoffer-desktop.exe').Path,
+            (Resolve-Path -LiteralPath (Join-Path 'src-tauri/target/release/bundle/nsis' $installerName)).Path
+          )
+          $signedMainEvidence = $null
+          foreach ($artifactPath in $requiredArtifacts) {
+            $matchingRecords = @($records | Where-Object { $_.path -eq $artifactPath })
+            if ($matchingRecords.Count -ne 1) {
+              throw "Expected exactly one Authenticode audit record for $artifactPath; found $($matchingRecords.Count)."
+            }
+            $recordedHash = $matchingRecords[0].sha256.ToUpperInvariant()
+            $evidencePath = (Resolve-Path -LiteralPath $matchingRecords[0].evidencePath).Path
+            $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $evidencePath).Hash
+            if ($recordedHash -ne $actualHash) {
+              throw "Authenticode audit hash mismatch for $evidencePath."
+            }
+
+            $signature = Get-AuthenticodeSignature -LiteralPath $evidencePath
+            $actualThumbprint = if ($null -ne $signature.SignerCertificate) {
+              ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
+            } else {
+              ''
+            }
+            if ($signature.Status -ne 'Valid') {
+              throw "Final artifact is not Authenticode-valid: $evidencePath ($($signature.Status))."
+            }
+            if ($actualThumbprint -ne $expectedThumbprint) {
+              throw "Final artifact certificate does not match the pinned thumbprint: $evidencePath."
+            }
+            if ($null -eq $signature.TimeStamperCertificate) {
+              throw "Final artifact is missing its trusted timestamp: $evidencePath."
+            }
+            if ([IO.Path]::GetFileName($artifactPath) -ieq 'seekoffer-desktop.exe') {
+              $signedMainEvidence = $evidencePath
+            }
+          }
+
+          $temporaryUninstallerRecords = @(
+            $records | Where-Object { [IO.Path]::GetExtension($_.path) -eq '.tmp' }
+          )
+          if ($temporaryUninstallerRecords.Count -lt 1) {
+            throw 'Tauri did not report an Authenticode-signed temporary NSIS uninstaller.'
+          }
+          foreach ($record in $temporaryUninstallerRecords) {
+            $evidencePath = (Resolve-Path -LiteralPath $record.evidencePath).Path
+            if ((Get-FileHash -Algorithm SHA256 -LiteralPath $evidencePath).Hash -ne $record.sha256) {
+              throw "Temporary NSIS uninstaller evidence hash mismatch: $evidencePath."
+            }
+            $signature = Get-AuthenticodeSignature -LiteralPath $evidencePath
+            $actualThumbprint = ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
+            if (
+              $signature.Status -ne 'Valid' -or
+              $actualThumbprint -ne $expectedThumbprint -or
+              $null -eq $signature.TimeStamperCertificate
+            ) {
+              throw "Temporary NSIS uninstaller evidence is not trusted: $evidencePath."
+            }
+          }
+
+          if ([string]::IsNullOrWhiteSpace($signedMainEvidence)) {
+            throw 'The signed patched desktop executable evidence was not preserved.'
+          }
+          $persistentEvidenceDirectory = 'src-tauri/target/release/authenticode-evidence'
+          New-Item -ItemType Directory -Path $persistentEvidenceDirectory -Force | Out-Null
+          Copy-Item -LiteralPath $signedMainEvidence `
+            -Destination (Join-Path $persistentEvidenceDirectory 'seekoffer-desktop.exe') `
+            -Force
+
+      - name: Remove protected Authenticode certificate material
+        if: always()
+        shell: pwsh
+        run: |
+          if (-not [string]::IsNullOrWhiteSpace($env:SEEKOFFER_AUTHENTICODE_TEMP_DIR)) {
+            $runnerTemp = (Resolve-Path -LiteralPath $env:RUNNER_TEMP).Path.TrimEnd('\')
+            $candidate = (Resolve-Path -LiteralPath $env:SEEKOFFER_AUTHENTICODE_TEMP_DIR -ErrorAction SilentlyContinue).Path
+            $expectedPrefix = "$runnerTemp\seekoffer-authenticode-"
+            if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+              if (-not $candidate.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Refusing to remove unexpected Authenticode directory: $candidate"
+              }
+              Remove-Item -LiteralPath $candidate -Recurse -Force
+            }
+          }
+
+      - name: Package and validate updater release
+        shell: pwsh
+        run: npm run desktop:package
+
+      - name: Upload validated release bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: seekoffer-desktop-${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.channel }}
+          path: |
+            releases/seekoffer-desktop/v${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.channel }}/public
+            releases/seekoffer-desktop/v${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.channel }}/internal/build-info.json
+            releases/seekoffer-desktop/v${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.channel }}/internal/signed-seekoffer-desktop.exe
+            releases/seekoffer-desktop/v${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.channel }}/updater-site
+          if-no-files-found: error
+          retention-days: 14
+
+  verify:
+    name: Reverify downloaded Windows release
+    needs:
+      - prepare
+      - build
+    runs-on: windows-latest
+    timeout-minutes: 45
+    environment:
+      name: desktop-${{ needs.prepare.outputs.channel }}
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.release_commit }}
+      REPOSITORY: ${{ github.repository }}
+      EXPECTED_THUMBPRINT: ${{ vars.WINDOWS_CERTIFICATE_THUMBPRINT }}
+    steps:
+      - name: Download validated bundle into a fresh runner
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: seekoffer-desktop-${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.channel }}
+          path: release-bundle
+
+      - name: Checkout immutable verifier sources
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_commit }}
+          path: release-source
+          sparse-checkout: |
+            scripts/desktop-update-manifest.mjs
+            src-tauri/**
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Rust verifier
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+
+      - name: Setup Node.js verifier
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Reverify hashes, updater signature and Authenticode
+        shell: pwsh
+        run: |
+          $publicDirectory = Get-ChildItem -LiteralPath release-bundle -Directory -Recurse |
+            Where-Object { $_.Name -eq 'public' } |
+            Select-Object -First 1
+          if ($null -eq $publicDirectory) {
+            throw 'Downloaded release artifact does not contain a public directory.'
+          }
+          $installer = Join-Path $publicDirectory.FullName "SeekOffer-Desktop-v$env:VERSION-Windows-x64-Setup.exe"
+          $signatureFile = "$installer.sig"
+          $manifest = Join-Path $publicDirectory.FullName 'latest.json'
+          $checksumFile = Join-Path $publicDirectory.FullName 'SHA256SUMS.txt'
+          foreach ($requiredFile in @($installer, $signatureFile, $manifest, $checksumFile)) {
+            if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
+              throw "Downloaded release is missing $requiredFile."
+            }
+          }
+
+          $checksums = @{}
+          Get-Content -LiteralPath $checksumFile | ForEach-Object {
+            if ($_ -notmatch '^([0-9A-Fa-f]{64})\s{2}(.+)$') {
+              throw "Invalid SHA256SUMS entry: $_"
+            }
+            $checksums[$matches[2]] = $matches[1].ToUpperInvariant()
+          }
+          foreach ($entry in $checksums.GetEnumerator()) {
+            $filePath = Join-Path $publicDirectory.FullName $entry.Key
+            $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $filePath).Hash
+            if ($actualHash -ne $entry.Value) {
+              throw "Downloaded artifact hash mismatch: $($entry.Key)."
+            }
+          }
+
+          $buildInfoFile = Get-ChildItem -LiteralPath release-bundle -File -Recurse -Filter build-info.json |
+            Select-Object -First 1
+          if ($null -eq $buildInfoFile) {
+            throw 'Downloaded release artifact does not contain build-info.json.'
+          }
+          $buildInfo = Get-Content -LiteralPath $buildInfoFile.FullName -Raw | ConvertFrom-Json
+          if ($buildInfo.version -ne $env:VERSION -or $buildInfo.releaseChannel -ne 'stable') {
+            throw 'Downloaded build metadata has the wrong version or channel.'
+          }
+          $installerHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer).Hash
+          $signatureHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $signatureFile).Hash
+          $manifestHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $manifest).Hash
+          if (
+            $buildInfo.installer.sha256 -ne $installerHash -or
+            $buildInfo.updater.signatureSha256 -ne $signatureHash -or
+            $buildInfo.updater.manifestSha256 -ne $manifestHash
+          ) {
+            throw 'Downloaded build metadata is not bound to the downloaded release files.'
+          }
+
+          $expectedUrl = "https://github.com/$env:REPOSITORY/releases/download/$env:RELEASE_TAG/SeekOffer-Desktop-v$env:VERSION-Windows-x64-Setup.exe"
+          & node release-source/scripts/desktop-update-manifest.mjs verify `
+            $manifest `
+            --version $env:VERSION `
+            --url $expectedUrl `
+            --signature-file $signatureFile
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Downloaded updater manifest verification failed.'
+          }
+
+          $tauri = Get-Content -LiteralPath release-source/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          & cargo run --quiet --locked `
+            --manifest-path release-source/src-tauri/Cargo.toml `
+            --example verify_updater_signature `
+            -- $installer $signatureFile $tauri.plugins.updater.pubkey
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Downloaded Tauri updater Minisign verification failed.'
+          }
+
+          $expectedThumbprint = ($env:EXPECTED_THUMBPRINT -replace '\s', '').ToUpperInvariant()
+          if ($expectedThumbprint -notmatch '^[0-9A-F]{40}$') {
+            throw 'The protected Authenticode thumbprint is invalid.'
+          }
+          $desktopExecutable = Get-ChildItem -LiteralPath release-bundle -File -Recurse -Filter signed-seekoffer-desktop.exe |
+            Select-Object -First 1
+          if ($null -eq $desktopExecutable) {
+            throw 'Downloaded release artifact does not contain the signed desktop executable.'
+          }
+          foreach ($artifactPath in @($desktopExecutable.FullName, $installer)) {
+            $authenticode = Get-AuthenticodeSignature -LiteralPath $artifactPath
+            $actualThumbprint = if ($null -ne $authenticode.SignerCertificate) {
+              ($authenticode.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
+            } else {
+              ''
+            }
+            if ($authenticode.Status -ne 'Valid') {
+              throw "Downloaded artifact is not Authenticode-valid: $artifactPath."
+            }
+            if ($actualThumbprint -ne $expectedThumbprint) {
+              throw "Downloaded artifact certificate is not the pinned certificate: $artifactPath."
+            }
+            if ($null -eq $authenticode.TimeStamperCertificate) {
+              throw "Downloaded artifact is missing its trusted timestamp: $artifactPath."
+            }
+          }
+          $desktopEvidenceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $desktopExecutable.FullName).Hash
+          if (
+            $buildInfo.applicationAuthenticode.sha256 -ne $desktopEvidenceHash -or
+            $buildInfo.applicationAuthenticode.status -ne 'Valid' -or
+            $buildInfo.applicationAuthenticode.thumbprint -ne $expectedThumbprint -or
+            -not $buildInfo.applicationAuthenticode.timestamped
+          ) {
+            throw 'Downloaded build metadata is not bound to the signed desktop executable evidence.'
+          }
+
+  publish:
+    name: Publish immutable GitHub Release
+    needs:
+      - prepare
+      - build
+      - verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: desktop-${{ needs.prepare.outputs.channel }}
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.release_commit }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Download validated bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: seekoffer-desktop-${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.channel }}
+          path: release-bundle
+
+      - name: Locate and verify public assets
+        id: paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          public_dir="$(find release-bundle -type d -name public -print -quit)"
+          if [ -z "$public_dir" ]; then
+            echo 'Packaged public directory was not found.' >&2
+            exit 1
+          fi
+          installer="$public_dir/SeekOffer-Desktop-v${VERSION}-Windows-x64-Setup.exe"
+          signature="${installer}.sig"
+          manifest="$public_dir/latest.json"
+          for file in "$installer" "$signature" "$manifest" \
+            "$public_dir/SHA256SUMS.txt" \
+            "$public_dir/RELEASE-NOTES.zh-CN.md" \
+            "$public_dir/INSTALL.zh-CN.md"; do
+            test -s "$file" || { echo "Missing or empty release asset: $file" >&2; exit 1; }
+          done
+          echo "public_dir=$public_dir" >> "$GITHUB_OUTPUT"
+          echo "installer=$installer" >> "$GITHUB_OUTPUT"
+          echo "signature=$signature" >> "$GITHUB_OUTPUT"
+          echo "manifest=$manifest" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout verifier script from release tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_commit }}
+          path: release-source
+          sparse-checkout: |
+            scripts/desktop-update-manifest.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Verify updater manifest again
+        shell: bash
+        env:
+          MANIFEST_PATH: ${{ steps.paths.outputs.manifest }}
+          SIGNATURE_PATH: ${{ steps.paths.outputs.signature }}
+        run: |
+          set -euo pipefail
+          node release-source/scripts/desktop-update-manifest.mjs verify \
+            "$MANIFEST_PATH" \
+            --version "$VERSION" \
+            --signature-file "$SIGNATURE_PATH"
+
+      - name: Recheck Stable version monotonicity before draft creation
+        shell: bash
+        env:
+          STABLE_MANIFEST_URL: https://seekoffer-desktop-updates.vercel.app/stable/latest.json
+        run: |
+          set -euo pipefail
+          stable_manifest="$(mktemp)"
+          trap 'rm -f "$stable_manifest"' EXIT
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+            --max-time 30 --output "$stable_manifest" "$STABLE_MANIFEST_URL"
+          VERSION="$VERSION" STABLE_MANIFEST_PATH="$stable_manifest" \
+            node --input-type=module -e "
+              import { readFileSync } from 'node:fs';
+              import {
+                assertStableDesktopUpgrade,
+                validateDesktopUpdateManifest
+              } from './release-source/scripts/desktop-update-manifest.mjs';
+              const current = JSON.parse(readFileSync(process.env.STABLE_MANIFEST_PATH, 'utf8'));
+              validateDesktopUpdateManifest(current);
+              assertStableDesktopUpgrade(process.env.VERSION, current.version);
+            "
+
+      - name: Reconfirm immutable tag commit before draft creation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C release-source fetch --force --tags --prune --prune-tags origin
+          git -C release-source show-ref --verify --quiet "refs/tags/$RELEASE_TAG" || {
+            echo 'Release tag was deleted after verification.' >&2
+            exit 1
+          }
+          actual_commit="$(git -C release-source rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          if [ "$actual_commit" != "$RELEASE_COMMIT" ]; then
+            echo "Release tag moved after verification: $actual_commit != $RELEASE_COMMIT" >&2
+            exit 1
+          fi
+
+      - name: Refuse replacing an existing immutable release
+        shell: bash
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; published releases are immutable." >&2
+            exit 1
+          fi
+
+      - name: Create hidden draft release
+        shell: bash
+        env:
+          RELEASE_NOTES_PATH: ${{ steps.paths.outputs.public_dir }}/RELEASE-NOTES.zh-CN.md
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" \
+            --repo "$REPOSITORY" \
+            --verify-tag \
+            --title "SeekOffer Desktop v${VERSION}" \
+            --notes-file "$RELEASE_NOTES_PATH" \
+            --draft
+
+      - name: Upload binary assets before updater manifest
+        shell: bash
+        env:
+          PUBLIC_DIR: ${{ steps.paths.outputs.public_dir }}
+          INSTALLER_PATH: ${{ steps.paths.outputs.installer }}
+          SIGNATURE_PATH: ${{ steps.paths.outputs.signature }}
+        run: |
+          set -euo pipefail
+          public_dir="$PUBLIC_DIR"
+          gh release upload "$RELEASE_TAG" \
+            "$INSTALLER_PATH" \
+            "$SIGNATURE_PATH" \
+            "$public_dir/SHA256SUMS.txt" \
+            "$public_dir/RELEASE-NOTES.zh-CN.md" \
+            "$public_dir/INSTALL.zh-CN.md" \
+            --repo "$REPOSITORY"
+
+      - name: Upload updater manifest last
+        shell: bash
+        env:
+          MANIFEST_PATH: ${{ steps.paths.outputs.manifest }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" \
+            "$MANIFEST_PATH" \
+            --repo "$REPOSITORY"
+
+      - name: Verify draft assets and publish release
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C release-source fetch --force --tags --prune --prune-tags origin
+          git -C release-source show-ref --verify --quiet "refs/tags/$RELEASE_TAG" || {
+            echo 'Release tag was deleted while the draft was being prepared.' >&2
+            exit 1
+          }
+          actual_commit="$(git -C release-source rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          if [ "$actual_commit" != "$RELEASE_COMMIT" ]; then
+            echo "Release tag moved while the draft was being prepared." >&2
+            exit 1
+          fi
+          asset_names="$(gh release view "$RELEASE_TAG" \
+            --repo "$REPOSITORY" \
+            --json assets \
+            --jq '.assets[].name')"
+          for expected in \
+            "SeekOffer-Desktop-v${VERSION}-Windows-x64-Setup.exe" \
+            "SeekOffer-Desktop-v${VERSION}-Windows-x64-Setup.exe.sig" \
+            'SHA256SUMS.txt' \
+            'RELEASE-NOTES.zh-CN.md' \
+            'INSTALL.zh-CN.md' \
+            'latest.json'; do
+            grep -Fxq "$expected" <<<"$asset_names" || {
+              echo "Draft release is missing $expected" >&2
+              exit 1
+            }
+          done
+          gh release edit "$RELEASE_TAG" \
+            --repo "$REPOSITORY" \
+            --draft=false \
+            --prerelease="$PRERELEASE"
+
+      - name: Record updater-site handoff
+        shell: bash
+        run: |
+          {
+            echo '### Desktop release published'
+            echo
+            echo "- Release: $RELEASE_TAG"
+            echo '- Binary and signature were uploaded before `latest.json`.'
+            echo '- The isolated `updater-site` directory remains in the workflow artifact.'
+            echo '- No Vercel deployment was performed by this workflow.'
+            echo '- Promote the channel manifest only after validating the public release URLs.'
+          } >> "$GITHUB_STEP_SUMMARY"

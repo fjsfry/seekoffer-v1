@@ -6,8 +6,19 @@ node_modules_corrupt_*/
 # next build outputs
 .next/
 .next-web/
+.next-desktop/
+.next-desktop-dev/
 hosting-dist/
 out/
+/releases/
+
+# local QA and generated review output
+/artifacts/
+/outputs/
+/docs/previews/
+/playwright-report/
+/test-results/
+/.playwright/
 
 # logs
 *.log

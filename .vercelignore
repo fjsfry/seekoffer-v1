@@ -16,3 +16,15 @@ pnpm-debug.log*
 tsconfig.tsbuildinfo
 public/site-marks/_preview/
 .local-backups/
+
+# Local QA, desktop bundles, and source-only release material must never be
+# uploaded as part of the public web deployment.
+artifacts/
+outputs/
+backups/
+browser-extension/
+docs/
+supabase/
+tests/
+src-tauri/
+.github/

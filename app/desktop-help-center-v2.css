@@ -1,0 +1,1677 @@
+/* Search-first Help & Feedback home, based on mature help-center patterns.
+ * Scoped to the current desktop component; the public website is untouched. */
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-help-center {
+  --guide-canvas: var(--desktop-canvas, var(--so-canvas, #f5f7f6));
+  --guide-surface: var(--desktop-surface, var(--so-surface, #ffffff));
+  --guide-surface-subtle: var(--desktop-surface-subtle, var(--so-surface-subtle, #f7f9f8));
+  --guide-surface-hover: var(--desktop-surface-hover, var(--so-surface-hover, #f1f5f4));
+  --guide-border: var(--desktop-border, var(--so-border, #dfe5e3));
+  --guide-border-strong: var(--desktop-border-strong, var(--so-border-strong, #c9d1ce));
+  --guide-text: var(--desktop-text, var(--so-text, #172321));
+  --guide-text-secondary: var(--desktop-text-secondary, var(--so-text-secondary, #56635f));
+  --guide-text-tertiary: var(--desktop-text-tertiary, var(--so-text-tertiary, #75817d));
+  --guide-accent: var(--desktop-accent, var(--so-brand, #176c65));
+  --guide-accent-strong: var(--desktop-accent-strong, var(--so-brand-strong, #10544f));
+  --guide-accent-soft: var(--desktop-accent-muted, var(--so-brand-soft, #e9f4f2));
+  width: min(1280px, 100%) !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  margin: 0 auto !important;
+  display: grid !important;
+  align-content: start !important;
+  gap: 20px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  scrollbar-gutter: stable;
+  color: var(--guide-text) !important;
+  background: transparent !important;
+  container: help-center-v2 / inline-size;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-help-center .desktop-help-hero {
+  min-height: 164px !important;
+  height: auto !important;
+  padding: 18px 20px !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: auto 48px !important;
+  align-items: center !important;
+  gap: 14px !important;
+  overflow: hidden !important;
+  border: 1px solid var(--guide-border) !important;
+  border-radius: 12px !important;
+  background: var(--guide-surface) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-hero-topline {
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 24px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-help-center .desktop-guide-hero-copy {
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-help-center .desktop-guide-hero h1 {
+  margin: 0 !important;
+  color: var(--guide-text) !important;
+  font-size: 32px !important;
+  font-weight: 600 !important;
+  line-height: 40px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-help-center .desktop-guide-hero p {
+  max-width: 720px !important;
+  margin: 2px 0 0 !important;
+  color: var(--guide-text-secondary) !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+  white-space: normal !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-hero-search {
+  width: min(900px, 100%) !important;
+  min-width: 0 !important;
+  height: 48px !important;
+  padding: 0 11px 0 14px !important;
+  display: grid !important;
+  grid-template-columns: 20px minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 10px !important;
+  border: 1px solid var(--guide-border-strong) !important;
+  border-radius: 12px !important;
+  color: var(--guide-text-secondary) !important;
+  background: var(--guide-surface-subtle) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-hero-search:focus-within {
+  border-color: var(--guide-accent) !important;
+  background: var(--guide-surface) !important;
+  box-shadow: 0 0 0 3px var(--guide-accent-soft) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-hero-search > svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-hero-search input {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 44px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  color: var(--guide-text) !important;
+  background: transparent !important;
+  font-size: 14px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-hero-search button {
+  width: 30px !important;
+  height: 30px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  color: var(--guide-text-secondary) !important;
+  background: transparent !important;
+  cursor: pointer !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-hero-search kbd {
+  min-height: 26px !important;
+  padding: 2px 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  border: 1px solid var(--guide-border) !important;
+  border-radius: 7px !important;
+  color: var(--guide-text-secondary) !important;
+  background: var(--guide-surface) !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: max-content !important;
+  max-height: none !important;
+  overflow: visible !important;
+  border: 1px solid var(--guide-border) !important;
+  border-radius: 12px !important;
+  background: var(--guide-surface) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-section {
+  min-width: 0 !important;
+  padding: 20px !important;
+  border-bottom: 1px solid var(--guide-border) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-section:last-of-type {
+  border-bottom: 0 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-section-heading {
+  min-width: 0 !important;
+  margin-bottom: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-section-heading h2 {
+  margin: 0 !important;
+  color: var(--guide-text) !important;
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  line-height: 28px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-section-heading p {
+  margin: 2px 0 0 !important;
+  color: var(--guide-text-tertiary) !important;
+  font-size: 13px !important;
+  line-height: 20px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-section-heading > button {
+  min-height: 38px !important;
+  padding: 0 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  border: 0 !important;
+  border-radius: 9px !important;
+  color: var(--guide-accent) !important;
+  background: transparent !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-section-heading > button:hover {
+  background: var(--guide-accent-soft) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-featured-grid {
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-featured-grid > button {
+  min-width: 0 !important;
+  min-height: 112px !important;
+  padding: 16px !important;
+  display: grid !important;
+  grid-template-columns: 42px minmax(0, 1fr) 18px !important;
+  align-items: start !important;
+  gap: 12px !important;
+  border: 1px solid var(--guide-border) !important;
+  border-radius: 12px !important;
+  color: inherit !important;
+  background: var(--guide-surface-subtle) !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-featured-grid > button:hover {
+  border-color: color-mix(in srgb, var(--guide-accent) 34%, var(--guide-border)) !important;
+  background: var(--guide-accent-soft) !important;
+  transform: translateY(-1px) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-guide-featured-grid,
+  .desktop-guide-directory-list
+) > button > span:first-child {
+  width: 42px !important;
+  height: 42px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 11px !important;
+  color: var(--guide-accent) !important;
+  background: var(--guide-accent-soft) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-guide-featured-grid,
+  .desktop-guide-directory-list
+) > button svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-guide-featured-grid,
+  .desktop-guide-directory-list
+) > button > div {
+  min-width: 0 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-guide-featured-grid,
+  .desktop-guide-directory-list
+) > button strong {
+  display: block !important;
+  color: var(--guide-text) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 24px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-guide-featured-grid,
+  .desktop-guide-directory-list
+) > button p {
+  margin: 4px 0 0 !important;
+  display: -webkit-box !important;
+  overflow: hidden !important;
+  color: var(--guide-text-secondary) !important;
+  font-size: 13px !important;
+  line-height: 20px !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-guide-featured-grid,
+  .desktop-guide-directory-list
+) > button > svg {
+  margin-top: 12px !important;
+  color: var(--guide-text-tertiary) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-directory-list {
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  overflow: hidden !important;
+  border: 1px solid var(--guide-border) !important;
+  border-radius: 12px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-directory-list > button {
+  min-width: 0 !important;
+  min-height: 84px !important;
+  padding: 14px 16px !important;
+  display: grid !important;
+  grid-template-columns: 42px minmax(0, 1fr) 18px !important;
+  align-items: center !important;
+  gap: 12px !important;
+  border: 0 !important;
+  border-right: 1px solid var(--guide-border) !important;
+  border-bottom: 1px solid var(--guide-border) !important;
+  color: inherit !important;
+  background: var(--guide-surface) !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-directory-list > button:nth-child(2n) {
+  border-right: 0 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-directory-list > button:nth-last-child(-n + 2) {
+  border-bottom: 0 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-directory-list > button:hover {
+  background: var(--guide-surface-hover) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-question-results {
+  margin-top: 12px !important;
+  overflow: hidden !important;
+  border: 1px solid var(--guide-border) !important;
+  border-radius: 12px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-question-results button {
+  width: 100% !important;
+  min-height: 58px !important;
+  padding: 0 15px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--guide-border) !important;
+  color: var(--guide-text) !important;
+  background: var(--guide-surface) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-question-results button:last-child {
+  border-bottom: 0 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-question-results button:hover {
+  color: var(--guide-accent) !important;
+  background: var(--guide-surface-hover) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-question-results svg {
+  width: 17px !important;
+  height: 17px !important;
+  flex: 0 0 17px !important;
+  color: var(--guide-text-tertiary) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-faq-list {
+  overflow: hidden !important;
+  border: 1px solid var(--guide-border) !important;
+  border-radius: 12px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-faq-list details {
+  border-bottom: 1px solid var(--guide-border) !important;
+  background: var(--guide-surface) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-faq-list details:last-child {
+  border-bottom: 0 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-faq-list details[open] {
+  background: var(--guide-surface-subtle) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-faq-list summary {
+  min-height: 58px !important;
+  padding: 11px 15px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  color: var(--guide-text) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 22px !important;
+  list-style: none !important;
+  cursor: pointer !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-faq-list summary::-webkit-details-marker {
+  display: none !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-faq-list summary svg {
+  width: 18px !important;
+  height: 18px !important;
+  flex: 0 0 18px !important;
+  color: var(--guide-text-tertiary) !important;
+  transition: transform var(--motion-fast, 167ms) var(--motion-ease-standard, ease) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-faq-list details[open] summary svg {
+  color: var(--guide-accent) !important;
+  transform: rotate(180deg) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-faq-list details > p {
+  margin: -2px 50px 0 15px !important;
+  padding: 0 0 15px !important;
+  color: var(--guide-text-secondary) !important;
+  font-size: 14px !important;
+  line-height: 23px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-support-cta {
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 18px 24px !important;
+  display: grid !important;
+  grid-template-columns: 42px minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 14px !important;
+  border-top: 1px solid var(--guide-border) !important;
+  background: var(--guide-surface-subtle) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-support-cta > span {
+  width: 42px !important;
+  height: 42px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 11px !important;
+  color: var(--guide-accent) !important;
+  background: var(--guide-accent-soft) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-support-cta h2 {
+  margin: 0 !important;
+  color: var(--guide-text) !important;
+  font-size: 17px !important;
+  font-weight: 600 !important;
+  line-height: 25px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-support-cta p {
+  margin: 2px 0 0 !important;
+  color: var(--guide-text-secondary) !important;
+  font-size: 13px !important;
+  line-height: 20px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-support-cta > button {
+  min-height: 42px !important;
+  padding: 0 14px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  border: 1px solid var(--guide-accent-strong) !important;
+  border-radius: 10px !important;
+  color: #ffffff !important;
+  background: var(--guide-accent-strong) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-empty {
+  min-height: 260px !important;
+  padding: 36px 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: var(--guide-text-tertiary) !important;
+  text-align: center !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-empty > svg {
+  width: 26px !important;
+  height: 26px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-empty strong {
+  margin-top: 12px !important;
+  color: var(--guide-text) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-empty p {
+  margin: 4px 0 0 !important;
+  font-size: 13px !important;
+  line-height: 21px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-empty > div {
+  margin-top: 16px !important;
+  display: flex !important;
+  gap: 8px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-home-empty button {
+  min-height: 40px !important;
+  padding: 0 12px !important;
+  border: 1px solid var(--guide-border) !important;
+  border-radius: 9px !important;
+  color: var(--guide-text) !important;
+  background: var(--guide-surface) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: max-content !important;
+  max-height: none !important;
+  overflow: visible !important;
+  border: 1px solid var(--guide-border) !important;
+  border-radius: 12px !important;
+  background: var(--guide-surface) !important;
+  outline: none !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-topbar {
+  min-height: 54px !important;
+  padding: 0 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  border-bottom: 1px solid var(--guide-border) !important;
+  color: var(--guide-text-secondary) !important;
+  background: var(--guide-surface-subtle) !important;
+  font-size: 12px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-topbar button {
+  min-height: 36px !important;
+  padding: 0 9px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  border: 0 !important;
+  border-radius: 9px !important;
+  color: var(--guide-accent) !important;
+  background: transparent !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-topbar button:hover {
+  background: var(--guide-accent-soft) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-header {
+  width: min(900px, 100%) !important;
+  margin: 0 auto !important;
+  padding: 30px 32px 20px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-header h2 {
+  margin: 0 !important;
+  color: var(--guide-text) !important;
+  font-size: 30px !important;
+  font-weight: 600 !important;
+  line-height: 39px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-header p {
+  margin: 6px 0 0 !important;
+  color: var(--guide-text-secondary) !important;
+  font-size: 15px !important;
+  line-height: 25px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-body {
+  width: min(960px, 100%) !important;
+  min-width: 0 !important;
+  margin: 0 auto !important;
+  padding: 0 32px 32px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-body :is(
+  .desktop-guide-module-card,
+  [data-guide-tone]
+) {
+  --guide-topic: var(--guide-accent) !important;
+  --guide-topic-soft: var(--guide-accent-soft) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-body .desktop-guide-start-steps {
+  display: block !important;
+  overflow: hidden !important;
+  border: 1px solid var(--guide-border) !important;
+  border-radius: 14px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-body .desktop-guide-start-steps > li {
+  min-height: 88px !important;
+  padding: 13px 14px !important;
+  display: grid !important;
+  grid-template-columns: 42px minmax(0, 1fr) auto !important;
+  grid-template-rows: auto !important;
+  align-items: center !important;
+  gap: 12px !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--guide-border) !important;
+  border-radius: 0 !important;
+  background: var(--guide-surface) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-body .desktop-guide-start-steps > li:last-child {
+  border-bottom: 0 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-body .desktop-guide-start-steps > li:hover {
+  background: var(--guide-surface-hover) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-body .desktop-guide-start-steps .desktop-guide-row-icon {
+  grid-row: auto !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-body .desktop-guide-start-steps a {
+  grid-column: auto !important;
+  justify-self: end !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-footer {
+  border-top: 1px solid var(--guide-border) !important;
+  background: var(--guide-surface-subtle) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-helpful-prompt {
+  min-width: 0 !important;
+  padding: 18px 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  border-bottom: 1px solid var(--guide-border) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-helpful-prompt strong {
+  display: block !important;
+  color: var(--guide-text) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  line-height: 23px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-helpful-prompt span {
+  display: block !important;
+  margin-top: 2px !important;
+  color: var(--guide-text-tertiary) !important;
+  font-size: 12px !important;
+  line-height: 19px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-helpful-prompt > div:last-child {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  gap: 8px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-helpful-prompt button {
+  min-height: 38px !important;
+  padding: 0 11px !important;
+  border: 1px solid var(--guide-border) !important;
+  border-radius: 9px !important;
+  color: var(--guide-text-secondary) !important;
+  background: var(--guide-surface) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-helpful-prompt button:hover {
+  border-color: var(--guide-accent) !important;
+  color: var(--guide-accent) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-related {
+  padding: 18px 24px 22px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-related h3 {
+  margin: 0 0 10px !important;
+  color: var(--guide-text) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-related > div {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-related button {
+  min-width: 0 !important;
+  min-height: 42px !important;
+  padding: 0 11px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  border: 1px solid var(--guide-border) !important;
+  border-radius: 10px !important;
+  color: var(--guide-text-secondary) !important;
+  background: var(--guide-surface) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) .desktop-guide-related button:hover {
+  color: var(--guide-accent) !important;
+  background: var(--guide-accent-soft) !important;
+}
+
+.desktop-guide-support-suggestions {
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid var(--so-border, #dfe8e5);
+  border-radius: 12px;
+}
+
+.desktop-guide-support-drawer {
+  animation: desktop-help-support-fade-in var(--motion-fast, 167ms) var(--motion-ease-enter, ease-out) both !important;
+}
+
+@keyframes desktop-help-support-fade-in {
+  from { opacity: 0; transform: none; }
+  to { opacity: 1; transform: none; }
+}
+
+.desktop-guide-support-suggestions > button {
+  width: 100%;
+  min-width: 0;
+  min-height: 72px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-bottom: 1px solid var(--so-border, #dfe8e5);
+  color: inherit;
+  background: var(--so-surface, #ffffff);
+  text-align: left;
+  cursor: pointer;
+}
+
+.desktop-guide-support-suggestions > button:last-child {
+  border-bottom: 0;
+}
+
+.desktop-guide-support-suggestions > button:hover {
+  background: var(--so-surface-subtle, #f4f7f6);
+}
+
+.desktop-guide-support-suggestions > button > span:first-child {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--so-brand, #176c65);
+  background: var(--so-brand-soft, #e9f4f2);
+}
+
+.desktop-guide-support-suggestions svg {
+  width: 17px;
+  height: 17px;
+}
+
+.desktop-guide-support-suggestions strong {
+  display: block;
+  color: var(--so-text, #122026);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 21px;
+}
+
+.desktop-guide-support-suggestions small {
+  margin-top: 2px;
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--so-text-secondary, #56635f);
+  font-size: 12px;
+  line-height: 18px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.desktop-guide-environment-details {
+  overflow: hidden;
+  border: 1px solid var(--so-border, #dfe8e5);
+  border-radius: 11px;
+  background: var(--so-surface-subtle, #f4f7f6);
+}
+
+.desktop-guide-environment-details summary {
+  min-height: 48px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--so-text-secondary, #56635f);
+  font-size: 13px;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.desktop-guide-environment-details summary::-webkit-details-marker { display: none; }
+.desktop-guide-environment-details summary svg { width: 17px; height: 17px; transition: transform var(--motion-fast, 167ms) var(--motion-ease-standard, ease); }
+.desktop-guide-environment-details[open] summary svg { transform: rotate(180deg); }
+.desktop-guide-environment-details .desktop-guide-diagnostics { margin: 0 10px 10px; }
+
+.desktop-guide-support-back {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--so-border, #dfe8e5);
+  border-radius: 9px;
+  color: var(--so-text-secondary, #56635f);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.desktop-guide-selected-issue {
+  min-height: 44px;
+  padding: 9px 11px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--so-border, #dfe8e5);
+  border-radius: 10px;
+  background: var(--so-surface-subtle, #f4f7f6);
+}
+
+.desktop-guide-selected-issue span {
+  color: var(--so-text-tertiary, #75817d);
+  font-size: 12px;
+}
+
+.desktop-guide-selected-issue strong {
+  color: var(--so-text, #122026);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.desktop-guide-selected-issue button {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--so-brand, #176c65);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+html.seekoffer-desktop-surface[data-desktop-theme='dark'] :is(
+  .desktop-guide-support-suggestions,
+  .desktop-guide-support-suggestions > button,
+  .desktop-guide-environment-details,
+  .desktop-guide-support-back,
+  .desktop-guide-selected-issue
+) {
+  border-color: #30403d;
+  color: #aebdb9;
+  background: #202d2a;
+}
+
+html.seekoffer-desktop-surface[data-desktop-theme='dark'] .desktop-guide-support-suggestions strong {
+  color: #f1f6f4;
+}
+
+html.seekoffer-desktop-surface[data-desktop-theme='dark'] .desktop-guide-selected-issue strong {
+  color: #f1f6f4;
+}
+
+html.seekoffer-desktop-surface[data-desktop-theme='dark'] .desktop-guide-support-suggestions small {
+  color: #aebdb9;
+}
+
+@container help-center-v2 (max-width: 1040px) {
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-featured-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-directory-list,
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-related > div {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-directory-list > button,
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-directory-list > button:nth-child(2n),
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-directory-list > button:nth-last-child(-n + 2) {
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--guide-border) !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-directory-list > button:last-child {
+    border-bottom: 0 !important;
+  }
+}
+
+@container help-center-v2 (max-width: 640px) {
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-hero-topline,
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-helpful-prompt {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-support-cta {
+    grid-template-columns: 42px minmax(0, 1fr) !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-support-cta > button {
+    grid-column: 2 !important;
+    width: max-content !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-topbar {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    padding-block: 8px !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-header,
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-body {
+    padding-inline: 18px !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-body .desktop-guide-start-steps > li {
+    grid-template-columns: 38px minmax(0, 1fr) !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell) .desktop-guide-article-body .desktop-guide-start-steps a {
+    grid-column: 2 !important;
+    justify-self: start !important;
+  }
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-help-center {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-help-center .desktop-help-hero {
+  min-height: 206px !important;
+  height: 206px !important;
+  padding: 16px 18px !important;
+  grid-template-rows: minmax(0, 1fr) 48px !important;
+  gap: 14px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-help-center .desktop-guide-hero-topline {
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  gap: 10px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-help-center .desktop-guide-support-trigger {
+  min-height: 38px !important;
+  padding-inline: 10px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-home-section {
+  padding: 18px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) :is(
+  .desktop-guide-featured-grid,
+  .desktop-guide-directory-list,
+  .desktop-guide-related > div
+) {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-directory-list > button,
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-directory-list > button:nth-child(2n),
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-directory-list > button:nth-last-child(-n + 2) {
+  border-right: 0 !important;
+  border-bottom: 1px solid var(--guide-border) !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-directory-list > button:last-child {
+  border-bottom: 0 !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-support-cta {
+  grid-template-columns: 42px minmax(0, 1fr) !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-support-cta > button {
+  grid-column: 2 !important;
+  width: max-content !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-article-header,
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-article-body {
+  padding-inline: 18px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-article-body .desktop-guide-start-steps > li {
+  grid-template-columns: 38px minmax(0, 1fr) !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-article-body .desktop-guide-start-steps a {
+  grid-column: 2 !important;
+  justify-self: start !important;
+}
+
+html[data-desktop-reduce-motion='true'] .desktop-help-center,
+html[data-desktop-reduce-motion='true'] .desktop-help-center *,
+html[data-desktop-reduce-motion='true'] .desktop-help-center *::before,
+html[data-desktop-reduce-motion='true'] .desktop-help-center *::after {
+  scroll-behavior: auto !important;
+  animation: none !important;
+  transition: none !important;
+}
+
+html:is([data-desktop-zoom-level='150'], [data-desktop-zoom-level='175'], [data-desktop-zoom-level='200'])
+  .desktop-guide-support-drawer {
+  position: fixed !important;
+  inset: 8px !important;
+  width: auto !important;
+  max-width: none !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+/* Full-scale integrity. Help cards and article rows grow with their copy;
+ * 125%-200% uses a single-column hero without hiding support controls. */
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-guide-featured-grid,
+  .desktop-guide-directory-list
+) > button {
+  height: auto !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-guide-featured-grid,
+  .desktop-guide-directory-list
+) > button p,
+.desktop-guide-support-suggestions small {
+  display: block !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  -webkit-line-clamp: unset !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-help-center .desktop-help-hero {
+  height: auto !important;
+  min-height: 164px !important;
+  grid-template-rows: auto 48px !important;
+  overflow: visible !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-help-center .desktop-guide-hero-topline {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 10px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-help-center .desktop-guide-support-trigger {
+  width: max-content !important;
+  max-width: 100% !important;
+  justify-self: start !important;
+  white-space: normal !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) :is(
+  .desktop-guide-featured-grid,
+  .desktop-guide-directory-list,
+  .desktop-guide-related > div
+) {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) :is(.desktop-guide-support-cta, .desktop-guide-helpful-prompt) {
+  align-items: flex-start !important;
+  grid-template-columns: 42px minmax(0, 1fr) !important;
+  flex-direction: column !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-support-cta > button {
+  grid-column: 2 !important;
+  width: auto !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-article-body .desktop-guide-start-steps > li {
+  height: auto !important;
+  grid-template-columns: 38px minmax(0, 1fr) !important;
+  grid-template-rows: auto auto !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-guide-article-body .desktop-guide-start-steps a {
+  grid-column: 2 !important;
+  justify-self: start !important;
+  white-space: normal !important;
+}
+
+/* Notice-library parity authority.
+ *
+ * The notice library is the desktop product's density reference: an 88px
+ * page header, 20px top-level rhythm, 18px product panels and 48px controls.
+ * Keep help content task-oriented, but do not let it become a separate,
+ * oversized documentation site at ordinary desktop widths. */
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center) {
+  width: 100% !important;
+  max-width: 1280px !important;
+  height: 100% !important;
+  gap: 20px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-help-hero:is(.desktop-help-hero) {
+  min-height: var(--app-page-header-h, 88px) !important;
+  height: var(--app-page-header-h, 88px) !important;
+  padding: 14px 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-hero-topline {
+  width: 100% !important;
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 20px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-hero h1 {
+  font-size: 28px !important;
+  line-height: 36px !important;
+  font-weight: 600 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-hero p {
+  font-size: 14px !important;
+  line-height: 22px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-support-trigger {
+  min-height: 48px !important;
+  height: 48px !important;
+  padding-inline: 18px !important;
+  border-radius: 10px !important;
+  white-space: nowrap !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-help-search-toolbar {
+  min-height: 88px !important;
+  height: 88px !important;
+  padding: 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  border-radius: 12px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-hero-search {
+  width: 100% !important;
+  height: 48px !important;
+  border-radius: 10px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  :is(.desktop-guide-home, .desktop-guide-article) {
+  border-radius: var(--product-radius-panel, 12px) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-home-section {
+  padding: 20px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-featured-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-featured-grid > button {
+  min-height: 124px !important;
+  padding: 16px !important;
+  border-radius: var(--product-radius-panel, 12px) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-directory-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  border-radius: var(--product-radius-panel, 12px) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-directory-list > button,
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-directory-list > button:nth-child(2n),
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-directory-list > button:nth-last-child(-n + 2) {
+  min-height: 92px !important;
+  padding: 16px 18px !important;
+  border-right: 1px solid var(--guide-border) !important;
+  border-bottom: 1px solid var(--guide-border) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-directory-list > button:nth-child(2n) {
+  border-right: 0 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-directory-list > button:nth-last-child(-n + 2) {
+  border-bottom: 0 !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  :is(.desktop-guide-question-results, .desktop-guide-home-faq-list) {
+  border-radius: var(--product-radius-panel, 12px) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  :is(.desktop-guide-question-results button, .desktop-guide-home-faq-list summary) {
+  min-height: 60px !important;
+  padding-inline: 18px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-support-cta {
+  min-height: 96px !important;
+  padding: 20px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-support-cta > button,
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-helpful-prompt button,
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-article-topbar button {
+  min-height: 48px !important;
+  border-radius: 10px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  :is(.desktop-guide-article-header, .desktop-guide-article-body, .desktop-guide-article-footer) {
+  padding-inline: 20px !important;
+}
+
+@container help-center-v2 (max-width: 780px) {
+  .desktop-app-shell:is(.desktop-app-shell)
+    .desktop-help-center:is(.desktop-help-center)
+    :is(.desktop-guide-featured-grid, .desktop-guide-directory-list, .desktop-guide-related > div) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell)
+    .desktop-help-center:is(.desktop-help-center)
+    .desktop-guide-directory-list > button,
+  .desktop-app-shell:is(.desktop-app-shell)
+    .desktop-help-center:is(.desktop-help-center)
+    .desktop-guide-directory-list > button:nth-child(2n),
+  .desktop-app-shell:is(.desktop-app-shell)
+    .desktop-help-center:is(.desktop-help-center)
+    .desktop-guide-directory-list > button:nth-last-child(-n + 2) {
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--guide-border) !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell)
+    .desktop-help-center:is(.desktop-help-center)
+    .desktop-guide-directory-list > button:last-child {
+    border-bottom: 0 !important;
+  }
+}
+
+@container help-center-v2 (max-width: 620px) {
+  .desktop-app-shell:is(.desktop-app-shell)
+    .desktop-help-center:is(.desktop-help-center)
+    .desktop-help-hero:is(.desktop-help-hero) {
+    min-height: 144px !important;
+    height: auto !important;
+    padding: 18px 20px !important;
+    overflow: visible !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell)
+    .desktop-help-center:is(.desktop-help-center)
+    .desktop-guide-hero-topline {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: start !important;
+    gap: 12px !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell)
+    .desktop-help-center:is(.desktop-help-center)
+    .desktop-guide-support-trigger {
+    justify-self: start !important;
+  }
+
+  .desktop-app-shell:is(.desktop-app-shell)
+    .desktop-help-center:is(.desktop-help-center)
+    .desktop-guide-support-cta {
+    grid-template-columns: 42px minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .desktop-app-shell:is(.desktop-app-shell)
+    .desktop-help-center:is(.desktop-help-center)
+    .desktop-guide-section-heading > button {
+    min-width: 80px !important;
+    flex: 0 0 auto !important;
+    padding-inline: 8px !important;
+    white-space: nowrap !important;
+  }
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-help-center:is(.desktop-help-center) .desktop-help-hero:is(.desktop-help-hero) {
+  min-height: var(--app-page-header-h, 88px) !important;
+  height: auto !important;
+  padding: 18px 20px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-help-center:is(.desktop-help-center) .desktop-guide-hero-topline {
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-items: start !important;
+  gap: 12px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-help-center:is(.desktop-help-center) .desktop-guide-support-trigger {
+  min-height: 48px !important;
+  height: auto !important;
+  justify-self: start !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-help-center:is(.desktop-help-center):is(.desktop-help-center)
+  .desktop-help-hero:is(.desktop-help-hero):is(.desktop-help-hero) {
+  min-height: var(--app-page-header-h, 88px) !important;
+  height: auto !important;
+  padding: 18px 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  border-radius: 12px !important;
+  overflow: visible !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-help-center:is(.desktop-help-center):is(.desktop-help-center)
+  .desktop-guide-hero-topline {
+  width: 100% !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-items: start !important;
+  gap: 12px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-help-center:is(.desktop-help-center):is(.desktop-help-center)
+  .desktop-guide-support-trigger {
+  min-height: 48px !important;
+  height: auto !important;
+  justify-self: start !important;
+  padding-inline: 18px !important;
+  white-space: normal !important;
+}
+
+/* Functional icon rhythm.  Navigation glyphs remain compact; task-card and
+ * section identity icons share a 44px box, start exactly 20px from the card
+ * edge, and align to the first title line. */
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  :is(.desktop-guide-featured-grid, .desktop-guide-directory-list) > button {
+  padding: 20px !important;
+  grid-template-columns: 44px minmax(0, 1fr) 18px !important;
+  align-items: start !important;
+  gap: 14px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-featured-grid > button {
+  min-height: 132px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-directory-list > button,
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-directory-list > button:nth-child(2n),
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-directory-list > button:nth-last-child(-n + 2) {
+  min-height: 100px !important;
+  padding: 20px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  :is(.desktop-guide-featured-grid, .desktop-guide-directory-list)
+  > button > span:first-child {
+  width: 44px !important;
+  height: 44px !important;
+  flex: 0 0 44px !important;
+  align-self: start !important;
+  border-radius: 12px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  :is(.desktop-guide-featured-grid, .desktop-guide-directory-list)
+  > button > span:first-child svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-support-cta {
+  padding: 20px !important;
+  grid-template-columns: 44px minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  gap: 14px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-support-cta > span {
+  width: 44px !important;
+  height: 44px !important;
+  flex: 0 0 44px !important;
+  align-self: start !important;
+  border-radius: 12px !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell)
+  .desktop-help-center:is(.desktop-help-center)
+  .desktop-guide-support-cta > span svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+@container help-center-v2 (max-width: 620px) {
+  .desktop-app-shell:is(.desktop-app-shell)
+    .desktop-help-center:is(.desktop-help-center)
+    .desktop-guide-support-cta {
+    grid-template-columns: 44px minmax(0, 1fr) !important;
+  }
+}

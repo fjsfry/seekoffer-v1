@@ -31,6 +31,18 @@ export type MaterialChecklistKey =
   | 'personalStatementReady'
   | 'contactSupervisorDone';
 
+/**
+ * Files that can be prepared and submitted with an application.
+ *
+ * `contactSupervisorDone` deliberately remains on `UserProjectRecord` for
+ * backwards-compatible contact tracking, but it is a workflow signal rather
+ * than a document and must never be included in material completion totals.
+ */
+export type DocumentMaterialChecklistKey = Exclude<
+  MaterialChecklistKey,
+  'contactSupervisorDone'
+>;
+
 export type ChangeLogEntry = {
   date: string;
   field: string;
@@ -153,14 +165,22 @@ export const userStatusOptions: UserProjectStatus[] = [
 
 export const priorityOptions: PriorityLevel[] = ['高', '中', '低'];
 
-export const materialChecklistDefinitions: Array<{ key: MaterialChecklistKey; label: string }> = [
+export const documentMaterialChecklistDefinitions: Array<{
+  key: DocumentMaterialChecklistKey;
+  label: string;
+}> = [
   { key: 'cvReady', label: '简历' },
   { key: 'transcriptReady', label: '成绩单' },
   { key: 'rankingProofReady', label: '排名证明' },
   { key: 'recommendationReady', label: '推荐信' },
-  { key: 'personalStatementReady', label: '个人陈述' },
-  { key: 'contactSupervisorDone', label: '导师联系' }
+  { key: 'personalStatementReady', label: '个人陈述' }
 ];
+
+/**
+ * Backwards-compatible name used by the existing web and desktop surfaces.
+ * It now intentionally describes document materials only (five files).
+ */
+export const materialChecklistDefinitions = documentMaterialChecklistDefinitions;
 
 export const applicationColumnPresets: ApplicationColumnPreset[] = [
   {

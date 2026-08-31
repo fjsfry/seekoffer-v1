@@ -166,7 +166,7 @@ export default function HomePage() {
     { title: '申请决策', description: '多维筛选院校，科学定位更高效', icon: Target },
     { title: '截止提醒', description: '关键节点提前预警，重要截止不再错过', icon: CalendarDays },
     { title: '背景提升', description: '竞赛库和资源中心，沉淀可写进材料的经历', icon: Trophy },
-    { title: '工作台跟进', description: '一站式管理进度，让申请事务不再杂乱', icon: Monitor }
+    { title: '申请跟进', description: '一站式管理进度，让申请事务不再杂乱', icon: Monitor }
   ];
 
   const stepCards = [
@@ -178,7 +178,7 @@ export default function HomePage() {
     },
     {
       index: '2',
-      title: '建申请表 / 加入工作台',
+      title: '建申请表 / 加入申请',
       description: '整理材料，统一管理所有申请',
       icon: FileText
     },
@@ -203,7 +203,7 @@ export default function HomePage() {
               <span className="block sm:whitespace-nowrap">整理成清晰路径</span>
             </h1>
             <p className="mt-6 max-w-[610px] text-[15px] leading-7 text-slate-600 sm:mt-8 sm:text-base sm:leading-8 lg:text-lg lg:leading-9">
-              寻鹿 Seekoffer 同步整理夏令营、预推免与正式推免通知，把院校筛选、截止提醒、申请材料和进度跟进放进同一个工作台。
+              寻鹿 Seekoffer 同步整理夏令营、预推免与正式推免通知，把院校筛选、截止提醒、申请材料和进度跟进集中到全部申请。
             </p>
 
             <div className="mt-8 grid grid-cols-2 gap-3 sm:mt-10 sm:flex sm:flex-wrap sm:gap-5">
@@ -218,7 +218,7 @@ export default function HomePage() {
                 href="/me"
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[16px] border border-brand/25 bg-white/92 px-4 py-3 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5 hover:border-brand sm:rounded-[18px] sm:px-7 sm:py-4"
               >
-                打开工作台
+                打开全部申请
               </Link>
             </div>
           </div>
@@ -352,7 +352,7 @@ export default function HomePage() {
         <div className="product-card grid min-h-[285px] overflow-hidden rounded-[30px] bg-white/90 backdrop-blur lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           <div className="p-7 lg:p-8">
             <h2 className="text-[1.35rem] font-semibold leading-snug tracking-tight text-ink xl:text-2xl">
-              今天先处理什么，工作台会直接告诉你
+              今天先处理什么，全部申请会直接告诉你
             </h2>
             <p className="mt-4 text-sm leading-8 text-slate-600">
               待办、进度、材料完成度、截止提醒，一目了然，帮你聚焦最重要的下一步。
@@ -361,7 +361,7 @@ export default function HomePage() {
               href="/me"
               className="mt-7 inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:bg-brand-deep"
             >
-              进入工作台
+              进入全部申请
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -447,7 +447,7 @@ function HomeHeroPreview() {
         <div className="mb-4 flex items-center justify-between px-1">
           <div className="flex items-center gap-3">
             <SeekofferMiniMark className="h-9 w-9" />
-            <div className="text-sm font-semibold text-ink">我的申请工作台</div>
+            <div className="text-sm font-semibold text-ink">全部申请</div>
             <span className="rounded-full bg-brand/[0.07] px-2 py-1 text-[10px] font-semibold text-brand">
               产品界面示意
             </span>

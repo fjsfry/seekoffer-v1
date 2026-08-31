@@ -1,0 +1,553 @@
+.header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-4);
+  padding: var(--app-space-4) var(--app-space-5);
+  border-bottom: 1px solid var(--so-divider);
+  background: var(--so-surface);
+}
+
+.heading,
+.headerActions,
+.markAllButton,
+.pausedBanner,
+.reminderActions,
+.footer,
+.footerPrimaryAction,
+.footerSecondaryAction,
+.primaryItemAction,
+.itemAction,
+.iconItemAction {
+  display: flex;
+  align-items: center;
+}
+
+.heading {
+  min-width: 0;
+  gap: var(--app-space-2);
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--so-text);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.countBadge {
+  display: inline-flex;
+  min-width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 6px;
+  border-radius: 999px;
+  color: var(--so-text-secondary);
+  background: var(--so-surface-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.headerActions {
+  flex: 0 0 auto;
+  gap: var(--app-space-1);
+}
+
+.toolbarButton,
+.markAllButton,
+.pausedAction,
+.inlineStateAction,
+.stateAction,
+.primaryItemAction,
+.itemAction,
+.iconItemAction,
+.footerPrimaryAction,
+.footerSecondaryAction,
+.undoButton {
+  border-radius: var(--app-radius-control);
+  transition:
+    color var(--motion-hover) var(--motion-ease-standard),
+    border-color var(--motion-hover) var(--motion-ease-standard),
+    background-color var(--motion-hover) var(--motion-ease-standard),
+    opacity var(--motion-hover) var(--motion-ease-standard);
+}
+
+.toolbarButton {
+  color: var(--so-text-secondary);
+}
+
+.toolbarButtonActive {
+  color: var(--so-brand-strong);
+  background: var(--so-brand-soft);
+}
+
+.toolbarGlyph {
+  width: 16px;
+  height: 16px;
+}
+
+.markAllButton {
+  min-height: 36px;
+  gap: 6px;
+  padding-inline: 10px;
+  color: var(--so-brand);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.markAllButton:hover:not(:disabled),
+.inlineStateAction:hover,
+.primaryItemAction:hover,
+.footerPrimaryAction:hover {
+  color: var(--so-brand-hover);
+  background: var(--so-brand-soft);
+}
+
+.markAllButton:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.filtersRegion {
+  padding: var(--app-space-3) var(--app-space-5) 0;
+}
+
+.filterTabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--app-space-1);
+  padding: var(--app-space-1);
+  border: 1px solid var(--so-border);
+  border-radius: var(--app-radius-card);
+  background: var(--so-surface-muted);
+}
+
+.filterTab {
+  min-height: 36px;
+  border-radius: var(--app-radius-control);
+  color: var(--so-text-secondary);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  transition:
+    color var(--motion-hover) var(--motion-ease-standard),
+    background-color var(--motion-hover) var(--motion-ease-standard);
+}
+
+.filterTab:hover {
+  color: var(--so-text);
+  background: var(--so-surface-hover);
+}
+
+.filterTabActive,
+.filterTabActive:hover {
+  color: var(--so-on-brand);
+  background: var(--so-brand);
+}
+
+.pausedBanner {
+  min-width: 0;
+  justify-content: space-between;
+  gap: var(--app-space-3);
+  margin-top: var(--app-space-3);
+  padding: 10px 12px;
+  border: 1px solid var(--so-border);
+  border-radius: var(--app-radius-card);
+  color: var(--so-text-secondary);
+  background: var(--so-surface-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.pausedCopy {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pausedAction {
+  flex: 0 0 auto;
+  color: var(--so-brand);
+  font-weight: 600;
+}
+
+.pausedAction:hover {
+  color: var(--so-brand-hover);
+  text-decoration: underline;
+}
+
+.inlineStateRegion {
+  margin-top: var(--app-space-3);
+}
+
+.inlineStateAction,
+.stateAction {
+  min-height: 32px;
+  padding-inline: 12px;
+  color: var(--so-brand);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.stateAction {
+  border: 1px solid var(--so-border);
+  background: var(--so-surface);
+}
+
+.stateAction:hover {
+  border-color: var(--so-border-strong);
+  color: var(--so-brand-hover);
+  background: var(--so-surface-hover);
+}
+
+.scrollRegion {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0 var(--app-space-5) var(--app-space-5);
+}
+
+.sectionTitle {
+  padding: var(--app-space-5) 0 var(--app-space-3);
+  color: var(--so-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.stateSurface {
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+
+.stateSurface > :nth-child(3) {
+  grid-column: 2;
+  justify-content: flex-start;
+}
+
+.reminderList {
+  display: grid;
+  gap: var(--app-space-3);
+}
+
+.reminderItem {
+  padding: var(--app-space-4);
+  border: 1px solid var(--so-divider);
+  border-radius: var(--app-radius-card);
+  color: var(--so-text);
+  background: var(--so-surface);
+  transition:
+    border-color var(--motion-hover) var(--motion-ease-standard),
+    background-color var(--motion-hover) var(--motion-ease-standard),
+    opacity var(--motion-hover) var(--motion-ease-standard);
+}
+
+.reminderItem[data-kind='deadline'] {
+  border-color: var(--so-border-selected);
+  background: var(--so-brand-soft);
+}
+
+.reminderItem:hover {
+  border-color: var(--so-border-strong);
+  background: var(--so-surface-hover);
+}
+
+.reminderItemRead {
+  opacity: 0.7;
+}
+
+.reminderMain {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 8px;
+  align-items: start;
+  gap: var(--app-space-3);
+}
+
+.reminderIcon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  color: var(--so-brand-strong);
+  background: var(--so-brand-soft);
+}
+
+.reminderGlyph {
+  width: 20px;
+  height: 20px;
+}
+
+.reminderCopy {
+  min-width: 0;
+}
+
+.reminderTitle {
+  color: var(--so-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.reminderDetail,
+.reminderTime {
+  margin-top: var(--app-space-1);
+  color: var(--so-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.reminderTime {
+  color: var(--so-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.unreadIndicator {
+  width: 8px;
+  height: 8px;
+  margin-top: var(--app-space-1);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.unreadIndicatorActive {
+  background: var(--so-brand);
+}
+
+.reminderActions {
+  justify-content: flex-end;
+  gap: var(--app-space-1);
+  margin-top: var(--app-space-3);
+  padding-top: var(--app-space-2);
+  border-top: 1px solid var(--so-divider);
+}
+
+.primaryItemAction,
+.itemAction,
+.iconItemAction {
+  min-height: 32px;
+  justify-content: center;
+  gap: var(--app-space-1);
+  padding-inline: 10px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.primaryItemAction {
+  color: var(--so-brand);
+  font-weight: 600;
+}
+
+.itemAction,
+.iconItemAction {
+  color: var(--so-text-secondary);
+  font-weight: 500;
+}
+
+.itemAction:hover,
+.iconItemAction:hover,
+.footerSecondaryAction:hover {
+  color: var(--so-brand);
+  background: var(--so-surface-hover);
+}
+
+.iconItemAction {
+  width: 32px;
+  padding-inline: 0;
+}
+
+.actionGlyph {
+  width: 14px;
+  height: 14px;
+}
+
+.snoozeControl {
+  position: relative;
+}
+
+.snoozeMenu {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  bottom: calc(100% + var(--app-space-2));
+  width: 224px;
+  padding: 6px;
+  border: 1px solid var(--so-border-strong);
+  border-radius: var(--so-radius-popup);
+  background: var(--so-surface);
+  box-shadow: var(--so-shadow-popover);
+}
+
+.snoozeMenuItem {
+  display: grid;
+  width: 100%;
+  min-height: 48px;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 1px;
+  padding: 7px 10px;
+  border-radius: var(--app-radius-control);
+  color: var(--so-text);
+  text-align: left;
+  transition:
+    color var(--motion-hover) var(--motion-ease-standard),
+    background-color var(--motion-hover) var(--motion-ease-standard);
+}
+
+.snoozeMenuItem:hover,
+.snoozeMenuItem:focus-visible {
+  color: var(--so-brand-strong);
+  background: var(--so-surface-hover);
+  outline: none;
+}
+
+.snoozeMenuItem strong {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.snoozeMenuItem small {
+  color: var(--so-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.undoBar {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-3);
+  padding: 8px var(--app-space-5);
+  border-top: 1px solid var(--so-border-selected);
+  color: var(--so-brand-strong);
+  background: var(--so-brand-soft);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.undoButton {
+  min-width: 52px;
+  min-height: 30px;
+  color: var(--so-brand);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.undoButton:hover,
+.undoButton:focus-visible {
+  color: var(--so-brand-hover);
+  background: var(--so-brand-soft-hover);
+}
+
+.footer {
+  justify-content: space-between;
+  gap: var(--app-space-3);
+  padding: var(--app-space-3) var(--app-space-5);
+  border-top: 1px solid var(--so-divider);
+  background: var(--so-surface);
+}
+
+.footerPrimaryAction,
+.footerSecondaryAction {
+  min-height: 36px;
+  gap: 6px;
+  padding-inline: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.footerPrimaryAction {
+  color: var(--so-brand);
+}
+
+.footerSecondaryAction {
+  color: var(--so-text-secondary);
+}
+
+.footerSpacer {
+  min-width: 1px;
+  min-height: 1px;
+}
+
+.toolbarButton:focus-visible,
+.markAllButton:focus-visible,
+.filterTab:focus-visible,
+.pausedAction:focus-visible,
+.inlineStateAction:focus-visible,
+.stateAction:focus-visible,
+.primaryItemAction:focus-visible,
+.itemAction:focus-visible,
+.iconItemAction:focus-visible,
+.footerPrimaryAction:focus-visible,
+.footerSecondaryAction:focus-visible,
+.undoButton:focus-visible {
+  outline: 2px solid var(--so-brand);
+  outline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+  .header,
+  .filtersRegion,
+  .scrollRegion,
+  .footer {
+    padding-inline: var(--app-space-4);
+  }
+
+  .snoozeMenu {
+    right: -36px;
+    width: min(224px, calc(100vw - 40px));
+  }
+}
+
+@media (forced-colors: active) {
+  .filterTabActive,
+  .unreadIndicatorActive {
+    color: HighlightText;
+    background: Highlight;
+  }
+
+  .reminderItem,
+  .stateAction,
+  .snoozeMenu {
+    border-color: CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbarButton,
+  .markAllButton,
+  .filterTab,
+  .pausedAction,
+  .inlineStateAction,
+  .stateAction,
+  .reminderItem,
+  .primaryItemAction,
+  .itemAction,
+  .iconItemAction,
+  .footerPrimaryAction,
+  .footerSecondaryAction,
+  .snoozeMenuItem,
+  .undoButton {
+    transition: none;
+  }
+}

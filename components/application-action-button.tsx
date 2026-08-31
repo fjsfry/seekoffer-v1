@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
-import { Check, LoaderCircle, Plus } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { ArrowRight, LoaderCircle, Plus } from 'lucide-react';
 import { addProjectToApplicationTable, fetchUserProjects, watchApplicationTable } from '@/lib/cloudbase-data';
 import { openAuthModal, writeAuthIntent } from '@/lib/auth-intent';
 import { useUserSessionState } from '@/hooks/use-user-session';
@@ -24,13 +24,13 @@ function getActionErrorMessage(error: unknown) {
     return error;
   }
 
-  return '加入工作台失败，请刷新后重试；如果仍然失败，请通过右下角反馈入口告诉我们。';
+  return '加入申请失败，请刷新后重试；如果仍然失败，请通过右下角反馈入口告诉我们。';
 }
 
 export function ApplicationActionButton({
   projectId,
   variant = 'primary',
-  label = '加入工作台',
+  label = '加入申请',
   addedLabel
 }: {
   projectId: string;
@@ -39,6 +39,7 @@ export function ApplicationActionButton({
   addedLabel?: string;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { loggedIn } = useUserSessionState();
   const [added, setAdded] = useState(false);
   const [pending, setPending] = useState(false);
@@ -101,23 +102,40 @@ export function ApplicationActionButton({
     }
   }
 
+  function handlePrimaryAction() {
+    if (added) {
+      router.push('/');
+      return;
+    }
+    void handleAdd();
+  }
+
   const className =
     variant === 'secondary'
       ? 'w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep disabled:opacity-70'
       : 'rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white';
 
   return (
-    <div className="space-y-2">
-      <button onClick={handleAdd} className={className} disabled={pending}>
+    <div
+      className="space-y-2"
+      data-action-state={pending ? 'pending' : added ? 'added' : 'idle'}
+    >
+      <button
+        type="button"
+        onClick={handlePrimaryAction}
+        className={className}
+        disabled={pending}
+        aria-busy={pending}
+      >
         <span className="inline-flex items-center gap-2">
           {pending ? (
             <LoaderCircle className="h-4 w-4 animate-spin" />
           ) : added ? (
-            <Check className="h-4 w-4" />
+            <ArrowRight className="h-4 w-4" />
           ) : (
             <Plus className="h-4 w-4" />
           )}
-          {added ? addedLabel || (variant === 'secondary' ? '已加入' : '已加入工作台') : pending ? '加入中...' : label}
+          {added ? addedLabel || '查看申请' : pending ? '加入中...' : label}
         </span>
       </button>
       {message ? <div className="text-xs leading-5 text-rose-600">{message}</div> : null}

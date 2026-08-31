@@ -7,7 +7,7 @@ export function SeekofferLogo() {
       <div className="overflow-hidden rounded-[18px] border border-brand/10 bg-white p-1 shadow-sm">
         <Image
           src="/logo.png"
-          alt="寻鹿 Seekoffer"
+          alt=""
           width={40}
           height={40}
           className="h-9 w-9 rounded-[12px] object-cover md:h-11 md:w-11 md:rounded-[14px]"

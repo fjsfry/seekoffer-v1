@@ -92,8 +92,10 @@ export function StatusBadge({
 
   return (
     <span
+      data-status-tone={finalTone}
       className={joinClasses(
-        'inline-flex items-center rounded-full font-medium whitespace-nowrap',
+        'desktop-status-badge inline-flex items-center rounded-full font-medium whitespace-nowrap',
+        `desktop-status-badge--${finalTone}`,
         sizeClassMap[size],
         toneClassMap[finalTone],
         className

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
+import { DesktopStateSurface } from '@/components/desktop-state-surface';
 import { SiteShell } from '@/components/site-shell';
 import {
   competitionItems,
@@ -41,7 +42,7 @@ export default function CompetitionsPage() {
   const [category, setCategory] = useState('全部');
   const [keyword, setKeyword] = useState('');
   const [showAllCategories, setShowAllCategories] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [requestedPage, setRequestedPage] = useState(1);
   const categories = useMemo(() => getCompetitionCategories(), []);
   const filters = useMemo<CompetitionFilters>(
     () => ({ level, category, keyword }),
@@ -60,18 +61,11 @@ export default function CompetitionsPage() {
     [filters]
   );
   const pageCount = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+  const currentPage = Math.min(requestedPage, pageCount);
   const pageItems = useMemo(
     () => filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
     [currentPage, filteredItems]
   );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [category, keyword, level]);
-
-  useEffect(() => {
-    if (currentPage > pageCount) setCurrentPage(pageCount);
-  }, [currentPage, pageCount]);
   const levelCounts = useMemo(
     () => buildFilterCounts(competitionLevelOptions, filters, 'level'),
     [filters]
@@ -118,11 +112,13 @@ export default function CompetitionsPage() {
     setCategory('全部');
     setKeyword('');
     setShowAllCategories(false);
+    setRequestedPage(1);
   };
 
   return (
     <SiteShell>
-      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
+      <div className="desktop-secondary-page desktop-competitions-page space-y-8 lg:space-y-10">
+      <section className="desktop-secondary-header page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">
             全国大学生赛事一览
@@ -132,7 +128,7 @@ export default function CompetitionsPage() {
           </p>
         </div>
 
-        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+        <div className="desktop-secondary-summary mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
           {pageStats.map((item) => {
             const Icon = item.icon;
 
@@ -153,7 +149,7 @@ export default function CompetitionsPage() {
         </div>
       </section>
 
-      <section className="surface-card overflow-hidden rounded-[32px] p-5 lg:p-6">
+      <section className="desktop-filter-surface surface-card overflow-hidden rounded-[32px] p-5 lg:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-brand/8 text-brand">
@@ -168,7 +164,7 @@ export default function CompetitionsPage() {
             type="button"
             onClick={resetFilters}
             disabled={!hasActiveFilters}
-            className="inline-flex w-fit items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-brand/30 hover:text-brand disabled:cursor-not-allowed disabled:opacity-45"
+            className="desktop-competition-reset inline-flex w-fit items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-brand/30 hover:text-brand disabled:cursor-not-allowed disabled:opacity-45"
           >
             <RotateCcw className="h-4 w-4" />
             重置筛选
@@ -180,12 +176,16 @@ export default function CompetitionsPage() {
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
               value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
+              onChange={(event) => {
+                setKeyword(event.target.value);
+                setRequestedPage(1);
+              }}
               placeholder="搜索赛事名称、简称、类别或主办方"
-              className="h-12 w-full rounded-2xl border border-slate-100 bg-white pl-12 pr-4 text-sm font-semibold text-ink outline-none transition placeholder:text-slate-400 focus:border-brand/35 focus:ring-4 focus:ring-brand/8"
+              aria-label="搜索竞赛"
+              className="desktop-competition-search-input h-12 w-full rounded-2xl border border-slate-100 bg-white pl-12 pr-4 text-sm font-semibold text-ink outline-none transition placeholder:text-slate-400 focus:border-brand/35 focus:ring-4 focus:ring-brand/8"
             />
           </label>
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-sm font-semibold text-slate-600">
+          <div className="desktop-competition-filter-summary rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-sm font-semibold text-slate-600">
             当前显示 <span className="text-brand">{filteredItems.length}</span>
             <span className="mx-1 text-slate-300">/</span>
             {competitionItems.length} 个赛事
@@ -199,16 +199,20 @@ export default function CompetitionsPage() {
               options={competitionLevelOptions}
               value={level}
               counts={levelCounts}
-              onChange={(value) =>
-                setLevel((current) => (current === value && value !== '全部' ? '全部' : (value as LevelFilter)))
-              }
+              onChange={(value) => {
+                setLevel((current) => (current === value && value !== '全部' ? '全部' : (value as LevelFilter)));
+                setRequestedPage(1);
+              }}
             />
             <FilterChips
               label="专业类别"
               options={categoryPreviewOptions}
               value={category}
               counts={categoryCounts}
-              onChange={(value) => setCategory((current) => (current === value && value !== '全部' ? '全部' : value))}
+              onChange={(value) => {
+                setCategory((current) => (current === value && value !== '全部' ? '全部' : value));
+                setRequestedPage(1);
+              }}
             />
             {hiddenCategoryCount > 0 ? (
               <button
@@ -224,7 +228,7 @@ export default function CompetitionsPage() {
         </div>
       </section>
 
-      <section className="flex flex-wrap items-center justify-between gap-3 px-1 lg:px-2">
+      <section className="desktop-secondary-toolbar flex flex-wrap items-center justify-between gap-3 px-1 lg:px-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold text-slate-500">
           <span>
             当前显示 <span className="text-brand">{filteredItems.length}</span> 个赛事
@@ -248,33 +252,37 @@ export default function CompetitionsPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <section className="desktop-competitions-list grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filteredItems.length ? (
           pageItems.map((item) => <CompetitionCard key={item.id} item={item} />)
         ) : (
-          <div className="surface-card rounded-[28px] px-6 py-12 text-center md:col-span-2 xl:col-span-3">
-            <Trophy className="mx-auto h-9 w-9 text-slate-300" />
-            <h3 className="mt-4 text-lg font-semibold text-ink">没有匹配的竞赛</h3>
-            <p className="mt-2 text-sm leading-7 text-slate-500">可以清空关键词，或放宽级别、类别筛选。</p>
-          </div>
+          <DesktopStateSurface
+            className="md:col-span-2 xl:col-span-3"
+            variant="section"
+            icon={<Trophy />}
+            title="没有匹配的竞赛"
+            detail="可以清空关键词，或放宽级别、类别筛选。"
+            action={hasActiveFilters ? <button type="button" onClick={resetFilters}>清除筛选</button> : undefined}
+          />
         )}
       </section>
 
       {filteredItems.length > PAGE_SIZE ? (
-        <nav className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-white/80 bg-white/90 px-4 py-3 shadow-soft" aria-label="竞赛列表分页">
+        <nav className="desktop-secondary-pagination flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-white/80 bg-white/90 px-4 py-3 shadow-soft" aria-label="竞赛列表分页">
           <div className="text-sm text-slate-500">
             第 {currentPage} / {pageCount} 页，当前显示 {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredItems.length)} 条
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" disabled={currentPage === 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} className="inline-flex h-10 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 disabled:opacity-40">
+            <button type="button" disabled={currentPage === 1} onClick={() => setRequestedPage(Math.max(1, currentPage - 1))} className="inline-flex h-10 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 disabled:opacity-40">
               <ChevronLeft className="h-4 w-4" />上一页
             </button>
-            <button type="button" disabled={currentPage === pageCount} onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))} className="inline-flex h-10 items-center gap-1 rounded-xl bg-brand px-3 text-sm font-semibold text-white disabled:opacity-40">
+            <button type="button" disabled={currentPage === pageCount} onClick={() => setRequestedPage(Math.min(pageCount, currentPage + 1))} className="inline-flex h-10 items-center gap-1 rounded-xl bg-brand px-3 text-sm font-semibold text-white disabled:opacity-40">
               下一页<ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </nav>
       ) : null}
+      </div>
     </SiteShell>
   );
 }
@@ -380,9 +388,7 @@ function CompetitionCard({ item }: { item: CompetitionItem }) {
         : 'bg-rose-50 text-rose-500';
 
   return (
-    <article className="group relative flex min-h-[270px] flex-col overflow-hidden rounded-[18px] border border-slate-200/70 bg-gradient-to-br from-white via-white to-slate-50/90 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/15 hover:shadow-soft">
-      <Trophy className="pointer-events-none absolute -right-7 top-10 h-36 w-36 text-slate-900/[0.035] transition group-hover:text-brand/[0.055]" />
-
+    <article className="desktop-competition-card">
       <div className="relative z-10 flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-wrap gap-2">
           <span className={`rounded-full px-3 py-1 text-xs font-semibold ${levelTone}`}>{item.level}</span>
@@ -407,17 +413,24 @@ function CompetitionCard({ item }: { item: CompetitionItem }) {
         </div>
       </div>
 
-      <a
-        href={item.officialUrl || '#'}
-        target="_blank"
-        rel="noreferrer"
-        className={`relative z-10 mt-auto inline-flex w-fit items-center gap-2 pt-5 text-sm font-semibold ${
-          item.officialUrl ? 'text-brand hover:text-brand-deep' : 'pointer-events-none text-slate-300'
-        }`}
-      >
-        {item.officialUrl ? '前往官网' : '官网待补充'}
-        <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-      </a>
+      {item.officialUrl ? (
+        <a
+          href={item.officialUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="relative z-10 mt-auto inline-flex w-fit items-center gap-2 pt-5 text-sm font-semibold text-brand hover:text-brand-deep"
+        >
+          前往官网
+          <ArrowUpRight className="h-4 w-4" />
+        </a>
+      ) : (
+        <span
+          aria-disabled="true"
+          className="relative z-10 mt-auto inline-flex w-fit pt-5 text-sm font-semibold text-slate-400"
+        >
+          官网待补充
+        </span>
+      )}
     </article>
   );
 }

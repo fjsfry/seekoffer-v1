@@ -60,7 +60,8 @@ const faqs = [
 export default function ConsultingPage() {
   return (
     <SiteShell>
-      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
+      <div className="desktop-secondary-page desktop-consulting-page space-y-8 lg:space-y-10">
+      <section className="desktop-secondary-header page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">保研咨询</h1>
           <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">把背景、目标、材料和申请节奏整理清楚，形成更稳的下一步动作。</p>
@@ -77,7 +78,7 @@ export default function ConsultingPage() {
           </div>
         </div>
 
-        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+        <div className="desktop-secondary-summary mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
           {[
             ['定位复核', '冲稳保'],
             ['材料清单', '查短板'],
@@ -98,7 +99,7 @@ export default function ConsultingPage() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[30px] bg-brand px-6 py-7 text-white shadow-float sm:px-8">
+      <section className="desktop-consulting-callout overflow-hidden rounded-[30px] bg-brand px-6 py-7 text-white shadow-float sm:px-8">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-2xl font-semibold">先说明问题，再判断是否需要服务</h2>
@@ -111,7 +112,7 @@ export default function ConsultingPage() {
         </div>
       </section>
 
-      <section className="surface-card rounded-[34px] p-6 lg:p-8">
+      <section className="desktop-reading-section surface-card rounded-[34px] p-6 lg:p-8">
         <div className="flex items-start gap-3">
           <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
             <Target className="h-5 w-5" />
@@ -182,7 +183,7 @@ export default function ConsultingPage() {
         </div>
       </section>
 
-      <section className="surface-card rounded-[34px] p-6 lg:p-8">
+      <section className="desktop-reading-section surface-card rounded-[34px] p-6 lg:p-8">
         <div className="flex items-start gap-3">
           <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
             <HelpCircle className="h-5 w-5" />
@@ -201,6 +202,7 @@ export default function ConsultingPage() {
           ))}
         </div>
       </section>
+      </div>
     </SiteShell>
   );
 }

@@ -1,8 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { AuthActionBridge } from '@/components/auth-action-bridge';
-import { AuthModal } from '@/components/auth-modal';
-import { UserSessionProvider } from '@/components/user-session-provider';
-import { VisitorPresenceTracker } from '@/components/visitor-presence-tracker';
+import { BuildSurface, buildSurfaceDocument } from 'seekoffer-build-surface';
 import { SITE_DESCRIPTION, SITE_NAME, absoluteUrl, buildOrganizationJsonLd, buildWebSiteJsonLd, jsonLdScript } from '@/lib/seo';
 import './globals.css';
 
@@ -84,18 +81,17 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN">
+    <html
+      lang="zh-CN"
+      className={buildSurfaceDocument.className}
+      suppressHydrationWarning={buildSurfaceDocument.suppressHydrationWarning}
+    >
       <body>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={jsonLdScript([buildWebSiteJsonLd(), buildOrganizationJsonLd()])}
         />
-        <UserSessionProvider>
-          <AuthActionBridge />
-          <AuthModal />
-          <VisitorPresenceTracker />
-          {children}
-        </UserSessionProvider>
+        <BuildSurface>{children}</BuildSurface>
       </body>
     </html>
   );

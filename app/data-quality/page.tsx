@@ -23,14 +23,15 @@ const qualityCards = [
 export default function DataQualityPage() {
   return (
     <SiteShell>
-      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
+      <div className="desktop-secondary-page desktop-data-quality-page desktop-reading-page space-y-8 lg:space-y-10">
+      <section className="desktop-secondary-header page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">通知整理说明</h1>
           <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
             寻鹿会把分散的保研通知整理成更容易筛选、收藏和推进的申请信息。
           </p>
         </div>
-        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+        <div className="desktop-secondary-summary mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
           {qualityCards.map((item) => {
             const Icon = item.icon;
 
@@ -102,6 +103,7 @@ export default function DataQualityPage() {
           </a>
         </aside>
       </section>
+      </div>
     </SiteShell>
   );
 }

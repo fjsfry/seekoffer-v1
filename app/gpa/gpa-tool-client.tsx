@@ -18,6 +18,8 @@ import {
   Trash2,
   Upload
 } from 'lucide-react';
+import { DesktopConfirmDialog } from '@/components/desktop-confirm-dialog';
+import { emitDesktopFeedback } from '@/lib/desktop-route-events';
 
 type Semester = '1-1' | '1-2' | '2-1' | '2-2' | '3-1' | '3-2' | '4-1' | '4-2';
 type CourseType = 'required' | 'core' | 'elective' | 'general' | 'public' | 'other';
@@ -407,7 +409,9 @@ export function GpaToolClient() {
   const [message, setMessage] = useState('');
   const [lastSaved, setLastSaved] = useState('');
   const [hydrated, setHydrated] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const restoreInputRef = useRef<HTMLInputElement | null>(null);
+  const resetDialogReturnFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -593,27 +597,56 @@ export function GpaToolClient() {
   }
 
   function resetAll() {
+    const snapshot = { courses, bonusItems, materials, settings };
     setCourses([]);
     setBonusItems([]);
     setMaterials(DEFAULT_MATERIALS);
     setSettings(DEFAULT_SETTINGS);
     setMessage('工具数据已清空，本地记忆已同步更新。');
+    emitDesktopFeedback({
+      message: 'GPA 工具数据已清空',
+      detail: '课程、加分项、材料进度和计算设置已重置。',
+      tone: 'success',
+      duration: 7000,
+      actionLabel: '撤销',
+      onAction: () => {
+        setCourses(snapshot.courses);
+        setBonusItems(snapshot.bonusItems);
+        setMaterials(snapshot.materials);
+        setSettings(snapshot.settings);
+        setMessage('已撤销清空，原有工具数据已恢复。');
+      }
+    });
+  }
+
+  function requestReset() {
+    const isDesktopSurface = document.documentElement.classList.contains('seekoffer-desktop-surface');
+    if (isDesktopSurface) {
+      resetDialogReturnFocusRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setResetDialogOpen(true);
+      return;
+    }
+
+    if (window.confirm('确定清空 GPA 工具中的课程、加分项、材料进度和设置吗？')) {
+      resetAll();
+    }
   }
 
   return (
     <>
-      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center lg:px-8">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold text-brand shadow-sm">
+      <section className="desktop-gpa-header page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center lg:px-8">
+        <div className="desktop-gpa-header-copy">
+          <div className="desktop-gpa-save-badge inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold text-brand shadow-sm">
             <Save className="h-4 w-4" />
             本地记忆开启
           </div>
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-ink md:text-5xl">GPA 与材料工具</h1>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">
+          <h1 className="desktop-gpa-title mt-4 text-4xl font-semibold tracking-tight text-ink md:text-5xl">GPA 与材料工具</h1>
+          <p className="desktop-gpa-subtitle mt-4 max-w-3xl text-base leading-8 text-slate-600">
             把保研申请里反复计算和检查的事情集中起来：课程 GPA、加分折算、材料进度和目标反推都保存在当前浏览器。
           </p>
         </div>
-        <div className="rounded-[28px] border border-brand/10 bg-white/82 p-5 shadow-sm">
+        <div className="desktop-gpa-autosave rounded-[28px] border border-brand/10 bg-white/82 p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brand/8 text-brand">
               <Database className="h-5 w-5" />
@@ -623,7 +656,7 @@ export function GpaToolClient() {
               <div className="mt-1 text-xs text-slate-500">{lastSaved ? new Date(lastSaved).toLocaleString('zh-CN') : '等待首次输入'}</div>
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs text-slate-500">
+          <div className="desktop-gpa-autosave-metrics mt-4 grid grid-cols-2 gap-2 text-center text-xs text-slate-500">
             <div className="rounded-2xl bg-slate-50 px-3 py-3">
               <div className="text-lg font-semibold text-ink">{stats.totalCourses}</div>
               课程
@@ -636,7 +669,7 @@ export function GpaToolClient() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="desktop-gpa-summary grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="加权均分" value={stats.weightedAverage ? formatNumber(stats.weightedAverage, 1) : '--'} hint="按当前筛选范围计算" icon={Gauge} tone="brand" />
         <MetricCard label="计入学分" value={formatNumber(stats.countedCredits, 1)} hint={`总学分 ${formatNumber(stats.totalCredits, 1)}`} icon={Layers3} tone="green" />
         <MetricCard label="材料进度" value={`${stats.materialProgress}%`} hint={`${materials.filter((task) => task.status === 'done').length}/${materials.length} 已完成`} icon={ClipboardCheck} tone="blue" />
@@ -644,7 +677,7 @@ export function GpaToolClient() {
       </section>
 
       {message ? (
-        <section className="rounded-[28px] border border-brand/15 bg-white/86 px-5 py-4 text-sm text-brand shadow-sm backdrop-blur">
+        <section className="desktop-gpa-message desktop-inline-state rounded-[28px] border border-brand/15 bg-white/86 px-5 py-4 text-sm text-brand shadow-sm backdrop-blur" role="status">
           <div className="flex items-start gap-3">
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="leading-7">{message}</div>
@@ -652,8 +685,8 @@ export function GpaToolClient() {
         </section>
       ) : null}
 
-      <section className="surface-card rounded-[34px] p-4 sm:p-5 lg:p-6">
-        <div className="no-scrollbar flex gap-2 overflow-x-auto rounded-[26px] bg-slate-100/80 p-1">
+      <section className="desktop-gpa-workspace surface-card rounded-[34px] p-4 sm:p-5 lg:p-6">
+        <div className="desktop-gpa-tabs no-scrollbar flex gap-2 overflow-x-auto rounded-[26px] bg-slate-100/80 p-1" aria-label="GPA 与材料工具">
           {[
             { key: 'courses', label: '课程', icon: Layers3 },
             { key: 'gpa', label: 'GPA', icon: BarChart3 },
@@ -667,8 +700,9 @@ export function GpaToolClient() {
               <button
                 key={item.key}
                 type="button"
+                aria-pressed={selected}
                 onClick={() => setActiveTab(item.key as TabKey)}
-                className={`inline-flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
+                className={`desktop-gpa-tab inline-flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
                   selected ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:bg-white/70 hover:text-brand'
                 }`}
               >
@@ -680,10 +714,10 @@ export function GpaToolClient() {
         </div>
 
         {activeTab === 'courses' ? (
-          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
-            <div className="rounded-[28px] border border-slate-100 bg-white/90 p-5">
+          <div className="desktop-gpa-courses-pane mt-6 grid gap-6 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
+            <div className="desktop-gpa-panel desktop-gpa-course-form rounded-[28px] border border-slate-100 bg-white/90 p-5">
               <SectionTitle icon={Plus} title="添加课程" subtitle="成绩会实时纳入 GPA 计算，并自动保存。" />
-              <div className="mt-5 grid gap-4">
+              <div className="desktop-gpa-form-fields mt-5 grid gap-4">
                 <Field label="课程名称">
                   <input className={inputClassName} value={courseDraft.name} onChange={(event) => setCourseDraft((current) => ({ ...current, name: event.target.value }))} placeholder="如：高等数学 A" />
                 </Field>
@@ -725,7 +759,7 @@ export function GpaToolClient() {
                     ))}
                   </select>
                 </Field>
-                <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
+                <label className="desktop-gpa-checkbox-row flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
                   <input
                     type="checkbox"
                     checked={courseDraft.countForGpa}
@@ -734,7 +768,7 @@ export function GpaToolClient() {
                   />
                   计入保研 GPA
                 </label>
-                <div className="flex flex-wrap gap-3">
+                <div className="desktop-gpa-form-actions flex flex-wrap gap-3">
                   <button type="button" onClick={addCourse} className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep">
                     <Plus className="h-4 w-4" />
                     添加课程
@@ -747,10 +781,10 @@ export function GpaToolClient() {
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-100 bg-white/90 p-5">
+            <div className="desktop-gpa-panel desktop-gpa-table-panel rounded-[28px] border border-slate-100 bg-white/90 p-5">
               <SectionTitle icon={Layers3} title="课程列表" subtitle="可临时排除不参与保研 GPA 的课程。" />
-              <div className="mt-5 overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
+              <div className="desktop-gpa-table-scroll mt-5 overflow-x-auto">
+                <table className="desktop-gpa-table w-full min-w-[760px] text-left text-sm">
                   <thead className="text-xs font-semibold text-slate-500">
                     <tr className="border-b border-slate-100">
                       <th className="py-3 pr-3">课程</th>
@@ -803,8 +837,8 @@ export function GpaToolClient() {
         ) : null}
 
         {activeTab === 'gpa' ? (
-          <div className="mt-6 grid gap-6">
-            <div className="grid gap-4 rounded-[28px] border border-slate-100 bg-white/90 p-5 lg:grid-cols-2">
+          <div className="desktop-gpa-results-pane mt-6 grid gap-6">
+            <div className="desktop-gpa-panel desktop-gpa-filter-panel grid gap-4 rounded-[28px] border border-slate-100 bg-white/90 p-5 lg:grid-cols-2">
               <Field label="计算范围">
                 <select className={inputClassName} value={settings.scope} onChange={(event) => updateSetting('scope', event.target.value as Scope)}>
                   <option value="all">全部课程</option>
@@ -826,26 +860,26 @@ export function GpaToolClient() {
               </Field>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="desktop-gpa-algorithm-strip grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               {ALGORITHM_OPTIONS.map((option) => {
                 const result = gpaResults.find((item) => item.algo === option.value) || calculateGpa([], option.value);
                 const isBest = option.value !== 'weighted' && bestFourPoint?.algo === option.value;
                 return (
-                  <div key={option.value} className={`rounded-[28px] border bg-white/92 p-5 shadow-sm ${isBest ? 'border-emerald-200 ring-4 ring-emerald-50' : 'border-slate-100'}`}>
-                    <div className="text-sm font-semibold text-slate-500">{option.label}</div>
-                    <div className={`mt-4 text-3xl font-semibold ${option.value === 'weighted' ? 'text-sky-600' : 'text-brand'}`}>
+                  <div key={option.value} className={`desktop-gpa-algorithm-result rounded-[28px] border bg-white/92 p-5 shadow-sm ${isBest ? 'border-emerald-200 ring-4 ring-emerald-50' : 'border-slate-100'}`}>
+                    <div className="desktop-gpa-algorithm-label text-sm font-semibold text-slate-500">{option.label}</div>
+                    <div className={`desktop-gpa-algorithm-value mt-4 text-3xl font-semibold ${option.value === 'weighted' ? 'text-sky-600' : 'text-brand'}`}>
                       {formatNumber(result.gpa, option.value === 'weighted' ? 1 : 3)}
                     </div>
-                    <div className="mt-2 text-xs text-slate-500">{option.scale}{isBest ? ' · 当前最高' : ''}</div>
+                    <div className="desktop-gpa-algorithm-meta mt-2 text-xs text-slate-500">{option.scale}{isBest ? ' · 当前最高' : ''}</div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="rounded-[28px] border border-slate-100 bg-white/90 p-5">
+            <div className="desktop-gpa-panel desktop-gpa-table-panel rounded-[28px] border border-slate-100 bg-white/90 p-5">
               <SectionTitle icon={BarChart3} title="课程换算明细" subtitle={`当前筛选 ${filteredCourses.length} 门课程。`} />
-              <div className="mt-5 overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
+              <div className="desktop-gpa-table-scroll mt-5 overflow-x-auto">
+                <table className="desktop-gpa-table w-full min-w-[720px] text-left text-sm">
                   <thead className="text-xs font-semibold text-slate-500">
                     <tr className="border-b border-slate-100">
                       <th className="py-3 pr-3">课程</th>
@@ -882,14 +916,14 @@ export function GpaToolClient() {
         ) : null}
 
         {activeTab === 'materials' ? (
-          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="rounded-[28px] border border-slate-100 bg-white/90 p-5">
+          <div className="desktop-gpa-materials-pane mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="desktop-gpa-panel desktop-gpa-materials-panel rounded-[28px] border border-slate-100 bg-white/90 p-5">
               <SectionTitle icon={ClipboardCheck} title="材料进度" subtitle="状态、截止时间和备注会一起保存。" />
-              <div className="mt-5 grid gap-3">
+              <div className="desktop-gpa-material-list mt-5 grid gap-3">
                 {materials.map((task) => {
                   const meta = deadlineMeta(task);
                   return (
-                    <div key={task.id} className="grid gap-3 rounded-[24px] bg-slate-50 p-4 lg:grid-cols-[minmax(0,1fr)_150px_150px_minmax(180px,1fr)] lg:items-center">
+                    <div key={task.id} className="desktop-gpa-material-row grid gap-3 rounded-[24px] bg-slate-50 p-4 lg:grid-cols-[minmax(0,1fr)_150px_150px_minmax(180px,1fr)] lg:items-center">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="font-semibold text-ink">{task.title}</div>
@@ -924,14 +958,14 @@ export function GpaToolClient() {
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-100 bg-white/90 p-5">
+            <div className="desktop-gpa-panel desktop-gpa-deadlines-panel rounded-[28px] border border-slate-100 bg-white/90 p-5">
               <SectionTitle icon={CalendarClock} title="截止提醒" subtitle="优先处理逾期和 3 天内事项。" />
-              <div className="mt-5 grid gap-3">
+              <div className="desktop-gpa-deadline-list mt-5 grid gap-3">
                 {materials.filter((task) => task.status !== 'done').map((task) => ({ task, meta: deadlineMeta(task) }))
                   .sort((a, b) => (a.task.deadline || '9999').localeCompare(b.task.deadline || '9999'))
                   .slice(0, 5)
                   .map(({ task, meta }) => (
-                    <div key={task.id} className="rounded-[22px] bg-slate-50 px-4 py-4">
+                    <div key={task.id} className="desktop-gpa-deadline-row rounded-[22px] bg-slate-50 px-4 py-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-semibold text-ink">{task.title}</div>
@@ -948,8 +982,8 @@ export function GpaToolClient() {
         ) : null}
 
         {activeTab === 'goal' ? (
-          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
-            <div className="rounded-[28px] border border-slate-100 bg-white/90 p-5">
+          <div className="desktop-gpa-goal-pane mt-6 grid gap-6 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
+            <div className="desktop-gpa-panel desktop-gpa-goal-form rounded-[28px] border border-slate-100 bg-white/90 p-5">
               <SectionTitle icon={Target} title="目标反推" subtitle="估算后续课程需要达到的平均表现。" />
               <div className="mt-5 grid gap-4">
                 <Field label="目标算法">
@@ -968,23 +1002,23 @@ export function GpaToolClient() {
               </div>
             </div>
 
-            <div className="grid gap-4">
-              <div className="rounded-[28px] border border-slate-100 bg-white/90 p-5">
+            <div className="desktop-gpa-goal-results grid gap-4">
+              <div className="desktop-gpa-panel rounded-[28px] border border-slate-100 bg-white/90 p-5">
                 <SectionTitle icon={Gauge} title="反推结果" subtitle="结果依赖你当前计入保研 GPA 的课程。" />
                 {goalResult ? (
-                  <div className="mt-5 grid gap-4 md:grid-cols-3">
+                  <div className="desktop-gpa-result-grid mt-5 grid gap-4 md:grid-cols-3">
                     <ResultTile label="当前结果" value={formatNumber(goalResult.current.gpa, settings.goalAlgo === 'weighted' ? 1 : 3)} />
                     <ResultTile label="剩余平均需达到" value={formatNumber(goalResult.requiredAverage, settings.goalAlgo === 'weighted' ? 1 : 3)} />
                     <ResultTile label="折算为百分制" value={goalResult.requiredScore} />
                   </div>
                 ) : (
-                  <div className="mt-5 rounded-[24px] bg-slate-50 px-5 py-8 text-sm text-slate-500">请填写目标和剩余学分。</div>
+                  <div className="desktop-gpa-empty mt-5 rounded-[24px] bg-slate-50 px-5 py-8 text-sm text-slate-500">请填写目标和剩余学分。</div>
                 )}
               </div>
 
-              <div className="rounded-[28px] border border-slate-100 bg-white/90 p-5">
+              <div className="desktop-gpa-panel desktop-gpa-comprehensive rounded-[28px] border border-slate-100 bg-white/90 p-5">
                 <SectionTitle icon={Plus} title="综合成绩" subtitle="适合粗略模拟学校的综合评价权重。" />
-                <div className="mt-5 grid gap-4 lg:grid-cols-4">
+                <div className="desktop-gpa-comprehensive-fields mt-5 grid gap-4 lg:grid-cols-4">
                   <Field label="学业权重">
                     <input className={compactInputClassName} type="number" value={settings.academicWeight} onChange={(event) => updateSetting('academicWeight', Number.parseFloat(event.target.value) || 0)} />
                   </Field>
@@ -1002,13 +1036,13 @@ export function GpaToolClient() {
                     </select>
                   </Field>
                 </div>
-                <div className="mt-5 grid gap-4 md:grid-cols-3">
+                <div className="desktop-gpa-result-grid mt-5 grid gap-4 md:grid-cols-3">
                   <ResultTile label="学业折算" value={formatNumber(comprehensive.academicScore, 1)} />
                   <ResultTile label={comprehensive.capped ? '加分封顶' : '加分合计'} value={`+${formatNumber(comprehensive.cappedBonus, 1)}`} />
                   <ResultTile label="综合分" value={formatNumber(comprehensive.finalScore, 2)} />
                 </div>
-                <div className="mt-5 grid gap-3">
-                  <div className="grid gap-3 md:grid-cols-[1fr_1fr_120px_auto]">
+                <div className="desktop-gpa-bonus-list mt-5 grid gap-3">
+                  <div className="desktop-gpa-bonus-editor grid gap-3 md:grid-cols-[1fr_1fr_120px_auto]">
                     <input className={compactInputClassName} value={bonusDraft.name} onChange={(event) => setBonusDraft((current) => ({ ...current, name: event.target.value }))} placeholder="加分项" />
                     <input className={compactInputClassName} value={bonusDraft.level} onChange={(event) => setBonusDraft((current) => ({ ...current, level: event.target.value }))} placeholder="级别/说明" />
                     <input className={compactInputClassName} type="number" value={bonusDraft.score} onChange={(event) => setBonusDraft((current) => ({ ...current, score: Number.parseFloat(event.target.value) || 0 }))} />
@@ -1030,7 +1064,7 @@ export function GpaToolClient() {
                     </button>
                   </div>
                   {bonusItems.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between gap-3 rounded-[20px] bg-slate-50 px-4 py-3">
+                    <div key={item.id} className="desktop-gpa-bonus-row flex items-center justify-between gap-3 rounded-[20px] bg-slate-50 px-4 py-3">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-semibold text-ink">{item.name}</div>
                         <div className="truncate text-xs text-slate-500">{item.category}{item.level ? ` · ${item.level}` : ''}</div>
@@ -1055,7 +1089,7 @@ export function GpaToolClient() {
         ) : null}
 
         {activeTab === 'backup' ? (
-          <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          <div className="desktop-gpa-backup-pane mt-6 grid gap-6 lg:grid-cols-3">
             <BackupAction icon={Download} title="导出备份" text="下载 JSON 文件，用于跨浏览器迁移或阶段存档。" buttonText="导出 JSON" onClick={exportBackup} />
             <BackupAction
               icon={Upload}
@@ -1064,11 +1098,24 @@ export function GpaToolClient() {
               buttonText="选择文件"
               onClick={() => restoreInputRef.current?.click()}
             />
-            <BackupAction icon={RotateCcw} title="清空重置" text="清空当前工具数据，并同步覆盖本地记忆。" buttonText="清空数据" onClick={resetAll} danger />
+            <BackupAction icon={RotateCcw} title="清空重置" text="清空当前工具数据，并同步覆盖本地记忆。" buttonText="清空数据" onClick={requestReset} danger />
             <input ref={restoreInputRef} type="file" accept="application/json,.json" className="hidden" onChange={handleRestore} />
           </div>
         ) : null}
       </section>
+
+      <DesktopConfirmDialog
+        open={resetDialogOpen}
+        title="清空 GPA 工具数据？"
+        description={`将清空 ${courses.length} 门课程、${bonusItems.length} 个加分项，并重置材料进度和计算设置。完成后可在短时间内撤销。`}
+        confirmLabel="确认清空"
+        returnFocusTo={resetDialogReturnFocusRef.current}
+        onCancel={() => setResetDialogOpen(false)}
+        onConfirm={() => {
+          resetAll();
+          setResetDialogOpen(false);
+        }}
+      />
     </>
   );
 }
@@ -1094,12 +1141,12 @@ function MetricCard({
   }[tone];
 
   return (
-    <div className="soft-stat-pill rounded-[28px] px-5 py-5">
+    <div className="desktop-gpa-metric soft-stat-pill rounded-[28px] px-5 py-5">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <div className="text-xs font-semibold text-slate-500">{label}</div>
-          <div className="mt-2 truncate text-2xl font-semibold text-ink">{value}</div>
-          <div className="mt-1 truncate text-xs text-slate-500">{hint}</div>
+          <div className="desktop-gpa-metric-label text-xs font-semibold text-slate-500">{label}</div>
+          <div className="desktop-gpa-metric-value mt-2 truncate text-2xl font-semibold text-ink">{value}</div>
+          <div className="desktop-gpa-metric-hint mt-1 truncate text-xs text-slate-500">{hint}</div>
         </div>
         <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${toneClass}`}>
           <Icon className="h-5 w-5" />
@@ -1119,8 +1166,8 @@ function SectionTitle({
   subtitle: string;
 }) {
   return (
-    <div className="flex items-start gap-3">
-      <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
+    <div className="desktop-gpa-section-title flex items-start gap-3">
+      <span className="desktop-gpa-section-icon mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/8 text-brand">
         <Icon className="h-5 w-5" />
       </span>
       <div>
@@ -1133,7 +1180,7 @@ function SectionTitle({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="grid gap-2 text-sm font-semibold text-slate-600">
+    <label className="desktop-gpa-field grid gap-2 text-sm font-semibold text-slate-600">
       <span>{label}</span>
       {children}
     </label>
@@ -1142,7 +1189,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function ResultTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[24px] bg-slate-50 px-5 py-5">
+    <div className="desktop-gpa-result-tile rounded-[24px] bg-slate-50 px-5 py-5">
       <div className="text-xs font-semibold text-slate-500">{label}</div>
       <div className="mt-3 text-2xl font-semibold text-brand">{value}</div>
     </div>
@@ -1165,7 +1212,7 @@ function BackupAction({
   danger?: boolean;
 }) {
   return (
-    <div className="rounded-[28px] border border-slate-100 bg-white/90 p-5">
+    <div className="desktop-gpa-backup-action rounded-[28px] border border-slate-100 bg-white/90 p-5">
       <span className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl ${danger ? 'bg-rose-50 text-rose-600' : 'bg-brand/8 text-brand'}`}>
         <Icon className="h-5 w-5" />
       </span>

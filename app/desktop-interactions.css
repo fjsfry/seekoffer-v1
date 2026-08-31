@@ -1,0 +1,1304 @@
+/*
+ * SeekOffer desktop interaction layer.
+ * Timing follows one desktop interaction ladder. Motion is
+ * intentionally functional: it explains state changes without delaying work.
+ */
+
+.desktop-app-shell,
+.desktop-auth-shell {
+  --motion-faster: 83ms;
+  --motion-fast: 167ms;
+  --motion-normal: 250ms;
+  --motion-instant: var(--motion-faster);
+  --motion-standard: var(--motion-fast);
+  --motion-layout: var(--motion-fast);
+  --motion-press: var(--motion-faster);
+  --motion-hover: var(--motion-faster);
+  --motion-exit: var(--motion-faster);
+  --motion-enter: var(--motion-fast);
+  --motion-popup: var(--motion-fast);
+  --motion-popup-exit: var(--motion-faster);
+  --motion-panel: var(--motion-normal);
+  --motion-panel-exit: var(--motion-fast);
+  --motion-modal: var(--motion-fast);
+  --motion-modal-exit: var(--motion-faster);
+  --motion-route: var(--motion-fast);
+  --motion-progress: var(--motion-normal);
+  --motion-route-progress: var(--motion-normal);
+  --motion-state-enter: var(--motion-fast);
+  --motion-spinner: 900ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-enter: cubic-bezier(0, 0, 0, 1);
+  --motion-ease-exit: cubic-bezier(1, 0, 1, 1);
+  --motion-ease-move: cubic-bezier(0.55, 0.55, 0, 1);
+  /* Keep the later flagship aliases on this one functional rhythm. */
+  --desktop-motion-fast: var(--motion-hover) !important;
+  --desktop-motion-standard: var(--motion-enter) !important;
+  --desktop-ease-standard: var(--motion-ease-standard) !important;
+}
+
+/* Layout motion is opt-in. A permanent grid transition makes native resize,
+ * zoom and splitter dragging lag behind the pointer. */
+.desktop-app-shell[data-animate-layout='true'] {
+  transition: grid-template-columns var(--motion-layout) var(--motion-ease-move);
+}
+
+html.desktop-workbench-is-resizing .desktop-app-shell {
+  transition: none !important;
+}
+
+.desktop-app-shell :where(
+  button,
+  a,
+  [role='row'],
+  [role='tab'],
+  [role='option'],
+  [role='menuitem'],
+  [role='menuitemradio']
+) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.desktop-app-shell :where(button, a):active:not(:disabled),
+.desktop-auth-shell :where(button, a):active:not(:disabled) {
+  transition-duration: var(--motion-instant) !important;
+}
+
+.desktop-primary-nav-item,
+.desktop-rail-utility-button,
+.desktop-toolbar-icon,
+.desktop-account-button,
+.desktop-project-scope button,
+.desktop-project-filter select,
+.desktop-project-search,
+.desktop-setting-switch-track,
+.desktop-setting-switch-thumb,
+.desktop-setting-segment,
+.desktop-week-day,
+.desktop-task-row {
+  transition-duration: var(--motion-hover) !important;
+  transition-timing-function: var(--motion-ease-standard) !important;
+}
+
+.desktop-primary-nav-item::before,
+.desktop-project-row::before {
+  transition:
+    opacity var(--motion-hover) var(--motion-ease-standard),
+    transform var(--motion-hover) var(--motion-ease-standard) !important;
+}
+
+.desktop-primary-nav-item:not(.desktop-primary-nav-item--active)::before,
+.desktop-project-row:not(.is-selected)::before {
+  opacity: 0;
+  transform: scaleY(0.55);
+}
+
+.desktop-view-stage {
+  min-height: 100%;
+  animation: desktop-view-enter var(--motion-route) var(--motion-ease-enter) both;
+}
+
+@keyframes desktop-view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.desktop-app-shell[data-route-pending='true'] .desktop-content-region {
+  cursor: progress;
+}
+
+.desktop-route-progress {
+  width: calc(100vw - var(--desktop-rail-width)) !important;
+  height: 2px;
+  opacity: 0;
+  background: #168070 !important;
+  transform: scaleX(1);
+  transform-origin: left center;
+  transition:
+    left var(--motion-layout) var(--motion-ease-move),
+    opacity var(--motion-exit) var(--motion-ease-exit),
+    transform var(--motion-exit) var(--motion-ease-standard) !important;
+}
+
+.desktop-route-progress[data-state='idle'],
+.desktop-route-progress:not(.is-active):not([data-state]) {
+  opacity: 0;
+  transform: scaleX(1);
+  animation: none !important;
+}
+
+.desktop-route-progress[data-state='delayed'] {
+  opacity: 0;
+  transform: scaleX(0.08);
+  animation: none !important;
+}
+
+.desktop-route-progress.is-active:not([data-state]) {
+  animation: desktop-route-progress-v3 var(--motion-route-progress) var(--motion-ease-enter) 120ms both !important;
+}
+
+/* The React route state has already observed the 120ms anti-flash delay. */
+.desktop-route-progress[data-state='pending'] {
+  animation: desktop-route-progress-v3 var(--motion-route-progress) var(--motion-ease-enter) both !important;
+}
+
+.desktop-route-progress[data-state='stalled'] {
+  opacity: 1;
+  transform: scaleX(0.72);
+  animation: desktop-route-progress-stalled 1200ms var(--motion-ease-standard) infinite both !important;
+}
+
+.desktop-route-progress[data-state='completing'] {
+  opacity: 1 !important;
+  transform: scaleX(1) !important;
+  animation: none !important;
+  transition:
+    left var(--motion-layout) var(--motion-ease-move),
+    opacity var(--motion-exit) var(--motion-ease-exit),
+    transform var(--motion-exit) var(--motion-ease-standard) !important;
+}
+
+@keyframes desktop-route-progress-v3 {
+  0% {
+    opacity: 1;
+    transform: scaleX(0.08);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scaleX(0.72);
+  }
+}
+
+@keyframes desktop-route-progress-stalled {
+  0%,
+  100% {
+    opacity: 0.82;
+    transform: scaleX(0.72);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scaleX(0.82);
+  }
+}
+
+.desktop-command-backdrop {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-exit) var(--motion-ease-exit),
+    visibility 0ms linear var(--motion-exit);
+}
+
+.desktop-command-backdrop[data-state='open'] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity var(--motion-enter) var(--motion-ease-enter),
+    visibility 0ms step-start;
+}
+
+.desktop-command-backdrop > section {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.995);
+  transition:
+    opacity var(--motion-exit) var(--motion-ease-exit),
+    transform var(--motion-exit) var(--motion-ease-exit);
+}
+
+.desktop-command-backdrop[data-state='open'] > section {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity var(--motion-enter) var(--motion-ease-enter),
+    transform var(--motion-enter) var(--motion-ease-enter);
+}
+
+.desktop-account-popover,
+.desktop-zoom-menu,
+.desktop-display-popover {
+  transform-origin: top right;
+  animation: desktop-popover-enter var(--motion-popup) var(--motion-ease-enter) both;
+}
+
+.desktop-command-group-label {
+  padding: 9px 12px 4px;
+  color: #5f706c;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.desktop-command-option {
+  transition:
+    background-color var(--motion-hover) var(--motion-ease-standard),
+    color var(--motion-hover) var(--motion-ease-standard) !important;
+}
+
+@keyframes desktop-popover-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.desktop-reminder-center {
+  transition:
+    opacity var(--motion-panel-exit) var(--motion-ease-exit),
+    transform var(--motion-panel) var(--motion-ease-standard),
+    visibility 0ms linear var(--motion-panel) !important;
+}
+
+.desktop-app-shell[data-reminders-open='true'] .desktop-reminder-center {
+  transition:
+    opacity var(--motion-enter) var(--motion-ease-enter),
+    transform var(--motion-panel) var(--motion-ease-standard),
+    visibility 0ms step-start !important;
+}
+
+.desktop-reminder-backdrop,
+.desktop-inspector-backdrop {
+  transition:
+    opacity var(--motion-exit) var(--motion-ease-exit),
+    visibility 0ms linear var(--motion-exit) !important;
+}
+
+.desktop-project-inspector {
+  transition: box-shadow var(--motion-enter) var(--motion-ease-standard) !important;
+}
+
+.desktop-app-shell .desktop-qq-workbench[data-layout-mode='drawer'] .desktop-project-inspector {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--motion-panel-exit) var(--motion-ease-exit),
+    transform var(--motion-panel) var(--motion-ease-standard),
+    box-shadow var(--motion-panel-exit) var(--motion-ease-exit),
+    visibility 0ms linear var(--motion-panel) !important;
+}
+
+.desktop-app-shell .desktop-qq-workbench[data-layout-mode='drawer'] .desktop-project-inspector.is-open {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity var(--motion-enter) var(--motion-ease-enter),
+    transform var(--motion-panel) var(--motion-ease-standard),
+    box-shadow var(--motion-enter) var(--motion-ease-standard),
+    visibility 0ms step-start !important;
+}
+
+.desktop-project-row {
+  transition:
+    background-color var(--motion-hover) var(--motion-ease-standard),
+    border-color var(--motion-hover) var(--motion-ease-standard),
+    opacity var(--motion-hover) var(--motion-ease-standard) !important;
+}
+
+.desktop-project-row:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+
+.desktop-settings-section {
+  animation: desktop-settings-section-enter var(--motion-enter) var(--motion-ease-enter) both;
+}
+
+@keyframes desktop-settings-section-enter {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.desktop-today-background {
+  display: contents;
+}
+
+.desktop-workbench-overview {
+  display: contents;
+}
+
+.desktop-quick-add-backdrop {
+  animation: desktop-backdrop-enter var(--motion-enter) var(--motion-ease-enter) both;
+}
+
+.desktop-quick-add-dialog {
+  animation: desktop-dialog-enter var(--motion-modal) var(--motion-ease-enter) both;
+}
+
+@keyframes desktop-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes desktop-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.995);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Project context and shared state surfaces enter as one container. There is
+ * deliberately no descendant stagger: useful content is immediately ready. */
+.desktop-project-context-enter {
+  animation: desktop-project-context-enter var(--motion-enter) var(--motion-ease-enter) both;
+}
+
+.desktop-app-shell [data-desktop-state-variant] {
+  animation: desktop-project-context-enter var(--motion-state-enter) var(--motion-ease-enter) both;
+}
+
+@keyframes desktop-project-context-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* A mounted dialog with data-state gets a symmetric exit. Older conditional
+ * portals remain visible and use @starting-style for the same entrance. */
+.seekoffer-desktop-surface .desktop-global-dialog-backdrop[data-state] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-exit) var(--motion-ease-exit),
+    visibility 0ms linear var(--motion-exit) !important;
+}
+
+.seekoffer-desktop-surface .desktop-global-dialog-backdrop[data-state='open'] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity var(--motion-enter) var(--motion-ease-enter),
+    visibility 0ms step-start !important;
+}
+
+.seekoffer-desktop-surface .desktop-global-dialog-backdrop[data-state] .desktop-global-dialog-panel {
+  opacity: 0;
+  transform: translateY(4px) scale(0.995);
+  transition:
+    opacity var(--motion-modal-exit) var(--motion-ease-exit),
+    transform var(--motion-modal-exit) var(--motion-ease-exit) !important;
+}
+
+.seekoffer-desktop-surface .desktop-global-dialog-backdrop[data-state='open'] .desktop-global-dialog-panel {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity var(--motion-modal) var(--motion-ease-enter),
+    transform var(--motion-modal) var(--motion-ease-enter) !important;
+}
+
+.seekoffer-desktop-surface :is(
+  .desktop-global-dialog-backdrop:not([data-state]),
+  .desktop-manual-application-backdrop,
+  .desktop-offer-dialog,
+  .desktop-discussion-dialog
+) {
+  opacity: 1;
+  transition: opacity var(--motion-enter) var(--motion-ease-enter) !important;
+}
+
+.seekoffer-desktop-surface :is(
+  .desktop-global-dialog-backdrop:not([data-state]) .desktop-global-dialog-panel,
+  .desktop-manual-application-dialog,
+  .desktop-offer-dialog-panel,
+  .desktop-discussion-dialog-panel
+) {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transform-origin: center;
+  transition:
+    opacity var(--motion-modal) var(--motion-ease-enter),
+    transform var(--motion-modal) var(--motion-ease-enter) !important;
+}
+
+@starting-style {
+  .seekoffer-desktop-surface :is(
+    .desktop-global-dialog-backdrop:not([data-state]),
+    .desktop-manual-application-backdrop,
+    .desktop-offer-dialog,
+    .desktop-discussion-dialog
+  ) {
+    opacity: 0;
+  }
+
+  .seekoffer-desktop-surface :is(
+    .desktop-global-dialog-backdrop:not([data-state]) .desktop-global-dialog-panel,
+    .desktop-manual-application-dialog,
+    .desktop-offer-dialog-panel,
+    .desktop-discussion-dialog-panel
+  ) {
+    opacity: 0;
+    transform: translateY(4px) scale(0.995);
+  }
+}
+
+.seekoffer-desktop-surface .desktop-manual-application-backdrop[data-state] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-exit) var(--motion-ease-exit),
+    visibility 0ms linear var(--motion-exit) !important;
+}
+
+.seekoffer-desktop-surface .desktop-manual-application-backdrop[data-state='open'] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity var(--motion-enter) var(--motion-ease-enter),
+    visibility 0ms step-start !important;
+}
+
+.seekoffer-desktop-surface .desktop-manual-application-dialog[data-state] {
+  opacity: 0;
+  transform: translateY(4px) scale(0.995);
+  transition:
+    opacity var(--motion-exit) var(--motion-ease-exit),
+    transform var(--motion-exit) var(--motion-ease-exit) !important;
+}
+
+.seekoffer-desktop-surface .desktop-manual-application-dialog[data-state='open'] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity var(--motion-enter) var(--motion-ease-enter),
+    transform var(--motion-enter) var(--motion-ease-enter) !important;
+}
+
+.seekoffer-desktop-surface :is(
+  .desktop-offer-dialog,
+  .desktop-discussion-dialog
+)[data-state] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-exit) var(--motion-ease-exit),
+    visibility 0ms linear var(--motion-exit) !important;
+}
+
+.seekoffer-desktop-surface :is(
+  .desktop-offer-dialog,
+  .desktop-discussion-dialog
+)[data-state='open'] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity var(--motion-enter) var(--motion-ease-enter),
+    visibility 0ms step-start !important;
+}
+
+.seekoffer-desktop-surface :is(
+  .desktop-offer-dialog-panel,
+  .desktop-discussion-dialog-panel
+)[data-state] {
+  opacity: 0;
+  transform: translateY(4px) scale(0.995);
+  transition:
+    opacity var(--motion-exit) var(--motion-ease-exit),
+    transform var(--motion-exit) var(--motion-ease-exit) !important;
+}
+
+.seekoffer-desktop-surface :is(
+  .desktop-offer-dialog-panel,
+  .desktop-discussion-dialog-panel
+)[data-state='open'] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity var(--motion-enter) var(--motion-ease-enter),
+    transform var(--motion-enter) var(--motion-ease-enter) !important;
+}
+
+.desktop-app-shell .desktop-quick-add-backdrop[data-state] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  animation: none !important;
+  transition:
+    opacity var(--motion-exit) var(--motion-ease-exit),
+    visibility 0ms linear var(--motion-exit) !important;
+}
+
+.desktop-app-shell .desktop-quick-add-backdrop[data-state='open'] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity var(--motion-enter) var(--motion-ease-enter),
+    visibility 0ms step-start !important;
+}
+
+.desktop-app-shell .desktop-quick-add-dialog[data-state] {
+  opacity: 0;
+  transform: translateY(4px) scale(0.995);
+  animation: none !important;
+  transition:
+    opacity var(--motion-exit) var(--motion-ease-exit),
+    transform var(--motion-exit) var(--motion-ease-exit) !important;
+}
+
+.desktop-app-shell .desktop-quick-add-dialog[data-state='open'] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity var(--motion-enter) var(--motion-ease-enter),
+    transform var(--motion-enter) var(--motion-ease-enter) !important;
+}
+
+.seekoffer-desktop-surface .desktop-update-toast {
+  animation: desktop-backdrop-enter var(--motion-enter) var(--motion-ease-enter) both;
+}
+
+/* One quiet hover/selection transition for user-facing object rows. Geometry
+ * stays still; only functional state colors and opacity move. */
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-application-object-row,
+  .desktop-notice-card,
+  .desktop-college-card,
+  .desktop-deadline-row-card,
+  .desktop-competition-card,
+  .desktop-resource-tool-card,
+  .desktop-resource-link,
+  .desktop-reminder-item,
+  .desktop-setting-link-row,
+  .desktop-contacts-row-trigger,
+  .desktop-offers-feed-item,
+  .desktop-pro-plan-row
+),
+.desktop-app-shell:is(.desktop-app-shell) .desktop-schedule-row > div:first-child {
+  transition:
+    background-color var(--motion-hover) var(--motion-ease-standard),
+    border-color var(--motion-hover) var(--motion-ease-standard),
+    color var(--motion-hover) var(--motion-ease-standard),
+    opacity var(--motion-hover) var(--motion-ease-standard) !important;
+}
+
+/* All persistent progress affordances use one pace and one keyframe. */
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-sync-icon.is-spinning,
+  .desktop-notice-loading-icon svg,
+  .desktop-workbench-loading-icon svg,
+  .desktop-inspector-loading-icon svg,
+  .desktop-reminder-state--loading .desktop-reminder-state-icon svg
+),
+.desktop-auth-shell:is(.desktop-auth-shell) :is(
+  .desktop-login-spinner,
+  .desktop-auth-loading > span
+) {
+  animation: desktop-motion-spin var(--motion-spinner) linear infinite !important;
+}
+
+@keyframes desktop-motion-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Progress bars move only when their real value changes. An element mounted
+ * at its current inline width has no previous value, so there is no first-load
+ * sweep or list stagger. */
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-project-workspace-progress > i,
+  .desktop-application-object-card-progress > i
+) {
+  transition: width var(--motion-progress) var(--motion-ease-standard) !important;
+}
+
+/* Native checks and pressed icon toggles provide a small, local confirmation
+ * without moving their surrounding row. */
+.desktop-app-shell:is(.desktop-app-shell) input[type='checkbox'] {
+  transition:
+    accent-color var(--motion-hover) var(--motion-ease-standard),
+    background-color var(--motion-hover) var(--motion-ease-standard),
+    border-color var(--motion-hover) var(--motion-ease-standard),
+    box-shadow var(--motion-hover) var(--motion-ease-standard),
+    transform var(--motion-press) var(--motion-ease-standard) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) input[type='checkbox']:active {
+  transform: scale(0.9);
+}
+
+.desktop-app-shell:is(.desktop-app-shell) button[aria-pressed] > svg {
+  transition:
+    color var(--motion-hover) var(--motion-ease-standard),
+    opacity var(--motion-hover) var(--motion-ease-standard),
+    transform var(--motion-enter) var(--motion-ease-standard) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) button[aria-pressed='true'] > svg {
+  transform: scale(1.06);
+}
+
+.desktop-app-shell:is(.desktop-app-shell) button[aria-pressed]:active > svg {
+  transform: scale(0.9);
+  transition-duration: var(--motion-press) !important;
+}
+
+/* Attention markers enter once when mounted. They never pulse or loop. */
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-nav-badge,
+  .desktop-settings-update-dot
+) {
+  transform-origin: center;
+  animation: desktop-attention-enter var(--motion-enter) var(--motion-ease-enter) both;
+}
+
+@keyframes desktop-attention-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.desktop-feedback-toast {
+  position: fixed;
+  z-index: 260;
+  right: 22px;
+  bottom: calc(var(--desktop-statusbar-height) + 18px);
+  display: grid;
+  width: min(390px, calc(100vw - 44px));
+  min-height: 60px;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 10px 11px 14px;
+  border: 1px solid var(--desktop-border-strong);
+  border-radius: 10px;
+  color: var(--desktop-text);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16px 42px rgba(20, 53, 48, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition:
+    opacity var(--motion-exit) var(--motion-ease-exit),
+    transform var(--motion-exit) var(--motion-ease-exit);
+}
+
+.desktop-feedback-toast[data-state='open'] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition:
+    opacity var(--motion-enter) var(--motion-ease-enter),
+    transform var(--motion-enter) var(--motion-ease-enter);
+}
+
+.desktop-feedback-toast--success {
+  border-color: #9fc9be;
+}
+
+.desktop-feedback-toast--warning,
+.desktop-feedback-toast--error {
+  border-color: #d8b2ad;
+}
+
+.desktop-feedback-icon {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #0f665d;
+  background: #e3f1ee;
+}
+
+.desktop-feedback-toast--warning .desktop-feedback-icon,
+.desktop-feedback-toast--error .desktop-feedback-icon {
+  color: #8f342f;
+  background: #faecea;
+}
+
+.desktop-feedback-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.desktop-feedback-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.desktop-feedback-copy strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-feedback-copy small {
+  overflow: hidden;
+  color: #5f706c;
+  font-size: 12px !important;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-feedback-action {
+  min-height: 34px;
+  padding: 0 9px;
+  border-radius: 7px;
+  color: #0f665d;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-feedback-action:hover {
+  background: #e9f3f0;
+}
+
+.desktop-feedback-close {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: #5f706c;
+}
+
+.desktop-feedback-close:hover {
+  color: #203a36;
+  background: #eef3f1;
+}
+
+.desktop-feedback-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+.desktop-window-error {
+  position: fixed;
+  z-index: 280;
+  top: calc(var(--desktop-titlebar-height, 56px) + 8px);
+  right: 10px;
+  max-width: 300px;
+  padding: 8px 11px;
+  border: 1px solid #d8b2ad;
+  border-radius: 8px;
+  color: #7c2e2a;
+  background: #fff7f6;
+  box-shadow: 0 8px 24px rgba(76, 35, 31, 0.14);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.desktop-workbench-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.desktop-workbench-error button {
+  min-height: 34px;
+  flex: 0 0 auto;
+  padding: 0 11px;
+  border: 1px solid currentColor;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-route-error {
+  display: grid;
+  width: min(680px, 100%);
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 16px;
+  margin: clamp(42px, 9vh, 96px) auto 0;
+  padding: 26px;
+  border: 1px solid var(--desktop-border, #d8e2df);
+  border-radius: 12px;
+  background: var(--desktop-surface, #ffffff);
+  box-shadow: var(--desktop-shadow-md, 0 18px 50px rgba(20, 55, 49, 0.12));
+}
+
+.desktop-route-error-icon {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: #0f665d;
+  background: #e3f1ee;
+}
+
+.desktop-route-error-icon svg {
+  width: 23px;
+  height: 23px;
+}
+
+.desktop-route-error p,
+.desktop-route-error h1,
+.desktop-route-error span {
+  margin: 0;
+}
+
+.desktop-route-error p {
+  color: #5f706c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-route-error h1 {
+  margin-top: 4px;
+  color: var(--desktop-text, #122b27);
+  font-size: 22px;
+  line-height: 30px;
+}
+
+.desktop-route-error > div > span {
+  display: block;
+  margin-top: 8px;
+  color: var(--desktop-text-secondary, #536b66);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.desktop-route-error-actions {
+  display: flex;
+  grid-column: 2;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 4px;
+}
+
+.desktop-route-error .desktop-primary-command {
+  color: #ffffff;
+  border-color: var(--desktop-accent, #0f766a);
+  background: var(--desktop-accent, #0f766a);
+}
+
+.desktop-route-error .desktop-secondary-command {
+  color: var(--desktop-text-secondary, #536b66);
+  border-color: var(--desktop-border, #d8e2df);
+  background: var(--desktop-surface, #ffffff);
+}
+
+.desktop-route-error .desktop-secondary-command:hover {
+  color: #0f665d;
+  border-color: #9fc9c0;
+  background: #f2f8f6;
+}
+
+/* 150% and above proactively switch to the compact navigation and drawer
+ * model, independent of how a WebView reports its CSS viewport after zoom. */
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) {
+  --desktop-rail-width: 72px;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) :is(
+  .desktop-brand-wordmark,
+  .desktop-nav-group-label,
+  .desktop-primary-nav-item > span:not(.desktop-nav-badge),
+  .desktop-rail-utility-button > span,
+  .desktop-rail-utility-button kbd
+) {
+  display: none;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) :is(.desktop-brand-header, .desktop-primary-rail) {
+  padding-right: 8px !important;
+  padding-left: 8px !important;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) :is(.desktop-primary-nav-item, .desktop-rail-utility-button) {
+  justify-content: center;
+  padding-right: 0 !important;
+  padding-left: 0 !important;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-workbench-layout {
+  display: block;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-project-inspector {
+  position: fixed;
+  z-index: 210;
+  top: calc(var(--desktop-titlebar-height) + 12px);
+  right: 12px;
+  bottom: calc(var(--desktop-statusbar-height) + 12px);
+  width: min(380px, calc(100vw - 24px));
+  overflow-y: auto;
+  pointer-events: none;
+  transform: translateX(calc(100% + 28px));
+  box-shadow: 0 20px 60px rgba(20, 53, 48, 0.22);
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-project-inspector.is-open {
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-inspector-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: var(--desktop-text-secondary);
+  background: #eef4f2;
+}
+
+/* Contrast corrections for Windows text-sized helper copy. */
+.desktop-login-field input::-moz-placeholder {
+  color: #5f706c !important;
+}
+.desktop-login-field input::placeholder,
+.desktop-login-legal,
+.desktop-login-assist,
+.desktop-auth-trust small,
+.desktop-startup-description,
+.desktop-startup-status,
+.desktop-startup-footnote,
+.desktop-reminder-center .text-slate-400,
+.desktop-command-dialog .text-slate-400 {
+  color: #5f706c !important;
+}
+
+.desktop-command-dialog input::-moz-placeholder {
+  color: #5f706c !important;
+  opacity: 1;
+}
+
+.desktop-command-dialog input::placeholder {
+  color: #5f706c !important;
+  opacity: 1;
+}
+
+/* Unified interaction foundation. Enter motion explains hierarchy; exit is
+ * deliberately faster so repeated work never waits on decoration. */
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-command-option,
+  .desktop-feedback-action,
+  .desktop-feedback-close,
+  .desktop-primary-command,
+  .desktop-secondary-command,
+  .desktop-toolbar-icon,
+  .desktop-primary-nav-item,
+  .desktop-rail-utility-button
+) {
+  transition-duration: var(--motion-hover) !important;
+  transition-timing-function: var(--motion-ease-standard) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-command-option,
+  .desktop-feedback-action,
+  .desktop-feedback-close,
+  .desktop-primary-command,
+  .desktop-secondary-command,
+  .desktop-toolbar-icon
+):active {
+  transform: translateY(1px) scale(0.99);
+  transition-duration: var(--motion-press) !important;
+}
+
+.desktop-command-backdrop[data-state] {
+  transition-duration: var(--motion-popup-exit) !important;
+}
+
+.desktop-command-backdrop[data-state='open'] {
+  transition-duration: var(--motion-popup) !important;
+}
+
+.desktop-command-backdrop[data-state] > section {
+  transition-duration: var(--motion-modal-exit) !important;
+}
+
+.desktop-command-backdrop[data-state='open'] > section {
+  transition-duration: var(--motion-modal) !important;
+}
+
+.seekoffer-desktop-surface :is(
+  .desktop-global-dialog-panel,
+  .desktop-manual-application-dialog,
+  .desktop-offer-dialog-panel,
+  .desktop-discussion-dialog-panel,
+  .desktop-quick-add-dialog
+) {
+  animation-duration: var(--motion-modal) !important;
+}
+
+.seekoffer-desktop-surface :is(
+  .desktop-global-dialog-backdrop[data-state='closed'] .desktop-global-dialog-panel,
+  .desktop-manual-application-dialog[data-state='closed'],
+  .desktop-offer-dialog[data-state='closed'] .desktop-offer-dialog-panel,
+  .desktop-discussion-dialog[data-state='closed'] .desktop-discussion-dialog-panel,
+  .desktop-quick-add-dialog[data-state='closed']
+) {
+  animation-duration: var(--motion-modal-exit) !important;
+  transition-duration: var(--motion-modal-exit) !important;
+}
+
+.desktop-app-shell:is(.desktop-app-shell) :is(
+  .desktop-project-row.is-selected,
+  .desktop-application-object-row[aria-selected='true'],
+  .desktop-command-option[aria-selected='true'],
+  .desktop-contacts-row-trigger[aria-selected='true']
+) {
+  transition:
+    background-color var(--motion-hover) var(--motion-ease-standard),
+    border-color var(--motion-hover) var(--motion-ease-standard),
+    color var(--motion-hover) var(--motion-ease-standard) !important;
+}
+
+.desktop-feedback-toast[data-feedback-state='pending'] {
+  border-color: var(--desktop-border-strong);
+}
+
+.desktop-feedback-toast[data-feedback-state='pending'] .desktop-feedback-icon {
+  color: #43635e;
+  background: #eef3f1;
+}
+
+.desktop-feedback-toast[data-feedback-state='success'] {
+  border-color: #9fc9be;
+}
+
+.desktop-feedback-toast[data-feedback-state='error'] {
+  border-color: #d8b2ad;
+}
+
+.desktop-feedback-toast[data-feedback-state='undo'] {
+  border-color: #aebfe0;
+}
+
+.desktop-feedback-toast[data-feedback-state='undo'] .desktop-feedback-icon {
+  color: #315c9b;
+  background: #eaf0fb;
+}
+
+.desktop-feedback-pending-icon {
+  animation: desktop-motion-spin var(--motion-spinner) linear infinite;
+}
+
+html[data-desktop-reduce-motion='true'] *,
+html[data-desktop-reduce-motion='true'] *::before,
+html[data-desktop-reduce-motion='true'] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
+}
+
+html[data-desktop-reduce-motion='true'] :is(
+  .desktop-login-spinner,
+  .desktop-auth-loading > span,
+  .desktop-startup-progress > span,
+  .desktop-sync-icon.is-spinning,
+  .desktop-notice-loading-icon svg,
+  .desktop-workbench-loading-icon svg,
+  .desktop-inspector-loading-icon svg,
+  .desktop-reminder-state--loading .desktop-reminder-state-icon svg,
+  .desktop-route-progress,
+  .desktop-project-context-enter,
+  [data-desktop-state-variant],
+  .desktop-nav-badge,
+  .desktop-settings-update-dot,
+  .desktop-update-toast,
+  .desktop-feedback-pending-icon
+) {
+  animation: none !important;
+}
+
+html[data-desktop-reduce-motion='true'] .desktop-route-progress:is(
+  .is-active,
+  [data-state='pending'],
+  [data-state='stalled']
+) {
+  opacity: 1 !important;
+  transform: scaleX(0.72) !important;
+}
+
+html[data-desktop-reduce-motion='true'] .desktop-route-progress[data-state='completing'] {
+  opacity: 1 !important;
+  transform: scaleX(1) !important;
+}
+
+html[data-desktop-reduce-motion='true'] :is(
+  .desktop-view-stage,
+  .desktop-command-backdrop > section,
+  .desktop-project-inspector,
+  .desktop-feedback-toast,
+  .desktop-quick-add-dialog,
+  .desktop-project-context-enter,
+  [data-desktop-state-variant],
+  .desktop-global-dialog-panel,
+  .desktop-manual-application-dialog,
+  .desktop-offer-dialog-panel,
+  .desktop-discussion-dialog-panel,
+  .desktop-command-option,
+  .desktop-feedback-action,
+  .desktop-feedback-close,
+  .desktop-primary-command,
+  .desktop-secondary-command,
+  .desktop-toolbar-icon,
+  button[aria-pressed] > svg
+) {
+  transform: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.desktop-app-shell, .desktop-auth-shell),
+  :is(.desktop-app-shell, .desktop-auth-shell) *,
+  :is(.desktop-app-shell, .desktop-auth-shell) *::before,
+  :is(.desktop-app-shell, .desktop-auth-shell) *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  .desktop-login-spinner,
+  .desktop-auth-loading > span,
+  .desktop-startup-progress > span,
+  .desktop-sync-icon.is-spinning,
+  .desktop-notice-loading-icon svg,
+  .desktop-workbench-loading-icon svg,
+  .desktop-inspector-loading-icon svg,
+  .desktop-reminder-state--loading .desktop-reminder-state-icon svg,
+  .desktop-route-progress,
+  .desktop-project-context-enter,
+  [data-desktop-state-variant],
+  .desktop-nav-badge,
+  .desktop-settings-update-dot,
+  .desktop-update-toast,
+  .desktop-feedback-pending-icon {
+    animation: none !important;
+  }
+
+  .desktop-route-progress:is(
+    .is-active,
+    [data-state='pending'],
+    [data-state='stalled']
+  ) {
+    opacity: 1 !important;
+    transform: scaleX(0.72) !important;
+  }
+
+  .desktop-route-progress[data-state='completing'] {
+    opacity: 1 !important;
+    transform: scaleX(1) !important;
+  }
+
+  .desktop-view-stage,
+  .desktop-command-backdrop > section,
+  .desktop-project-inspector,
+  .desktop-feedback-toast,
+  .desktop-quick-add-dialog,
+  .desktop-project-context-enter,
+  [data-desktop-state-variant],
+  .desktop-global-dialog-panel,
+  .desktop-manual-application-dialog,
+  .desktop-offer-dialog-panel,
+  .desktop-discussion-dialog-panel,
+  .desktop-command-option,
+  .desktop-feedback-action,
+  .desktop-feedback-close,
+  .desktop-primary-command,
+  .desktop-secondary-command,
+  .desktop-toolbar-icon,
+  button[aria-pressed] > svg {
+    transform: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .desktop-feedback-toast,
+  .desktop-workbench-error button {
+    border-color: CanvasText;
+  }
+
+  .desktop-feedback-icon {
+    color: ButtonText;
+    background: ButtonFace;
+  }
+}

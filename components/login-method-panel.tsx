@@ -17,7 +17,11 @@ import {
   UserPlus,
   X
 } from 'lucide-react';
-import { SUPABASE_ENABLE_ANONYMOUS, SUPABASE_ENABLE_PHONE_AUTH } from '@/lib/supabase-env';
+import {
+  SEEKOFFER_SITE_URL,
+  SUPABASE_ENABLE_ANONYMOUS,
+  SUPABASE_ENABLE_PHONE_AUTH
+} from '@/lib/supabase-env';
 import {
   isEmailIdentifier,
   resendSignupConfirmationCode,
@@ -32,6 +36,19 @@ import {
 
 type AuthView = 'password' | 'otp';
 type PasswordMode = 'login' | 'register';
+type AuthErrorField = 'account' | 'password' | 'passwordConfirm' | 'code' | 'form';
+
+function friendlyAuthErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message.trim() : '';
+  const containsChinese = /[\u3400-\u9fff]/.test(message);
+  const containsTechnicalDetail = /(supabase|fetch|jwt|sql|status\s*code|networkerror|failed to fetch)/i.test(message);
+
+  if (message && containsChinese && !containsTechnicalDetail) {
+    return message;
+  }
+
+  return '当前登录暂时没有完成，请检查网络后重试。';
+}
 
 function looksLikePhoneIdentifier(value: string) {
   return /^[+\d\s\-()]{6,}$/.test(value.trim());
@@ -98,10 +115,12 @@ function IconInput({
 
 export function LoginMethodPanel({
   mode = 'modal',
+  allowGuest = SUPABASE_ENABLE_ANONYMOUS,
   onClose,
   onSuccess
 }: {
-  mode?: 'card' | 'popover' | 'modal';
+  mode?: 'card' | 'popover' | 'modal' | 'desktop';
+  allowGuest?: boolean;
   onClose?: () => void;
   onSuccess?: () => void;
 }) {
@@ -133,13 +152,14 @@ export function LoginMethodPanel({
   >('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [errorField, setErrorField] = useState<AuthErrorField>('form');
 
   const accountLabel = SUPABASE_ENABLE_PHONE_AUTH ? '邮箱或手机号' : '邮箱';
   const accountPlaceholder = SUPABASE_ENABLE_PHONE_AUTH ? '请输入邮箱或手机号' : '请输入邮箱地址';
   const isEmailAccount = isEmailIdentifier(account);
   const passwordPending = pending === 'password' || pending === 'register' || pending === 'verify-signup';
   const passwordActionLabel =
-    passwordMode === 'login' ? '立即登录并查看进度' : signupCodeSent ? '完成注册并进入工作台' : '发送注册验证码';
+    passwordMode === 'login' ? '立即登录并查看进度' : signupCodeSent ? '完成注册并查看全部申请' : '发送注册验证码';
   const formIntro = useMemo(() => {
     if (passwordMode === 'register') {
       return signupCodeSent
@@ -191,6 +211,13 @@ export function LoginMethodPanel({
   function resetFeedback() {
     setError('');
     setMessage('');
+    setErrorField('form');
+  }
+
+  function showError(message: string, field: AuthErrorField = 'form') {
+    setMessage('');
+    setError(message);
+    setErrorField(field);
   }
 
   function resetSignupChallenge() {
@@ -203,17 +230,17 @@ export function LoginMethodPanel({
   function validateAccount(options: { emailOnly?: boolean } = {}) {
     const value = account.trim();
     if (!value) {
-      setError(`请先输入${accountLabel}。`);
+      showError(`请先输入${accountLabel}。`, 'account');
       return '';
     }
 
     if ((options.emailOnly || !SUPABASE_ENABLE_PHONE_AUTH) && !isEmailIdentifier(value)) {
       if (looksLikePhoneIdentifier(value) && !SUPABASE_ENABLE_PHONE_AUTH) {
-        setError('当前暂未开放手机号登录，请使用邮箱完成登录或注册。');
+        showError('当前暂未开放手机号登录，请使用邮箱完成登录或注册。', 'account');
         return '';
       }
 
-      setError('请输入完整的邮箱地址，例如 name@example.com。');
+      showError('请输入完整的邮箱地址，例如 name@example.com。', 'account');
       return '';
     }
 
@@ -266,7 +293,7 @@ export function LoginMethodPanel({
 
       return result;
     } catch (taskError) {
-      setError(taskError instanceof Error ? taskError.message : '当前登录暂时不可用，请稍后重试。');
+      showError(friendlyAuthErrorMessage(taskError));
       return null;
     } finally {
       setPending('');
@@ -281,7 +308,7 @@ export function LoginMethodPanel({
 
     if (passwordMode === 'register' && signupCodeSent) {
       if (!signupCode.trim()) {
-        setError('请输入注册邮件中的 6 位验证码。');
+        showError('请输入注册邮件中的 6 位验证码。', 'code');
         return;
       }
 
@@ -299,17 +326,17 @@ export function LoginMethodPanel({
     }
 
     if (!password.trim()) {
-      setError('请输入密码。');
+      showError('请输入密码。', 'password');
       return;
     }
 
     if (password.length < 6) {
-      setError('密码至少需要 6 位。');
+      showError('密码至少需要 6 位。', 'password');
       return;
     }
 
     if (passwordMode === 'register' && password !== passwordConfirm) {
-      setError('两次输入的密码不一致。');
+      showError('两次输入的密码不一致。', 'passwordConfirm');
       return;
     }
 
@@ -403,7 +430,7 @@ export function LoginMethodPanel({
     }
 
     if (!otpCode.trim()) {
-      setError('请输入邮箱中的 6 位验证码。');
+      showError('请输入邮箱中的 6 位验证码。', 'code');
       return;
     }
 
@@ -437,6 +464,355 @@ export function LoginMethodPanel({
     }
 
     void handleSendCode();
+  }
+
+  function openLegalPage(path: '/terms' | '/privacy') {
+    const href = `${SEEKOFFER_SITE_URL.replace(/\/$/, '')}${path}`;
+    if ('__TAURI_INTERNALS__' in window) {
+      void import('@tauri-apps/plugin-opener').then(({ openUrl }) => openUrl(href));
+      return;
+    }
+
+    window.open(href, '_blank', 'noopener,noreferrer');
+  }
+
+  function handleDesktopLoginTabKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (pending) return;
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+
+    const tablist = event.currentTarget;
+    const nextView =
+      event.key === 'Home'
+        ? 'password'
+        : event.key === 'End'
+          ? 'otp'
+          : activeView === 'password'
+            ? 'otp'
+            : 'password';
+    switchToLogin(nextView);
+    const nextIndex = nextView === 'password' ? 0 : 1;
+    window.requestAnimationFrame(() => {
+      const tabs = tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+      tabs[nextIndex]?.focus();
+    });
+  }
+
+  if (mode === 'desktop') {
+    const registering = passwordMode === 'register';
+    const desktopHeading = registering ? '创建寻鹿账号' : '登录寻鹿';
+    const desktopDescription = registering
+      ? signupCodeSent
+        ? '输入邮件中的 6 位验证码，完成账号确认'
+        : '使用邮箱创建账号，申请进度自动同步'
+      : '继续管理你的申请、材料与截止提醒';
+    const desktopActionLabel =
+      activeView === 'otp'
+        ? '验证并登录'
+        : registering
+          ? signupCodeSent
+            ? '完成注册'
+            : '发送注册验证码'
+          : '登录';
+    const desktopSubmitBusy = activeView === 'otp'
+      ? pending === 'verify-code'
+      : passwordPending;
+    const desktopSubmitDisabled = Boolean(pending) || (activeView === 'otp' && otpCode.length !== 6);
+
+    return (
+      <section
+        className="desktop-login-method-panel"
+        aria-labelledby="desktop-login-title"
+        data-auth-view={activeView}
+        data-auth-mode={registering ? 'register' : 'login'}
+        data-feedback-state={desktopSubmitBusy ? 'pending' : error ? 'error' : message ? 'success' : 'idle'}
+      >
+        <header className="desktop-login-card-header">
+          <h1 id="desktop-login-title">{desktopHeading}</h1>
+          <p>{desktopDescription}</p>
+        </header>
+
+        <form
+          className="desktop-login-form"
+          onSubmit={handleFormSubmit}
+          aria-busy={Boolean(pending)}
+        >
+          {!registering ? (
+            <div
+              className="desktop-login-tabs"
+              role="tablist"
+              aria-label="登录方式"
+              onKeyDown={handleDesktopLoginTabKeyDown}
+            >
+              <button
+                id="desktop-login-tab-password"
+                type="button"
+                role="tab"
+                aria-selected={activeView === 'password'}
+                aria-controls="desktop-login-tabpanel"
+                tabIndex={activeView === 'password' ? 0 : -1}
+                data-state={activeView === 'password' ? 'active' : 'idle'}
+                onClick={() => switchToLogin('password')}
+                disabled={Boolean(pending)}
+              >
+                密码登录
+              </button>
+              <button
+                id="desktop-login-tab-otp"
+                type="button"
+                role="tab"
+                aria-selected={activeView === 'otp'}
+                aria-controls="desktop-login-tabpanel"
+                tabIndex={activeView === 'otp' ? 0 : -1}
+                data-state={activeView === 'otp' ? 'active' : 'idle'}
+                onClick={() => switchToLogin('otp')}
+                disabled={Boolean(pending)}
+              >
+                验证码登录
+              </button>
+            </div>
+          ) : (
+            <div className="desktop-register-context">
+              <span>{signupCodeSent ? '验证注册邮箱' : '邮箱注册'}</span>
+              <button type="button" onClick={() => switchToLogin('password')}>
+                返回登录
+              </button>
+            </div>
+          )}
+
+          <div
+            id="desktop-login-tabpanel"
+            className="desktop-login-fields"
+            role={!registering ? 'tabpanel' : undefined}
+            aria-labelledby={!registering ? `desktop-login-tab-${activeView}` : undefined}
+          >
+            <label className="desktop-login-field">
+              <span className="sr-only">邮箱地址</span>
+              <span className="desktop-login-field-icon" aria-hidden="true">
+                <Mail />
+              </span>
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                autoFocus
+                value={account}
+                readOnly={signupCodeSent}
+                disabled={Boolean(pending)}
+                onChange={(event) => {
+                  setAccount(event.target.value);
+                  resetFeedback();
+                  resetSignupChallenge();
+                }}
+                placeholder="邮箱地址"
+                aria-invalid={Boolean(error) && errorField === 'account'}
+                aria-describedby={message || error ? 'desktop-auth-feedback' : undefined}
+              />
+            </label>
+
+            {account.trim() && !isEmailAccount ? (
+              <p className="desktop-login-field-hint">{helperText}</p>
+            ) : null}
+
+            {activeView === 'password' && !signupCodeSent ? (
+              <>
+                <label className="desktop-login-field">
+                  <span className="sr-only">密码</span>
+                  <span className="desktop-login-field-icon" aria-hidden="true">
+                    <KeyRound />
+                  </span>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete={registering ? 'new-password' : 'current-password'}
+                    disabled={Boolean(pending)}
+                    value={password}
+                    onChange={(event) => {
+                      setPassword(event.target.value);
+                      resetFeedback();
+                    }}
+                    placeholder={registering ? '设置密码（至少 6 位）' : '请输入密码'}
+                    aria-invalid={Boolean(error) && errorField === 'password'}
+                    aria-describedby={message || error ? 'desktop-auth-feedback' : undefined}
+                  />
+                  <button
+                    type="button"
+                    className="desktop-login-field-action"
+                    onClick={() => setShowPassword((current) => !current)}
+                    disabled={Boolean(pending)}
+                    aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                    title={showPassword ? '隐藏密码' : '显示密码'}
+                  >
+                    <Eye />
+                  </button>
+                </label>
+
+                {registering ? (
+                  <label className="desktop-login-field">
+                    <span className="sr-only">确认密码</span>
+                    <span className="desktop-login-field-icon" aria-hidden="true">
+                      <ShieldCheck />
+                    </span>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      disabled={Boolean(pending)}
+                      value={passwordConfirm}
+                      onChange={(event) => {
+                        setPasswordConfirm(event.target.value);
+                        resetFeedback();
+                      }}
+                      placeholder="再次输入密码"
+                      aria-invalid={Boolean(error) && errorField === 'passwordConfirm'}
+                      aria-describedby={message || error ? 'desktop-auth-feedback' : undefined}
+                    />
+                  </label>
+                ) : (
+                  <div className="desktop-login-assist">
+                    <button
+                      type="button"
+                      onClick={() => void handlePasswordReset()}
+                      disabled={Boolean(pending)}
+                    >
+                      {pending === 'reset-password' ? '正在发送…' : '忘记密码？'}
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : null}
+
+            {activeView === 'password' && registering && signupCodeSent ? (
+              <div className="desktop-login-code-block">
+                <p>
+                  验证码已发送至 <strong>{signupEmail || account}</strong>
+                </p>
+                <div>
+                  <label className="desktop-login-field">
+                    <span className="sr-only">注册验证码</span>
+                    <span className="desktop-login-field-icon" aria-hidden="true">
+                      <ShieldCheck />
+                    </span>
+                    <input
+                      value={signupCode}
+                      onChange={(event) => {
+                        setSignupCode(event.target.value.replace(/\D/g, '').slice(0, 6));
+                        resetFeedback();
+                      }}
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      disabled={Boolean(pending)}
+                      placeholder="6 位注册验证码"
+                      aria-invalid={Boolean(error) && errorField === 'code'}
+                      aria-describedby={message || error ? 'desktop-auth-feedback' : undefined}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="desktop-login-code-action"
+                    onClick={() => void handleResendSignupCode()}
+                    disabled={Boolean(pending) || signupResendIn > 0}
+                  >
+                    {pending === 'resend-signup' ? <LoaderCircle className="desktop-login-spinner" aria-hidden="true" /> : null}
+                    {signupResendIn > 0 ? `${signupResendIn}s` : '重新发送'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {activeView === 'otp' ? (
+              <div className="desktop-login-code-row">
+                <label className="desktop-login-field">
+                  <span className="sr-only">邮箱验证码</span>
+                  <span className="desktop-login-field-icon" aria-hidden="true">
+                    <ShieldCheck />
+                  </span>
+                  <input
+                    value={otpCode}
+                    onChange={(event) => {
+                      setOtpCode(event.target.value.replace(/\D/g, '').slice(0, 6));
+                      resetFeedback();
+                    }}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    disabled={Boolean(pending)}
+                    placeholder="6 位邮箱验证码"
+                    aria-invalid={Boolean(error) && errorField === 'code'}
+                    aria-describedby={message || error ? 'desktop-auth-feedback' : undefined}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="desktop-login-code-action"
+                  onClick={() => void handleSendCode()}
+                  disabled={Boolean(pending) || resendIn > 0 || !isEmailAccount}
+                >
+                  {pending === 'send-code' ? <LoaderCircle className="desktop-login-spinner" aria-hidden="true" /> : null}
+                  {resendIn > 0 ? `${resendIn}s` : otpSent ? '重新发送' : '发送验证码'}
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          <div
+            className="desktop-login-feedback-slot"
+            aria-live="polite"
+            aria-atomic="true"
+            data-feedback-state={message ? 'success' : error ? 'error' : 'idle'}
+          >
+            {message ? (
+              <div id="desktop-auth-feedback" className="desktop-login-feedback desktop-login-feedback--success" role="status">
+                {message}
+              </div>
+            ) : error ? (
+              <div id="desktop-auth-feedback" className="desktop-login-feedback desktop-login-feedback--error" role="alert">
+                {error}
+              </div>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+          </div>
+
+          <button
+            type="submit"
+            className="desktop-login-primary"
+            disabled={desktopSubmitDisabled}
+            aria-busy={desktopSubmitBusy}
+            data-feedback-state={desktopSubmitBusy ? 'pending' : 'idle'}
+          >
+            {desktopSubmitBusy ? <LoaderCircle className="desktop-login-spinner" aria-hidden="true" /> : null}
+            <span>{desktopSubmitBusy ? '正在处理…' : desktopActionLabel}</span>
+          </button>
+
+          <p className="desktop-login-legal">
+            继续即表示你已阅读并同意
+            <button type="button" onClick={() => openLegalPage('/terms')}>《用户协议》</button>
+            与
+            <button type="button" onClick={() => openLegalPage('/privacy')}>《隐私政策》</button>
+          </p>
+
+          <div className="desktop-login-register-link">
+            {registering ? (
+              <>
+                <span>已有账号？</span>
+                <button type="button" onClick={() => switchToLogin('password')}>现在登录</button>
+              </>
+            ) : (
+              <>
+                <span>还没有账号？</span>
+                <button type="button" onClick={switchToRegister}>立即注册</button>
+              </>
+            )}
+          </div>
+
+          <div className="desktop-login-security-note" role="note" aria-label="账号安全说明">
+            <ShieldCheck aria-hidden="true" />
+            <p>
+              <strong>安全登录</strong>
+              <span>账号信息仅用于身份验证与申请数据同步</span>
+            </p>
+          </div>
+        </form>
+      </section>
+    );
   }
 
   return (
@@ -486,7 +862,7 @@ export function LoginMethodPanel({
             />
           </div>
 
-          {SUPABASE_ENABLE_ANONYMOUS ? (
+          {allowGuest ? (
             <button
               type="button"
               onClick={() => void runTask('guest', () => signInAsGuest())}

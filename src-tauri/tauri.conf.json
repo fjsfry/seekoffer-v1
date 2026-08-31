@@ -1,0 +1,103 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "寻鹿 SeekOffer",
+  "version": "0.2.21",
+  "identifier": "com.seekoffer.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev:desktop -- --hostname 127.0.0.1 --port 3000",
+    "devUrl": "http://127.0.0.1:3000",
+    "beforeBuildCommand": "npm run build:desktop",
+    "frontendDist": "../.next-desktop"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "寻鹿 SeekOffer",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 960,
+        "minHeight": 640,
+        "center": true,
+        "visible": false,
+        "focus": false,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false,
+        "backgroundColor": "#e6e7ed",
+        "zoomHotkeysEnabled": false
+      },
+      {
+        "label": "splashscreen",
+        "url": "desktop-splash.html",
+        "title": "寻鹿 SeekOffer",
+        "width": 520,
+        "height": 320,
+        "center": true,
+        "visible": true,
+        "focus": true,
+        "decorations": false,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "fullscreen": false,
+        "shadow": true,
+        "skipTaskbar": true,
+        "backgroundColor": "#e6e7ed"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "targets": ["nsis"],
+    "category": "Education",
+    "publisher": "SeekOffer",
+    "homepage": "https://www.seekoffer.com.cn",
+    "copyright": "Copyright © 2026 SeekOffer",
+    "shortDescription": "保研信息与申请管理桌面客户端",
+    "longDescription": "寻鹿 SeekOffer 将通知库、院校库、资源中心、申请项目、日程提醒和导师联系整合进同一个桌面客户端。",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "allowDowngrades": false,
+      "nsis": {
+        "installMode": "currentUser",
+        "compression": "lzma",
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "headerImage": "windows/assets/installer-header.bmp",
+        "uninstallerHeaderImage": "windows/assets/installer-header.bmp",
+        "sidebarImage": "windows/assets/installer-sidebar.bmp",
+        "installerHooks": "./windows/installer-hooks.nsh",
+        "displayLanguageSelector": false,
+        "languages": ["SimpChinese", "English"],
+        "customLanguageFiles": {
+          "SimpChinese": "./windows/languages/SimpChinese.nsh",
+          "English": "./windows/languages/English.nsh"
+        }
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgyMzcwMjE1RjAyQjRFNUIKUldSYlRpdndGUUkzZ2s1SVo5Tjk3aGVDRExaeWNNY1Q2YjJQQ24rdHZHWlBzUk9VbEh1UVY1M28K",
+      "endpoints": [
+        "https://seekoffer-desktop-updates.vercel.app/stable/latest.json",
+        "https://seekoffer-desktop-updates.vercel.app/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

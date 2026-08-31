@@ -36,7 +36,7 @@ body {
 }
 
 @media (min-width: 1024px) {
-  html {
+  html:not(.seekoffer-desktop-surface) {
     font-size: 18px;
   }
 }

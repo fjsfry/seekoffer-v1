@@ -81,23 +81,28 @@ export default function PublishPage() {
   if (!ready) {
     return (
       <SiteShell>
-        <PageSectionTitle
-          eyebrow="Share Offer"
-          title="发布 Offer 动态"
-          subtitle="真实 Offer 发布会影响候补判断，因此需要登录、核验和后续纠错机制。"
-        />
-        <LoginRequiredCard
-          title="发布动态前需要先登录"
-          description="为了减少虚假信息，发布 Offer 动态需要登录核验；你仍然可以选择匿名展示。"
-          requiredAuth="member"
-          actionLabel="登录后继续"
-          intent={{
-            type: 'publish-offer',
-            returnTo: '/publish',
-            reason: 'publish-gate',
-            requiredAuth: 'member'
-          }}
-        />
+        <div className="desktop-publish-header">
+          <PageSectionTitle
+            eyebrow="Share Offer"
+            title="发布 Offer 动态"
+            subtitle="真实 Offer 发布会影响候补判断，因此需要登录、核验和后续纠错机制。"
+            level="h1"
+          />
+        </div>
+        <div className="desktop-publish-gate">
+          <LoginRequiredCard
+            title="发布动态前需要先登录"
+            description="为了减少虚假信息，发布 Offer 动态需要登录核验；你仍然可以选择匿名展示。"
+            requiredAuth="member"
+            actionLabel="登录后继续"
+            intent={{
+              type: 'publish-offer',
+              returnTo: '/publish',
+              reason: 'publish-gate',
+              requiredAuth: 'member'
+            }}
+          />
+        </div>
       </SiteShell>
     );
   }
@@ -105,42 +110,50 @@ export default function PublishPage() {
   if (!loggedIn || !canPublish) {
     return (
       <SiteShell>
-        <PageSectionTitle
-          eyebrow="Share Offer"
-          title="发布 Offer 动态"
-          subtitle="分享你的保研去向与释放的 Offer，帮助候补池中的同学更快预判机会变化。"
-        />
-        <LoginRequiredCard
-          title={loggedIn ? '试用态还不能直接发布 Offer' : '发布动态前需要先登录'}
-          description={
-            loggedIn
-              ? '试用模式可以先体验通知库和基础工作台，但发布 Offer 会影响社区可信度，所以需要使用邮箱账号登录后再继续。'
-              : '登录后即可发布 Offer 动态。提交内容会先核验，也可以匿名展示。'
-          }
-          requiredAuth="member"
-          actionLabel={loggedIn ? '使用正式账号登录' : '登录后继续'}
-          intent={{
-            type: 'publish-offer',
-            returnTo: '/publish',
-            reason: 'publish-gate',
-            requiredAuth: 'member'
-          }}
-        />
+        <div className="desktop-publish-header">
+          <PageSectionTitle
+            eyebrow="Share Offer"
+            title="发布 Offer 动态"
+            subtitle="分享你的保研去向与释放的 Offer，帮助候补池中的同学更快预判机会变化。"
+            level="h1"
+          />
+        </div>
+        <div className="desktop-publish-gate">
+          <LoginRequiredCard
+            title={loggedIn ? '试用态还不能直接发布 Offer' : '发布动态前需要先登录'}
+            description={
+              loggedIn
+                ? '试用模式可以先体验通知库和基础申请管理，但发布 Offer 会影响社区可信度，所以需要使用邮箱账号登录后再继续。'
+                : '登录后即可发布 Offer 动态。提交内容会先核验，也可以匿名展示。'
+            }
+            requiredAuth="member"
+            actionLabel={loggedIn ? '使用正式账号登录' : '登录后继续'}
+            intent={{
+              type: 'publish-offer',
+              returnTo: '/publish',
+              reason: 'publish-gate',
+              requiredAuth: 'member'
+            }}
+          />
+        </div>
       </SiteShell>
     );
   }
 
   return (
     <SiteShell>
-      <PageSectionTitle
-        eyebrow="Share Offer"
-        title="发布 Offer 动态"
-        subtitle="分享你的保研去向与释放的 Offer，帮助候补池中的同学更快预判机会变化。"
-      />
+      <div className="desktop-publish-header">
+        <PageSectionTitle
+          eyebrow="Share Offer"
+          title="发布 Offer 动态"
+          subtitle="分享你的保研去向与释放的 Offer，帮助候补池中的同学更快预判机会变化。"
+          level="h1"
+        />
+      </div>
 
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <form onSubmit={handleSubmit} className="product-card rounded-[30px] p-6 lg:p-8">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-5">
+      <section className="desktop-publish-layout grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <form onSubmit={handleSubmit} className="desktop-publish-form product-card rounded-[30px] p-6 lg:p-8">
+          <div className="desktop-publish-form-header mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-5">
             <div>
               <h2 className="text-xl font-semibold text-ink">提交动态</h2>
               <p className="mt-2 text-sm leading-7 text-slate-500">请只提交你本人确认的信息，避免写入联系方式、导师隐私或可识别他人的内容。</p>
@@ -151,7 +164,7 @@ export default function PublishPage() {
             </span>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="desktop-publish-field-grid grid gap-5 md:grid-cols-2">
             <Field label="核验称呼">
               <input
                 value={form.authorName}
@@ -216,7 +229,7 @@ export default function PublishPage() {
             </Field>
           </div>
 
-          <div className="mt-5">
+          <div className="desktop-publish-description-field mt-5">
             <Field label="补充说明">
               <textarea
                 value={form.content}
@@ -224,13 +237,13 @@ export default function PublishPage() {
                 maxLength={1200}
                 rows={7}
                 className={`${inputClassName} resize-none leading-7`}
-                placeholder="建议写清楚：信息来源、录取/放弃/候补状态、时间节点、是否已电话或邮件确认。不要写手机号、微信号、身份证号、导师私人联系方式。"
+                placeholder="建议写清楚：录取/放弃/候补状态、时间节点、是否已电话或邮件确认。不要写手机号、微信号、身份证号、导师私人联系方式。"
               />
             </Field>
             <div className="mt-2 text-right text-xs font-semibold text-slate-400">{form.content.length}/1200</div>
           </div>
 
-          <label className="mt-5 flex items-start gap-3 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-600">
+          <label className="desktop-publish-anonymous mt-5 flex items-start gap-3 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-600">
             <input
               type="checkbox"
               checked={form.isAnonymous}
@@ -242,12 +255,12 @@ export default function PublishPage() {
             </span>
           </label>
 
-          <div className={`mt-5 rounded-2xl px-4 py-3 text-sm leading-7 ${submitted ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-50 text-slate-600'}`}>
+          <div className={`desktop-publish-status desktop-inline-state mt-5 rounded-2xl px-4 py-3 text-sm leading-7 ${submitted ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-50 text-slate-600'}`} role="status">
             {submitted ? <CheckCircle2 className="mr-2 inline h-4 w-4" /> : null}
             {message}
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="desktop-publish-actions mt-6 flex flex-wrap gap-3">
             <button
               type="submit"
               disabled={pending}
@@ -265,8 +278,8 @@ export default function PublishPage() {
           </div>
         </form>
 
-        <aside className="grid content-start gap-5">
-          <section className="product-card rounded-[22px] p-6">
+        <aside className="desktop-publish-aside grid content-start gap-5">
+          <section className="desktop-publish-guidance product-card rounded-[22px] p-6">
             <h2 className="text-lg font-semibold text-ink">发布前检查</h2>
             <div className="mt-5 grid gap-4">
               {[
@@ -283,7 +296,7 @@ export default function PublishPage() {
             </div>
           </section>
 
-          <section className="product-card rounded-[22px] p-6">
+          <section className="desktop-publish-guidance product-card rounded-[22px] p-6">
             <h2 className="text-lg font-semibold text-ink">发布流程</h2>
             <div className="mt-5 grid gap-3 text-sm leading-7 text-slate-600">
               <p>1. 你提交动态，并选择是否匿名展示。</p>
@@ -303,7 +316,7 @@ export default function PublishPage() {
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="grid gap-2 text-sm font-semibold text-slate-700">
+    <label className="desktop-publish-field grid gap-2 text-sm font-semibold text-slate-700">
       <span>{label}</span>
       {children}
     </label>

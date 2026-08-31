@@ -1,0 +1,3067 @@
+/*
+ * SeekOffer desktop v0.1.6 — QQ shell + MCHOSE workspace.
+ *
+ * This is the final desktop visual layer. Earlier desktop files retain the
+ * component-level behavior and historical fallbacks; this file owns the
+ * active Windows shell, spacing, typography, and responsive composition.
+*/
+
+/* Root CSS zoom scales viewport units as well as content in WebView2. Counter
+ * that once at the app frame so every level still occupies exactly one native
+ * window, with a smaller effective layout viewport at larger zoom factors. */
+.seekoffer-desktop-surface {
+  --desktop-zoomed-viewport-width: 100vw;
+  --desktop-zoomed-viewport-height: 100vh;
+}
+
+.seekoffer-desktop-surface[data-desktop-zoom-level='80'] {
+  --desktop-zoomed-viewport-width: 125vw;
+  --desktop-zoomed-viewport-height: 125vh;
+}
+
+.seekoffer-desktop-surface[data-desktop-zoom-level='90'] {
+  --desktop-zoomed-viewport-width: 111.111111vw;
+  --desktop-zoomed-viewport-height: 111.111111vh;
+}
+
+.seekoffer-desktop-surface[data-desktop-zoom-level='110'] {
+  --desktop-zoomed-viewport-width: 90.909091vw;
+  --desktop-zoomed-viewport-height: 90.909091vh;
+}
+
+.seekoffer-desktop-surface[data-desktop-zoom-level='125'] {
+  --desktop-zoomed-viewport-width: 80vw;
+  --desktop-zoomed-viewport-height: 80vh;
+}
+
+.seekoffer-desktop-surface[data-desktop-zoom-level='150'] {
+  --desktop-zoomed-viewport-width: 66.666667vw;
+  --desktop-zoomed-viewport-height: 66.666667vh;
+}
+
+.seekoffer-desktop-surface[data-desktop-zoom-level='175'] {
+  --desktop-zoomed-viewport-width: 57.142857vw;
+  --desktop-zoomed-viewport-height: 57.142857vh;
+}
+
+.seekoffer-desktop-surface[data-desktop-zoom-level='200'] {
+  --desktop-zoomed-viewport-width: 50vw;
+  --desktop-zoomed-viewport-height: 50vh;
+}
+
+.seekoffer-desktop-surface :is(.desktop-app-shell, .desktop-auth-shell) {
+  width: var(--desktop-zoomed-viewport-width) !important;
+  height: var(--desktop-zoomed-viewport-height) !important;
+}
+
+.desktop-app-shell {
+  --desktop-rail-width: 76px;
+  --desktop-master-width: 462px;
+  --desktop-titlebar-height: 64px;
+  --desktop-statusbar-height: 0px;
+  --desktop-canvas: #f3f6f5;
+  --desktop-rail-surface: #f8faf9;
+  --desktop-surface: #ffffff;
+  --desktop-surface-subtle: #f6f9f8;
+  --desktop-surface-raised: #ffffff;
+  --desktop-border: #dbe4e1;
+  --desktop-border-strong: #c7d5d1;
+  --desktop-text: #172321;
+  --desktop-text-secondary: #52635f;
+  --desktop-text-tertiary: #667672;
+  --desktop-accent: #176c5b;
+  --desktop-accent-strong: #0f5147;
+  --desktop-accent-muted: #e8f3ef;
+  --desktop-accent-hover: #deeee9;
+  --desktop-danger: #b32635;
+  --desktop-danger-muted: #fff1f3;
+  --desktop-shadow-sm: 0 1px 2px rgba(16, 63, 55, 0.045);
+  --desktop-shadow-md: 0 18px 44px rgba(16, 63, 55, 0.12);
+  grid-template-columns: var(--desktop-rail-width) minmax(0, 1fr) !important;
+  grid-template-rows: var(--desktop-titlebar-height) minmax(0, 1fr) !important;
+  color: var(--desktop-text);
+  background: var(--desktop-canvas);
+  font-family:
+    "Segoe UI Variable Text",
+    "Microsoft YaHei UI",
+    "Segoe UI",
+    sans-serif;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+/* Tauri window movement is handled by the title-bar mouse handler. Keeping the
+ * CSS drag region disabled prevents WebView2 from processing the same gesture
+ * a second time, while the full empty title-bar area remains draggable. */
+.desktop-titlebar-drag {
+  app-region: no-drag !important;
+  -webkit-app-region: no-drag !important;
+}
+
+.desktop-app-shell[data-desktop-theme='dark'] {
+  --desktop-canvas: #151b1a;
+  --desktop-rail-surface: #171e1c;
+  --desktop-surface: #1d2523;
+  --desktop-surface-subtle: #212b28;
+  --desktop-surface-raised: #252f2c;
+  --desktop-border: #34413e;
+  --desktop-border-strong: #465650;
+  --desktop-text: #eef5f2;
+  --desktop-text-secondary: #bdcbc6;
+  --desktop-text-tertiary: #8fa09a;
+  --desktop-accent: #65b8a2;
+  --desktop-accent-strong: #8bd1be;
+  --desktop-accent-muted: #203c35;
+  --desktop-accent-hover: #29483f;
+}
+
+.desktop-app-shell :where(button, input, select, textarea) {
+  font-family: inherit;
+}
+
+.desktop-app-shell :where(small, kbd) {
+  font-size: 12px !important;
+  line-height: 17px;
+}
+
+/* Unified, draggable Windows title bar. */
+.desktop-brand-header,
+.desktop-topbar {
+  grid-row: 1 !important;
+  min-height: var(--desktop-titlebar-height) !important;
+  border-color: var(--desktop-border) !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-brand-header {
+  z-index: 4;
+  grid-column: 1 / 3 !important;
+  width: 254px;
+  justify-self: start;
+  padding: 0 20px !important;
+  border-right: 0 !important;
+}
+
+.desktop-brand-link {
+  gap: 11px !important;
+}
+
+.desktop-brand-mark,
+.desktop-brand-header > a > span:first-child {
+  width: 42px !important;
+  height: 42px !important;
+  border: 1px solid #d5e1dd !important;
+  border-radius: 11px !important;
+  background: #fbfaf6 !important;
+  box-shadow: none !important;
+}
+
+.desktop-brand-wordmark {
+  display: inline-flex !important;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--desktop-text) !important;
+  font-size: 17px !important;
+  font-weight: 650 !important;
+  line-height: 24px;
+}
+
+.desktop-brand-wordmark strong {
+  color: var(--desktop-accent-strong) !important;
+  font: inherit;
+}
+
+.desktop-brand-english {
+  color: var(--desktop-text) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+
+.desktop-topbar {
+  z-index: 3;
+  grid-column: 1 / 3 !important;
+  padding-left: 264px !important;
+}
+
+.desktop-history-controls {
+  display: none !important;
+}
+
+.desktop-route-label {
+  display: none !important;
+}
+
+.desktop-search-trigger {
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 40px !important;
+  justify-content: center;
+  padding: 0 !important;
+  border-color: transparent !important;
+  border-radius: 9px !important;
+  color: var(--desktop-text-secondary) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.desktop-search-trigger:hover {
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-search-trigger > span,
+.desktop-search-trigger > kbd {
+  display: none !important;
+}
+
+.desktop-toolbar-icon {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 9px !important;
+  color: var(--desktop-text-secondary) !important;
+}
+
+.desktop-toolbar-icon svg,
+.desktop-search-trigger svg,
+.desktop-sync-label svg {
+  width: 19px !important;
+  height: 19px !important;
+}
+
+.desktop-toolbar-icon:hover:not(:disabled),
+.desktop-account-button:hover {
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-sync-label {
+  width: 40px !important;
+  height: 40px !important;
+  justify-content: center;
+  padding: 0 !important;
+  color: var(--desktop-text-secondary) !important;
+}
+
+.desktop-sync-text,
+.desktop-account-label {
+  display: none !important;
+}
+
+.desktop-sync-icon.is-spinning {
+  animation: desktop-sync-spin 900ms linear infinite;
+}
+
+@keyframes desktop-sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.desktop-account-button {
+  width: 40px !important;
+  height: 40px !important;
+  justify-content: center;
+  padding: 0 !important;
+  border-radius: 50% !important;
+}
+
+.desktop-account-avatar,
+.desktop-account-button > span:first-child {
+  width: 34px !important;
+  height: 34px !important;
+  border: 1px solid #c9ddd7 !important;
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+  font-size: 14px !important;
+}
+
+.desktop-caption-button {
+  width: 46px !important;
+  height: var(--desktop-titlebar-height) !important;
+  flex-basis: 46px !important;
+  color: var(--desktop-text-secondary) !important;
+}
+
+.desktop-caption-button:hover:not(.desktop-caption-close) {
+  background: var(--desktop-surface-subtle) !important;
+}
+
+/* QQ-like icon rail. Text remains in the accessibility tree and native tooltip. */
+.desktop-primary-rail {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  min-width: 0;
+  gap: 10px !important;
+  padding: 14px 10px 12px !important;
+  border-color: var(--desktop-border) !important;
+  background: var(--desktop-rail-surface) !important;
+}
+
+.desktop-nav-list--primary {
+  display: grid !important;
+  gap: 7px !important;
+}
+
+.desktop-primary-nav-item,
+.desktop-rail-utility-button {
+  position: relative;
+  width: 54px !important;
+  min-width: 54px !important;
+  min-height: 48px !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: 11px !important;
+  color: var(--desktop-text-secondary) !important;
+  background: transparent !important;
+}
+
+.desktop-primary-nav-item:hover,
+.desktop-rail-utility-button:hover {
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-primary-nav-item[aria-current='page'],
+.desktop-primary-nav-item--active,
+.desktop-rail-utility-button[aria-current='page'],
+.desktop-rail-utility-button--active {
+  border-color: #cfe2dc !important;
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-primary-nav-item[aria-current='page']::before,
+.desktop-primary-nav-item--active::before {
+  top: 9px !important;
+  bottom: 9px !important;
+  left: -11px !important;
+  width: 3px !important;
+  border-radius: 0 3px 3px 0 !important;
+  background: var(--desktop-accent) !important;
+}
+
+.desktop-primary-nav-item > span:not(.desktop-nav-badge),
+.desktop-rail-utility-button > span,
+.desktop-rail-utility-button > kbd {
+  display: none !important;
+}
+
+.desktop-primary-nav-item svg,
+.desktop-rail-utility-button svg {
+  width: 23px !important;
+  height: 23px !important;
+  flex: 0 0 auto;
+}
+
+.desktop-nav-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  min-width: 17px;
+  height: 17px;
+  margin: 0;
+  padding: 0 4px;
+  border: 2px solid var(--desktop-rail-surface);
+  border-radius: 9px;
+  color: #fff;
+  background: #b32635;
+  font-size: 10px !important;
+  line-height: 13px;
+}
+
+.desktop-rail-utilities {
+  display: grid !important;
+  justify-items: center;
+  gap: 5px !important;
+  margin-top: auto !important;
+  padding-top: 10px !important;
+  border-color: var(--desktop-border) !important;
+}
+
+/* Content canvas and non-home routes. */
+.desktop-content-region {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  min-width: 0;
+  background: var(--desktop-canvas) !important;
+}
+
+.desktop-view-stage {
+  min-height: 100%;
+}
+
+.desktop-content-region:has(.desktop-qq-workbench) {
+  overflow: hidden !important;
+}
+
+.desktop-view-stage:has(> .desktop-qq-workbench) {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desktop-route-content {
+  width: 100%;
+  max-width: 1720px !important;
+  padding: 22px 24px 32px !important;
+}
+
+.desktop-statusbar {
+  display: none !important;
+}
+
+.desktop-feedback-toast {
+  bottom: 18px !important;
+}
+
+/* Settings becomes its own QQ-like surface, without a nested outer rail. */
+.desktop-app-shell[data-settings-open='true'] .desktop-primary-rail {
+  display: none !important;
+}
+
+.desktop-app-shell[data-settings-open='true'] .desktop-content-region {
+  grid-column: 1 / 3 !important;
+}
+
+.desktop-settings-page {
+  min-height: 100%;
+  padding: 24px 28px 36px !important;
+  color: var(--desktop-text);
+  background: var(--desktop-canvas) !important;
+}
+
+.desktop-settings-header {
+  width: min(1180px, 100%);
+  margin: 0 auto 18px !important;
+  padding: 0 !important;
+}
+
+.desktop-settings-eyebrow {
+  display: none !important;
+}
+
+.desktop-settings-title {
+  color: var(--desktop-text) !important;
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  line-height: 36px !important;
+}
+
+.desktop-settings-subtitle {
+  margin-top: 3px !important;
+  color: var(--desktop-text-secondary) !important;
+  font-size: 14px !important;
+}
+
+.desktop-settings-layout {
+  grid-template-columns: 232px minmax(0, 1fr) !important;
+  width: min(1180px, 100%);
+  min-height: 620px;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--desktop-border) !important;
+  border-radius: 14px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: var(--desktop-shadow-sm) !important;
+}
+
+.desktop-settings-nav {
+  padding: 16px 12px !important;
+  border-right: 1px solid var(--desktop-border) !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-settings-nav-title {
+  margin: 0 8px 10px !important;
+  color: var(--desktop-text-tertiary) !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+}
+
+.desktop-settings-nav-item {
+  min-height: 48px !important;
+  padding: 7px 10px !important;
+  border: 1px solid transparent !important;
+  border-radius: 9px !important;
+  color: var(--desktop-text-secondary) !important;
+  background: transparent !important;
+}
+
+.desktop-settings-nav-item:hover {
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-settings-nav-item--active {
+  border-color: #cee1db !important;
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-settings-nav-copy strong {
+  font-size: 14px !important;
+  font-weight: 650 !important;
+}
+
+.desktop-settings-nav-copy small,
+.desktop-settings-nav-chevron {
+  display: none !important;
+}
+
+.desktop-settings-content {
+  padding: 26px 30px 38px !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-settings-section {
+  max-width: 820px !important;
+}
+
+.desktop-settings-section-heading {
+  margin-bottom: 18px !important;
+}
+
+.desktop-settings-section-copy h2 {
+  color: var(--desktop-text) !important;
+  font-size: 22px !important;
+  line-height: 30px !important;
+}
+
+.desktop-settings-section-copy p,
+.desktop-setting-copy p,
+.desktop-setting-description {
+  color: var(--desktop-text-secondary) !important;
+}
+
+.desktop-settings-group {
+  overflow: hidden;
+  border: 1px solid var(--desktop-border) !important;
+  border-radius: 11px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-setting-row,
+.desktop-setting-link-row,
+.desktop-settings-shortcut-row {
+  min-height: 58px !important;
+  border-color: var(--desktop-border) !important;
+  background: var(--desktop-surface) !important;
+}
+
+/* QQ-like reminder drawer: message rows instead of floating card stacks. */
+.desktop-reminder-center {
+  top: var(--desktop-titlebar-height) !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: min(420px, calc(100vw - var(--desktop-rail-width))) !important;
+  border-left: 1px solid var(--desktop-border) !important;
+  border-radius: 0 !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: -18px 0 46px rgba(20, 53, 48, 0.12) !important;
+}
+
+.desktop-reminder-center > header,
+.desktop-reminder-center > footer {
+  border-color: var(--desktop-border) !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-reminder-scroll > div.grid {
+  gap: 0 !important;
+  overflow: hidden;
+  border: 1px solid var(--desktop-border);
+  border-radius: 11px;
+  background: var(--desktop-surface);
+}
+
+.desktop-reminder-scroll article {
+  border: 0 !important;
+  border-bottom: 1px solid var(--desktop-border) !important;
+  border-radius: 0 !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-reminder-scroll article:last-child {
+  border-bottom: 0 !important;
+}
+
+.desktop-reminder-scroll article:hover {
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-reminder-state {
+  min-height: 240px !important;
+  border-style: solid !important;
+  border-color: var(--desktop-border) !important;
+  border-radius: 10px !important;
+  color: var(--desktop-text);
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-reminder-state-icon {
+  border-radius: 10px !important;
+}
+
+.desktop-reminder-state--loading .desktop-reminder-state-icon svg {
+  animation: desktop-reminder-loading-spin 900ms linear infinite;
+}
+
+.desktop-reminder-item h4 {
+  font-size: 14px !important;
+  line-height: 21px !important;
+}
+
+.desktop-reminder-item h4 + p {
+  font-size: 13px !important;
+  line-height: 20px !important;
+}
+
+.desktop-reminder-item h4 + p + p {
+  font-size: 12px !important;
+  line-height: 18px !important;
+}
+
+@keyframes desktop-reminder-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-reminder-state--loading .desktop-reminder-state-icon svg,
+  .desktop-sync-icon.is-spinning {
+    animation: none !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  .desktop-brand-header {
+    width: 230px;
+  }
+
+  .desktop-topbar {
+    padding-left: 240px !important;
+  }
+
+  .desktop-route-label {
+    max-width: 132px !important;
+  }
+
+  .desktop-settings-page {
+    padding-inline: 22px !important;
+  }
+}
+
+@media (max-width: 1040px) {
+  .desktop-app-shell {
+    --desktop-rail-width: 68px;
+  }
+
+  .desktop-brand-header {
+    width: 216px;
+    padding-left: 14px !important;
+  }
+
+  .desktop-topbar {
+    padding-left: 222px !important;
+  }
+
+  .desktop-route-label {
+    max-width: 104px !important;
+  }
+
+  .desktop-primary-rail {
+    padding-inline: 7px !important;
+  }
+
+  .desktop-primary-nav-item,
+  .desktop-rail-utility-button {
+    width: 52px !important;
+    min-width: 52px !important;
+  }
+
+  .desktop-primary-nav-item[aria-current='page']::before,
+  .desktop-primary-nav-item--active::before {
+    left: -8px !important;
+  }
+
+  .desktop-settings-layout {
+    grid-template-columns: 206px minmax(0, 1fr) !important;
+  }
+
+  .desktop-settings-content {
+    padding-inline: 24px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-app-shell *,
+  .desktop-app-shell *::before,
+  .desktop-app-shell *::after {
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * Selected option 1: application context list + focused project workspace.
+ * The whole second row is the product; there is no dashboard hero or KPI wall.
+ */
+.desktop-qq-workbench {
+  display: block !important;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-width: none !important;
+  padding: 0 !important;
+  overflow: hidden;
+  background: var(--desktop-canvas);
+}
+
+.desktop-qq-workbench-layout {
+  display: grid !important;
+  grid-template-columns: var(--desktop-master-width) minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  align-items: stretch !important;
+  gap: 0 !important;
+  overflow: hidden;
+  background: var(--desktop-canvas);
+}
+
+.desktop-application-context,
+.desktop-project-workspace {
+  min-width: 0;
+  min-height: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-application-context {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--desktop-border) !important;
+}
+
+.desktop-application-context-header {
+  display: flex;
+  min-height: 82px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 20px 12px;
+}
+
+.desktop-application-context-copy {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.desktop-application-context-copy h1 {
+  margin: 0;
+  color: var(--desktop-text);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 30px;
+  letter-spacing: -0.02em;
+}
+
+.desktop-application-context-count {
+  display: inline-flex;
+  min-width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 11px;
+  color: var(--desktop-text-secondary);
+  background: var(--desktop-surface-subtle);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.desktop-application-context-add {
+  display: inline-flex;
+  min-width: 72px;
+  height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 11px;
+  border: 1px solid #cce0da;
+  border-radius: 9px;
+  color: var(--desktop-accent-strong);
+  background: var(--desktop-accent-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.desktop-application-context-add:hover {
+  border-color: #b9d5cd;
+  background: var(--desktop-accent-hover);
+}
+
+.desktop-application-context-toolbar {
+  display: grid !important;
+  min-height: auto !important;
+  flex: 0 0 auto;
+  grid-template-columns: 1fr !important;
+  gap: 9px !important;
+  padding: 0 18px 15px !important;
+  border-bottom: 1px solid var(--desktop-border);
+}
+
+.desktop-application-context-toolbar .desktop-project-search {
+  width: 100%;
+  min-width: 0;
+  height: 40px !important;
+  padding: 0 12px !important;
+  border-color: var(--desktop-border) !important;
+  border-radius: 9px !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-application-context-toolbar .desktop-project-search:focus-within {
+  border-color: var(--desktop-accent) !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: 0 0 0 2px rgba(23, 108, 91, 0.1);
+}
+
+.desktop-application-context-toolbar .desktop-project-scope {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--desktop-border);
+  border-radius: 9px;
+  background: var(--desktop-surface-subtle);
+}
+
+.desktop-application-context-toolbar .desktop-project-scope button {
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--desktop-text-secondary);
+  background: transparent;
+  font-size: 12px !important;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.desktop-application-context-toolbar .desktop-project-scope button[aria-pressed='true'] {
+  color: var(--desktop-accent-strong);
+  background: var(--desktop-surface);
+  box-shadow: var(--desktop-shadow-sm);
+}
+
+.desktop-application-filter-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.desktop-application-filter-row .desktop-project-filter,
+.desktop-application-filter-row .desktop-project-filter select {
+  width: 100%;
+  min-width: 0;
+}
+
+.desktop-application-filter-row .desktop-project-filter select {
+  height: 36px !important;
+  max-width: none !important;
+  padding: 0 28px 0 9px !important;
+  border-color: var(--desktop-border) !important;
+  border-radius: 8px !important;
+  color: var(--desktop-text-secondary) !important;
+  background-color: var(--desktop-surface) !important;
+  font-size: 13px !important;
+}
+
+.desktop-application-context .desktop-workbench-error {
+  margin: 10px 18px 0;
+}
+
+.desktop-application-object-list {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+.desktop-application-object-list .desktop-project-table-body {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd7d3 transparent;
+}
+
+.desktop-application-object-row {
+  position: relative;
+  display: grid !important;
+  min-height: 128px !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-rows: 52px 22px 18px !important;
+  gap: 9px 12px !important;
+  padding: 14px 18px 13px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--desktop-border) !important;
+  color: var(--desktop-text);
+  background: var(--desktop-surface) !important;
+  cursor: default;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.desktop-application-object-row:hover {
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-application-object-row.is-selected {
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-application-object-row.is-selected::before {
+  position: absolute;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 3px !important;
+  border-radius: 0 !important;
+  background: var(--desktop-accent) !important;
+  content: "";
+}
+
+.desktop-application-object-main {
+  display: grid;
+  min-width: 0;
+  grid-column: 1 / 3;
+  grid-row: 1;
+  grid-template-columns: 42px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 11px;
+}
+
+.desktop-application-object-main > :first-child {
+  width: 42px !important;
+  height: 42px !important;
+}
+
+.desktop-application-object-main > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--desktop-text-tertiary);
+}
+
+.desktop-application-object-copy {
+  min-width: 0;
+}
+
+.desktop-application-object-copy > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.desktop-application-object-copy strong {
+  overflow: hidden;
+  color: var(--desktop-text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-application-object-copy span {
+  overflow: hidden;
+  color: var(--desktop-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-application-object-copy p {
+  overflow: hidden;
+  margin: 2px 0 0;
+  color: var(--desktop-text-tertiary);
+  font-size: 13px;
+  line-height: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-application-object-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.desktop-application-object-meta > span {
+  color: var(--desktop-text-tertiary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.desktop-application-object-meta .desktop-project-status {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  color: var(--desktop-accent-strong);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-application-object-meta .desktop-project-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--desktop-accent);
+}
+
+.desktop-application-object-materials {
+  width: 118px;
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: end;
+}
+
+.desktop-application-object-materials > div:first-child {
+  display: flex;
+  height: auto !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--desktop-text-tertiary);
+  font-size: 12px;
+}
+
+.desktop-application-object-materials strong {
+  color: var(--desktop-text-secondary);
+  font-size: 12px;
+}
+
+.desktop-application-object-materials > div:last-child,
+.desktop-project-workspace-progress {
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #e4ebe8;
+}
+
+.desktop-application-object-materials i,
+.desktop-project-workspace-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--desktop-accent);
+}
+
+.desktop-application-object-deadline {
+  display: flex !important;
+  grid-column: 1 / 3;
+  grid-row: 3;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--desktop-text-tertiary);
+  font-size: 12px;
+}
+
+.desktop-application-object-deadline strong {
+  color: var(--desktop-text-secondary) !important;
+  font-size: 12px !important;
+  line-height: 18px;
+}
+
+.desktop-application-object-deadline small {
+  color: var(--desktop-text-tertiary) !important;
+}
+
+.desktop-application-object-deadline.is-urgent strong,
+.desktop-application-object-deadline.is-urgent small {
+  color: var(--desktop-danger) !important;
+}
+
+/* Selected application workspace. */
+.desktop-project-workspace {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.desktop-project-workspace-header {
+  display: flex;
+  min-height: 116px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 30px 18px !important;
+  border-bottom: 1px solid var(--desktop-border) !important;
+}
+
+.desktop-project-inspector > .desktop-project-workspace-header > .desktop-project-workspace-identity {
+  display: flex !important;
+  min-width: 0;
+  align-items: center;
+  gap: 16px;
+}
+
+.desktop-project-workspace-identity > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.desktop-project-workspace-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.desktop-project-workspace-identity span {
+  color: var(--desktop-text-tertiary) !important;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.desktop-project-workspace-identity h2 {
+  min-width: 0;
+  overflow: hidden;
+  margin: 2px 0 0;
+  color: var(--desktop-text) !important;
+  font-size: 26px !important;
+  font-weight: 700 !important;
+  line-height: 34px !important;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-project-workspace-status {
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--desktop-text-secondary) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  white-space: nowrap;
+}
+
+.desktop-project-workspace-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--desktop-accent);
+}
+
+.desktop-project-workspace-identity p {
+  overflow: hidden;
+  max-width: 720px;
+  margin: 3px 0 0;
+  color: var(--desktop-text-secondary) !important;
+  font-size: 13px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-project-workspace-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-project-workspace-primary {
+  display: inline-flex;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 17px;
+  border: 1px solid var(--desktop-accent);
+  border-radius: 9px;
+  color: #ffffff !important;
+  background: var(--desktop-accent) !important;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(15, 81, 71, 0.14);
+}
+
+.desktop-project-workspace-primary:hover {
+  border-color: var(--desktop-accent-strong);
+  background: var(--desktop-accent-strong) !important;
+}
+
+.desktop-project-workspace-tabs {
+  display: flex;
+  min-height: 54px;
+  flex: 0 0 auto;
+  align-items: stretch;
+  gap: 30px;
+  padding: 0 30px;
+  border-bottom: 1px solid var(--desktop-border);
+  background: var(--desktop-surface);
+}
+
+.desktop-project-workspace-tabs button {
+  position: relative;
+  min-width: 44px;
+  padding: 0 2px;
+  border: 0;
+  color: var(--desktop-text-secondary);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.desktop-project-workspace-tabs button:hover {
+  color: var(--desktop-accent-strong);
+}
+
+.desktop-project-workspace-tabs button[aria-selected='true'] {
+  color: var(--desktop-accent-strong);
+  font-weight: 700;
+}
+
+.desktop-project-workspace-tabs button[aria-selected='true']::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--desktop-accent);
+  content: "";
+}
+
+.desktop-project-workspace-body {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 22px 30px 30px;
+  outline: none;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd7d3 transparent;
+}
+
+.desktop-project-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--desktop-border);
+  border-radius: 12px;
+  background: var(--desktop-surface);
+}
+
+.desktop-project-overview-card {
+  min-width: 0;
+  min-height: 124px;
+  padding: 18px 20px;
+  border: 0;
+  border-right: 1px solid var(--desktop-border);
+  border-radius: 0;
+  background: var(--desktop-surface);
+}
+
+.desktop-project-overview-card:last-child {
+  border-right: 0;
+}
+
+.desktop-project-overview-card > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--desktop-text-tertiary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktop-project-overview-card > span svg {
+  width: 17px;
+  height: 17px;
+  color: var(--desktop-accent);
+}
+
+.desktop-project-overview-card strong,
+.desktop-project-overview-card select {
+  display: block;
+  margin-top: 12px;
+  color: var(--desktop-text);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 28px;
+}
+
+.desktop-project-overview-card select {
+  width: 100%;
+  height: 38px;
+  margin-top: 10px;
+  padding: 0 30px 0 10px;
+  border: 1px solid var(--desktop-border);
+  border-radius: 8px;
+  background: var(--desktop-surface-subtle);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.desktop-project-overview-card small {
+  display: block;
+  margin-top: 3px;
+  color: var(--desktop-text-tertiary);
+}
+
+.desktop-project-overview-card.is-urgent strong,
+.desktop-project-overview-card.is-urgent small {
+  color: var(--desktop-danger);
+}
+
+.desktop-project-workspace-section {
+  margin-top: 16px;
+  padding: 20px;
+  border: 1px solid var(--desktop-border);
+  border-radius: 11px;
+  background: var(--desktop-surface);
+}
+
+.desktop-project-stage-section,
+.desktop-project-material-overview-section {
+  padding: 20px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.desktop-project-material-overview-section {
+  padding-top: 18px;
+  border-top: 1px solid var(--desktop-border);
+}
+
+.desktop-project-workspace-section > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.desktop-project-workspace-section h3 {
+  margin: 0;
+  color: var(--desktop-text);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 25px;
+}
+
+.desktop-project-workspace-section header p {
+  margin: 2px 0 0;
+  color: var(--desktop-text-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.desktop-project-workspace-section header :where(button, a) {
+  min-height: 34px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--desktop-accent-strong);
+  background: var(--desktop-accent-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.desktop-project-stage-line {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.desktop-project-stage-line::before {
+  position: absolute;
+  top: 16px;
+  right: 10%;
+  left: 10%;
+  height: 1px;
+  background: var(--desktop-border-strong);
+  content: "";
+}
+
+.desktop-project-stage-item {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  color: var(--desktop-text-tertiary);
+  text-align: center;
+}
+
+.desktop-project-stage-item > span {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--desktop-border-strong);
+  border-radius: 50%;
+  color: var(--desktop-text-tertiary);
+  background: var(--desktop-surface);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.desktop-project-stage-item strong {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.desktop-project-stage-item.is-complete,
+.desktop-project-stage-item.is-current {
+  color: var(--desktop-accent-strong);
+}
+
+.desktop-project-stage-item.is-complete > span,
+.desktop-project-stage-item.is-current > span {
+  border-color: var(--desktop-accent);
+  color: #ffffff;
+  background: var(--desktop-accent);
+}
+
+.desktop-project-stage-item.is-current > span {
+  box-shadow: 0 0 0 4px var(--desktop-accent-muted);
+}
+
+.desktop-project-workspace-checklist {
+  display: grid;
+  grid-template-columns: 1fr;
+  overflow: hidden;
+  border: 1px solid var(--desktop-border);
+  border-radius: 9px;
+}
+
+.desktop-project-workspace-checklist button {
+  display: grid;
+  min-height: 48px;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 1px solid var(--desktop-border);
+  color: var(--desktop-text-secondary);
+  background: var(--desktop-surface);
+  font-size: 13px;
+  text-align: left;
+}
+
+.desktop-project-workspace-checklist button > small {
+  color: var(--desktop-text-tertiary) !important;
+  font-size: 12px !important;
+  font-weight: 600;
+}
+
+.desktop-project-workspace-checklist button[aria-pressed='true'] > small {
+  color: var(--desktop-accent-strong) !important;
+}
+
+.desktop-project-workspace-checklist button:last-child {
+  border-bottom: 0;
+}
+
+.desktop-project-workspace-checklist button:hover {
+  background: var(--desktop-surface-subtle);
+}
+
+.desktop-project-workspace-checklist button[aria-pressed='true'] {
+  color: var(--desktop-text);
+}
+
+.desktop-project-workspace-checklist button > span:first-child {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--desktop-border-strong);
+  border-radius: 4px;
+  color: #ffffff;
+  background: var(--desktop-surface);
+}
+
+.desktop-project-workspace-checklist button[aria-pressed='true'] > span:first-child {
+  border-color: var(--desktop-accent);
+  background: var(--desktop-accent);
+}
+
+.desktop-project-material-panel > header > strong {
+  color: var(--desktop-accent-strong);
+  font-size: 24px;
+  line-height: 30px;
+}
+
+.desktop-project-material-panel > .desktop-project-workspace-progress {
+  height: 6px;
+  margin: -4px 0 18px;
+}
+
+.desktop-project-related-panel dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.desktop-project-related-panel dl > div,
+.desktop-project-related-empty {
+  min-height: 84px;
+  padding: 14px;
+  border: 1px solid var(--desktop-border);
+  border-radius: 9px;
+  background: var(--desktop-surface-subtle);
+}
+
+.desktop-project-related-panel dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--desktop-text-tertiary);
+  font-size: 12px;
+}
+
+.desktop-project-related-panel dd {
+  display: grid;
+  gap: 2px;
+  margin: 9px 0 0;
+  color: var(--desktop-text);
+  font-size: 14px;
+}
+
+.desktop-project-related-empty strong {
+  color: var(--desktop-text);
+  font-size: 15px;
+}
+
+.desktop-project-related-empty p {
+  margin: 4px 0 0;
+  color: var(--desktop-text-secondary);
+  font-size: 13px;
+}
+
+.desktop-project-activity-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.desktop-project-activity-list li {
+  display: grid;
+  min-height: 58px;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--desktop-border);
+}
+
+.desktop-project-activity-list li:last-child {
+  border-bottom: 0;
+}
+
+.desktop-project-activity-list li > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--desktop-accent);
+}
+
+.desktop-project-activity-list strong,
+.desktop-project-activity-list small {
+  display: block;
+}
+
+.desktop-project-activity-list strong {
+  color: var(--desktop-text);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.desktop-project-activity-list small {
+  margin-top: 2px;
+  color: var(--desktop-text-tertiary);
+}
+
+.desktop-project-workspace-footer {
+  display: flex !important;
+  min-height: 62px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 30px !important;
+  border-top: 1px solid var(--desktop-border) !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-project-workspace-footer a {
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px !important;
+  border: 1px solid var(--desktop-border) !important;
+  border-radius: 8px !important;
+  color: var(--desktop-text-secondary) !important;
+  background: var(--desktop-surface) !important;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.desktop-project-workspace-footer a:hover {
+  border-color: #bfd7d0 !important;
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-project-workspace .desktop-inspector-close {
+  display: none;
+}
+
+.desktop-project-workspace .desktop-inspector-close--floating {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  right: 12px;
+}
+
+@media (max-width: 1180px) {
+  .desktop-project-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .desktop-project-overview-card {
+    border-right: 1px solid var(--desktop-border);
+    border-bottom: 1px solid var(--desktop-border);
+  }
+
+  .desktop-project-overview-card:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .desktop-project-overview-card:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+}
+
+@media (max-width: 1439px) and (min-width: 1280px) {
+  .desktop-app-shell {
+    --desktop-master-width: 400px;
+  }
+}
+
+@media (max-width: 1279px) and (min-width: 1100px) {
+  .desktop-app-shell {
+    --desktop-master-width: 360px;
+  }
+}
+
+@media (max-width: 1099px) and (min-width: 960px) {
+  .desktop-app-shell {
+    --desktop-master-width: 320px;
+  }
+}
+
+@media (max-width: 959px) {
+  .desktop-qq-workbench-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .desktop-application-context {
+    border-right: 0 !important;
+  }
+
+  .desktop-project-workspace {
+    position: fixed !important;
+    z-index: 66;
+    top: var(--desktop-titlebar-height) !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: min(760px, calc(100vw - var(--desktop-rail-width))) !important;
+    max-width: none !important;
+    border-left: 1px solid var(--desktop-border) !important;
+    box-shadow: -20px 0 48px rgba(16, 63, 55, 0.16) !important;
+    transform: translateX(calc(100% + 24px));
+    visibility: hidden;
+    transition:
+      transform 220ms cubic-bezier(0.2, 0, 0, 1),
+      visibility 0s linear 220ms;
+  }
+
+  .desktop-project-workspace.is-open {
+    transform: translateX(0);
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .desktop-project-workspace .desktop-inspector-close {
+    display: inline-flex !important;
+  }
+
+  .desktop-inspector-backdrop {
+    position: fixed !important;
+    z-index: 65;
+    top: var(--desktop-titlebar-height) !important;
+    right: 0;
+    bottom: 0 !important;
+    left: var(--desktop-rail-width);
+    background: rgba(19, 38, 34, 0.18) !important;
+  }
+
+  .desktop-application-context-header,
+  .desktop-application-context-toolbar,
+  .desktop-application-object-list {
+    width: min(760px, 100%);
+    margin-inline: auto;
+  }
+
+  .desktop-application-context-toolbar {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: center;
+  }
+
+  .desktop-application-context-toolbar .desktop-project-search,
+  .desktop-application-filter-row {
+    grid-column: 1 !important;
+  }
+
+  .desktop-application-object-row {
+    min-height: 118px !important;
+  }
+}
+
+@media (max-width: 780px) {
+  .desktop-project-workspace {
+    width: calc(100vw - var(--desktop-rail-width)) !important;
+  }
+
+  .desktop-project-workspace-header {
+    padding-inline: 20px !important;
+  }
+
+  .desktop-project-workspace-identity > div:first-child {
+    width: auto !important;
+    height: auto !important;
+    min-width: 0;
+  }
+
+  .desktop-project-workspace-identity h2 {
+    font-size: 21px !important;
+    line-height: 29px !important;
+  }
+
+  .desktop-project-workspace-tabs,
+  .desktop-project-workspace-body,
+  .desktop-project-workspace-footer {
+    padding-inline: 20px !important;
+  }
+
+  .desktop-project-workspace-tabs {
+    overflow-x: auto;
+    gap: 24px;
+    scrollbar-width: none;
+  }
+
+  .desktop-project-workspace-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .desktop-project-workspace-tabs button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .desktop-project-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .desktop-project-stage-item strong {
+    font-size: 12px;
+  }
+}
+
+/* WebView zoom reduces the available CSS viewport. Keep interaction state and
+ * layout state aligned so high zoom never leaves an inert detail pane onscreen. */
+.desktop-app-shell[data-zoom-level='150'] {
+  --desktop-rail-width: 64px;
+  --desktop-zoom-drawer-width: 520px;
+}
+
+.desktop-app-shell[data-zoom-level='175'] {
+  --desktop-rail-width: 56px;
+  --desktop-zoom-drawer-width: 460px;
+}
+
+.desktop-app-shell[data-zoom-level='200'] {
+  --desktop-rail-width: 52px;
+  --desktop-zoom-drawer-width: 400px;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) :is(.desktop-primary-nav-item, .desktop-rail-utility-button) {
+  width: 44px !important;
+  min-width: 44px !important;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-primary-rail {
+  padding-inline: 4px !important;
+}
+
+/* At the two largest scales the native window has much less logical height.
+ * Keep every destination reachable: compact the rail rhythm, anchor it at the
+ * top, and allow a scrollbar-free overflow path at the minimum window size. */
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200'])
+  .desktop-primary-rail {
+  align-items: stretch !important;
+  gap: 4px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  scrollbar-width: none;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200'])
+  .desktop-primary-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200'])
+  .desktop-nav-list--primary {
+  gap: 2px !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200'])
+  :is(.desktop-primary-nav-item, .desktop-rail-utility-button) {
+  min-height: 36px !important;
+  height: 36px !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200'])
+  :is(.desktop-primary-nav-item, .desktop-rail-utility-button) svg {
+  width: 19px !important;
+  height: 19px !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200'])
+  .desktop-rail-utilities {
+  gap: 2px !important;
+  margin-top: auto !important;
+  padding-top: 5px !important;
+}
+
+@media (max-height: 800px) {
+  /* Keep Settings pinned and keep all six primary destinations visible in the
+   * minimum-height window. Help remains available through command search. */
+  .desktop-app-shell:is(
+    [data-zoom-level='150'],
+    [data-zoom-level='175'],
+    [data-zoom-level='200']
+  ) .desktop-rail-utilities > :not(:last-child) {
+    display: none !important;
+  }
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-brand-wordmark {
+  display: none !important;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-brand-header {
+  width: var(--desktop-rail-width) !important;
+  padding-inline: calc((var(--desktop-rail-width) - 42px) / 2) !important;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-topbar {
+  padding-left: var(--desktop-rail-width) !important;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-qq-workbench-layout {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.desktop-app-shell[data-zoom-level='150'] .desktop-project-overview-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.desktop-app-shell[data-zoom-level='150'] .desktop-project-overview-card {
+  border-right: 1px solid var(--desktop-border);
+  border-bottom: 1px solid var(--desktop-border);
+}
+
+.desktop-app-shell[data-zoom-level='150'] .desktop-project-overview-card:nth-child(2n) {
+  border-right: 0;
+}
+
+.desktop-app-shell[data-zoom-level='150'] .desktop-project-overview-card:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-project-workspace {
+  position: fixed !important;
+  z-index: 66;
+  top: var(--desktop-titlebar-height) !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: min(var(--desktop-zoom-drawer-width), calc(100vw - 16px)) !important;
+  max-width: none !important;
+  border-left: 1px solid var(--desktop-border) !important;
+  box-shadow: -20px 0 48px rgba(16, 63, 55, 0.16) !important;
+  transform: translateX(calc(100% + 24px));
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 220ms cubic-bezier(0.2, 0, 0, 1),
+    visibility 0s linear 220ms;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-project-workspace.is-open {
+  transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-project-workspace .desktop-inspector-close {
+  display: inline-flex !important;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-inspector-backdrop {
+  position: fixed !important;
+  z-index: 65;
+  top: var(--desktop-titlebar-height) !important;
+  right: 0;
+  bottom: 0 !important;
+  left: var(--desktop-rail-width);
+  background: rgba(19, 38, 34, 0.18) !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200'])
+  .desktop-project-overview-grid {
+  grid-template-columns: 1fr;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200'])
+  .desktop-project-overview-card {
+  border-right: 0;
+  border-bottom: 1px solid var(--desktop-border);
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200'])
+  .desktop-project-overview-card:last-child {
+  border-bottom: 0;
+}
+
+/* SeekOffer desktop v0.1.9 — QQ + MCHOSE interaction and route polish. */
+.desktop-app-shell :where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid rgba(23, 108, 91, 0.72) !important;
+  outline-offset: 2px;
+}
+
+.desktop-rail-utility-button > kbd {
+  display: none !important;
+}
+
+/* The notification library is a desktop workspace, not a marketing dashboard. */
+.desktop-app-shell .desktop-notice-library {
+  display: grid;
+  width: 100%;
+  max-width: 1560px;
+  gap: 12px;
+  margin: 0 auto;
+}
+
+.desktop-app-shell .desktop-notice-hero {
+  min-height: 94px;
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 520px) !important;
+  gap: 24px !important;
+  padding: 18px 22px !important;
+  border: 1px solid var(--desktop-border) !important;
+  border-radius: 14px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-notice-hero::before,
+.desktop-app-shell .desktop-notice-hero::after {
+  display: none !important;
+}
+
+.desktop-app-shell .desktop-notice-hero h1 {
+  color: var(--desktop-text) !important;
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  line-height: 36px !important;
+  letter-spacing: -0.015em !important;
+}
+
+.desktop-app-shell .desktop-notice-hero p {
+  margin-top: 2px !important;
+  color: var(--desktop-text-secondary) !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+}
+
+.desktop-app-shell .desktop-notice-stats {
+  max-width: 520px !important;
+  gap: 0 !important;
+  overflow: hidden;
+  border: 1px solid var(--desktop-border);
+  border-radius: 10px;
+  background: var(--desktop-surface);
+}
+
+.desktop-app-shell .desktop-notice-stats .soft-stat-pill {
+  min-height: 56px;
+  padding: 8px 12px !important;
+  border: 0 !important;
+  border-left: 1px solid var(--desktop-border) !important;
+  border-radius: 0 !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-notice-stats .soft-stat-pill:first-child {
+  border-left: 0 !important;
+}
+
+.desktop-app-shell .desktop-notice-stats .soft-stat-pill > div {
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+.desktop-app-shell .desktop-notice-stats .soft-stat-pill span {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-app-shell .desktop-notice-stats .soft-stat-pill span svg {
+  width: 17px !important;
+  height: 17px !important;
+}
+
+.desktop-app-shell .desktop-notice-stats .soft-stat-pill div > div:first-child {
+  color: var(--desktop-text-tertiary) !important;
+  font-size: 11px !important;
+  line-height: 16px !important;
+}
+
+.desktop-app-shell .desktop-notice-stats .soft-stat-pill div > div:last-child {
+  color: var(--desktop-text) !important;
+  font-size: 16px !important;
+  line-height: 22px !important;
+}
+
+.desktop-app-shell .desktop-notice-filters {
+  padding: 16px 18px !important;
+  border: 1px solid var(--desktop-border) !important;
+  border-radius: 14px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-notice-filters > div:first-child {
+  gap: 4px !important;
+  padding-bottom: 12px !important;
+}
+
+.desktop-app-shell .desktop-notice-filters > div:first-child button {
+  min-height: 34px;
+  padding: 0 12px !important;
+}
+
+.desktop-app-shell .desktop-notice-filters > div:first-child button span {
+  bottom: -13px !important;
+}
+
+.desktop-app-shell .desktop-notice-filters > div:nth-child(2) {
+  margin-top: 12px !important;
+  gap: 8px !important;
+  grid-template-columns: minmax(0, 1fr) 132px !important;
+}
+
+.desktop-app-shell .desktop-notice-filters > div:nth-child(2) label,
+.desktop-app-shell .desktop-notice-filters > div:nth-child(2) button {
+  height: 44px !important;
+  border-radius: 9px !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-notice-filters > div:nth-child(2) button:hover {
+  transform: none !important;
+}
+
+.desktop-app-shell .desktop-notice-filters > div:nth-child(3) {
+  margin-top: 10px !important;
+  gap: 6px !important;
+}
+
+.desktop-app-shell .desktop-notice-filters > div:nth-child(3) button {
+  min-height: 32px;
+  padding: 0 11px !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-notice-filters :where(input, select) {
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-notice-results {
+  gap: 12px !important;
+  grid-template-columns: minmax(0, 1fr) 300px !important;
+}
+
+.desktop-app-shell .desktop-notice-results > div:first-child {
+  gap: 10px !important;
+}
+
+.desktop-app-shell .desktop-notice-toolbar {
+  min-height: 48px;
+  gap: 10px !important;
+  padding: 10px 14px !important;
+  border-color: var(--desktop-border) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-notice-card {
+  min-height: 168px !important;
+  padding: 16px !important;
+  border-color: var(--desktop-border) !important;
+  border-radius: 12px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+  transition:
+    background-color 167ms ease,
+    border-color 167ms ease !important;
+}
+
+.desktop-app-shell .desktop-notice-card:hover {
+  border-color: var(--desktop-border-strong) !important;
+  background: var(--desktop-surface-subtle) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.desktop-app-shell .desktop-notice-card > div:last-child {
+  gap: 14px !important;
+  grid-template-columns: 58px minmax(0, 1fr) 158px !important;
+}
+
+.desktop-app-shell .desktop-notice-card h2,
+.desktop-app-shell .desktop-notice-card a[class*='text-lg'] {
+  font-size: 16px !important;
+  line-height: 23px !important;
+}
+
+.desktop-app-shell .desktop-notice-card a[class*='text-lg'] {
+  min-height: 46px !important;
+}
+
+.desktop-app-shell .desktop-notice-card [class*='rounded-full'] {
+  border-radius: 8px !important;
+}
+
+.desktop-app-shell .desktop-notice-sidebar {
+  gap: 10px !important;
+}
+
+.desktop-app-shell .desktop-notice-sidecard {
+  padding: 16px !important;
+  border: 1px solid var(--desktop-border) !important;
+  border-radius: 12px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-notice-sidecard > div:first-child {
+  margin-bottom: 12px !important;
+}
+
+.desktop-app-shell .desktop-notice-sidecard > div:first-child span {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 8px !important;
+}
+
+.desktop-app-shell .desktop-notice-sidecard h2 {
+  font-size: 16px !important;
+  line-height: 23px !important;
+}
+
+.desktop-app-shell .desktop-notice-sidebar > .desktop-notice-sidecard:last-child,
+.desktop-app-shell .desktop-notice-promos {
+  display: none !important;
+}
+
+.desktop-app-shell .desktop-notice-loading {
+  min-height: 350px !important;
+  border-color: var(--desktop-border) !important;
+  border-radius: 12px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-notice-loading > div > span {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-notice-side-loading {
+  border-color: var(--desktop-border) !important;
+  border-radius: 9px !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+@media (max-width: 1240px) {
+  .desktop-app-shell .desktop-notice-hero {
+    grid-template-columns: 1fr !important;
+  }
+
+  .desktop-app-shell .desktop-notice-stats {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .desktop-app-shell .desktop-notice-results {
+    grid-template-columns: 1fr !important;
+  }
+
+  .desktop-app-shell .desktop-notice-sidebar {
+    display: none !important;
+  }
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-hero {
+  grid-template-columns: 1fr !important;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-results {
+  grid-template-columns: 1fr !important;
+}
+
+.desktop-app-shell:is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-sidebar {
+  display: none !important;
+}
+
+/* Final settings contract: QQ-style context navigation on the left, with the
+ * same flat work surface used by MCHOSE HUB. This explicitly resets legacy
+ * desktop.css rules that changed the layout into a website-like tab strip. */
+.desktop-app-shell .desktop-settings-layout {
+  display: grid !important;
+  grid-template-columns: 232px minmax(0, 1fr) !important;
+}
+
+.desktop-app-shell .desktop-settings-nav {
+  position: static !important;
+  display: flex !important;
+  width: auto !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 4px !important;
+  margin: 0 !important;
+  padding: 16px 12px !important;
+  border: 0 !important;
+  border-right: 1px solid var(--desktop-border) !important;
+  border-radius: 0 !important;
+}
+
+.desktop-app-shell .desktop-settings-nav-title {
+  display: block !important;
+}
+
+.desktop-app-shell .desktop-settings-nav-item {
+  display: grid !important;
+  grid-template-columns: 28px minmax(0, 1fr) !important;
+  justify-content: stretch !important;
+  text-align: left !important;
+}
+
+.desktop-app-shell .desktop-settings-nav-copy {
+  display: block !important;
+  min-width: 0;
+}
+
+/* Content density changes rhythm, never readability. */
+.desktop-app-shell[data-density='compact'] .desktop-application-object-row {
+  min-height: 96px !important;
+  grid-template-rows: 38px 18px 16px !important;
+  gap: 4px 10px !important;
+  padding: 9px 14px 8px !important;
+}
+
+.desktop-app-shell[data-density='compact'] .desktop-application-object-main {
+  grid-template-columns: 36px minmax(0, 1fr) 18px;
+  gap: 9px;
+}
+
+.desktop-app-shell[data-density='compact'] .desktop-application-object-main > :first-child {
+  width: 36px !important;
+  height: 36px !important;
+}
+
+.desktop-app-shell[data-density='compact'] .desktop-application-object-copy p {
+  display: none;
+}
+
+.desktop-app-shell[data-density='compact'] .desktop-application-object-materials {
+  width: 104px;
+}
+
+.desktop-app-shell[data-density='compact'] :is(
+  .desktop-setting-row,
+  .desktop-setting-link-row,
+  .desktop-settings-shortcut-row
+) {
+  min-height: 50px !important;
+  padding-block: 8px !important;
+}
+
+.desktop-app-shell[data-density='compact'] .desktop-reminder-scroll article {
+  padding: 12px 14px !important;
+}
+
+.desktop-app-shell[data-density='compact'] .desktop-reminder-scroll {
+  padding-inline: 14px !important;
+}
+
+/* Stable initial sync state. A single transform-only indicator avoids the
+ * parallel opacity bands that produced moire in WebView2 at non-integer zoom. */
+.desktop-app-shell .desktop-workbench-loading-state,
+.desktop-app-shell .desktop-workbench-error-state {
+  display: flex;
+  min-height: 180px;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 16px 18px;
+  padding: 24px;
+  border: 1px solid var(--desktop-border);
+  border-radius: 12px;
+  color: var(--desktop-text);
+  background: var(--desktop-surface-subtle);
+  text-align: left;
+}
+
+.desktop-app-shell .desktop-workbench-loading-state strong,
+.desktop-app-shell .desktop-workbench-error-state strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.desktop-app-shell .desktop-workbench-loading-state p,
+.desktop-app-shell .desktop-workbench-error-state p {
+  margin: 3px 0 0;
+  color: var(--desktop-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.desktop-app-shell .desktop-workbench-loading-icon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--desktop-accent-strong);
+  background: var(--desktop-accent-muted);
+}
+
+.desktop-app-shell .desktop-workbench-loading-icon svg {
+  width: 20px;
+  height: 20px;
+  animation: desktop-workbench-loading-spin 900ms linear infinite;
+}
+
+.desktop-app-shell .desktop-workbench-error-state {
+  flex-wrap: wrap;
+}
+
+.desktop-app-shell .desktop-workbench-error-state > svg {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  color: var(--desktop-danger);
+}
+
+.desktop-app-shell .desktop-workbench-error-state > div {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.desktop-app-shell .desktop-workbench-error-state > button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--desktop-border-strong);
+  border-radius: 8px;
+  color: var(--desktop-accent-strong);
+  background: var(--desktop-surface);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@keyframes desktop-workbench-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-app-shell .desktop-workbench-loading-icon svg {
+    animation: none !important;
+  }
+}
+
+/* At large UI scales the settings rail becomes a reachable context strip.
+ * The content remains full width and never shrinks its type. */
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200'])
+  .desktop-settings-layout {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200'])
+  .desktop-settings-nav {
+  flex-direction: row !important;
+  overflow-x: auto !important;
+  padding: 8px 10px !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid var(--desktop-border) !important;
+  scrollbar-width: thin;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200'])
+  .desktop-settings-nav-title {
+  display: none !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200'])
+  .desktop-settings-nav-item {
+  min-width: -moz-max-content !important;
+  min-width: max-content !important;
+  grid-template-columns: 22px auto !important;
+  padding-inline: 12px !important;
+}
+
+@media (max-width: 840px) {
+  .desktop-app-shell .desktop-settings-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .desktop-app-shell .desktop-settings-nav {
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    padding: 8px 10px !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--desktop-border) !important;
+    scrollbar-width: thin;
+  }
+
+  .desktop-app-shell .desktop-settings-nav-title {
+    display: none !important;
+  }
+
+  .desktop-app-shell .desktop-settings-nav-item {
+    min-width: -moz-max-content !important;
+    min-width: max-content !important;
+    grid-template-columns: 22px auto !important;
+    padding-inline: 12px !important;
+  }
+}
+
+/* Shared desktop workspace language for the remaining first-class routes.
+ * Website content keeps its data and actions, while the desktop surface uses
+ * MCHOSE-like density and QQ-like hierarchy instead of oversized landing-page
+ * cards. */
+.desktop-app-shell .desktop-route-content {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  color: var(--desktop-text);
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.desktop-app-shell .desktop-route-content > .page-hero {
+  min-height: 96px;
+  padding: 18px 22px !important;
+  border: 1px solid var(--desktop-border) !important;
+  border-radius: 14px !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-app-shell .desktop-route-content > .page-hero::before,
+.desktop-app-shell .desktop-route-content > .page-hero::after {
+  display: none !important;
+}
+
+.desktop-app-shell .desktop-route-content > .page-hero h1 {
+  color: var(--desktop-text) !important;
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  line-height: 36px !important;
+  letter-spacing: -0.015em !important;
+}
+
+.desktop-app-shell .desktop-route-content > .page-hero p {
+  margin-top: 3px !important;
+  color: var(--desktop-text-secondary) !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+}
+
+.desktop-app-shell .desktop-route-content > .page-hero > div:last-child:has(.soft-stat-pill) {
+  gap: 0 !important;
+  overflow: hidden;
+  border: 1px solid var(--desktop-border);
+  border-radius: 10px;
+  background: var(--desktop-surface);
+}
+
+.desktop-app-shell .desktop-route-content > .page-hero .soft-stat-pill {
+  min-height: 56px;
+  padding: 8px 12px !important;
+  border: 0 !important;
+  border-left: 1px solid var(--desktop-border) !important;
+  border-radius: 0 !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-route-content > .page-hero .soft-stat-pill:first-child {
+  border-left: 0 !important;
+}
+
+.desktop-app-shell .desktop-route-content > .page-hero .soft-stat-pill span {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+}
+
+.desktop-app-shell .desktop-route-content :where([class*='rounded-']):not(.rounded-full) {
+  border-radius: 10px !important;
+}
+
+.desktop-app-shell .desktop-route-content :where(section, article)[class*='shadow'] {
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-route-content :where(a, button):hover {
+  transform: none !important;
+}
+
+.desktop-app-shell .desktop-route-content :where(input, select, textarea) {
+  border-color: var(--desktop-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  font-size: 14px !important;
+}
+
+.desktop-app-shell .desktop-route-content :where(.surface-card, .product-card) {
+  border-color: var(--desktop-border) !important;
+  border-radius: 14px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+/* College library: toolbar + dense, stable result objects. */
+.desktop-app-shell .desktop-college-toolbar {
+  padding: 18px 20px !important;
+}
+
+.desktop-app-shell .desktop-college-toolbar > div:first-child {
+  margin-bottom: 14px !important;
+  padding-bottom: 12px !important;
+}
+
+.desktop-app-shell .desktop-college-card {
+  padding: 16px !important;
+  transition:
+    background-color 167ms ease,
+    border-color 167ms ease !important;
+}
+
+.desktop-app-shell .desktop-college-card:hover {
+  border-color: var(--desktop-border-strong) !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-app-shell .desktop-college-card [class*='text-2xl'] {
+  margin-top: 10px !important;
+  font-size: 18px !important;
+  line-height: 26px !important;
+}
+
+.desktop-app-shell .desktop-college-card [class*='grid-cols-2'] {
+  margin-top: 10px !important;
+  gap: 4px !important;
+}
+
+.desktop-app-shell .desktop-college-card [class*='grid-cols-2'] > div {
+  padding: 8px !important;
+  border: 1px solid var(--desktop-border);
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-app-shell .desktop-college-card > div > div:last-child > div:last-child {
+  margin-top: 12px !important;
+}
+
+.desktop-app-shell .desktop-route-pagination {
+  padding: 12px 16px !important;
+  border: 1px solid var(--desktop-border);
+  border-radius: 12px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-route-pagination button {
+  min-height: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  padding-block: 0 !important;
+}
+
+/* Resources: retain useful groupings while removing marketing-card scale. */
+.desktop-app-shell .desktop-resource-toolkit {
+  padding: 18px 20px !important;
+}
+
+.desktop-app-shell .desktop-resource-toolkit h2,
+.desktop-app-shell .desktop-resource-section-card h2 {
+  font-size: 20px !important;
+  line-height: 28px !important;
+}
+
+.desktop-app-shell .desktop-resource-toolkit > div:last-child {
+  margin-top: 14px !important;
+  gap: 10px !important;
+}
+
+.desktop-app-shell .desktop-resource-tool-card {
+  min-height: 0;
+  padding: 15px !important;
+  border-color: var(--desktop-border) !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-resource-tool-card > div {
+  min-height: 176px !important;
+}
+
+.desktop-app-shell .desktop-resource-tool-card [class*='h-14'] {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.desktop-app-shell .desktop-resource-tool-card [class*='h-14'] svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.desktop-app-shell .desktop-resource-tool-card h3 {
+  font-size: 16px !important;
+  line-height: 23px !important;
+}
+
+.desktop-app-shell .desktop-resource-sections {
+  gap: 12px !important;
+}
+
+.desktop-app-shell .desktop-resource-section-card > div {
+  grid-template-columns: 240px minmax(0, 1fr) !important;
+}
+
+.desktop-app-shell .desktop-resource-section-card > div > div {
+  padding: 18px !important;
+}
+
+/* Schedule and mentor contacts are work surfaces, not nested dashboards. */
+.desktop-app-shell :is(#schedule-board, #contacts-board) {
+  gap: 16px !important;
+}
+
+.desktop-app-shell :is(#schedule-board, #contacts-board) > :where(section) {
+  padding: 18px 20px !important;
+  border: 1px solid var(--desktop-border) !important;
+  border-radius: 14px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell :is(#schedule-page-title, #contacts-page-title) {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  line-height: 32px !important;
+}
+
+.desktop-app-shell :is(#schedule-board, #contacts-board)
+  :where([class*='rounded-']):not(.rounded-full) {
+  border-radius: 9px !important;
+}
+
+.desktop-app-shell :is(#schedule-board, #contacts-board)
+  :where(section, article, aside)[class*='shadow'] {
+  box-shadow: none !important;
+}
+
+.desktop-app-shell #contacts-board article {
+  border-color: var(--desktop-border) !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell #contacts-board article:hover {
+  border-color: var(--desktop-border-strong) !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+@media (max-width: 1160px) {
+  .desktop-app-shell .desktop-route-content > .page-hero {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .desktop-app-shell .desktop-route-content > .page-hero > div:last-child:has(.soft-stat-pill) {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .desktop-app-shell .desktop-resource-section-card > div {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])
+  .desktop-route-content {
+  padding: 16px !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])
+  .desktop-route-content > .page-hero {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+/* Authentication uses the same 64px chrome and compact control metrics as the
+ * signed-in shell. The supplied SeekOffer background remains the visual asset. */
+.desktop-auth-shell {
+  --desktop-auth-titlebar-height: 64px !important;
+  font-family:
+    'Segoe UI Variable Text',
+    'Segoe UI',
+    'Microsoft YaHei UI',
+    sans-serif;
+}
+
+.desktop-auth-titlebar {
+  min-height: 64px !important;
+  padding-left: 16px !important;
+  border-color: var(--desktop-border, #dbe4e1) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+}
+
+.desktop-auth-brand {
+  gap: 9px !important;
+}
+
+.desktop-auth-brand-mark {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 9px !important;
+}
+
+.desktop-auth-brand-wordmark {
+  gap: 6px !important;
+}
+
+.desktop-auth-brand-wordmark strong,
+.desktop-auth-brand-wordmark span {
+  font-size: 17px !important;
+  line-height: 24px !important;
+}
+
+.desktop-auth-shell .desktop-caption-button {
+  width: 46px !important;
+  height: 64px !important;
+}
+
+.desktop-auth-form-region {
+  padding: 24px 28px 18px !important;
+}
+
+.desktop-login-method-panel {
+  width: min(520px, calc(100vw - 48px)) !important;
+  max-width: 520px !important;
+  max-height: calc(100vh - 64px - 104px) !important;
+  border: 1px solid rgba(190, 207, 201, 0.92) !important;
+  border-radius: 14px !important;
+  background: rgba(255, 255, 255, 0.97) !important;
+  box-shadow: 0 16px 40px rgba(24, 66, 58, 0.12) !important;
+}
+
+.desktop-login-card-header {
+  padding: 24px 34px 0 !important;
+}
+
+.desktop-login-card-mark {
+  width: 56px !important;
+  height: 56px !important;
+}
+
+.desktop-login-card-header h1 {
+  margin-top: 10px !important;
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  line-height: 36px !important;
+}
+
+.desktop-login-card-header p {
+  margin-top: 4px !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+}
+
+.desktop-login-method-panel > .desktop-login-form {
+  padding: 18px 34px 24px !important;
+}
+
+.desktop-login-tabs button {
+  min-height: 44px !important;
+  font-size: 15px !important;
+}
+
+.desktop-login-tabs button[aria-selected='true']::after {
+  height: 2px !important;
+}
+
+.desktop-login-fields {
+  gap: 10px !important;
+  margin-top: 14px !important;
+}
+
+.desktop-login-field {
+  height: 50px !important;
+  border-radius: 9px !important;
+  box-shadow: none !important;
+}
+
+.desktop-login-field input {
+  font-size: 15px !important;
+}
+
+.desktop-login-field-action {
+  height: 48px !important;
+}
+
+.desktop-login-assist,
+.desktop-login-register-link {
+  font-size: 14px !important;
+}
+
+.desktop-login-method-panel button.desktop-login-primary[type='submit'] {
+  min-height: 50px !important;
+  margin-top: 12px !important;
+  border-radius: 9px !important;
+  box-shadow: none !important;
+  font-size: 15px !important;
+}
+
+.desktop-login-method-panel button.desktop-login-primary[type='submit']:hover:not(:disabled) {
+  box-shadow: none !important;
+}
+
+.desktop-auth-trust {
+  min-height: 76px !important;
+  border-color: rgba(206, 219, 214, 0.92) !important;
+  background: rgba(252, 253, 252, 0.94) !important;
+}
+
+.desktop-auth-trust > div {
+  gap: 10px !important;
+  padding: 11px 24px !important;
+}
+
+.desktop-auth-trust > div > span {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+.desktop-auth-trust svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.desktop-auth-trust strong {
+  font-size: 13px !important;
+  line-height: 19px !important;
+}
+
+.desktop-auth-trust small {
+  font-size: 12px !important;
+  line-height: 17px !important;
+}
+
+/* Match the native splash metrics to avoid a visible size jump. */
+.desktop-startup-mark {
+  width: 72px !important;
+  height: 72px !important;
+}
+
+.desktop-startup-wordmark {
+  margin-top: 12px !important;
+  font-size: 21px !important;
+  line-height: 29px !important;
+}
+
+.desktop-startup-content h1 {
+  margin-top: 22px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 24px !important;
+}
+
+.desktop-startup-progress {
+  width: 172px !important;
+  margin-top: 15px !important;
+}
+
+html[data-desktop-reduce-motion='true'] .desktop-workbench-loading-icon svg,
+html[data-desktop-reduce-motion='true'] .desktop-reminder-state--loading .desktop-reminder-state-icon svg,
+html[data-desktop-reduce-motion='true'] .desktop-sync-icon.is-spinning {
+  animation: none !important;
+}
+
+@media (max-height: 760px) {
+  .desktop-auth-trust {
+    display: none !important;
+  }
+
+  .desktop-login-method-panel {
+    max-height: calc(100vh - 64px - 24px) !important;
+  }
+}
+
+/* One selection signal is enough in a compact icon rail. */
+.desktop-app-shell :is(
+  .desktop-primary-nav-item[aria-current='page'],
+  .desktop-primary-nav-item--active,
+  .desktop-rail-utility-button[aria-current='page'],
+  .desktop-rail-utility-button--active
+) {
+  border-color: transparent !important;
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-app-shell :is(
+  .desktop-primary-nav-item[aria-current='page'],
+  .desktop-primary-nav-item--active
+)::before {
+  display: none !important;
+}

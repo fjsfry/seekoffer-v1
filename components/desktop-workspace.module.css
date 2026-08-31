@@ -1,0 +1,6338 @@
+.page {
+  display: flex;
+  min-width: 0;
+  min-height: 720px;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--so-text, #1f2329);
+  font-family: inherit;
+}
+
+:global(.desktop-app-shell) .page {
+  height: 100%;
+  min-height: 0;
+}
+
+.pageHeader {
+  display: flex;
+  min-width: 0;
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 18px;
+  border: 1px solid var(--so-border, #dee0e3);
+  border-radius: var(--app-radius-panel, 12px);
+  background: var(--so-surface, #ffffff);
+}
+
+.pageHeading {
+  min-width: 0;
+}
+
+.pageTitle {
+  margin: 0;
+  color: var(--so-text, #1f2329);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 36px;
+}
+
+.pageSummary {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--so-text-secondary, #646a73);
+  font-size: 13px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton,
+.iconButton,
+.backButton {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: var(--app-radius-control, 8px);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  cursor: pointer;
+  transition: background-color var(--motion-hover, 83ms) ease, border-color var(--motion-hover, 83ms) ease, color var(--motion-hover, 83ms) ease;
+}
+
+.primaryButton {
+  padding: 9px 14px;
+  border: 1px solid var(--app-primary-bg, #0f6b61);
+  color: var(--app-primary-fg, #ffffff);
+  background: var(--app-primary-bg, #0f6b61);
+  white-space: nowrap;
+}
+
+.primaryButton:hover {
+  border-color: var(--app-primary-bg-hover, #0c5e56);
+  background: var(--app-primary-bg-hover, #0c5e56);
+}
+
+.primaryButton:active:not(:disabled) {
+  border-color: var(--app-primary-bg-pressed, #094d46);
+  background: var(--app-primary-bg-pressed, #094d46);
+  box-shadow: none;
+  transform: none;
+}
+
+.secondaryButton,
+.backButton {
+  padding: 9px 13px;
+  border: 1px solid var(--so-border, #dee0e3);
+  color: var(--so-text-secondary, #646a73);
+  background: var(--so-surface, #ffffff);
+}
+
+.secondaryButton:hover,
+.backButton:hover {
+  border-color: var(--so-border-strong, #d0d3d6);
+  color: var(--so-text, #1f2329);
+  background: var(--so-surface-hover, #eff0f1);
+}
+
+.secondaryButton:active:not(:disabled),
+.backButton:active:not(:disabled) {
+  border-color: var(--so-border-strong, #d0d3d6);
+  color: var(--so-text, #1f2329);
+  background: var(--so-surface-pressed, #e6e8eb);
+  box-shadow: none;
+  transform: none;
+}
+
+.dangerButton {
+  padding: 9px 13px;
+  border: 1px solid color-mix(in srgb, var(--so-danger, #c9443d) 36%, var(--so-border, #dee0e3));
+  color: var(--so-danger, #c9443d);
+  background: var(--so-danger-soft, #fff0ef);
+}
+
+.dangerButton:hover {
+  background: color-mix(in srgb, var(--so-danger, #c9443d) 12%, var(--so-danger-soft, #fff0ef));
+}
+
+.dangerButton:active:not(:disabled) {
+  border-color: color-mix(in srgb, var(--so-danger, #c9443d) 54%, var(--so-border, #dee0e3));
+  background: color-mix(in srgb, var(--so-danger, #c9443d) 20%, var(--so-danger-soft, #fff0ef));
+  box-shadow: none;
+  transform: none;
+}
+
+.iconButton {
+  width: 40px;
+  min-width: 40px;
+  padding: 0;
+  border: 1px solid var(--so-border, #dee0e3);
+  color: var(--so-text-secondary, #646a73);
+  background: var(--so-surface, #ffffff);
+}
+
+.iconButton:hover {
+  color: var(--so-brand, #0f6b61);
+  background: var(--so-brand-soft, #eaf5f3);
+}
+
+.iconButton:active:not(:disabled) {
+  border-color: var(--so-border-strong, #d0d3d6);
+  color: var(--so-brand-strong, #094d46);
+  background: var(--so-surface-pressed, #e6e8eb);
+  box-shadow: none;
+  transform: none;
+}
+
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible,
+.dangerButton:focus-visible,
+.iconButton:focus-visible,
+.backButton:focus-visible,
+.listRow:focus-visible,
+.dayItem:focus-visible,
+.fieldControl:focus-visible {
+  outline: 2px solid var(--so-brand, #0f6b61);
+  outline-offset: 2px;
+}
+
+.workspace {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--so-border, #dee0e3);
+  border-radius: var(--app-radius-panel, 12px);
+  background: var(--so-surface, #ffffff);
+}
+
+.masterPane,
+.detailPane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.masterPane {
+  border-right: 1px solid var(--so-border, #dee0e3);
+  background: var(--so-surface-subtle, #f8f9fa);
+}
+
+.detailPane {
+  background: var(--so-surface, #ffffff);
+}
+
+.masterToolbar,
+.detailHeader {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--so-divider, #e5e6e8);
+  background: var(--so-surface, #ffffff);
+}
+
+.masterToolbar {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.detailHeader {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+}
+
+.detailHeading {
+  min-width: 0;
+}
+
+.detailTitle {
+  margin: 0;
+  color: var(--so-text, #1f2329);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 26px;
+}
+
+.detailSubtitle {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--so-text-secondary, #646a73);
+  font-size: 13px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backButton {
+  display: none;
+}
+
+.searchBox {
+  display: flex;
+  min-height: 40px;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  padding: 0 11px;
+  border: 1px solid var(--so-border, #dee0e3);
+  border-radius: var(--app-radius-control, 8px);
+  color: var(--so-text-tertiary, #8f959e);
+  background: var(--so-surface, #ffffff);
+}
+
+.searchInput {
+  width: 100%;
+  min-width: 0;
+  border: 0 !important;
+  outline: 0 !important;
+  color: var(--so-text, #1f2329);
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.filterGrid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.filterGridThree {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.fieldControl {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--so-border, #dee0e3);
+  border-radius: var(--app-radius-control, 8px);
+  color: var(--so-text, #1f2329);
+  background: var(--so-surface, #ffffff);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+textarea.fieldControl {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.monthToolbar {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 7px;
+}
+
+.monthTitle {
+  overflow: hidden;
+  color: var(--so-text, #1f2329);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.masterScroll,
+.detailScroll {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.listGroupTitle {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 13px;
+  border-bottom: 1px solid var(--so-divider, #e5e6e8);
+  color: var(--so-text-secondary, #646a73);
+  background: color-mix(in srgb, var(--so-surface-subtle, #f8f9fa) 97%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.listRow {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 76px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border: 0;
+  border-bottom: 1px solid var(--so-divider, #e5e6e8);
+  color: var(--so-text, #1f2329);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-hover, 83ms) var(--motion-ease-standard, cubic-bezier(.2, 0, 0, 1)),
+    border-color var(--motion-hover, 83ms) var(--motion-ease-standard, cubic-bezier(.2, 0, 0, 1)),
+    box-shadow var(--motion-hover, 83ms) var(--motion-ease-standard, cubic-bezier(.2, 0, 0, 1)),
+    color var(--motion-hover, 83ms) var(--motion-ease-standard, cubic-bezier(.2, 0, 0, 1));
+}
+
+.listRow:hover {
+  background: var(--so-surface-hover, #eff0f1);
+}
+
+.listRowSelected {
+  background: var(--so-brand-soft, #eaf5f3);
+  box-shadow: inset 3px 0 0 var(--so-brand, #0f6b61);
+}
+
+.listRowDone .rowTitle {
+  color: var(--so-text-tertiary, #8f959e);
+  text-decoration: line-through;
+}
+
+.rowIcon,
+.avatar {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--so-brand, #0f6b61);
+  background: var(--so-brand-soft, #eaf5f3);
+}
+
+.avatar {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rowBody {
+  min-width: 0;
+}
+
+.rowTitle {
+  display: block;
+  overflow: hidden;
+  color: var(--so-text, #1f2329);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowMeta,
+.rowDescription {
+  display: block;
+  overflow: hidden;
+  color: var(--so-text-secondary, #646a73);
+  font-size: 13px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowMeta {
+  margin-top: 2px;
+}
+
+.rowEnd {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.rowDate {
+  color: var(--so-text-secondary, #646a73);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.statusPill,
+.neutralPill {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  transition:
+    background-color var(--motion-hover, 83ms) var(--motion-ease-standard, cubic-bezier(.2, 0, 0, 1)),
+    color var(--motion-hover, 83ms) var(--motion-ease-standard, cubic-bezier(.2, 0, 0, 1));
+}
+
+.statusPill {
+  color: var(--so-brand-strong, #094d46);
+  background: var(--so-brand-soft, #eaf5f3);
+}
+
+.neutralPill {
+  color: var(--so-text-secondary, #646a73);
+  background: var(--so-surface-muted, #f5f6f7);
+}
+
+.detailScroll {
+  padding: 18px;
+}
+
+.detailSection {
+  padding: 0 0 18px;
+  border-bottom: 1px solid var(--so-divider, #e5e6e8);
+}
+
+.detailSection + .detailSection {
+  padding-top: 18px;
+}
+
+.detailSection:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--so-text, #1f2329);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.sectionDescription {
+  margin: 2px 0 0;
+  color: var(--so-text-secondary, #646a73);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.dayItems {
+  display: grid;
+  border: 1px solid var(--so-border, #dee0e3);
+  border-radius: var(--app-radius-card, 12px);
+  overflow: hidden;
+}
+
+.dayItem {
+  display: grid;
+  min-width: 0;
+  min-height: 58px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 0;
+  border-bottom: 1px solid var(--so-divider, #e5e6e8);
+  color: var(--so-text, #1f2329);
+  background: var(--so-surface, #ffffff);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-hover, 83ms) var(--motion-ease-standard, cubic-bezier(.2, 0, 0, 1)),
+    border-color var(--motion-hover, 83ms) var(--motion-ease-standard, cubic-bezier(.2, 0, 0, 1)),
+    color var(--motion-hover, 83ms) var(--motion-ease-standard, cubic-bezier(.2, 0, 0, 1));
+}
+
+.dayItem:last-child {
+  border-bottom: 0;
+}
+
+.dayItem:hover,
+.dayItemSelected {
+  background: var(--so-brand-soft, #eaf5f3);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.formGridWide {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field {
+  display: block;
+  min-width: 0;
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--so-text-secondary, #646a73);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.formActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.privacyNotice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  border-left: 3px solid var(--so-brand, #0f6b61);
+  color: var(--so-text-secondary, #646a73);
+  background: var(--so-brand-soft, #eaf5f3);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.privacyText {
+  min-width: 0;
+}
+
+.timeline {
+  display: grid;
+  gap: 0;
+  padding-left: 8px;
+}
+
+.timelineItem {
+  position: relative;
+  min-height: 58px;
+  padding: 0 0 16px 22px;
+  color: var(--so-text-secondary, #646a73);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.timelineItem::before {
+  position: absolute;
+  top: 5px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--so-brand, #0f6b61);
+  content: '';
+}
+
+.timelineItem::after {
+  position: absolute;
+  top: 16px;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: var(--so-border, #dee0e3);
+  content: '';
+}
+
+.timelineItem:last-child::after {
+  display: none;
+}
+
+.emptyState {
+  display: flex;
+  min-height: 220px;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  color: var(--so-text-secondary, #646a73);
+  text-align: center;
+}
+
+.emptyInner {
+  max-width: 420px;
+}
+
+.emptyIcon {
+  display: inline-flex;
+  width: 46px;
+  height: 46px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: var(--so-brand, #0f6b61);
+  background: var(--so-brand-soft, #eaf5f3);
+}
+
+.emptyTitle {
+  margin: 12px 0 0;
+  color: var(--so-text, #1f2329);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.emptyDescription {
+  margin: 5px 0 0;
+  font-size: 13px;
+  line-height: 21px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:global(html[data-desktop-theme='dark']) .page {
+  color: var(--so-text);
+}
+
+:global(html[data-desktop-theme='dark']) :is(
+  .pageHeader,
+  .workspace,
+  .detailPane,
+  .masterToolbar,
+  .detailHeader,
+  .secondaryButton,
+  .backButton,
+  .iconButton,
+  .searchBox,
+  .fieldControl,
+  .dayItem
+) {
+  border-color: var(--so-border);
+  color: var(--so-text);
+  background: var(--so-surface);
+}
+
+:global(html[data-desktop-theme='dark']) .masterPane {
+  border-color: var(--so-border);
+  background: var(--so-surface-subtle);
+}
+
+:global(html[data-desktop-theme='dark']) :is(.masterToolbar, .detailHeader) {
+  border-bottom-color: var(--so-border);
+}
+
+:global(html[data-desktop-theme='dark']) :is(
+  .pageTitle,
+  .detailTitle,
+  .monthTitle,
+  .rowTitle,
+  .sectionTitle,
+  .emptyTitle,
+  .searchInput
+) {
+  color: var(--so-text);
+}
+
+:global(html[data-desktop-theme='dark']) :is(
+  .pageSummary,
+  .detailSubtitle,
+  .rowMeta,
+  .rowDescription,
+  .rowDate,
+  .sectionDescription,
+  .fieldLabel,
+  .timelineItem,
+  .emptyState
+) {
+  color: var(--so-text-secondary);
+}
+
+:global(html[data-desktop-theme='dark']) :is(.secondaryButton, .backButton, .iconButton):hover {
+  border-color: var(--so-border-strong);
+  color: var(--so-brand-strong);
+  background: var(--so-surface-hover);
+}
+
+:global(html[data-desktop-theme='dark']) .dangerButton {
+  border-color: color-mix(in srgb, var(--so-danger) 38%, var(--so-border));
+  color: var(--so-danger);
+  background: var(--so-danger-soft);
+}
+
+:global(html[data-desktop-theme='dark']) .dangerButton:hover {
+  background: color-mix(in srgb, var(--so-danger) 18%, var(--so-danger-soft));
+}
+
+:global(html[data-desktop-theme='dark']) :is(
+  .primaryButton,
+  .secondaryButton,
+  .dangerButton,
+  .iconButton,
+  .backButton,
+  .listRow,
+  .dayItem,
+  .fieldControl
+):focus-visible {
+  outline-color: var(--so-brand-strong);
+}
+
+:global(html[data-desktop-theme='dark']) .listGroupTitle {
+  border-color: var(--so-border);
+  color: var(--so-text-secondary);
+  background: color-mix(in srgb, var(--so-surface-subtle) 94%, transparent);
+}
+
+:global(html[data-desktop-theme='dark']) .listRow {
+  border-color: var(--so-border);
+  color: var(--so-text);
+}
+
+:global(html[data-desktop-theme='dark']) .listRow:hover {
+  background: var(--so-surface-hover);
+}
+
+:global(html[data-desktop-theme='dark']) .listRowSelected {
+  background: var(--so-brand-soft);
+  box-shadow: inset 3px 0 0 var(--so-brand-strong);
+}
+
+:global(html[data-desktop-theme='dark']) .listRowDone .rowTitle {
+  color: var(--so-text-tertiary);
+}
+
+:global(html[data-desktop-theme='dark']) :is(.rowIcon, .avatar, .emptyIcon) {
+  color: var(--so-brand-strong);
+  background: var(--so-brand-soft);
+}
+
+:global(html[data-desktop-theme='dark']) .statusPill {
+  color: var(--so-brand-strong);
+  background: var(--so-brand-soft);
+}
+
+:global(html[data-desktop-theme='dark']) .neutralPill {
+  color: var(--so-text-secondary);
+  background: var(--so-surface-muted);
+}
+
+:global(html[data-desktop-theme='dark']) :is(.detailSection, .dayItems, .dayItem) {
+  border-color: var(--so-border);
+}
+
+:global(html[data-desktop-theme='dark']) :is(.dayItem:hover, .dayItemSelected) {
+  background: var(--so-surface-hover);
+}
+
+:global(html[data-desktop-theme='dark']) .privacyNotice {
+  border-color: var(--so-brand-strong);
+  color: var(--so-text-secondary);
+  background: var(--so-brand-soft);
+}
+
+:global(html[data-desktop-theme='dark']) .timelineItem::before {
+  background: var(--so-brand-strong);
+}
+
+:global(html[data-desktop-theme='dark']) .timelineItem::after {
+  background: var(--so-border-strong);
+}
+
+@media (max-width: 1040px) {
+  .workspace {
+    grid-template-columns: minmax(280px, 330px) minmax(0, 1fr);
+  }
+
+  .formGridWide {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .page {
+    min-height: 660px;
+  }
+
+  .pageHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .headerActions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .workspace {
+    display: block;
+  }
+
+  .masterPane {
+    height: 100%;
+    border-right: 0;
+  }
+
+  .detailPane {
+    display: none;
+    height: 100%;
+  }
+
+  .workspace[data-detail-open='true'] .masterPane {
+    display: none;
+  }
+
+  .workspace[data-detail-open='true'] .detailPane {
+    display: flex;
+  }
+
+  .backButton {
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .pageHeader {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .headerActions {
+  width: 100%;
+  justify-content: space-between;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .workspace {
+  display: block;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .masterPane {
+  height: 100%;
+  border-right: 0;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .detailPane {
+  display: none;
+  height: 100%;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .workspace[data-detail-open='true'] .masterPane {
+  display: none;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .workspace[data-detail-open='true'] .detailPane {
+  display: flex;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .backButton {
+  display: inline-flex;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .formGrid,
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .formGridWide {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 560px) {
+  .filterGrid,
+  .filterGridThree,
+  .formGrid,
+  .formGridWide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detailHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .detailScroll {
+    padding: 14px;
+  }
+
+  .rowEnd {
+    display: none;
+  }
+
+  .listRow {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButton,
+  .secondaryButton,
+  .dangerButton,
+  .iconButton,
+  .backButton,
+  .listRow,
+  .dayItem {
+    transition: none;
+  }
+}
+
+:global(html[data-desktop-reduce-motion='true']) :is(
+  .primaryButton,
+  .secondaryButton,
+  .dangerButton,
+  .iconButton,
+  .backButton,
+  .listRow,
+  .dayItem,
+  .statusPill,
+  .neutralPill
+) {
+  transition: none !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Schedule workspace: category + Eisenhower priority language
+ * ----------------------------------------------------------------------- */
+
+.schedulePage {
+  position: relative;
+  container-name: schedule-workspace-page;
+  container-type: inline-size;
+  --schedule-surface: var(--so-surface, #ffffff);
+  --schedule-surface-subtle: var(--so-surface-subtle, #f7f9f8);
+  --schedule-surface-hover: var(--so-surface-hover, #f1f5f4);
+  --schedule-border: var(--so-border, #dfe6e4);
+  --schedule-text: var(--so-text, #14211f);
+  --schedule-secondary: var(--so-text-secondary, #687772);
+  --so-danger: #a92f3d;
+  --so-danger-soft: #fff0f0;
+}
+
+.schedulePage [data-category='申请'] {
+  --schedule-category: #7462d8;
+  --schedule-category-soft: color-mix(in srgb, #7462d8 12%, var(--schedule-surface));
+}
+
+.schedulePage [data-category='学习'] {
+  --schedule-category: #d85c72;
+  --schedule-category-soft: color-mix(in srgb, #d85c72 12%, var(--schedule-surface));
+}
+
+.schedulePage [data-category='作业'] {
+  --schedule-category: #df7d32;
+  --schedule-category-soft: color-mix(in srgb, #df7d32 13%, var(--schedule-surface));
+}
+
+.schedulePage [data-category='工作'] {
+  --schedule-category: #477fd1;
+  --schedule-category-soft: color-mix(in srgb, #477fd1 12%, var(--schedule-surface));
+}
+
+.schedulePage [data-category='生活'] {
+  --schedule-category: #35a46b;
+  --schedule-category-soft: color-mix(in srgb, #35a46b 12%, var(--schedule-surface));
+}
+
+.schedulePage [data-category='其他'] {
+  --schedule-category: #75827e;
+  --schedule-category-soft: color-mix(in srgb, #75827e 11%, var(--schedule-surface));
+}
+
+.schedulePage [data-priority='重要且紧急'] {
+  --schedule-priority: #a92f3d;
+  --schedule-priority-soft: color-mix(in srgb, #a92f3d 11%, var(--schedule-surface));
+}
+
+.schedulePage [data-priority='重要不紧急'] {
+  --schedule-priority: #8b4b08;
+  --schedule-priority-soft: color-mix(in srgb, #8b4b08 12%, var(--schedule-surface));
+}
+
+.schedulePage [data-priority='不重要紧急'] {
+  --schedule-priority: #126b45;
+  --schedule-priority-soft: color-mix(in srgb, #126b45 11%, var(--schedule-surface));
+}
+
+.schedulePage [data-priority='不重要不紧急'] {
+  --schedule-priority: #245da8;
+  --schedule-priority-soft: color-mix(in srgb, #245da8 11%, var(--schedule-surface));
+}
+
+:global(html[data-desktop-theme='dark']) .schedulePage {
+  --so-danger: #ff9aa6;
+  --so-danger-soft: #3f282d;
+}
+
+:global(html[data-desktop-theme='dark']) .schedulePage [data-priority='重要且紧急'] {
+  --schedule-priority: #ff9aa6;
+}
+
+:global(html[data-desktop-theme='dark']) .schedulePage [data-priority='重要不紧急'] {
+  --schedule-priority: #f4b165;
+}
+
+:global(html[data-desktop-theme='dark']) .schedulePage [data-priority='不重要紧急'] {
+  --schedule-priority: #73d3a1;
+}
+
+:global(html[data-desktop-theme='dark']) .schedulePage [data-priority='不重要不紧急'] {
+  --schedule-priority: #8db8ff;
+}
+
+.schedulePage .workspace {
+  grid-template-columns: minmax(360px, 400px) minmax(0, 1fr);
+  border-radius: 18px;
+  background: var(--schedule-surface);
+}
+
+.schedulePage .workspace[data-view-mode='quadrant'] {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+}
+
+.schedulePage .workspace[data-detail-open='false'],
+.schedulePage .workspace[data-detail-open='false'][data-view-mode='quadrant'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.schedulePage .workspace[data-detail-open='false'] .detailPane {
+  display: none;
+}
+
+.schedulePage .workspace[data-detail-open='false'] .masterPane {
+  border-right: 0;
+}
+
+.schedulePage .workspace[data-detail-open='true'] .backButton {
+  display: inline-flex;
+}
+
+.schedulePage .workspace[data-detail-open='false'] .masterToolbar {
+  grid-template-columns: minmax(260px, 0.85fr) minmax(300px, 1fr) minmax(360px, 1.2fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.schedulePage .workspace[data-detail-open='false'] .scheduleToolbarTop {
+  grid-column: 1;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.schedulePage .workspace[data-detail-open='false'] .searchBox {
+  grid-column: 2;
+}
+
+.schedulePage .workspace[data-detail-open='false'] .scheduleFilterGrid {
+  grid-column: 3;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.schedulePage .workspace[data-detail-open='false'] .scheduleFilterGrid > :nth-child(2) {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+.schedulePage .workspace[data-detail-open='false'] .categoryFilterBar {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(7, minmax(72px, 1fr));
+}
+
+.schedulePage .workspace[data-detail-open='false'] .masterToolbar > .secondaryButton {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
+.schedulePage .workspace[data-detail-open='false'] .listRow {
+  min-height: 74px;
+  grid-template-columns: 42px minmax(0, 1fr) minmax(190px, auto);
+  padding-inline: 18px;
+}
+
+.schedulePage .workspace[data-detail-open='false'] .listGroupTitle {
+  padding-inline: 18px;
+}
+
+.schedulePage .masterPane {
+  background: var(--schedule-surface-subtle);
+}
+
+.schedulePage .masterToolbar {
+  gap: 12px;
+  padding: 16px;
+  background: var(--schedule-surface);
+}
+
+.scheduleToolbarTop {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.viewToggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 3px;
+  border: 1px solid var(--schedule-border);
+  border-radius: 10px;
+  background: var(--schedule-surface-subtle);
+}
+
+.viewToggle button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--schedule-secondary);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.viewToggle button[aria-pressed='true'] {
+  color: var(--schedule-text);
+  background: var(--schedule-surface);
+  box-shadow: 0 1px 3px rgb(23 38 34 / 9%);
+}
+
+.categoryFilterBar {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.categoryFilterButton {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 1px solid var(--schedule-border);
+  border-radius: 9px;
+  color: var(--schedule-secondary);
+  background: var(--schedule-surface);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.categoryFilterButton svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--schedule-category, var(--so-brand));
+}
+
+.categoryFilterButton[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--schedule-category, var(--so-brand)) 42%, var(--schedule-border));
+  color: var(--schedule-category, var(--so-brand-strong));
+  background: var(--schedule-category-soft, var(--so-brand-soft));
+}
+
+.scheduleFilterGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scheduleFilterGrid > :nth-child(2) {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.schedulePage .listGroupTitle {
+  min-height: 38px;
+  padding-inline: 15px;
+  color: var(--schedule-secondary);
+  background: color-mix(in srgb, var(--schedule-surface-subtle) 95%, transparent);
+  font-size: 13px;
+}
+
+.scheduleListRow {
+  position: relative;
+  min-height: 82px;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--schedule-surface);
+}
+
+.scheduleListRow:hover {
+  background: var(--schedule-surface-hover);
+}
+
+.scheduleListRow[data-selected='true'],
+.scheduleListRow[aria-current='true'] {
+  background: color-mix(in srgb, var(--so-brand) 8%, var(--schedule-surface));
+  box-shadow: inset 3px 0 0 var(--so-brand);
+}
+
+.scheduleListRow .rowIcon,
+.scheduleDayItem .rowIcon,
+.quadrantCategoryIcon {
+  color: var(--schedule-category);
+  background: var(--schedule-category-soft);
+}
+
+.scheduleListRow .rowMeta,
+.scheduleDayItem .rowMeta {
+  color: var(--schedule-secondary);
+}
+
+.priorityPill {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 7px;
+  color: var(--schedule-priority);
+  background: var(--schedule-priority-soft);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.inlineQuickAction {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  border: 1px solid var(--schedule-border);
+  border-radius: 8px;
+  color: var(--so-brand-strong, #116b5b);
+  background: var(--schedule-surface);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.inlineQuickAction:hover {
+  border-color: var(--so-border-selected, #8db7ad);
+  background: var(--so-brand-soft, #edf7f4);
+}
+
+.inlineQuickAction:focus-visible {
+  outline: 2px solid var(--so-brand, #177866);
+  outline-offset: 2px;
+}
+
+.scheduleListRow[data-recent-action='true'] {
+  animation: productivity-row-confirm 900ms cubic-bezier(.2, 0, 0, 1);
+}
+
+.schedulePage .listRowDone {
+  background: color-mix(in srgb, var(--schedule-surface-subtle) 72%, transparent);
+}
+
+.schedulePage .listRowDone .rowIcon {
+  color: var(--so-text-tertiary);
+  background: var(--so-surface-muted);
+}
+
+.scheduleDayItem {
+  border-left: 3px solid transparent;
+}
+
+.scheduleDayItem:hover {
+  background: var(--schedule-surface-hover);
+}
+
+.scheduleDayItem[aria-selected='true'],
+.scheduleDayItem.dayItemSelected {
+  border-left-color: var(--so-brand);
+  background: color-mix(in srgb, var(--so-brand) 7%, var(--schedule-surface));
+}
+
+.scheduleFormGrid {
+  align-items: end;
+}
+
+textarea.scheduleTitleControl {
+  min-height: 58px;
+  overflow-y: auto;
+  resize: none;
+  white-space: pre-wrap;
+}
+
+.quickDateHint {
+  align-self: center;
+  color: var(--schedule-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.pickerField {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.categoryPicker {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.categoryPicker button {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 64px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 30px 20px;
+  align-items: center;
+  justify-items: start;
+  gap: 2px 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--schedule-border);
+  border-radius: 12px;
+  color: var(--schedule-secondary);
+  background: var(--schedule-surface);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.categoryPicker button > span:first-child {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--schedule-category);
+  background: var(--schedule-category-soft);
+}
+
+.categoryPicker button > span:first-child svg {
+  width: 18px;
+  height: 18px;
+}
+
+.categoryPicker button > svg:last-child {
+  grid-column: 2;
+  grid-row: 1;
+  width: 17px;
+  color: var(--schedule-category);
+}
+
+.categoryPicker button[aria-checked='true'] {
+  border-color: color-mix(in srgb, var(--schedule-category) 48%, var(--schedule-border));
+  color: var(--schedule-text);
+  background: var(--schedule-category-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--schedule-category) 24%, transparent);
+}
+
+.priorityPicker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.priorityPicker button {
+  display: grid;
+  min-width: 0;
+  min-height: 46px;
+  grid-template-columns: 34px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--schedule-border);
+  border-radius: 11px;
+  color: var(--schedule-secondary);
+  background: var(--schedule-surface);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.priorityNumeral {
+  display: inline-flex;
+  min-width: 28px;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--schedule-priority);
+  background: var(--schedule-priority-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.priorityPicker button > svg:last-child {
+  width: 18px;
+  color: var(--schedule-priority);
+}
+
+.priorityPicker button[aria-checked='true'] {
+  border-color: color-mix(in srgb, var(--schedule-priority) 48%, var(--schedule-border));
+  color: var(--schedule-text);
+  background: var(--schedule-priority-soft);
+}
+
+.moreFields {
+  margin-top: 16px;
+  border-top: 1px solid var(--schedule-border);
+}
+
+.moreFields summary {
+  padding: 13px 2px 9px;
+  color: var(--schedule-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.moreFields[open] summary {
+  color: var(--schedule-text);
+}
+
+.schedulePage .formActions {
+  flex-wrap: wrap;
+}
+
+.schedulePage .dangerButton {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.scheduleIdleState {
+  display: grid;
+  min-height: 230px;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 30px 24px;
+  color: var(--schedule-secondary);
+  text-align: center;
+}
+
+.scheduleIdleIcon {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  color: var(--so-brand);
+  background: var(--so-brand-soft);
+}
+
+.scheduleIdleIcon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.scheduleIdleState h3 {
+  margin: 4px 0 0;
+  color: var(--schedule-text);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 25px;
+}
+
+.scheduleIdleState p {
+  max-width: 430px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 21px;
+}
+
+.scheduleIdleState button {
+  margin-top: 6px;
+}
+
+.quadrantGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+
+.quadrantPanel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--schedule-border);
+  border-top: 3px solid var(--schedule-priority);
+  border-radius: 14px;
+  background: var(--schedule-surface);
+}
+
+.quadrantHeader {
+  display: grid;
+  min-height: 48px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--schedule-border);
+  color: var(--schedule-text);
+  background: var(--schedule-priority-soft);
+  font-size: 13px;
+}
+
+.quadrantHeader > span:last-child {
+  min-width: 24px;
+  color: var(--schedule-secondary);
+  text-align: right;
+}
+
+.quadrantItems {
+  display: grid;
+}
+
+.quadrantItem {
+  display: grid;
+  min-width: 0;
+  min-height: 58px;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--schedule-border);
+  color: var(--schedule-text);
+  background: var(--schedule-surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.quadrantItem:last-child {
+  border-bottom: 0;
+}
+
+.quadrantItem:hover {
+  background: var(--schedule-surface-hover);
+}
+
+.quadrantItem[aria-selected='true'] {
+  background: color-mix(in srgb, var(--so-brand) 8%, var(--schedule-surface));
+  box-shadow: inset 3px 0 0 var(--so-brand);
+}
+
+.quadrantCategoryIcon {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+}
+
+.quadrantItemBody {
+  min-width: 0;
+}
+
+.quadrantItemBody strong,
+.quadrantItemBody small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quadrantItemBody strong {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.quadrantItemBody small,
+.quadrantItemDate {
+  color: var(--schedule-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.quadrantItemDate {
+  white-space: nowrap;
+}
+
+.quadrantEmpty {
+  margin: 0;
+  padding: 18px 12px;
+  color: var(--schedule-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.workspace[data-view-mode='quadrant'] .categoryFilterBar {
+  grid-template-columns: repeat(7, minmax(72px, 1fr));
+}
+
+.workspace[data-view-mode='quadrant'] .scheduleFilterGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workspace[data-view-mode='quadrant'] .scheduleFilterGrid > :nth-child(2) {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+@container schedule-workspace-page (max-width: 1120px) {
+  .schedulePage .workspace {
+    grid-template-columns: minmax(310px, 350px) minmax(0, 1fr);
+  }
+
+  .schedulePage .workspace[data-view-mode='quadrant'] {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 380px);
+  }
+
+  .categoryPicker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .schedulePage .workspace[data-detail-open='false'] .masterToolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedulePage .workspace[data-detail-open='false'] .scheduleToolbarTop {
+    grid-column: 1;
+  }
+
+  .schedulePage .workspace[data-detail-open='false'] .searchBox {
+    grid-column: 2;
+  }
+
+  .schedulePage .workspace[data-detail-open='false'] :is(.scheduleFilterGrid, .categoryFilterBar, .masterToolbar > .secondaryButton) {
+    grid-column: 1 / -1;
+  }
+
+  .schedulePage .scheduleListRow :is(.rowTitle, .rowMeta) {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}
+
+@container schedule-workspace-page (max-width: 900px) {
+  .schedulePage .workspace,
+  .schedulePage .workspace[data-view-mode='quadrant'] {
+    display: block;
+  }
+
+  .schedulePage .masterPane {
+    height: 100%;
+    border-right: 0;
+  }
+
+  .schedulePage .detailPane {
+    display: none;
+    height: 100%;
+  }
+
+  .schedulePage .workspace[data-detail-open='true'] .masterPane {
+    display: none;
+  }
+
+  .schedulePage .workspace[data-detail-open='true'] .detailPane {
+    display: flex;
+  }
+
+  .schedulePage .backButton {
+    display: inline-flex;
+  }
+
+  .quadrantGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace[data-view-mode='quadrant'] .categoryFilterBar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .workspace[data-view-mode='quadrant'] .scheduleFilterGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace[data-view-mode='quadrant'] .scheduleFilterGrid > :nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@container schedule-workspace-page (max-width: 720px) {
+  .schedulePage .pageHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .schedulePage .headerActions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@container schedule-workspace-page (max-width: 620px) {
+  .schedulePage .detailHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .schedulePage .formGrid,
+  .schedulePage .scheduleFilterGrid,
+  .priorityPicker {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .scheduleFilterGrid > :nth-child(2) {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .categoryPicker,
+  .categoryFilterBar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedulePage .formActions > button {
+    flex: 1 1 auto;
+  }
+
+  .schedulePage .workspace[data-detail-open='false'] .masterToolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .schedulePage .workspace[data-detail-open='false'] :is(
+    .scheduleToolbarTop,
+    .searchBox,
+    .scheduleFilterGrid,
+    .categoryFilterBar,
+    .masterToolbar > .secondaryButton
+  ) {
+    grid-column: 1;
+  }
+
+  .schedulePage .workspace[data-detail-open='false'] .categoryFilterBar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedulePage .workspace[data-detail-open='false'] .listRow {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .schedulePage .workspace[data-detail-open='false'] .rowEnd {
+    display: none;
+  }
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .workspace,
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .workspace[data-view-mode='quadrant'] {
+  display: block;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .detailHeader {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage :is(
+  .categoryPicker,
+  .priorityPicker,
+  .scheduleFilterGrid,
+  .formGrid
+) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .scheduleFilterGrid > :nth-child(2) {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .categoryFilterBar {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .quadrantGrid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .workspace[data-detail-open='false'] .masterToolbar {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .workspace[data-detail-open='false'] :is(
+  .scheduleToolbarTop,
+  .searchBox,
+  .scheduleFilterGrid,
+  .categoryFilterBar,
+  .masterToolbar > .secondaryButton
+) {
+  grid-column: 1;
+}
+
+/* --------------------------------------------------------------------------
+ * Schedule side peek: the collection remains mounted while reserving the
+ * inspector footprint, so row actions never sit underneath the detail panel.
+ * Compact/high-zoom layouts stay stacked.
+ * ----------------------------------------------------------------------- */
+
+@container schedule-workspace-page (min-width: 901px) {
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .workspace,
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .workspace[data-view-mode='quadrant'],
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .workspace[data-detail-open='false'] {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    isolation: isolate;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .masterPane {
+    width: 100%;
+    border-right: 0;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .masterScroll {
+    box-sizing: border-box;
+    padding-right: 0;
+    transition: padding-right var(--motion-panel-exit, 167ms) var(--motion-ease-exit, cubic-bezier(.4, 0, 1, 1));
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .workspace[data-detail-open='true'] .masterScroll {
+    padding-right: clamp(440px, 42cqi, 560px);
+    transition-duration: var(--motion-panel, 250ms);
+    transition-timing-function: var(--motion-ease-enter, cubic-bezier(0, 0, 0, 1));
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .detailPane,
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .workspace[data-detail-open='false'] .detailPane {
+    position: absolute;
+    z-index: 30;
+    inset: 0 0 0 auto;
+    display: flex;
+    width: clamp(440px, 42cqi, 560px);
+    height: 100%;
+    overflow: hidden;
+    border-left: 1px solid var(--schedule-border);
+    border-radius: 0 17px 17px 0;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translate3d(12px, 0, 0);
+    background: var(--schedule-surface);
+    box-shadow: var(--so-shadow-popover, -18px 0 42px rgb(26 42 37 / 14%));
+    transition:
+      opacity var(--motion-exit, 83ms) cubic-bezier(1, 0, 1, 1),
+      transform var(--motion-exit, 83ms) cubic-bezier(1, 0, 1, 1),
+      visibility 0s linear var(--motion-exit, 83ms);
+    will-change: transform, opacity;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .workspace[data-detail-open='true'] .detailPane {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate3d(0, 0, 0);
+    transition:
+      opacity var(--motion-enter, 167ms) cubic-bezier(0, 0, 0, 1),
+      transform var(--motion-enter, 167ms) cubic-bezier(0, 0, 0, 1),
+      visibility 0s linear 0s;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .workspace[data-detail-open='true'] .backButton {
+    display: inline-flex;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .masterToolbar {
+    grid-template-columns: minmax(260px, .85fr) minmax(300px, 1fr) minmax(360px, 1.2fr);
+    align-items: start;
+    gap: 12px;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .scheduleToolbarTop {
+    grid-column: 1;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .searchBox {
+    grid-column: 2;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .scheduleFilterGrid {
+    grid-column: 3;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .scheduleFilterGrid > :nth-child(2) {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .categoryFilterBar {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(7, minmax(72px, 1fr));
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .masterToolbar > .secondaryButton {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .listRow {
+    min-height: 74px;
+    grid-template-columns: 42px minmax(0, 1fr) minmax(190px, auto);
+    padding-inline: 18px;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .listGroupTitle {
+    padding-inline: 18px;
+  }
+}
+
+@container schedule-workspace-page (min-width: 901px) and (max-width: 1120px) {
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .masterToolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .scheduleToolbarTop {
+    grid-column: 1;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .searchBox {
+    grid-column: 2;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage :is(
+    .scheduleFilterGrid,
+    .categoryFilterBar,
+    .masterToolbar > .secondaryButton
+  ) {
+    grid-column: 1 / -1;
+  }
+}
+
+@container schedule-workspace-page (max-width: 900px) {
+  .schedulePage .workspace,
+  .schedulePage .workspace[data-view-mode='quadrant'] {
+    display: block;
+    grid-template-columns: none;
+  }
+
+  .schedulePage .detailPane,
+  .schedulePage .workspace[data-detail-open='false'] .detailPane {
+    position: static;
+    display: none;
+    width: 100%;
+    height: 100%;
+    border-left: 0;
+    border-radius: 0;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    box-shadow: none;
+    transition: none;
+  }
+
+  .schedulePage .workspace[data-detail-open='true'] .masterPane {
+    display: none;
+  }
+
+  .schedulePage .workspace[data-detail-open='true'] .detailPane {
+    display: flex;
+  }
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .workspace,
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .workspace[data-view-mode='quadrant'] {
+  position: relative;
+  display: block;
+  grid-template-columns: none;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .detailPane,
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .workspace[data-detail-open='false'] .detailPane {
+  position: static;
+  display: none;
+  width: 100%;
+  height: 100%;
+  border-left: 0;
+  border-radius: 0;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  box-shadow: none;
+  transition: none;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .workspace[data-detail-open='true'] .masterPane {
+  display: none;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .workspace[data-detail-open='true'] .detailPane {
+  display: flex;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .schedulePage .detailPane {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+:global(html[data-desktop-reduce-motion='true']) .schedulePage .detailPane {
+  transform: none !important;
+  transition: none !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Schedule final polish: compact attributes, top-layer popovers and timeline
+ * ----------------------------------------------------------------------- */
+
+.schedulePage .monthToolbar {
+  grid-template-columns: 40px minmax(0, 1fr) 40px auto;
+}
+
+.todayButton {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid var(--schedule-border);
+  border-radius: 9px;
+  color: var(--schedule-secondary);
+  background: var(--schedule-surface);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.todayButton:hover {
+  color: var(--so-brand-strong);
+  background: var(--so-brand-soft);
+}
+
+.scheduleAdvancedFilters {
+  min-width: 0;
+  grid-column: 3;
+  grid-row: 1;
+  align-self: start;
+  justify-self: stretch;
+}
+
+.schedulePage .masterToolbar {
+  position: relative;
+  z-index: 20;
+  overflow: visible;
+}
+
+.schedulePage .masterScroll {
+  position: relative;
+  z-index: 1;
+}
+
+.schedulePage .categoryFilterButton {
+  min-height: 32px;
+  padding-inline: 10px;
+  font-size: 13px;
+}
+
+.filterTrigger {
+  display: inline-flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--schedule-border);
+  border-radius: 9px;
+  color: var(--schedule-text);
+  background: var(--schedule-surface);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filterTrigger:hover,
+.filterTrigger[aria-expanded='true'] {
+  border-color: var(--so-border-selected);
+  background: var(--so-brand-soft);
+}
+
+.filterTrigger > svg:last-child {
+  margin-left: auto;
+}
+
+.filterCount {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  color: var(--so-brand-strong);
+  background: color-mix(in srgb, var(--so-brand) 12%, var(--schedule-surface));
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.schedulePopoverSurface {
+  position: fixed;
+  inset: auto;
+  left: var(--schedule-popover-left);
+  top: var(--schedule-popover-top);
+  width: var(--schedule-popover-width);
+  max-width: calc(100vw - 24px);
+  max-height: min(420px, calc(100vh - 24px));
+  padding: 0;
+  margin: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--schedule-border);
+  border-radius: 14px;
+  color: var(--schedule-text);
+  background: var(--schedule-surface);
+  box-shadow: var(--so-shadow-popover, 0 16px 40px rgb(24 40 35 / 18%));
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity var(--motion-exit, 83ms) cubic-bezier(1, 0, 1, 1),
+    transform var(--motion-exit, 83ms) cubic-bezier(1, 0, 1, 1),
+    display var(--motion-exit, 83ms) allow-discrete,
+    overlay var(--motion-exit, 83ms) allow-discrete;
+}
+
+.schedulePopoverSurface:popover-open {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--motion-enter, 167ms) cubic-bezier(0, 0, 0, 1),
+    transform var(--motion-enter, 167ms) cubic-bezier(0, 0, 0, 1),
+    display var(--motion-enter, 167ms) allow-discrete,
+    overlay var(--motion-enter, 167ms) allow-discrete;
+}
+
+@starting-style {
+  .schedulePopoverSurface:popover-open {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.filterPopoverSurface {
+  padding: 14px;
+}
+
+.popoverHeader {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.popoverHeader strong {
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.popoverHeader span {
+  color: var(--schedule-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.filterPopoverFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.popoverFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--schedule-border);
+}
+
+.attributePickerRow {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 10px;
+}
+
+.attributePicker {
+  min-width: 0;
+}
+
+.attributePickerTrigger {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  grid-template-columns: 30px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 10px;
+  border: 1px solid var(--schedule-border);
+  border-radius: 10px;
+  color: var(--schedule-text);
+  background: var(--schedule-surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.attributePickerTrigger:hover,
+.attributePickerTrigger[aria-expanded='true'] {
+  border-color: color-mix(in srgb, var(--schedule-category, var(--schedule-priority, var(--so-brand))) 42%, var(--schedule-border));
+  background: var(--schedule-category-soft, var(--schedule-priority-soft, var(--so-brand-soft)));
+}
+
+.attributePickerIcon {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--schedule-category, var(--schedule-priority));
+  background: var(--schedule-category-soft, var(--schedule-priority-soft));
+}
+
+.attributePickerIcon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.attributePickerText {
+  display: grid;
+  min-width: 0;
+}
+
+.attributePickerText small,
+.attributePickerText strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attributePickerText small {
+  color: var(--schedule-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+}
+
+.attributePickerText strong {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.attributePickerTrigger > svg:last-child {
+  width: 17px;
+  height: 17px;
+  color: var(--schedule-secondary);
+}
+
+.attributePopoverSurface {
+  padding: 10px;
+}
+
+.categoryPopoverSurface .categoryPicker {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.categoryPopoverSurface .categoryPicker button {
+  min-height: 56px;
+  grid-template-rows: 26px 18px;
+  padding: 6px 8px;
+}
+
+.categoryPopoverSurface .categoryPicker button > span:first-child {
+  width: 26px;
+  height: 26px;
+}
+
+.priorityPopoverSurface .priorityPicker {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.priorityPopoverSurface .priorityPicker button {
+  min-height: 44px;
+}
+
+/* The collection view uses the same two-tier rhythm as the notice library:
+ * navigation/search/filter controls share the first 40px row, while the
+ * scenario categories remain a quiet second row.  The wrapper stays intact in
+ * the DOM for semantics, but no longer consumes a second grid row at desktop
+ * widths.  Narrow containers and accessibility zoom continue through the
+ * existing stacked rules below. */
+@container schedule-workspace-page (min-width: 1080px) {
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .masterToolbar {
+    grid-template-columns:
+      minmax(300px, 1.05fr)
+      minmax(170px, .55fr)
+      minmax(260px, 1fr)
+      minmax(220px, .75fr);
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 10px;
+    padding: 14px 16px;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleToolbarTop {
+    display: contents;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleToolbarTop
+    .monthToolbar {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleToolbarTop
+    .viewToggle {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .searchBox {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleAdvancedFilters {
+    grid-column: 4;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .categoryFilterBar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+.schedulePage .masterScroll {
+  padding: 8px 12px 18px;
+  background: var(--schedule-surface-subtle);
+}
+
+.schedulePage .masterScroll > section + section {
+  margin-top: 8px;
+}
+
+.schedulePage .listGroupTitle {
+  min-height: 30px;
+  padding: 5px 4px;
+  border-bottom: 0;
+  background: color-mix(in srgb, var(--schedule-surface-subtle) 94%, transparent);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+:global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .schedulePage .workspace .scheduleListRow {
+  width: 100%;
+  min-height: 72px;
+  grid-template-columns: 40px minmax(0, 1fr) minmax(156px, auto);
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--schedule-border);
+  border-radius: 12px;
+  background: var(--schedule-surface);
+  box-shadow: none;
+}
+
+.schedulePage .scheduleListRow .rowTitle {
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.schedulePage .scheduleListRow + .scheduleListRow {
+  margin-top: 8px;
+}
+
+.schedulePage .scheduleListRow[data-selected='true'],
+.schedulePage .scheduleListRow[aria-current='true'] {
+  border-color: var(--so-border-selected);
+  background: color-mix(in srgb, var(--so-brand) 7%, var(--schedule-surface));
+  box-shadow: inset 0 0 0 1px var(--so-border-selected);
+}
+
+.schedulePage .detailHeader {
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.schedulePage .detailHeading {
+  grid-column: 1;
+  min-width: 0;
+}
+
+.schedulePage .detailTitle {
+  overflow: hidden;
+  font-size: 17px;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedulePage .backButton {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  grid-column: 2;
+  grid-row: 1;
+  padding: 0;
+  border-radius: 9px;
+}
+
+.schedulePage .backButton span {
+  display: none;
+}
+
+.schedulePage .detailSection:has(> form) {
+  padding-bottom: 0;
+}
+
+.schedulePage .detailSection > form .formActions {
+  position: sticky;
+  z-index: 3;
+  bottom: -18px;
+  margin: 18px -18px -18px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--schedule-border);
+  background: var(--schedule-surface);
+}
+
+.formSubmitStatus {
+  min-width: 0;
+  margin-right: auto;
+  color: var(--schedule-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.primaryButton[aria-busy='true'] {
+  cursor: wait;
+  opacity: .78;
+}
+
+.productivityToast {
+  position: absolute;
+  z-index: 80;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  max-width: min(420px, calc(100% - 36px));
+  min-height: 44px;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 10px 9px 14px;
+  border: 1px solid color-mix(in srgb, var(--so-brand, #177866) 26%, var(--schedule-border, var(--contacts-border)));
+  border-radius: 11px;
+  color: var(--so-text, #14211f);
+  background: var(--so-surface, #ffffff);
+  box-shadow: var(--so-shadow-popover, 0 14px 36px rgb(24 40 35 / 18%));
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.productivityToast > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.productivityToast > button {
+  min-height: 30px;
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--so-brand-strong, #116b5b);
+  background: var(--so-brand-soft, #edf7f4);
+  font: inherit;
+  cursor: pointer;
+}
+
+.productivityToast > button:focus-visible {
+  outline: 2px solid var(--so-brand, #177866);
+  outline-offset: 2px;
+}
+
+@keyframes productivity-row-confirm {
+  0%, 100% { box-shadow: none; }
+  35% { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--so-brand, #177866) 48%, transparent); }
+}
+
+@container schedule-workspace-page (min-width: 901px) and (max-width: 1120px) {
+  .schedulePage .scheduleAdvancedFilters {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    justify-self: stretch;
+  }
+}
+
+@container schedule-workspace-page (max-width: 620px) {
+  .schedulePage .scheduleAdvancedFilters {
+    grid-column: 1;
+    justify-self: stretch;
+  }
+
+  .attributePickerRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .schedulePage .scheduleListRow {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .schedulePage .scheduleListRow .rowIcon {
+    grid-row: 1 / span 2;
+  }
+
+  .schedulePage .scheduleListRow .rowEnd {
+    display: flex;
+    min-width: 0;
+    grid-column: 2;
+    grid-row: 2;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .schedulePage .detailHeader {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .schedulePage .backButton {
+    width: auto;
+    padding: 0 10px;
+  }
+
+  .schedulePage .backButton span {
+    display: inline;
+  }
+}
+
+@container schedule-workspace-page (max-width: 900px) {
+  .schedulePage .scheduleAdvancedFilters {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    justify-self: stretch;
+  }
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .scheduleAdvancedFilters {
+  grid-column: 1;
+  justify-self: stretch;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .attributePickerRow,
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .scheduleListRow {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .scheduleListRow {
+  grid-template-columns: 38px minmax(0, 1fr);
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .scheduleListRow .rowEnd {
+  display: flex;
+  grid-column: 2;
+  grid-row: 2;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .schedulePage .scheduleListRow .rowIcon {
+  grid-row: 1 / span 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .schedulePopoverSurface {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+:global(html[data-desktop-reduce-motion='true']) .schedulePopoverSurface {
+  transform: none !important;
+  transition: none !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Contacts workspace: full collection, compact filters and non-modal side peek
+ * ----------------------------------------------------------------------- */
+
+.contactsPage {
+  position: relative;
+  container-name: contacts-workspace-page;
+  container-type: inline-size;
+  --contacts-surface: var(--so-surface, #ffffff);
+  --contacts-surface-subtle: var(--so-surface-subtle, #f7f9f8);
+  --contacts-surface-hover: var(--so-surface-hover, #f1f5f4);
+  --contacts-border: var(--so-border, #dfe6e4);
+  --contacts-text: var(--so-text, #14211f);
+  --contacts-secondary: var(--so-text-secondary, #687772);
+}
+
+:global(.desktop-app-shell .desktop-route-content):has(> .contactsPage) {
+  grid-template-rows: minmax(0, 1fr) !important;
+  align-content: stretch !important;
+  overflow: hidden !important;
+}
+
+.contactsPage [data-feedback-status='未联系'],
+.contactsPopoverSurface [data-feedback-status='未联系'] {
+  --contact-status-color: var(--so-text-secondary, #646a73);
+  --contact-status-soft: var(--so-surface-muted, #f5f6f7);
+}
+
+.contactsPage [data-feedback-status='已投递'],
+.contactsPopoverSurface [data-feedback-status='已投递'] {
+  --contact-status-color: var(--so-brand, #0f6b61);
+  --contact-status-soft: var(--so-brand-soft, #eaf5f3);
+}
+
+.contactsPage [data-feedback-status='已回复'],
+.contactsPopoverSurface [data-feedback-status='已回复'] {
+  --contact-status-color: var(--so-success, #2b8a5a);
+  --contact-status-soft: var(--so-success-soft, #eaf7f0);
+}
+
+.contactsPage [data-feedback-status='已offer'],
+.contactsPopoverSurface [data-feedback-status='已offer'] {
+  --contact-status-color: var(--so-success, #2b8a5a);
+  --contact-status-soft: var(--so-success-soft, #eaf7f0);
+}
+
+.contactsPage [data-feedback-status='需跟进'],
+.contactsPopoverSurface [data-feedback-status='需跟进'] {
+  --contact-status-color: var(--so-warning, #8a5200);
+  --contact-status-soft: var(--so-warning-soft, #fff5e6);
+}
+
+.contactsPage [data-feedback-status='无回复'],
+.contactsPopoverSurface [data-feedback-status='无回复'] {
+  --contact-status-color: var(--so-warning, #8a5200);
+  --contact-status-soft: var(--so-warning-soft, #fff5e6);
+}
+
+.contactsPage [data-feedback-status='不合适'],
+.contactsPopoverSurface [data-feedback-status='不合适'] {
+  --contact-status-color: var(--so-danger, #c9443d);
+  --contact-status-soft: var(--so-danger-soft, #fff0ef);
+}
+
+.contactsPage .workspace {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  isolation: isolate;
+  border-radius: 18px;
+  background: var(--contacts-surface);
+}
+
+.contactsPage .masterPane {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  align-self: stretch;
+  overflow: hidden;
+  border-right: 0;
+  background: var(--contacts-surface-subtle);
+}
+
+.contactsPage .detailPane {
+  min-height: 0;
+}
+
+.contactsPage .masterToolbar {
+  position: relative;
+  z-index: 20;
+  padding: 14px 16px;
+  overflow: visible;
+  background: var(--contacts-surface);
+}
+
+.contactsToolbarRow {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(260px, 1fr) auto auto minmax(142px, auto);
+  align-items: center;
+  gap: 10px;
+}
+
+.contactsToolbarRow .searchBox {
+  min-width: 220px;
+}
+
+.contactsQuickFilter,
+.contactsToolbarButton,
+.contactIconButton {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--contacts-border);
+  border-radius: 9px;
+  color: var(--contacts-text);
+  background: var(--contacts-surface);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  cursor: pointer;
+  transition:
+    color var(--motion-hover, 83ms) var(--motion-ease-standard, cubic-bezier(.2, 0, 0, 1)),
+    border-color var(--motion-hover, 83ms) var(--motion-ease-standard, cubic-bezier(.2, 0, 0, 1)),
+    background-color var(--motion-hover, 83ms) var(--motion-ease-standard, cubic-bezier(.2, 0, 0, 1));
+}
+
+.contactsQuickFilter > span:first-child {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--so-warning, #8a5200);
+}
+
+.contactsQuickFilter:hover,
+.contactsQuickFilter[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--so-warning, #8a5200) 45%, var(--contacts-border));
+  color: var(--so-warning, #8a5200);
+  background: var(--so-warning-soft, #fff5e6);
+}
+
+.contactsToolbarControl {
+  min-width: 0;
+}
+
+.contactsToolbarButton {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.contactsToolbarButton:hover,
+.contactsToolbarButton[aria-expanded='true'] {
+  border-color: var(--so-border-selected, #8db7ad);
+  background: var(--so-brand-soft, #edf7f4);
+}
+
+.contactsToolbarButton > svg:last-child {
+  margin-left: 2px;
+  color: var(--contacts-secondary);
+}
+
+.contactsQuickFilter:focus-visible,
+.contactsToolbarButton:focus-visible,
+.contactIconButton:focus-visible,
+.contactsFilterOptions button:focus-visible,
+.contactsRangeOptions button:focus-visible,
+.contactsSegmentedOptions button:focus-visible,
+.contactsSortOptions button:focus-visible {
+  outline: 2px solid var(--so-brand, #177866);
+  outline-offset: 2px;
+}
+
+.contactsFilterCount {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  color: var(--so-brand-strong, #116b5b);
+  background: color-mix(in srgb, var(--so-brand, #177866) 12%, var(--contacts-surface));
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.contactsPage .masterScroll {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 12px;
+  padding: 14px 16px 20px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--so-brand, #177866) 2%, transparent), transparent 180px),
+    var(--contacts-surface-subtle);
+}
+
+.contactsPage .masterScroll > .emptyState {
+  grid-column: 1 / -1;
+}
+
+.contactsPage .contactListRow {
+  min-height: 112px;
+  grid-template-columns: 48px minmax(260px, 1fr) minmax(470px, 520px);
+  align-items: center;
+  gap: 16px;
+  padding: 15px 18px;
+  border: 1px solid var(--contacts-border);
+  border-radius: 14px;
+  background: var(--contacts-surface);
+  box-shadow: 0 1px 2px rgb(24 40 35 / 2.5%);
+}
+
+.contactsPage .contactListRow:hover {
+  border-color: color-mix(in srgb, var(--so-brand, #177866) 26%, var(--contacts-border));
+  background: color-mix(in srgb, var(--so-brand, #177866) 2.5%, var(--contacts-surface));
+  box-shadow: 0 6px 18px rgb(24 40 35 / 5%);
+}
+
+.contactsPage .contactListRow[aria-selected='true'] {
+  border-color: var(--so-border-selected, #8db7ad);
+  background: color-mix(in srgb, var(--so-brand, #177866) 7%, var(--contacts-surface));
+  box-shadow: inset 0 0 0 1px var(--so-border-selected, #8db7ad);
+}
+
+.contactsPage .contactAvatar {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border: 1px solid color-mix(in srgb, #7462d8 17%, var(--contacts-border));
+  border-radius: 14px;
+  color: #6555b8;
+  background: color-mix(in srgb, #7462d8 13%, var(--contacts-surface));
+  font-size: 17px;
+  box-shadow: 0 3px 10px rgb(63 53 121 / 6%);
+  overflow: hidden;
+}
+
+.contactAvatarHasPhoto {
+  padding: 0;
+  color: transparent !important;
+  background: var(--contacts-surface) !important;
+}
+
+.contactAvatarHasPhoto img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 24%;
+  animation: contact-photo-enter var(--motion-enter, 167ms) cubic-bezier(0, 0, 0, 1);
+}
+
+@keyframes contact-photo-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.contactPhotoLoadingIndicator {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 17px;
+  height: 17px;
+  border: 2px solid var(--contacts-surface);
+  border-top-color: var(--so-brand, #177866);
+  border-radius: 999px;
+  background: var(--contacts-surface);
+  animation: contact-photo-spin 800ms linear infinite;
+}
+
+@keyframes contact-photo-spin {
+  to { transform: rotate(360deg); }
+}
+
+.contactsPage .contactListRow:nth-child(3n + 2) .contactAvatar {
+  color: #3976c6;
+  background: color-mix(in srgb, #3976c6 12%, var(--contacts-surface));
+}
+
+.contactsPage .contactListRow:nth-child(3n + 3) .contactAvatar {
+  color: #b96d15;
+  background: color-mix(in srgb, #d9822b 13%, var(--contacts-surface));
+}
+
+.contactTitleLine {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.contactTitleLine .rowTitle {
+  min-width: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 25px;
+  letter-spacing: -0.01em;
+}
+
+.contactDraftPill {
+  display: inline-flex;
+  min-height: 22px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 6px;
+  color: var(--so-warning, #8a5200);
+  background: var(--so-warning-soft, #fff5e6);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.contactsPage .contactListRow .rowMeta {
+  margin-top: 2px;
+  color: var(--contacts-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.contactsPage .contactListRow .rowDescription {
+  margin-top: 3px;
+  color: var(--contacts-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.contactsPage .contactListRow .rowEnd {
+  display: grid;
+  min-width: 0;
+  align-self: stretch;
+  grid-template-columns: minmax(126px, .9fr) minmax(150px, 1.1fr) minmax(104px, .72fr) 20px;
+  align-items: center;
+  gap: 14px;
+}
+
+.contactRowMetric {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 5px;
+  padding-left: 16px;
+  border-left: 1px solid var(--contacts-border);
+}
+
+.contactRowMetric small {
+  overflow: hidden;
+  color: var(--contacts-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contactRowMetric .contactStatusPill {
+  width: max-content;
+  max-width: 100%;
+}
+
+.contactRowMetric .rowDate {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contactInlineSelect,
+.contactInlineDate {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--contacts-border);
+  border-radius: 8px;
+  color: var(--contacts-text);
+  background: var(--contacts-surface);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.contactInlineSelect {
+  color: var(--contact-status-color, var(--contacts-text));
+  background: var(--contact-status-soft, var(--contacts-surface));
+}
+
+.contactInlineDate[data-follow-up='overdue'] {
+  color: var(--so-danger, #c9443d);
+}
+
+.contactInlineDate[data-follow-up='soon'] {
+  color: var(--so-warning, #8a5200);
+}
+
+.contactInlineSelect:focus-visible,
+.contactInlineDate:focus-visible {
+  outline: 2px solid var(--so-brand, #177866);
+  outline-offset: 2px;
+}
+
+.contactInlineSelect:disabled,
+.contactInlineDate:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+}
+
+.contactsPage .contactListRow[data-recent-action='true'] {
+  animation: productivity-row-confirm 900ms cubic-bezier(.2, 0, 0, 1);
+}
+
+.contactRowValue {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--contacts-text) 82%, var(--contacts-secondary));
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contactsPage .contactRowNextAction {
+  color: var(--so-brand-strong, #116b5b) !important;
+  font-weight: 600 !important;
+}
+
+.contactRowChevron {
+  width: 20px;
+  height: 20px;
+  color: color-mix(in srgb, var(--contacts-secondary) 72%, transparent);
+  transition: color var(--motion-hover, 83ms) ease;
+}
+
+.contactsPage .contactListRow:hover .contactRowChevron,
+.contactsPage .contactListRow[aria-selected='true'] .contactRowChevron {
+  color: var(--so-brand-strong, #116b5b);
+}
+
+.contactStatusPill {
+  gap: 6px;
+  color: var(--contact-status-color, var(--so-text-secondary, #646a73));
+  background: var(--contact-status-soft, var(--so-surface-muted, #f5f6f7));
+}
+
+.contactStatusPill::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  content: '';
+}
+
+.contactsPage .rowDate[data-follow-up='overdue'],
+.contactHeaderMeta [data-follow-up='overdue'] {
+  color: var(--so-danger, #c9443d);
+}
+
+.contactsPage .rowDate[data-follow-up='soon'],
+.contactHeaderMeta [data-follow-up='soon'] {
+  color: var(--so-warning, #8a5200);
+}
+
+.contactsPage .rowDate[data-follow-up='none'],
+.contactHeaderMeta [data-follow-up='none'] {
+  color: var(--contacts-secondary);
+  font-weight: 500;
+}
+
+.contactsPopoverSurface {
+  position: fixed;
+  inset: auto;
+  left: var(--contacts-popover-left);
+  top: var(--contacts-popover-top);
+  width: var(--contacts-popover-width);
+  max-width: calc(100vw - 24px);
+  max-height: min(520px, calc(100vh - 24px));
+  padding: 0;
+  margin: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--contacts-border, #dfe6e4);
+  border-radius: 14px;
+  color: var(--contacts-text, #14211f);
+  background: var(--contacts-surface, #ffffff);
+  box-shadow: var(--so-shadow-popover, 0 16px 40px rgb(24 40 35 / 18%));
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity var(--motion-exit, 83ms) cubic-bezier(1, 0, 1, 1),
+    transform var(--motion-exit, 83ms) cubic-bezier(1, 0, 1, 1),
+    display var(--motion-exit, 83ms) allow-discrete,
+    overlay var(--motion-exit, 83ms) allow-discrete;
+}
+
+.contactsPopoverSurface:popover-open {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--motion-enter, 167ms) cubic-bezier(0, 0, 0, 1),
+    transform var(--motion-enter, 167ms) cubic-bezier(0, 0, 0, 1),
+    display var(--motion-enter, 167ms) allow-discrete,
+    overlay var(--motion-enter, 167ms) allow-discrete;
+}
+
+@starting-style {
+  .contactsPopoverSurface:popover-open {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.contactsFilterPopover,
+.contactsSortPopover {
+  padding: 14px;
+}
+
+.contactsPopoverHeader {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.contactsPopoverHeader strong {
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.contactsPopoverHeader span {
+  color: var(--contacts-secondary, #687772);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.contactsFilterGroup {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.contactsFilterGroup + .contactsFilterGroup {
+  margin-top: 14px;
+}
+
+.contactsFilterGroup legend {
+  margin-bottom: 7px;
+  color: var(--contacts-secondary, #687772);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.contactsFilterOptions,
+.contactsRangeOptions,
+.contactsSegmentedOptions,
+.contactsSortOptions {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.contactsFilterOptions,
+.contactsRangeOptions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.contactsSegmentedOptions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.contactsFilterOptions button,
+.contactsRangeOptions button,
+.contactsSegmentedOptions button,
+.contactsSortOptions button {
+  display: flex;
+  min-width: 0;
+  min-height: 38px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 1px solid var(--contacts-border, #dfe6e4);
+  border-radius: 9px;
+  color: var(--contacts-text, #14211f);
+  background: var(--contacts-surface, #ffffff);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.contactsFilterOptions button:hover,
+.contactsRangeOptions button:hover,
+.contactsSegmentedOptions button:hover,
+.contactsSortOptions button:hover {
+  background: var(--contacts-surface-hover, #f1f5f4);
+}
+
+.contactsFilterOptions button[aria-pressed='true'],
+.contactsRangeOptions button[aria-pressed='true'],
+.contactsSegmentedOptions button[aria-pressed='true'] {
+  border-color: var(--so-border-selected, #8db7ad);
+  color: var(--contact-status-color, var(--so-brand-strong, #116b5b));
+  background: var(--contact-status-soft, var(--so-brand-soft, #edf7f4));
+}
+
+.contactsFilterOptions button > span:first-child {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--contact-status-color, #788681);
+}
+
+.contactsFilterOptions button > svg:last-child {
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+}
+
+.contactsSegmentedOptions button {
+  justify-content: center;
+}
+
+.contactsPopoverFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--contacts-border, #dfe6e4);
+}
+
+.contactsSortOptions button {
+  min-height: 54px;
+  justify-content: space-between;
+}
+
+.contactsSortOptions button[aria-checked='true'] {
+  border-color: var(--so-border-selected, #8db7ad);
+  background: var(--so-brand-soft, #edf7f4);
+}
+
+.contactsSortOptions button > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.contactsSortOptions button strong,
+.contactsSortOptions button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contactsSortOptions button strong {
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.contactsSortOptions button small {
+  color: var(--contacts-secondary, #687772);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 17px;
+}
+
+.contactsPage .contactDetailHeader {
+  display: grid;
+  min-height: 100px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 20px;
+  border-bottom-color: var(--contacts-border);
+  background: color-mix(in srgb, var(--so-brand, #177866) 2.5%, var(--contacts-surface));
+}
+
+.contactDetailAvatar {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border: 1px solid color-mix(in srgb, #7462d8 20%, var(--contacts-border));
+  border-radius: 14px;
+  color: #6555b8;
+  background: color-mix(in srgb, #7462d8 13%, var(--contacts-surface));
+  font-size: 17px;
+  box-shadow: 0 4px 12px rgb(63 53 121 / 8%);
+  overflow: hidden;
+}
+
+.contactsPage .contactDetailHeader .detailHeading {
+  min-width: 0;
+}
+
+.contactsPage .contactDetailHeader .detailTitle {
+  overflow: hidden;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 27px;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contactsPage .contactDetailHeader .detailSubtitle {
+  margin-top: 1px;
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.contactHeaderMeta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  color: var(--contacts-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.contactHeaderMeta > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contactDetailActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.contactIconButton,
+.contactsPage .contactCloseButton {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+  border-radius: 10px;
+  text-decoration: none;
+}
+
+.contactIconButton:hover,
+.contactsPage .contactCloseButton:hover {
+  border-color: var(--so-border-selected, #8db7ad);
+  color: var(--so-brand-strong, #116b5b);
+  background: var(--so-brand-soft, #edf7f4);
+}
+
+.contactsPage .contactBackIcon {
+  display: none !important;
+}
+
+.contactsPage .contactDismissIcon {
+  display: block !important;
+}
+
+.contactsPage .contactCloseButton > span {
+  display: none;
+}
+
+.contactsPage .contactDetailScroll {
+  padding: 18px 20px 24px;
+  background: color-mix(in srgb, var(--contacts-surface-subtle) 94%, var(--contacts-surface));
+  scrollbar-gutter: stable;
+}
+
+.contactsPage .contactDetailSection {
+  padding: 18px 18px 20px;
+  border: 1px solid var(--contacts-border);
+  border-radius: 14px;
+  background: var(--contacts-surface);
+  box-shadow: 0 1px 2px rgb(24 40 35 / 3%);
+}
+
+.contactsPage .contactDetailSection + .contactDetailSection {
+  margin-top: 14px;
+  padding-top: 18px;
+}
+
+.contactsPage .contactDetailSection .sectionHeader {
+  margin-bottom: 15px;
+}
+
+.contactsPage .contactDetailSection .sectionTitle {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.contactsPage .contactDetailSection .sectionDescription {
+  margin-top: 3px;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.contactsPage .contactCoreGrid,
+.contactsPage .contactNextGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px 16px;
+}
+
+.contactsPage .contactDetailScroll .fieldLabel {
+  margin-bottom: 7px;
+  color: color-mix(in srgb, var(--contacts-text) 72%, var(--contacts-secondary));
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.contactsPage .contactDetailScroll .fieldControl {
+  min-height: 44px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 22px;
+  transition:
+    border-color var(--motion-hover, 83ms) ease,
+    background-color var(--motion-hover, 83ms) ease,
+    box-shadow var(--motion-hover, 83ms) ease;
+}
+
+.contactsPage .contactDetailScroll .fieldControl:hover {
+  border-color: color-mix(in srgb, var(--so-brand, #177866) 24%, var(--contacts-border));
+}
+
+.contactsPage .contactDetailScroll .fieldControl:focus {
+  border-color: var(--so-border-selected, #8db7ad);
+  background: var(--contacts-surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--so-brand, #177866) 9%, transparent);
+}
+
+.contactsPage .contactDetailScroll textarea.fieldControl {
+  min-height: 112px;
+}
+
+.contactsPage .contactDetailScroll textarea.contactCompactTextarea {
+  min-height: 44px;
+  overflow-y: auto;
+  resize: none;
+  white-space: pre-wrap;
+}
+
+.mentorHomepageField {
+  min-width: 0;
+}
+
+.mentorHomepageControl {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.mentorHomepageOpenButton {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--contacts-border);
+  border-radius: 10px;
+  color: var(--so-brand-strong, #116b5b);
+  background: var(--contacts-surface);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  text-decoration: none;
+}
+
+.mentorHomepageOpenButton:hover {
+  border-color: var(--so-border-selected, #8db7ad);
+  background: var(--so-brand-soft, #edf7f4);
+}
+
+.mentorPhotoStatus {
+  display: flex;
+  min-height: 24px;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--contacts-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.mentorPhotoStatus > svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.mentorPhotoStatus[data-phase='success'] {
+  color: var(--so-success, #2b8a5a);
+}
+
+.mentorPhotoStatus[data-phase='error'] {
+  color: var(--so-danger, #c9443d);
+}
+
+.mentorPhotoSpinner {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  border: 2px solid color-mix(in srgb, var(--so-brand, #177866) 18%, transparent);
+  border-top-color: var(--so-brand, #177866);
+  border-radius: 999px;
+  animation: contact-photo-spin 800ms linear infinite;
+}
+
+.contactPhotoTextButton {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--so-brand-strong, #116b5b);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  line-height: 18px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.contactPhotoTextButton:hover {
+  background: var(--so-brand-soft, #edf7f4);
+}
+
+.contactPhotoTextButton svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mentorPhotoCandidate {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px;
+  border: 1px solid color-mix(in srgb, var(--so-brand, #177866) 20%, var(--contacts-border));
+  border-radius: 10px;
+  color: var(--contacts-text);
+  background: var(--so-brand-soft, #edf7f4);
+}
+
+.mentorPhotoCandidate img {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--contacts-border);
+  border-radius: 10px;
+  object-fit: cover;
+  object-position: center 24%;
+}
+
+.mentorPhotoCandidate > div {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.mentorPhotoCandidate strong,
+.mentorPhotoCandidate span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mentorPhotoCandidate strong {
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.mentorPhotoCandidate span {
+  color: var(--contacts-secondary);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.mentorPhotoCandidate button {
+  min-height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--contacts-border);
+  border-radius: 8px;
+  color: var(--contacts-text);
+  background: var(--contacts-surface);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mentorPhotoCandidate button:first-of-type {
+  border-color: var(--so-brand, #177866);
+  color: var(--so-on-brand, #ffffff);
+  background: var(--so-brand, #177866);
+}
+
+.contactsPage select.fieldControl[data-feedback-status] {
+  border-color: color-mix(in srgb, var(--contact-status-color) 34%, var(--contacts-border));
+  color: var(--contact-status-color);
+  background: var(--contact-status-soft);
+  font-weight: 600;
+}
+
+.contactDetailsGroup {
+  margin-top: 14px;
+  overflow: clip;
+  border: 1px solid var(--contacts-border);
+  border-radius: 14px;
+  background: var(--contacts-surface);
+  box-shadow: 0 1px 2px rgb(24 40 35 / 3%);
+}
+
+.contactDetailsGroup > summary {
+  display: grid;
+  min-height: 64px;
+  grid-template-columns: minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  color: var(--contacts-text);
+  list-style: none;
+  cursor: pointer;
+}
+
+.contactDetailsGroup > summary:hover {
+  background: var(--contacts-surface-hover);
+}
+
+.contactDetailsGroup[open] > summary {
+  border-bottom: 1px solid var(--contacts-border);
+  background: color-mix(in srgb, var(--so-brand, #177866) 2.5%, var(--contacts-surface));
+}
+
+.contactDetailsGroup > summary:focus-visible {
+  outline: 2px solid var(--so-brand, #177866);
+  outline-offset: -3px;
+}
+
+.contactDetailsGroup > summary::-webkit-details-marker {
+  display: none;
+}
+
+.contactDetailsGroup > summary > span {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.contactDetailsGroup > summary strong {
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.contactDetailsGroup > summary small {
+  overflow: hidden;
+  color: var(--contacts-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contactDetailsGroup > summary > svg {
+  color: var(--contacts-secondary);
+  transition: transform var(--motion-hover, 83ms) ease;
+}
+
+.contactDetailsGroup[open] > summary > svg {
+  transform: rotate(180deg);
+}
+
+.contactDetailsBody {
+  padding: 18px;
+}
+
+.contactDetailsBody.timeline {
+  padding-left: 8px;
+}
+
+.contactDetailsBody > .timeline {
+  margin-bottom: 8px;
+}
+
+.contactDetailFooter {
+  position: sticky;
+  z-index: 3;
+  bottom: -24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  margin: 18px -20px -24px;
+  padding: 13px 20px;
+  border-top: 1px solid var(--contacts-border);
+  background: var(--contacts-surface);
+  box-shadow: 0 -8px 24px rgb(24 40 35 / 5%);
+}
+
+.contactPrivacyCopy,
+.contactSaveState,
+.contactFooterActions {
+  display: flex;
+  align-items: center;
+}
+
+.contactPrivacyCopy {
+  min-width: 0;
+  gap: 7px;
+  color: var(--contacts-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.contactPrivacyCopy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contactSaveState {
+  gap: 5px;
+  color: var(--so-success, #2b8a5a);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.contactSaveState[data-draft='true'] {
+  color: var(--contacts-secondary);
+}
+
+.contactFooterActions {
+  flex: 0 0 auto;
+  width: auto;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.contactFooterActions .contactSaveState {
+  margin-right: 4px;
+}
+
+@container contacts-workspace-page (width > 1240px) {
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .contactsPage .detailPane,
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .contactsPage .workspace[data-detail-open='false'] .detailPane {
+    position: absolute;
+    z-index: 30;
+    inset: 0 0 0 auto;
+    display: flex;
+    width: clamp(720px, 60cqi, 860px);
+    height: auto;
+    min-height: 0;
+    overflow: hidden;
+    border-left: 1px solid var(--contacts-border);
+    border-radius: 0 17px 17px 0;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translate3d(12px, 0, 0);
+    background: var(--contacts-surface);
+    box-shadow: var(--so-shadow-popover, -18px 0 42px rgb(26 42 37 / 14%));
+    transition:
+      opacity var(--motion-exit, 83ms) cubic-bezier(1, 0, 1, 1),
+      transform var(--motion-exit, 83ms) cubic-bezier(1, 0, 1, 1),
+      visibility 0s linear var(--motion-exit, 83ms);
+    will-change: transform, opacity;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .contactsPage .workspace[data-detail-open='true'] .detailPane {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate3d(0, 0, 0);
+    transition:
+      opacity var(--motion-enter, 167ms) cubic-bezier(0, 0, 0, 1),
+      transform var(--motion-enter, 167ms) cubic-bezier(0, 0, 0, 1),
+      visibility 0s linear 0s;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .contactsPage .workspace[data-detail-open='true'] .backButton {
+    display: inline-flex;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200'])) .contactsPage .contactDetailsGroup .contactDetailsBody.formGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container contacts-workspace-page (width <= 1240px) {
+  .contactsPage .masterScroll {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container contacts-workspace-page (width <= 1240px) {
+  .contactsPage .workspace {
+    display: block;
+    grid-template-columns: none;
+  }
+
+  .contactsPage .detailPane,
+  .contactsPage .workspace[data-detail-open='false'] .detailPane {
+    position: static;
+    display: none;
+    width: 100%;
+    height: 100%;
+    border-left: 0;
+    border-radius: 0;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    box-shadow: none;
+    transition: none;
+  }
+
+  .contactsPage .workspace[data-detail-open='true'] .masterPane {
+    display: none;
+  }
+
+  .contactsPage .workspace[data-detail-open='true'] .detailPane {
+    display: flex;
+  }
+
+  .contactsPage .workspace[data-detail-open='true'] .backButton {
+    display: inline-flex;
+  }
+
+  .contactsPage .contactBackIcon {
+    display: block !important;
+  }
+
+  .contactsPage .contactDismissIcon {
+    display: none !important;
+  }
+
+  .contactsPage .contactCloseButton {
+    width: auto;
+    padding: 0 10px;
+  }
+
+  .contactsPage .contactCloseButton > span {
+    display: inline;
+  }
+}
+
+@container contacts-workspace-page (max-width: 980px) {
+  .contactsPage .contactListRow {
+    min-height: 132px;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    align-items: start;
+  }
+
+  .contactsPage .contactListRow .contactAvatar {
+    grid-row: 1 / span 2;
+  }
+
+  .contactsPage .contactListRow .rowEnd {
+    min-width: 0;
+    grid-column: 2 / -1;
+    grid-row: 2;
+    grid-template-columns: minmax(120px, .9fr) minmax(150px, 1.1fr) minmax(104px, .72fr) 20px;
+    align-self: end;
+    gap: 10px;
+    margin-top: 9px;
+  }
+
+  .contactsPage .contactRowMetric:first-child {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .contactsPage .contactListRow :is(.rowMeta, .rowDescription) {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}
+
+@container contacts-workspace-page (max-width: 760px) {
+  .contactsToolbarRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .contactsToolbarRow .searchBox {
+    min-width: 0;
+    grid-column: 1 / -1;
+  }
+
+  .contactsPage .contactListRow .rowEnd {
+    grid-template-columns: minmax(150px, 1fr) minmax(104px, auto) 18px;
+  }
+
+  .contactsPage .contactRowMetric[data-contact-metric='last'] {
+    display: none;
+  }
+
+  .contactsPage .contactRowMetric[data-contact-metric='next'] {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .contactsPage .contactDetailHeader {
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    padding-inline: 13px;
+  }
+
+  .contactsPage .contactCoreGrid,
+  .contactsPage .contactNextGrid,
+  .contactsPage .contactDetailsBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mentorHomepageControl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mentorHomepageOpenButton {
+    justify-self: start;
+  }
+
+  .mentorPhotoCandidate {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .mentorPhotoCandidate button {
+    grid-row: 2;
+  }
+
+  .mentorPhotoCandidate button:first-of-type {
+    grid-column: 1;
+  }
+
+  .contactDetailFooter {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .contactFooterActions {
+    width: 100%;
+  }
+
+  .contactFooterActions .contactSaveState {
+    margin-right: auto;
+  }
+}
+
+@container contacts-workspace-page (max-width: 620px) {
+  .contactsPage .contactListRow {
+    min-height: 122px;
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 11px;
+    padding: 13px;
+    align-items: start;
+  }
+
+  .contactsPage .contactListRow .contactAvatar {
+    width: 40px;
+    height: 40px;
+    grid-row: 1 / span 2;
+    border-radius: 12px;
+    font-size: 15px;
+  }
+
+  .contactsPage .contactListRow .rowEnd {
+    display: grid;
+    min-width: 0;
+    grid-column: 2;
+    grid-row: 2;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: 8px;
+  }
+
+  .contactsPage .contactRowChevron {
+    display: none;
+  }
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .workspace {
+  position: relative;
+  display: block;
+  grid-template-columns: none;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .detailPane,
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .workspace[data-detail-open='false'] .detailPane {
+  position: static;
+  display: none;
+  width: 100%;
+  height: 100%;
+  border-left: 0;
+  border-radius: 0;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  box-shadow: none;
+  transition: none;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .workspace[data-detail-open='true'] .masterPane {
+  display: none;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .workspace[data-detail-open='true'] .detailPane,
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .workspace[data-detail-open='true'] .backButton {
+  display: flex;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .contactsToolbarRow,
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage :is(
+  .contactCoreGrid,
+  .contactNextGrid,
+  .contactDetailsBody
+) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .masterScroll {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .contactListRow {
+  min-height: 126px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: start;
+  gap: 11px;
+  padding: 13px;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .contactListRow .contactAvatar {
+  width: 42px;
+  height: 42px;
+  grid-row: 1 / span 2;
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .contactListRow .rowEnd {
+  display: grid;
+  min-width: 0;
+  grid-column: 2;
+  grid-row: 2;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) :is(
+  .schedulePage,
+  .contactsPage
+) .headerActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) :is(
+  .schedulePage,
+  .contactsPage
+) .headerActions > * {
+  width: 100%;
+  min-width: 0;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) :is(
+  .schedulePage .scheduleListRow,
+  .contactsPage .contactListRow
+) :is(.rowTitle, .rowMeta, .rowDescription) {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .contactRowMetric[data-contact-metric='last'],
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .contactRowChevron {
+  display: none;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .contactRowMetric[data-contact-metric='next'] {
+  padding-left: 0;
+  border-left: 0;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .contactDetailFooter {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .mentorHomepageControl,
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .mentorPhotoCandidate {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .mentorHomepageOpenButton {
+  justify-self: start;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .contactBackIcon {
+  display: block !important;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .contactDismissIcon {
+  display: none !important;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .contactCloseButton {
+  width: auto;
+  padding-inline: 10px;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .contactsPage .contactCloseButton > span {
+  display: inline;
+}
+
+/* High zoom uses a vertically scrollable single-panel workspace. The page
+ * keeps readable type and gives the object list a real viewport instead of
+ * shrinking the master pane to zero after the header and filters reflow. */
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) :is(
+  .schedulePage,
+  .contactsPage
+) {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) :is(
+  .schedulePage,
+  .contactsPage
+) .workspace {
+  min-height: 420px;
+  flex: 0 0 auto;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) :is(
+  .schedulePage,
+  .contactsPage
+) :is(.masterPane, .detailPane) {
+  min-height: 420px;
+  height: auto;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) :is(
+  .schedulePage,
+  .contactsPage
+) :is(.masterScroll, .detailScroll) {
+  min-height: 180px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contactsPage .detailPane,
+  .contactsPopoverSurface,
+  .contactDetailsGroup > summary > svg {
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .contactAvatarHasPhoto img,
+  .contactPhotoLoadingIndicator,
+  .mentorPhotoSpinner,
+  .scheduleListRow[data-recent-action='true'],
+  .contactListRow[data-recent-action='true'] {
+    animation: none !important;
+  }
+}
+
+:global(html[data-desktop-reduce-motion='true']) :is(
+  .contactsPage .detailPane,
+  .contactsPopoverSurface,
+  .contactDetailsGroup > summary > svg,
+  .contactsQuickFilter,
+  .contactsToolbarButton
+) {
+  transform: none !important;
+  transition: none !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Notice-library parity authority
+ *
+ * Schedule and mentor contacts are object collections, not dense data tables.
+ * This final layer therefore reuses the notice library's real runtime rhythm:
+ * an 88px page header, 20px top-level gaps, framed tool surfaces, 18px cards,
+ * 20px card padding and a 20/30 + 16/24 type ladder.  The existing data flow,
+ * popovers, keyboard model and side inspectors remain unchanged.
+ * ----------------------------------------------------------------------- */
+
+.schedulePage,
+.contactsPage {
+  gap: 20px !important;
+}
+
+:global(.desktop-app-shell) .schedulePage:global(#schedule-board),
+:global(.desktop-app-shell) .contactsPage:global(#contacts-board) {
+  gap: 20px !important;
+}
+
+:is(.schedulePage, .contactsPage) .pageHeader {
+  min-height: 88px;
+  gap: 24px;
+  padding: 12px 20px;
+  border-radius: 12px;
+}
+
+:is(.schedulePage, .contactsPage) .pageTitle {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 36px;
+  letter-spacing: -0.015em;
+}
+
+:is(.schedulePage, .contactsPage) .pageSummary {
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+:is(.schedulePage, .contactsPage) .workspace {
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:is(.schedulePage, .contactsPage) .masterPane {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+}
+
+:is(.schedulePage, .contactsPage) .masterToolbar {
+  box-sizing: border-box;
+  padding: 14px 20px;
+  border: 1px solid var(--so-border, #dfe6e4);
+  border-radius: 14px;
+  background: var(--so-surface, #ffffff);
+  box-shadow: none;
+}
+
+.schedulePage .masterToolbar {
+  min-height: 112px;
+}
+
+@container schedule-workspace-page (min-width: 1080px) {
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .masterToolbar {
+    padding: 14px 20px;
+  }
+}
+
+.contactsPage .masterToolbar {
+  min-height: 88px;
+  align-content: center;
+}
+
+:is(.schedulePage, .contactsPage) .searchBox {
+  box-sizing: border-box;
+  height: 40px;
+  min-height: 40px;
+  padding-inline: 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+:is(.schedulePage, .contactsPage) .masterScroll {
+  min-width: 0;
+  padding: 0 4px 18px 0;
+  background: transparent;
+}
+
+.schedulePage .masterScroll > section + section {
+  margin-top: 14px;
+}
+
+:global(.desktop-app-shell:is(.desktop-app-shell)) .schedulePage :global(.desktop-schedule-list) {
+  padding: 0 4px 18px 0 !important;
+}
+
+.schedulePage .listGroupTitle {
+  min-height: 36px;
+  padding: 5px 18px;
+  border: 0;
+  color: var(--schedule-secondary);
+  background: transparent;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+:global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+  .schedulePage
+  .workspace
+  .scheduleListRow {
+  min-height: 148px;
+  grid-template-columns: 48px minmax(0, 1fr) minmax(260px, 300px);
+  align-items: start;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--schedule-border);
+  border-radius: 18px;
+  background: var(--schedule-surface);
+  box-shadow: 0 5px 18px rgb(29 43 50 / 5.5%);
+}
+
+.schedulePage .scheduleListRow + .scheduleListRow {
+  margin-top: 14px;
+}
+
+.schedulePage .scheduleListRow .rowIcon {
+  width: 48px;
+  height: 48px;
+  align-self: start;
+  border-radius: 14px;
+}
+
+.schedulePage .scheduleListRow .rowTitle {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 30px;
+}
+
+.schedulePage .scheduleListRow .rowMeta {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.schedulePage .scheduleListRow .rowEnd {
+  display: grid;
+  min-width: 0;
+  align-self: stretch;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-rows: auto minmax(40px, 1fr);
+  align-items: start;
+  align-content: stretch;
+  gap: 10px 12px;
+  padding-left: 20px;
+  border-left: 1px solid var(--schedule-border);
+}
+
+.schedulePage .scheduleListRow .rowEnd :is(.priorityPill, .neutralPill) {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+}
+
+.schedulePage .scheduleListRow .rowEnd .rowDate {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  justify-self: end;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.schedulePage :is(.priorityPill, .neutralPill) {
+  min-height: 28px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.schedulePage .scheduleListRow .inlineQuickAction {
+  width: 100%;
+  min-height: 40px;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  align-self: end;
+  justify-self: stretch;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.schedulePage :is(.categoryFilterButton, .todayButton) {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.schedulePage .viewToggle button {
+  min-height: 34px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.schedulePage .categoryFilterButton {
+  min-height: 36px;
+}
+
+.schedulePage .categoryFilterButton {
+  border-radius: 9px;
+}
+
+.contactsPage .contactsToolbarRow {
+  grid-template-columns: minmax(280px, 1fr) auto auto minmax(150px, auto);
+  gap: 12px;
+}
+
+.contactsPage :is(.contactsQuickFilter, .contactsToolbarButton) {
+  min-height: 40px;
+  padding-inline: 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.contactsPage .masterScroll {
+  gap: 14px;
+}
+
+.contactsPage .contactListRow {
+  min-height: 148px;
+  grid-template-columns: 88px minmax(260px, 1fr) minmax(490px, 540px);
+  align-items: start;
+  gap: 20px;
+  padding: 20px;
+  border: 1px solid var(--contacts-border);
+  border-radius: 18px;
+  background: var(--contacts-surface);
+  box-shadow: 0 5px 18px rgb(29 43 50 / 5.5%);
+}
+
+.contactsPage .contactAvatar {
+  width: 88px;
+  height: 88px;
+  align-self: start;
+  border-radius: 16px;
+  font-size: 24px;
+}
+
+.contactsPage .contactTitleLine .rowTitle {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 30px;
+}
+
+.contactsPage .contactListRow :is(.rowMeta, .rowDescription) {
+  margin-top: 3px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.contactsPage .contactListRow .rowEnd {
+  grid-template-columns: minmax(126px, .9fr) minmax(160px, 1.1fr) minmax(112px, .72fr) 20px;
+  gap: 14px;
+  padding-left: 20px;
+  border-left: 1px solid var(--contacts-border);
+}
+
+.contactsPage .contactRowMetric {
+  gap: 6px;
+  padding-left: 14px;
+}
+
+.contactsPage .contactRowMetric:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.contactsPage .contactRowMetric small {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.contactsPage :is(.contactRowValue, .contactRowMetric .rowDate) {
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.contactsPage :is(.contactInlineSelect, .contactInlineDate) {
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+:is(.schedulePage, .contactsPage) .detailHeader,
+.contactsPage .contactDetailHeader {
+  min-height: 88px;
+  padding: 16px 20px;
+}
+
+:is(.schedulePage, .contactsPage) .detailTitle {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 30px;
+}
+
+:is(.schedulePage, .contactsPage) .detailSubtitle {
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+:is(.schedulePage, .contactsPage) .detailScroll {
+  padding: 20px;
+}
+
+:global(.desktop-app-shell:is(.desktop-app-shell))
+  .schedulePage
+  .masterScroll:has(> :global(.desktop-schedule-empty)),
+:global(.desktop-app-shell:is(.desktop-app-shell))
+  .contactsPage
+  .masterScroll:has(> :global(.desktop-contacts-empty)) {
+  display: grid !important;
+  grid-template-rows: auto !important;
+  align-content: start !important;
+  place-items: stretch !important;
+}
+
+:global(.desktop-app-shell:is(.desktop-app-shell)) .schedulePage :global(.desktop-schedule-empty),
+:global(.desktop-app-shell:is(.desktop-app-shell)) .contactsPage :global(.desktop-contacts-empty) {
+  min-height: 220px !important;
+  align-self: start !important;
+  justify-self: stretch !important;
+  padding: 24px 20px !important;
+  border: 1px solid var(--so-border, #dfe6e4) !important;
+  border-radius: 18px !important;
+  background: var(--so-surface, #ffffff) !important;
+  box-shadow: 0 5px 18px rgb(29 43 50 / 5.5%) !important;
+}
+
+:global(.desktop-app-shell) .schedulePage:global(#schedule-board) :global(.desktop-schedule-empty h2),
+:global(.desktop-app-shell) .schedulePage:global(#schedule-board) :global(.desktop-schedule-empty h3),
+:global(.desktop-app-shell) .contactsPage:global(#contacts-board) :global(.desktop-contacts-empty h2),
+:global(.desktop-app-shell) .contactsPage:global(#contacts-board) :global(.desktop-contacts-empty h3) {
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  line-height: 30px !important;
+}
+
+:global(.desktop-app-shell) .schedulePage:global(#schedule-board) :global(.desktop-schedule-empty p),
+:global(.desktop-app-shell) .contactsPage:global(#contacts-board) :global(.desktop-contacts-empty p) {
+  max-width: 520px !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+}
+
+:global(.desktop-app-shell:is(.desktop-app-shell))
+  :is(.schedulePage :global(.desktop-schedule-empty), .contactsPage :global(.desktop-contacts-empty))
+  :is(.emptyTitle, h2, h3) {
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  line-height: 30px !important;
+}
+
+:global(.desktop-app-shell:is(.desktop-app-shell))
+  :is(.schedulePage :global(.desktop-schedule-empty), .contactsPage :global(.desktop-contacts-empty))
+  p {
+  max-width: 520px !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+}
+
+@container schedule-workspace-page (max-width: 760px) {
+  .schedulePage .scheduleListRow {
+    min-height: auto;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: start;
+    padding: 20px;
+  }
+
+  .schedulePage .scheduleListRow .rowIcon {
+    grid-row: 1;
+  }
+
+  .schedulePage .scheduleListRow .rowEnd {
+    display: grid !important;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    margin-top: 12px;
+    padding: 14px 0 0;
+    border-top: 1px solid var(--schedule-border);
+    border-left: 0;
+  }
+}
+
+@container schedule-workspace-page (max-width: 520px) {
+  .schedulePage .scheduleListRow .rowEnd {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+
+  .schedulePage .inlineQuickAction {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+@container contacts-workspace-page (max-width: 980px) {
+  .contactsPage .contactListRow {
+    min-height: auto;
+    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: start;
+    padding: 20px;
+  }
+
+  .contactsPage .contactListRow .contactAvatar {
+    width: 72px;
+    height: 72px;
+    grid-row: 1 / span 2;
+    border-radius: 16px;
+    font-size: 20px;
+  }
+
+  .contactsPage .contactListRow .rowEnd {
+    grid-column: 2;
+    grid-row: 2;
+    grid-template-columns: minmax(120px, .9fr) minmax(150px, 1.1fr) minmax(108px, .72fr) 20px;
+    margin-top: 12px;
+    padding: 0;
+    border-left: 0;
+  }
+}
+
+@container contacts-workspace-page (max-width: 760px) {
+  .contactsPage .contactsToolbarRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .contactsPage .contactsToolbarRow .searchBox {
+    grid-column: 1 / -1;
+  }
+
+  .contactsPage .contactListRow .rowEnd {
+    grid-template-columns: minmax(150px, 1fr) minmax(112px, auto) 20px;
+  }
+}
+
+@container contacts-workspace-page (max-width: 620px) {
+  .contactsPage .contactListRow {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 14px;
+    padding: 20px;
+  }
+
+  .contactsPage .contactListRow .contactAvatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    font-size: 19px;
+  }
+
+  .contactsPage .contactListRow .rowEnd {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .schedulePage
+  .scheduleListRow {
+  min-height: auto;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 18px;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .schedulePage
+  .scheduleListRow
+  .rowEnd {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  margin-top: 12px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--schedule-border);
+  border-left: 0;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .schedulePage
+  .scheduleListRow
+  .rowIcon {
+  grid-row: 1;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .contactsPage
+  .contactListRow {
+  min-height: auto;
+  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: start;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 18px;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .contactsPage
+  .contactListRow
+  .contactAvatar {
+  width: 64px;
+  height: 64px;
+  grid-row: 1 / span 2;
+  border-radius: 16px;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .contactsPage
+  .contactListRow
+  .rowEnd {
+  grid-column: 2;
+  grid-row: 2;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+  padding: 0;
+  border-left: 0;
+}
+
+/* High zoom keeps every control visible, but uses the available width before
+ * falling back to a long single column.  This mirrors mature desktop apps:
+ * reflow is width-led, not a blanket "zoom means stack everything" rule. */
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .schedulePage
+  .categoryFilterBar {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .contactsPage
+  .contactsToolbarRow {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .contactsPage
+  .contactsToolbarRow
+  .searchBox {
+  grid-column: 1 / -1;
+}
+
+@container schedule-workspace-page (min-width: 420px) {
+  :global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .masterToolbar {
+    grid-template-columns: minmax(0, 1fr) minmax(168px, .66fr);
+    align-items: center;
+    gap: 10px 12px;
+  }
+
+  :global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleToolbarTop {
+    display: grid;
+    min-width: 0;
+    grid-column: 1 / -1 !important;
+    grid-template-columns: minmax(220px, 1fr) minmax(150px, .64fr);
+    gap: 10px;
+  }
+
+  :global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .searchBox {
+    grid-column: 1 !important;
+  }
+
+  :global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleAdvancedFilters {
+    grid-column: 2 !important;
+    align-self: center;
+  }
+
+  :global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .categoryFilterBar {
+    grid-column: 1 / -1 !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * Schedule reference authority
+ *
+ * Wide desktop uses a scan-first grouped agenda and a real summary rail.
+ * Existing create/edit side peek remains the only editor. Medium, narrow and
+ * high-zoom layouts reflow the same information without horizontal scrolling.
+ * ----------------------------------------------------------------------- */
+
+.schedulePage .masterPane {
+  gap: 12px !important;
+}
+
+.schedulePage .masterToolbar {
+  min-height: 116px !important;
+  padding: 14px 16px !important;
+  border-radius: 14px !important;
+}
+
+.scheduleContentGrid {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 304px;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.scheduleContentGrid[data-view-mode='quadrant'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:global(.desktop-app-shell:is(.desktop-app-shell))
+  .schedulePage
+  .scheduleContentGrid
+  :global(.desktop-schedule-list) {
+  min-width: 0 !important;
+  padding: 0 4px 18px 0 !important;
+}
+
+.schedulePage .masterScroll {
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.schedulePage .masterScroll > section + section {
+  margin-top: 12px;
+}
+
+.schedulePage .listGroupTitle {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 6px 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 0;
+  color: var(--schedule-secondary);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.schedulePage .listGroupTitle:hover {
+  color: var(--schedule-text);
+}
+
+.schedulePage .listGroupTitle:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid var(--so-brand, #0f6b61);
+  outline-offset: -2px;
+}
+
+.schedulePage .listGroupTitle > span {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.schedulePage .listGroupTitle > span:first-child strong {
+  color: var(--so-brand, #0f6b61);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.schedulePage .listGroupTitle small {
+  color: var(--schedule-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.schedulePage .listGroupTitle svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+.scheduleGroupRows {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--schedule-border);
+  border-radius: 14px;
+  background: var(--schedule-surface);
+  box-shadow: 0 5px 16px rgb(29 43 50 / 4%);
+}
+
+:global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+  .schedulePage
+  .workspace
+  .scheduleListRow {
+  box-sizing: border-box;
+  min-height: 112px;
+  display: grid;
+  grid-template-columns: 48px 104px minmax(0, 1fr) minmax(250px, 286px);
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding: 14px 16px;
+  overflow: hidden;
+  border: 0;
+  border-bottom: 1px solid var(--schedule-border);
+  border-radius: 0;
+  background: var(--schedule-surface);
+  box-shadow: none;
+}
+
+.schedulePage .scheduleGroupRows > .scheduleListRow:last-child {
+  border-bottom: 0;
+}
+
+.schedulePage .scheduleListRow + .scheduleListRow {
+  margin-top: 0;
+}
+
+.schedulePage .scheduleListRow:hover {
+  background: color-mix(in srgb, var(--so-brand, #0f6b61) 3%, var(--schedule-surface));
+}
+
+.schedulePage .scheduleListRow[aria-current='true'],
+.schedulePage .scheduleListRow[data-selected='true'] {
+  background: color-mix(in srgb, var(--so-brand, #0f6b61) 7%, var(--schedule-surface));
+  box-shadow: inset 3px 0 0 var(--so-brand, #0f6b61);
+}
+
+.schedulePage .scheduleListRow .rowIcon {
+  width: 48px;
+  height: 48px;
+  grid-column: 1;
+  grid-row: 1;
+  place-self: center;
+  border-radius: 14px;
+}
+
+.scheduleRowWhen {
+  min-width: 0;
+  min-height: 58px;
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  padding-left: 14px;
+  border-left: 1px solid var(--schedule-border);
+}
+
+.scheduleRowWhen strong {
+  color: var(--schedule-text);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.scheduleRowWhen small {
+  color: var(--schedule-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.schedulePage .scheduleListRow .rowBody {
+  min-width: 0;
+  grid-column: 3;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 5px;
+}
+
+.scheduleRowTitleLine {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+}
+
+.schedulePage .scheduleListRow .rowTitle {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--schedule-text);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 26px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scheduleCategoryTag,
+.scheduleTypeTag {
+  min-width: 0;
+  height: 24px;
+  padding: 2px 8px;
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scheduleCategoryTag {
+  max-width: 80px;
+  color: var(--schedule-category);
+  background: var(--schedule-category-soft);
+}
+
+.scheduleTypeTag {
+  max-width: 96px;
+  color: var(--schedule-secondary);
+  background: var(--schedule-surface-subtle);
+}
+
+.schedulePage .scheduleListRow .rowMeta {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--schedule-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedulePage .scheduleListRow .rowEnd {
+  min-width: 0;
+  min-height: 72px;
+  grid-column: 4;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  grid-template-rows: repeat(2, minmax(28px, auto));
+  align-items: center;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0 0 0 18px;
+  border-top: 0;
+  border-left: 1px solid var(--schedule-border);
+}
+
+.schedulePage .scheduleListRow .rowEnd :is(.priorityPill, .neutralPill) {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 26px;
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+  padding: 3px 8px;
+  overflow: hidden;
+  border-radius: 7px;
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedulePage .scheduleListRow .rowEnd .rowDate {
+  min-width: 0;
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  overflow: hidden;
+  color: var(--schedule-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedulePage .scheduleListRow .rowEnd .rowDate svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  color: var(--so-brand, #0f6b61);
+}
+
+.schedulePage .scheduleListRow .inlineQuickAction {
+  width: 92px;
+  min-width: 92px;
+  min-height: 40px;
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: center;
+  justify-self: end;
+  padding: 8px 12px;
+  border-radius: 9px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.scheduleSummaryRail {
+  min-width: 0;
+  min-height: 0;
+  padding: 0 4px 18px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.scheduleSummaryCard {
+  min-width: 0;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--schedule-border);
+  border-radius: 14px;
+  background: var(--schedule-surface);
+  box-shadow: none;
+}
+
+.scheduleSummaryHeader {
+  min-height: 48px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--schedule-border);
+}
+
+.scheduleSummaryHeader strong {
+  color: var(--schedule-text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.scheduleSummaryHeader > span {
+  color: var(--schedule-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.scheduleSummaryList {
+  min-width: 0;
+  display: grid;
+}
+
+.scheduleSummaryList > button {
+  min-width: 0;
+  min-height: 66px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-bottom: 1px solid var(--schedule-border);
+  color: var(--schedule-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.scheduleSummaryList > button:hover {
+  background: var(--schedule-surface-hover);
+}
+
+.scheduleSummaryList > button:focus-visible,
+.scheduleSummaryFooter:focus-visible,
+.scheduleQuickActions > button:focus-visible {
+  outline: 2px solid var(--so-brand, #0f6b61);
+  outline-offset: -2px;
+}
+
+.scheduleSummaryIcon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--schedule-category);
+  background: var(--schedule-category-soft);
+}
+
+.scheduleSummaryIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.scheduleSummaryList > button > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.scheduleSummaryList > button > span:nth-child(2) strong,
+.scheduleSummaryList > button > span:nth-child(2) small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scheduleSummaryList > button > span:nth-child(2) strong {
+  color: var(--schedule-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.scheduleSummaryList > button > span:nth-child(2) small {
+  color: var(--schedule-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.scheduleSummaryPriority,
+.scheduleSummaryState {
+  max-width: 86px;
+  padding: 3px 7px;
+  overflow: hidden;
+  border-radius: 7px;
+  color: var(--schedule-priority, var(--schedule-secondary));
+  background: var(--schedule-priority-soft, var(--schedule-surface-subtle));
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scheduleSummaryState {
+  color: var(--schedule-secondary);
+  background: var(--schedule-surface-subtle);
+}
+
+.scheduleSummaryEmpty {
+  min-height: 64px;
+  margin: 0;
+  padding: 16px 14px;
+  display: grid;
+  place-items: center start;
+  color: var(--schedule-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.scheduleSummaryFooter {
+  width: calc(100% - 24px);
+  min-height: 38px;
+  margin: 10px 12px 12px;
+  padding: 7px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--schedule-border);
+  border-radius: 9px;
+  color: var(--so-brand, #0f6b61);
+  background: var(--schedule-surface);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.scheduleSummaryFooter:hover {
+  border-color: color-mix(in srgb, var(--so-brand, #0f6b61) 38%, var(--schedule-border));
+  background: var(--schedule-surface-hover);
+}
+
+.scheduleSummaryFooter svg {
+  width: 16px;
+  height: 16px;
+}
+
+.scheduleQuickActionsCard .scheduleSummaryHeader {
+  border-bottom: 0;
+}
+
+.scheduleQuickActions {
+  padding: 0 12px 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.scheduleQuickActions > button {
+  min-width: 0;
+  min-height: 54px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  border: 1px solid var(--schedule-border);
+  border-radius: 10px;
+  color: var(--schedule-text);
+  background: var(--schedule-surface);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.scheduleQuickActions > button:hover {
+  background: var(--schedule-surface-hover);
+}
+
+.scheduleQuickActions > button > span {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--so-brand, #0f6b61);
+  background: color-mix(in srgb, var(--so-brand, #0f6b61) 11%, var(--schedule-surface));
+}
+
+.scheduleQuickActions > button > span[data-tone='blue'] {
+  color: #356fbe;
+  background: color-mix(in srgb, #356fbe 12%, var(--schedule-surface));
+}
+
+.scheduleQuickActions > button > span[data-tone='violet'] {
+  color: #7462d8;
+  background: color-mix(in srgb, #7462d8 12%, var(--schedule-surface));
+}
+
+.scheduleQuickActions > button > span[data-tone='orange'] {
+  color: #c36a1d;
+  background: color-mix(in srgb, #c36a1d 12%, var(--schedule-surface));
+}
+
+.scheduleQuickActions > button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.scheduleTipCard {
+  min-height: 82px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.scheduleTipCard > svg {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  color: var(--so-brand, #0f6b61);
+}
+
+.scheduleTipCard strong {
+  color: var(--schedule-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.scheduleTipCard p {
+  margin: 3px 0 0;
+  color: var(--schedule-secondary);
+  font-size: 12px;
+  line-height: 19px;
+}
+
+.schedulePage .workspace[data-detail-open='true'] .scheduleSummaryRail {
+  display: none;
+}
+
+@container schedule-workspace-page (min-width: 1180px) {
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .masterToolbar {
+    grid-template-columns: minmax(470px, auto) minmax(260px, 1fr) minmax(180px, 220px);
+    align-items: center;
+    gap: 10px 12px;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleToolbarTop {
+    grid-column: 1;
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) minmax(190px, .72fr);
+    gap: 10px;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .searchBox {
+    grid-column: 2;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleAdvancedFilters {
+    grid-column: 3;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .categoryFilterBar {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(7, minmax(72px, 1fr));
+  }
+}
+
+@container schedule-workspace-page (max-width: 1079px) {
+  .scheduleContentGrid {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  .schedulePage .masterScroll {
+    height: auto !important;
+    min-height: 0;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .scheduleSummaryRail {
+    padding: 0 4px 18px 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    overflow: visible;
+  }
+}
+
+@container schedule-workspace-page (max-width: 900px) {
+  .schedulePage .scheduleListRow {
+    min-height: 154px;
+    grid-template-columns: 44px 92px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .schedulePage .scheduleListRow .rowIcon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .scheduleRowWhen {
+    min-height: 50px;
+    padding-left: 12px;
+  }
+
+  .schedulePage .scheduleListRow .rowBody {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .schedulePage .scheduleListRow .rowEnd {
+    min-height: 56px;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 92px;
+    grid-template-rows: minmax(40px, auto);
+    gap: 10px;
+    padding: 12px 0 0;
+    border-top: 1px solid var(--schedule-border);
+    border-left: 0;
+  }
+
+  .schedulePage .scheduleListRow .rowEnd :is(.priorityPill, .neutralPill),
+  .schedulePage .scheduleListRow .rowEnd .rowDate,
+  .schedulePage .scheduleListRow .inlineQuickAction {
+    grid-row: 1;
+  }
+
+  .schedulePage .scheduleListRow .rowEnd .rowDate {
+    grid-column: 2;
+  }
+
+  .schedulePage .scheduleListRow .inlineQuickAction {
+    grid-column: 3;
+  }
+}
+
+@container schedule-workspace-page (max-width: 700px) {
+  .scheduleSummaryRail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container schedule-workspace-page (max-width: 560px) {
+  .schedulePage .scheduleListRow {
+    min-height: 226px;
+    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+  }
+
+  .scheduleRowWhen {
+    grid-column: 2;
+    grid-row: 1;
+    border-left: 0;
+  }
+
+  .schedulePage .scheduleListRow .rowBody {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .schedulePage .scheduleListRow .rowEnd {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    grid-template-columns: minmax(0, 1fr) 92px;
+    grid-template-rows: auto auto;
+  }
+
+  .schedulePage .scheduleListRow .rowEnd .rowDate {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .schedulePage .scheduleListRow .inlineQuickAction {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+
+  .scheduleRowTitleLine {
+    flex-wrap: wrap;
+  }
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .schedulePage
+  .scheduleContentGrid {
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .schedulePage
+  .masterScroll {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .schedulePage
+  .scheduleSummaryRail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: visible;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .schedulePage
+  .workspace[data-detail-open='true']
+  .scheduleSummaryRail {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .schedulePage :is(.scheduleListRow, .scheduleSummaryList > button, .scheduleSummaryFooter) {
+    transition: none !important;
+  }
+}
+
+:global(html[data-desktop-reduce-motion='true'])
+  .schedulePage
+  :is(.scheduleListRow, .scheduleSummaryList > button, .scheduleSummaryFooter) {
+  transition: none !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Contacts reference completion authority
+ *
+ * The wide card geometry already matches the supplied reference. This layer
+ * makes that result explicit, fixes aria-current selection, preserves all
+ * three metrics during reflow and keeps zoomed popovers inside the viewport.
+ * ----------------------------------------------------------------------- */
+
+.contactsPopoverSurface {
+  max-height: var(--contacts-popover-max-height, 520px);
+}
+
+:global(.desktop-app-shell:is(.desktop-app-shell))
+  .contactsPage
+  .masterScroll:global(.desktop-contacts-list) {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.contactsPage .contactListRow {
+  margin: 0 !important;
+}
+
+.contactsPage .contactListRow + .contactListRow {
+  margin-top: 0 !important;
+}
+
+.contactsPage .contactListRow[aria-current='true'] {
+  border-color: var(--so-border-selected, #8db7ad) !important;
+  background: color-mix(in srgb, var(--so-brand, #177866) 7%, var(--contacts-surface)) !important;
+  box-shadow: inset 0 0 0 1px var(--so-border-selected, #8db7ad) !important;
+}
+
+.contactsPage .contactListRow[aria-current='true'] .contactRowChevron {
+  color: var(--so-brand, #177866) !important;
+  opacity: 1 !important;
+}
+
+:global(.desktop-app-shell:is(.desktop-app-shell))
+  .contactsPage
+  .contactListRow
+  :is(.contactInlineSelect, .contactInlineDate) {
+  box-sizing: border-box !important;
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+}
+
+:global(.desktop-app-shell:is(.desktop-app-shell))
+  .contactsPage
+  .contactListRow
+  .contactInlineSelect {
+  color: var(--contact-status-color, var(--contacts-text)) !important;
+  background-color: var(--contact-status-soft, var(--contacts-surface)) !important;
+}
+
+:global(.desktop-app-shell:is(.desktop-app-shell))
+  .contactsPage
+  .contactListRow
+  .contactInlineDate {
+  background-color: var(--contacts-surface) !important;
+}
+
+@container contacts-workspace-page (max-width: 760px) {
+  .contactsPage .contactListRow .rowEnd {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) 18px !important;
+    gap: 10px !important;
+  }
+
+  .contactsPage .contactRowMetric[data-contact-metric='last'] {
+    display: grid !important;
+  }
+
+  .contactsPage .contactRowMetric[data-contact-metric='next'] {
+    padding-left: 10px !important;
+    border-left: 1px solid var(--contacts-border) !important;
+  }
+}
+
+@container contacts-workspace-page (max-width: 620px) {
+  .contactsPage .contactListRow .rowEnd {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .contactsPage .contactRowMetric {
+    min-height: 58px !important;
+    padding: 10px 0 0 !important;
+    border-top: 1px solid var(--contacts-border) !important;
+    border-left: 0 !important;
+  }
+
+  .contactsPage .contactRowMetric[data-contact-metric='last'] {
+    display: grid !important;
+  }
+
+  .contactsPage .contactRowChevron {
+    display: none !important;
+  }
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .contactsPage
+  .pageHeader
+  .pageHeading {
+  width: 100% !important;
+  align-self: stretch !important;
+  text-align: left !important;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .contactsPage
+  .contactListRow
+  .rowEnd {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 10px !important;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .contactsPage
+  .contactRowMetric {
+  min-height: 58px !important;
+  display: grid !important;
+  padding: 10px 0 0 !important;
+  border-top: 1px solid var(--contacts-border) !important;
+  border-left: 0 !important;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']))
+  .contactsPage
+  .contactRowMetric[data-contact-metric='last'] {
+  display: grid !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contactsPage .contactListRow {
+    transition: none !important;
+  }
+}
+
+:global(html[data-desktop-reduce-motion='true']) .contactsPage .contactListRow {
+  transition: none !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Schedule detail-open stability authority
+ *
+ * The detail pane is an absolute side peek on wide desktop. When it opens,
+ * reserve its footprint exactly once: the summary rail track collapses and
+ * the toolbar/list share the same remaining collection width. Medium panes
+ * switch to the existing detail-only flow instead of compressing the list.
+ * ----------------------------------------------------------------------- */
+
+@container schedule-workspace-page (min-width: 1080px) {
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .scheduleContentGrid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .masterScroll {
+    box-sizing: border-box !important;
+    padding-right: clamp(440px, 42cqi, 560px) !important;
+    transition: none !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .masterToolbar {
+    transition: padding-right var(--motion-panel, 250ms) var(--motion-ease-standard, cubic-bezier(.2, 0, 0, 1));
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .masterToolbar {
+    box-sizing: border-box !important;
+    padding-right: calc(clamp(440px, 42cqi, 560px) + 16px) !important;
+    grid-template-columns: minmax(280px, 1fr) minmax(220px, .78fr) !important;
+    grid-template-rows: auto auto auto !important;
+    align-items: stretch !important;
+    gap: 10px 12px !important;
+    transition: none !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .scheduleToolbarTop {
+    grid-column: 1 !important;
+    grid-row: 1 / span 2 !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .searchBox {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .scheduleAdvancedFilters {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .categoryFilterBar {
+    grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .masterToolbar > .secondaryButton {
+    grid-column: 1 / -1 !important;
+    grid-row: 4 !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .scheduleListRow {
+    min-height: 154px !important;
+    grid-template-columns: 44px 92px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    gap: 12px !important;
+    padding: 14px !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .scheduleListRow .rowIcon {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .scheduleRowWhen {
+    min-height: 50px !important;
+    padding-left: 12px !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .scheduleListRow .rowBody {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .scheduleListRow .rowEnd {
+    min-height: 56px !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 92px !important;
+    grid-template-rows: minmax(40px, auto) !important;
+    gap: 10px !important;
+    padding: 12px 0 0 !important;
+    border-top: 1px solid var(--schedule-border) !important;
+    border-left: 0 !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .scheduleListRow .rowEnd :is(.priorityPill, .neutralPill),
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .scheduleListRow .rowEnd .rowDate,
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .scheduleListRow .inlineQuickAction {
+    grid-row: 1 !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .scheduleListRow .rowEnd .rowDate {
+    grid-column: 2 !important;
+  }
+
+  :global(.desktop-app-shell:not([data-zoom-level='150']):not([data-zoom-level='175']):not([data-zoom-level='200']))
+    .schedulePage
+    .workspace[data-detail-open='true']
+    .scheduleListRow .inlineQuickAction {
+    grid-column: 3 !important;
+  }
+}
+
+@container schedule-workspace-page (max-width: 1079px) {
+  .schedulePage .workspace[data-detail-open='true'] {
+    display: block !important;
+    grid-template-columns: none !important;
+  }
+
+  .schedulePage .workspace[data-detail-open='true'] .masterPane {
+    display: none !important;
+  }
+
+  .schedulePage .workspace[data-detail-open='true'] .detailPane {
+    position: static !important;
+    z-index: auto !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    overflow: hidden !important;
+    border-left: 0 !important;
+    border-radius: 0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    transform: none !important;
+    box-shadow: none !important;
+    transition: none !important;
+  }
+
+  .schedulePage .workspace[data-detail-open='true'] .backButton {
+    display: inline-flex !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .schedulePage .masterToolbar {
+    transition: none !important;
+  }
+}
+
+:global(html[data-desktop-reduce-motion='true']) .schedulePage .masterToolbar {
+  transition: none !important;
+}
+
+/* Shared surface finish for the two workspaces. Geometry remains route-owned. */
+:is(.schedulePage, .contactsPage) .masterToolbar {
+  border-radius: var(--product-radius-panel, 12px) !important;
+  box-shadow: none !important;
+}
+
+.schedulePage :is(.scheduleGroupRows, .scheduleSummaryCard) {
+  border-color: var(--so-border, var(--schedule-border)) !important;
+  border-radius: var(--product-radius-panel, 12px) !important;
+  background: var(--so-surface, var(--schedule-surface)) !important;
+  box-shadow: none !important;
+}
+
+.schedulePage .viewToggle button:hover {
+  color: var(--so-text, var(--schedule-text)) !important;
+  background: var(--so-surface-hover, var(--schedule-surface-hover)) !important;
+}
+
+.schedulePage .viewToggle button:active {
+  color: var(--so-text, var(--schedule-text)) !important;
+  background: var(--so-surface-pressed, var(--schedule-surface-hover)) !important;
+  transform: none !important;
+}
+
+.schedulePage .viewToggle button[aria-pressed='true'] {
+  color: var(--so-text, var(--schedule-text)) !important;
+  background: var(--so-surface, var(--schedule-surface)) !important;
+  box-shadow: inset 0 0 0 1px var(--so-border, var(--schedule-border)) !important;
+}
+
+.schedulePage :is(
+  .scheduleCategoryTag,
+  .scheduleTypeTag,
+  .priorityPill,
+  .neutralPill,
+  .statusPill
+) {
+  border-radius: var(--product-radius-tag, 5px) !important;
+}
+
+@media (forced-colors: active) {
+  .schedulePage :is(
+    .viewToggle button[aria-pressed='true'],
+    .categoryFilterButton[aria-pressed='true']
+  ) {
+    border-color: Highlight !important;
+    color: HighlightText !important;
+    background: Highlight !important;
+    box-shadow: none !important;
+    forced-color-adjust: none !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * Narrow-window schedule resilience authority
+ *
+ * The summary rail is supporting information, so it is removed before it can
+ * collide with the primary agenda.  Agenda rows then use three explicit
+ * stacked bands instead of allowing the earlier wide four-track selector to
+ * create horizontal overflow.
+ * ----------------------------------------------------------------------- */
+@container schedule-workspace-page (max-width: 1079px) {
+  .schedulePage .workspace[data-detail-open='false'] .scheduleContentGrid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .schedulePage .workspace[data-detail-open='false'] .scheduleSummaryRail {
+    display: none !important;
+  }
+}
+
+@container schedule-workspace-page (max-width: 700px) {
+  :global(.desktop-app-shell:is(.desktop-app-shell))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleListRow {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 226px !important;
+    grid-template-columns: 44px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto !important;
+    align-items: start !important;
+    gap: 12px !important;
+    padding: 14px !important;
+    overflow: hidden !important;
+  }
+
+  :global(.desktop-app-shell:is(.desktop-app-shell))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleListRow .rowIcon {
+    width: 44px !important;
+    height: 44px !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  :global(.desktop-app-shell:is(.desktop-app-shell))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleRowWhen {
+    min-width: 0 !important;
+    min-height: 44px !important;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    padding-left: 0 !important;
+    border-left: 0 !important;
+  }
+
+  :global(.desktop-app-shell:is(.desktop-app-shell))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleListRow .rowBody {
+    min-width: 0 !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+  }
+
+  :global(.desktop-app-shell:is(.desktop-app-shell))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleListRow .rowEnd {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 74px !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 92px !important;
+    grid-template-rows: auto auto !important;
+    gap: 8px 10px !important;
+    padding: 12px 0 0 !important;
+    overflow: hidden !important;
+    border-top: 1px solid var(--schedule-border) !important;
+    border-left: 0 !important;
+  }
+
+  :global(.desktop-app-shell:is(.desktop-app-shell))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleListRow .rowEnd :is(.priorityPill, .neutralPill) {
+    min-width: 0 !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    justify-self: start !important;
+  }
+
+  :global(.desktop-app-shell:is(.desktop-app-shell))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleListRow .rowEnd .rowDate {
+    min-width: 0 !important;
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    justify-self: start !important;
+  }
+
+  :global(.desktop-app-shell:is(.desktop-app-shell))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleListRow .inlineQuickAction {
+    width: 92px !important;
+    min-width: 92px !important;
+    max-width: 92px !important;
+    grid-column: 2 !important;
+    grid-row: 1 / 3 !important;
+    justify-self: end !important;
+  }
+
+  .schedulePage .workspace[data-detail-open='false'] .scheduleRowTitleLine {
+    flex-wrap: wrap !important;
+  }
+}
+
+@media (max-height: 640px) {
+  :global(.desktop-app-shell:is(.desktop-app-shell))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .masterPane {
+    display: block !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    scrollbar-gutter: stable !important;
+    overscroll-behavior: contain !important;
+  }
+
+  :global(.desktop-app-shell:is(.desktop-app-shell))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .masterToolbar {
+    box-sizing: border-box !important;
+    height: auto !important;
+    min-height: max-content !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  :global(.desktop-app-shell:is(.desktop-app-shell))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleContentGrid {
+    width: 100% !important;
+    min-height: 320px !important;
+    margin-top: 12px !important;
+    overflow: visible !important;
+  }
+
+  :global(.desktop-app-shell:is(.desktop-app-shell))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .masterScroll,
+  :global(.desktop-app-shell:is(.desktop-app-shell))
+    .schedulePage
+    .workspace[data-detail-open='false']
+    .scheduleSummaryRail {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
