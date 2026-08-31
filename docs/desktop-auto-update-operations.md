@@ -272,6 +272,31 @@ releases/seekoffer-desktop/v<version>-<channel>/updater-site/
 
 同一个 Tag 已存在时 Workflow 直接失败，不能使用 `--clobber` 覆盖已公开资产。
 
+## 组装完整 updater-site 候选
+
+单次 Stable 构建只包含当前版本资产，不能直接覆盖生产 updater-site，否则会删除历史不可变安装包与回滚锚点。公开 GitHub Release 并下载、验签 Stable Workflow 产物后，必须以已经验证的生产目录为基线组装一个全新目录：
+
+```powershell
+npm run desktop:updater:compose -- `
+  --base <已验证的生产 updater-site> `
+  --candidate <本次 Stable Workflow updater-site> `
+  --output <全新的 promotion-candidate 目录> `
+  --version <version>
+```
+
+组装器会 fail closed：
+
+- Internal-test 只有 `internal-test/latest.json`，缺少根清单和 Stable 清单，因此不能被提升。
+- 候选版本必须严格高于生产 Stable；同版本不得重打或覆盖。
+- 根 `latest.json` 与 `stable/latest.json` 必须逐字节一致。
+- 安装包和 `.sig` 必须与 `SHA256SUMS.txt` 一致，清单签名必须与 `.sig` 一致。
+- 清单 URL 必须绑定当前 `desktop-v<version>` 不可变路径。
+- 候选与生产的缓存/CORS 策略必须一致。
+- 输出目录必须是全新目录；组装器不覆盖旧候选。
+- 生产历史文件逐文件 SHA-256 保持不变，新版本资产逐文件 SHA-256 与 Workflow 候选一致。
+
+组装完成后，先把输出目录部署到 Preview，完成下载回读、Minisign、Authenticode、历史资产和清单复核；只有 Preview 全部通过，才允许 Promote 到生产。
+
 ## Vercel 手动部署门禁
 
 部署前必须确认：

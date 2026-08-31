@@ -17,6 +17,7 @@
     "desktop:bundle": "tauri bundle --bundles nsis --config ./src-tauri/tauri.release.conf.json",
     "desktop:build": "npm run desktop:compile && npm run desktop:bundle",
     "desktop:package": "node ./scripts/package-desktop-release.mjs",
+    "desktop:updater:compose": "node ./scripts/compose-desktop-updater-site.mjs",
     "desktop:release": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/invoke-desktop-signed-release.ps1",
     "desktop:release:local-signed": "npm run desktop:release",
     "extension:icons": "node ./scripts/generate-fill-assistant-icons.mjs",

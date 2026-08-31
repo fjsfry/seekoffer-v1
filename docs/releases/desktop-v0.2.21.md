@@ -42,6 +42,7 @@
 - Sharp 提升到 `0.35.4`，使用修复后的 libvips 依赖。
 - Nano ID、brace-expansion 与 js-yaml 的间接依赖均锁定到修补版本。
 - 正式发行只接受官方 npm registry 的完整审计结果；不会使用 `--force` 绕过不兼容升级。
+- 新增 fail-closed updater-site 组装器：保留生产历史资产，只允许已验签 Stable 候选单调提升根/Stable 清单，拒绝内部包、同版本覆盖、哈希漂移和策略漂移。
 
 ## 发布边界
 
