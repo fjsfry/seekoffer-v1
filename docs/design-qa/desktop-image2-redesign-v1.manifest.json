@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "sourceDirectory": "artifacts/desktop-image2-redesign-v1",
+  "note": "The local bitmap concepts are QA inputs, not release-source assets. This manifest preserves their immutable identity without committing browser or artifact directories.",
+  "files": [
+    {
+      "file": "01-workbench.png",
+      "bytes": 1120609,
+      "sha256": "A4012487BFEA2C76E1C39F701AF7B4005C40EEE0471A7A93ACDEDF5A40A8BE1B"
+    },
+    {
+      "file": "02-settings.png",
+      "bytes": 913941,
+      "sha256": "22B6C12386E237F3FDBF673791BE98038B10ED581A02939073D884B2BA77A9FE"
+    },
+    {
+      "file": "03-information-library.png",
+      "bytes": 1265961,
+      "sha256": "9C5FE4631240988F403953DE95B061EEBCE946FABCE2A3F6C53F560D3A49228D"
+    },
+    {
+      "file": "04-schedule.png",
+      "bytes": 963867,
+      "sha256": "A485D44E8AD91E43FE9E8856A6E015504D665FCB5E1142EE0FB3F0D9935312DA"
+    }
+  ]
+}

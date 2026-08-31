@@ -2,7 +2,13 @@ import { FeedbackEntry } from './feedback-entry';
 import { SiteFooter } from './site-footer';
 import { SiteHeader } from './site-header';
 
+const isDesktopSurface = process.env.NEXT_PUBLIC_SEEKOFFER_SURFACE === 'desktop';
+
 export function SiteShell({ children }: { children: React.ReactNode }) {
+  if (isDesktopSurface) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="min-h-screen overflow-x-clip">
       <a
