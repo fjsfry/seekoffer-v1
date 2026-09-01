@@ -170,10 +170,13 @@ describe('desktop core information route design contract', () => {
   });
 
   it('keeps the last successful online snapshot when a manual refresh fails', () => {
-    expect(noticeSource).toContain('const hasOnlineSnapshotRef = useRef(false)');
-    expect(noticeSource).toContain("setLoadError('本次刷新失败，继续展示上次同步成功的通知。')");
-    expect(collegeSource).toContain('const hasOnlineSnapshotRef = useRef(false)');
-    expect(collegeSource).toContain("setNoticeSyncStatus('stale')");
+    expect(noticeSource).toContain('const [initialPublicNoticeSnapshot] = useState(() => getPublicNoticeSnapshot())');
+    expect(noticeSource).toContain('const hasOnlineSnapshotRef = useRef(initialPublicNoticeSnapshot.syncedAt !== null)');
+    expect(noticeSource).toContain("result.source === 'stale'");
+    expect(noticeSource).toContain('本次同步未完成，继续展示上次同步成功的通知。');
+    expect(collegeSource).toContain('const [initialPublicNoticeSnapshot] = useState(() => getPublicNoticeSnapshot())');
+    expect(collegeSource).toContain('const hasOnlineSnapshotRef = useRef(initialPublicNoticeSnapshot.syncedAt !== null)');
+    expect(collegeSource).toContain("result.source === 'stale' ? 'stale' : 'fallback'");
     expect(collegeSource).toContain("title={noticeSyncStatus === 'stale' ? '本次刷新失败' : '当前显示本地院校数据'}");
   });
 

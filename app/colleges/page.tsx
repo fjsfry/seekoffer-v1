@@ -22,7 +22,7 @@ import {
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { DesktopStateSurface } from '@/components/desktop-state-surface';
 import { SiteShell } from '@/components/site-shell';
-import { fetchPublicNotices } from '@/lib/cloudbase-data';
+import { getPublicNoticeSnapshot, loadPublicNotices } from '@/lib/cloudbase-data';
 import { collegeDirectory } from '@/lib/college-directory';
 import { buildCollegeNoticeStats } from '@/lib/notice-analytics';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
@@ -361,6 +361,7 @@ function DesktopCollegePagination({
 }
 
 export default function CollegesPage() {
+  const [initialPublicNoticeSnapshot] = useState(() => getPublicNoticeSnapshot());
   const [keyword, setKeyword] = useState('');
   const [city, setCity] = useState(allCityLabel);
   const [group, setGroup] = useState(allGroupLabel);
@@ -369,28 +370,47 @@ export default function CollegesPage() {
   const [showAllCities, setShowAllCities] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('active');
   const [viewRestored, setViewRestored] = useState(false);
-  const [noticeSyncStatus, setNoticeSyncStatus] = useState<CollegeNoticeSyncStatus>('loading');
-  const [noticeSyncAttemptedAt, setNoticeSyncAttemptedAt] = useState<Date | null>(null);
+  const [noticeSyncStatus, setNoticeSyncStatus] = useState<CollegeNoticeSyncStatus>(() => {
+    if (initialPublicNoticeSnapshot.error) {
+      return initialPublicNoticeSnapshot.source === 'stale' ? 'stale' : 'fallback';
+    }
+    return initialPublicNoticeSnapshot.syncedAt === null ? 'loading' : 'online';
+  });
+  const [noticeSyncAttemptedAt, setNoticeSyncAttemptedAt] = useState<Date | null>(() =>
+    initialPublicNoticeSnapshot.attemptedAt
+      ? new Date(initialPublicNoticeSnapshot.attemptedAt)
+      : null
+  );
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
-    filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
+    initialPublicNoticeSnapshot.rows.filter((item) => String(item.year) === '2026')
   );
   const pageRef = useRef<HTMLDivElement>(null);
   const scrollTopRef = useRef(0);
   const requestSequenceRef = useRef(0);
-  const hasOnlineSnapshotRef = useRef(false);
+  const hasOnlineSnapshotRef = useRef(initialPublicNoticeSnapshot.syncedAt !== null);
   const filterKey = `${keyword.trim().toLowerCase()}|${city}|${group}|${sortBy}`;
 
-  const loadProjects = useCallback(async () => {
+  const loadProjects = useCallback(async (options: { force?: boolean } = {}) => {
     const requestSequence = requestSequenceRef.current + 1;
     requestSequenceRef.current = requestSequence;
-    setNoticeSyncStatus('loading');
-    setNoticeSyncAttemptedAt(new Date());
+    const cachedSnapshot = getPublicNoticeSnapshot();
+    if (cachedSnapshot.rows.length > 0 || cachedSnapshot.syncedAt !== null) {
+      setProjects(cachedSnapshot.rows.filter((item) => String(item.year) === '2026'));
+    }
+    if (cachedSnapshot.syncedAt === null && !cachedSnapshot.error) {
+      setNoticeSyncStatus('loading');
+    }
     try {
-      const rows = await fetchPublicNotices({ refresh: true });
+      const result = await loadPublicNotices({ refresh: options.force === true });
       if (requestSequenceRef.current !== requestSequence) return;
-      setProjects(rows.filter((item) => String(item.year) === '2026'));
-      hasOnlineSnapshotRef.current = true;
-      setNoticeSyncStatus('online');
+      setProjects(result.rows.filter((item) => String(item.year) === '2026'));
+      setNoticeSyncAttemptedAt(result.attemptedAt ? new Date(result.attemptedAt) : null);
+      hasOnlineSnapshotRef.current = result.syncedAt !== null;
+      if (result.error) {
+        setNoticeSyncStatus(result.source === 'stale' ? 'stale' : 'fallback');
+      } else {
+        setNoticeSyncStatus(result.syncedAt === null ? 'fallback' : 'online');
+      }
     } catch {
       if (requestSequenceRef.current !== requestSequence) return;
       if (hasOnlineSnapshotRef.current) {
@@ -747,7 +767,7 @@ export default function CollegesPage() {
             ? `继续展示上次同步成功的院校统计。上次尝试 ${formatSyncTime(noticeSyncAttemptedAt)}。`
             : `在线通知暂时不可用；本地数据可以继续浏览。上次尝试 ${formatSyncTime(noticeSyncAttemptedAt)}。`}
           action={(
-            <button type="button" className="desktop-setting-secondary-button" onClick={() => void loadProjects()}>
+            <button type="button" className="desktop-setting-secondary-button" onClick={() => void loadProjects({ force: true })}>
               重新同步
             </button>
           )}

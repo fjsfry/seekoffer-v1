@@ -269,12 +269,31 @@ async function createFixture() {
   };
 }
 
-function runPackagingScript(fixture, environment = {}) {
+const RELEASE_ENVIRONMENT_KEYS = new Set([
+  'DESKTOP_UPDATE_ASSET_BASE_URL',
+  'GITHUB_REF',
+  'GITHUB_REF_NAME',
+  'GITHUB_REPOSITORY',
+  'TAURI_SIGNING_PRIVATE_KEY',
+  'TAURI_SIGNING_PRIVATE_KEY_PASSWORD',
+  'WINDOWS_CERTIFICATE',
+  'WINDOWS_CERTIFICATE_BASE64',
+  'WINDOWS_CERTIFICATE_PASSWORD'
+]);
+
+function runPackagingScript(fixture, environment = {}, inheritedEnvironment = process.env) {
+  const isolatedEnvironment = { ...inheritedEnvironment };
+  for (const key of Object.keys(isolatedEnvironment)) {
+    if (key.startsWith('SEEKOFFER_') || RELEASE_ENVIRONMENT_KEYS.has(key)) {
+      delete isolatedEnvironment[key];
+    }
+  }
+
   return spawnSync(process.execPath, [fixture.scriptPath], {
     cwd: fixture.root,
     encoding: 'utf8',
     env: {
-      ...process.env,
+      ...isolatedEnvironment,
       CARGO_NET_OFFLINE: 'true',
       CARGO_TARGET_DIR: path.join(fixture.root, '.cargo-target'),
       ...environment
@@ -382,6 +401,44 @@ describe('desktop release packaging guard', () => {
         SEEKOFFER_ALLOW_INTERNAL_REPACKAGE: 'true'
       });
       expect(allowed.status, allowed.stderr).toBe(0);
+    },
+    15_000
+  );
+
+  it(
+    'isolates fixture packaging from tag-runner release environment variables',
+    async () => {
+      const fixture = await createFixture();
+      const result = runPackagingScript(
+        fixture,
+        {},
+        {
+          ...process.env,
+          GITHUB_REF: 'refs/tags/desktop-v0.2.22',
+          GITHUB_REF_NAME: 'desktop-v0.2.22',
+          GITHUB_REPOSITORY: 'example/contaminated-repository',
+          SEEKOFFER_CURRENT_STABLE_VERSION: '0.2.21',
+          SEEKOFFER_RELEASE_CHANNEL: 'stable',
+          SEEKOFFER_RELEASE_TAG: 'desktop-v0.2.22',
+          SEEKOFFER_RELEASE_VERSION: '0.2.22',
+          SEEKOFFER_REPOSITORY_VISIBILITY: 'public',
+          SEEKOFFER_REQUIRE_CLEAN_SOURCE: 'true',
+          SEEKOFFER_REQUIRE_PUBLIC_REPOSITORY: 'true',
+          SEEKOFFER_REQUIRE_RELEASE_TAG: 'true',
+          SEEKOFFER_REQUIRE_VALID_AUTHENTICODE: 'true'
+        }
+      );
+
+      expect(result.status, result.stderr).toBe(0);
+      await expect(
+        readFile(
+          path.join(
+            fixture.root,
+            'releases/seekoffer-desktop/v0.2.5-internal-test/public/latest.json'
+          ),
+          'utf8'
+        )
+      ).resolves.toContain('"version": "0.2.5"');
     },
     15_000
   );
@@ -570,7 +627,7 @@ describe('desktop release packaging guard', () => {
     expect(output).toContain('"cargoLock":"9.9.9"');
   });
 
-  it('keeps the current desktop release metadata aligned at v0.2.21', async () => {
+  it('keeps the current desktop release metadata aligned at v0.2.22', async () => {
     const [packageRaw, packageLockRaw, tauriRaw, cargoTomlRaw, cargoLockRaw, releaseNotes, designQa] =
       await Promise.all([
         readFile(path.join(projectRoot, 'package.json'), 'utf8'),
@@ -578,8 +635,8 @@ describe('desktop release packaging guard', () => {
         readFile(path.join(projectRoot, 'src-tauri/tauri.conf.json'), 'utf8'),
         readFile(path.join(projectRoot, 'src-tauri/Cargo.toml'), 'utf8'),
         readFile(path.join(projectRoot, 'src-tauri/Cargo.lock'), 'utf8'),
-        readFile(path.join(projectRoot, 'docs/releases/desktop-v0.2.21.md'), 'utf8'),
-        readFile(path.join(projectRoot, 'docs/design-qa/desktop-app-v0.2.21.md'), 'utf8')
+        readFile(path.join(projectRoot, 'docs/releases/desktop-v0.2.22.md'), 'utf8'),
+        readFile(path.join(projectRoot, 'docs/design-qa/desktop-app-v0.2.22.md'), 'utf8')
       ]);
 
     const packageJson = JSON.parse(packageRaw);
@@ -592,7 +649,7 @@ describe('desktop release packaging guard', () => {
       /\[\[package\]\]\s*\nname\s*=\s*"seekoffer-desktop"\s*\nversion\s*=\s*"([^"]+)"/
     )?.[1];
 
-    expect(packageJson.version).toBe('0.2.21');
+    expect(packageJson.version).toBe('0.2.22');
     expect(packageLock.version).toBe(packageJson.version);
     expect(packageLock.packages[''].version).toBe(packageJson.version);
     expect(tauriConfig.version).toBe(packageJson.version);
@@ -602,7 +659,7 @@ describe('desktop release packaging guard', () => {
     ]);
     expect(cargoPackageVersion).toBe(packageJson.version);
     expect(cargoLockPackageVersion).toBe(packageJson.version);
-    expect(releaseNotes).toContain('v0.2.21');
-    expect(designQa).toContain('v0.2.21');
+    expect(releaseNotes).toContain('v0.2.22');
+    expect(designQa).toContain('v0.2.22');
   });
 });

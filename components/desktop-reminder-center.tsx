@@ -629,7 +629,9 @@ export function DesktopReminderCenter({
         const rows = await withReminderSyncTimeout(
           (async () => {
             if (refreshNotices) {
-              await fetchPublicNotices({ refresh: true });
+              // Public notices use a shared five-minute SWR cache. The timer
+              // revalidates only when stale and joins any page-level request.
+              await fetchPublicNotices();
             }
             return fetchApplicationRows(session?.userId || undefined);
           })()
@@ -656,10 +658,10 @@ export function DesktopReminderCenter({
 
     void refresh();
     const dispose = watchApplicationTable(() => void refresh());
-    const intervalTimer = window.setInterval(
-      () => void refresh(true),
-      REMINDER_REFRESH_MS
-    );
+    const intervalTimer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return;
+      void refresh(true);
+    }, REMINDER_REFRESH_MS);
     return () => {
       active = false;
       if (retryTimer !== null) window.clearTimeout(retryTimer);

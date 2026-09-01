@@ -1,6 +1,6 @@
 [package]
 name = "seekoffer-desktop"
-version = "0.2.21"
+version = "0.2.22"
 description = "寻鹿 SeekOffer 桌面客户端"
 authors = ["SeekOffer"]
 homepage = "https://www.seekoffer.com.cn"

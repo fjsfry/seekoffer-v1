@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "寻鹿 SeekOffer",
-  "version": "0.2.21",
+  "version": "0.2.22",
   "identifier": "com.seekoffer.desktop",
   "build": {
     "beforeDevCommand": "npm run dev:desktop -- --hostname 127.0.0.1 --port 3000",

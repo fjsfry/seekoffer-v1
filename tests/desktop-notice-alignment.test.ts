@@ -122,13 +122,19 @@ describe('desktop notice-library alignment contract', () => {
   });
 
   it('aligns every notice card to stable logo, copy, deadline and two-action tracks', () => {
+    const card = declarationsForBaseSelector('.desktop-notice-card');
     const layout = declarationsForBaseSelector('.desktop-notice-card-layout');
     const logo = declarationsForBaseSelector('.desktop-notice-card-layout > :first-child');
     const copy = declarationsForBaseSelector('.desktop-notice-card-copy');
     const actions = declarationsForBaseSelector('.desktop-notice-card-actions');
+    const buttons = declarationsForBaseSelector('.desktop-notice-card-actions > .desktop-notice-card-buttons');
     const deadline = declarationsForBaseSelector('.desktop-notice-card-deadline');
 
+    expect(card.get('min-height')).toBe('0');
+    expect(layout.get('height')).toBe('auto');
     expect(layout.get('grid-template-columns')).toBe('88px minmax(0, 1fr) 190px');
+    expect(layout.get('grid-template-rows')).toBe('auto');
+    expect(layout.get('align-items')).toBe('start');
 
     expect(logo.get('width')).toBe('88px');
     expect(logo.get('height')).toBe('88px');
@@ -142,8 +148,15 @@ describe('desktop notice-library alignment contract', () => {
 
     expect(actions.get('width')).toBe('190px');
     expect(actions.get('display')).toBe('grid');
-    expect(actions.get('grid-template-rows')?.trim().split(/\s+/)).toHaveLength(2);
-    expect(actions.get('align-content')).toMatch(/^(?:start|stretch)$/);
+    expect(actions.get('height')).toBe('auto');
+    expect(actions.get('min-height')).toBe('0');
+    expect(actions.get('grid-template-rows')).toBe('auto auto');
+    expect(actions.get('grid-template-rows')).not.toContain('fr');
+    expect(actions.get('align-self')).toBe('start');
+    expect(actions.get('align-content')).toBe('start');
+    expect(buttons.get('align-self')).toBe('start');
+    expect(buttons.get('align-self')).not.toBe('end');
+    expect(buttons.get('margin-top')).toBe('8px');
     expect(deadline.get('width')).toBe('100%');
     expect(deadline.get('justify-self')).toBe('stretch');
   });

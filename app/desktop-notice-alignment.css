@@ -74,7 +74,7 @@
 }
 
 .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card {
-  min-height: 220px !important;
+  min-height: 0 !important;
   padding: 20px !important;
   border: 1px solid var(--so-border) !important;
   border-radius: 18px !important;
@@ -83,10 +83,11 @@
 }
 
 .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-layout {
+  height: auto !important;
   grid-template-columns: 88px minmax(0, 1fr) 190px !important;
-  grid-template-rows: minmax(0, 1fr) !important;
+  grid-template-rows: auto !important;
   gap: 20px !important;
-  align-items: stretch !important;
+  align-items: start !important;
 }
 
 .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-layout > :first-child {
@@ -174,11 +175,13 @@
 .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-actions {
   display: grid !important;
   width: 190px !important;
-  min-height: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
   grid-column: 3 !important;
   grid-row: 1 !important;
-  grid-template-rows: auto 1fr !important;
-  align-content: stretch !important;
+  grid-template-rows: auto auto !important;
+  align-self: start !important;
+  align-content: start !important;
   justify-items: stretch !important;
   padding-left: 20px !important;
   border-left: 1px solid var(--so-divider) !important;
@@ -207,9 +210,9 @@
   .desktop-notice-card-actions > .desktop-notice-card-buttons {
   width: 100% !important;
   max-width: 100% !important;
-  align-self: end !important;
+  align-self: start !important;
   grid-template-columns: minmax(0, 1fr) !important;
-  margin-top: 0 !important;
+  margin-top: 8px !important;
   gap: 10px !important;
 }
 
@@ -290,7 +293,7 @@
 }
 
 .desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-card {
-  min-height: 188px !important;
+  min-height: 0 !important;
   padding: 14px !important;
 }
 

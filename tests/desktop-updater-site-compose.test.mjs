@@ -72,22 +72,22 @@ describe('desktop updater-site composition', () => {
     const base = path.join(root, 'base');
     const candidate = path.join(root, 'candidate');
     const output = path.join(root, 'output');
-    await writeStableSite(base, '0.2.19');
+    await writeStableSite(base, '0.2.21');
     await writeFile(path.join(base, 'artifacts', 'historical-anchor.txt'), 'keep-me');
-    await writeStableSite(candidate, '0.2.21');
+    await writeStableSite(candidate, '0.2.22');
 
     const result = await composeDesktopUpdaterSite({
       baseDirectory: base,
       candidateDirectory: candidate,
       outputDirectory: output,
-      expectedVersion: '0.2.21'
+      expectedVersion: '0.2.22'
     });
 
-    expect(result).toMatchObject({ baseVersion: '0.2.19', version: '0.2.21' });
+    expect(result).toMatchObject({ baseVersion: '0.2.21', version: '0.2.22' });
     const rootManifest = await readFile(path.join(output, 'latest.json'));
     const stableManifest = await readFile(path.join(output, 'stable', 'latest.json'));
     expect(rootManifest.equals(stableManifest)).toBe(true);
-    expect(JSON.parse(rootManifest).version).toBe('0.2.21');
+    expect(JSON.parse(rootManifest).version).toBe('0.2.22');
     expect(await readFile(path.join(output, 'artifacts', 'historical-anchor.txt'), 'utf8')).toBe(
       'keep-me'
     );
@@ -96,8 +96,8 @@ describe('desktop updater-site composition', () => {
         path.join(
           output,
           'artifacts',
-          'desktop-v0.2.21',
-          'SeekOffer-Desktop-v0.2.21-Windows-x64-Setup.exe'
+          'desktop-v0.2.22',
+          'SeekOffer-Desktop-v0.2.22-Windows-x64-Setup.exe'
         )
       )
     ).resolves.toBeInstanceOf(Buffer);
@@ -107,7 +107,7 @@ describe('desktop updater-site composition', () => {
     const root = await createRoot();
     const base = path.join(root, 'base');
     const candidate = path.join(root, 'candidate');
-    await writeStableSite(base, '0.2.19');
+    await writeStableSite(base, '0.2.21');
     await mkdir(path.join(candidate, 'internal-test'), { recursive: true });
     await writeFile(path.join(candidate, 'internal-test', 'latest.json'), '{}');
 
@@ -124,8 +124,8 @@ describe('desktop updater-site composition', () => {
     const root = await createRoot();
     const base = path.join(root, 'base');
     const candidate = path.join(root, 'candidate');
-    await writeStableSite(base, '0.2.19');
-    await writeStableSite(candidate, '0.2.19');
+    await writeStableSite(base, '0.2.21');
+    await writeStableSite(candidate, '0.2.21');
 
     await expect(
       composeDesktopUpdaterSite({
@@ -140,8 +140,8 @@ describe('desktop updater-site composition', () => {
     const root = await createRoot();
     const base = path.join(root, 'base');
     const candidate = path.join(root, 'candidate');
-    await writeStableSite(base, '0.2.19');
-    await writeStableSite(candidate, '0.2.21', { validSums: false });
+    await writeStableSite(base, '0.2.21');
+    await writeStableSite(candidate, '0.2.22', { validSums: false });
 
     await expect(
       composeDesktopUpdaterSite({
@@ -157,8 +157,8 @@ describe('desktop updater-site composition', () => {
     const base = path.join(root, 'base');
     const candidate = path.join(root, 'candidate');
     const output = path.join(root, 'output');
-    await writeStableSite(base, '0.2.19');
-    await writeStableSite(candidate, '0.2.21');
+    await writeStableSite(base, '0.2.21');
+    await writeStableSite(candidate, '0.2.22');
     await mkdir(output);
 
     await expect(

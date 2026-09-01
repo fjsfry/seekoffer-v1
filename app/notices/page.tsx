@@ -21,7 +21,7 @@ import { DesktopStateSurface } from '@/components/desktop-state-surface';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge } from '@/components/status-badge';
-import { fetchPublicNotices } from '@/lib/cloudbase-data';
+import { getPublicNoticeSnapshot, loadPublicNotices } from '@/lib/cloudbase-data';
 import {
   getDaysUntilDeadline,
   getDeadlineDistanceLabel,
@@ -474,15 +474,27 @@ function NoticesPageContent() {
   const searchParams = useSearchParams();
   const initialUrlState = useMemo(() => parseNoticeListUrlState(searchParams), [searchParams]);
   const initialNoticeState = initialUrlState || defaultNoticeListState;
+  const [initialPublicNoticeSnapshot] = useState(() => getPublicNoticeSnapshot());
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
-    filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
+    initialPublicNoticeSnapshot.rows.filter((item) => String(item.year) === '2026')
   );
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(
+    initialPublicNoticeSnapshot.rows.length === 0 && initialPublicNoticeSnapshot.syncedAt === null
+  );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
-  const [lastLoadedAt, setLastLoadedAt] = useState('');
-  const [loadError, setLoadError] = useState('');
-  const hasOnlineSnapshotRef = useRef(false);
+  const [lastLoadedAt, setLastLoadedAt] = useState(() =>
+    initialPublicNoticeSnapshot.syncedAt
+      ? getBeijingTimeString(new Date(initialPublicNoticeSnapshot.syncedAt))
+      : ''
+  );
+  const [loadError, setLoadError] = useState(() => {
+    if (!initialPublicNoticeSnapshot.error) return '';
+    return initialPublicNoticeSnapshot.source === 'stale'
+      ? '本次同步未完成，继续展示上次同步成功的通知。'
+      : '通知同步暂时不可用，已展示本地兜底数据。';
+  });
+  const hasOnlineSnapshotRef = useRef(initialPublicNoticeSnapshot.syncedAt !== null);
   const [keyword, setKeyword] = useState(initialNoticeState.keyword);
   const [schoolName, setSchoolName] = useState(initialNoticeState.schoolName);
   const [region, setRegion] = useState(initialNoticeState.region);
@@ -581,16 +593,30 @@ function NoticesPageContent() {
   useEffect(() => {
     let active = true;
 
-    async function loadPublicNotices() {
-      setIsLoading(true);
+    async function synchronizePublicNotices() {
+      const cachedSnapshot = getPublicNoticeSnapshot();
+      const hasDisplaySnapshot = cachedSnapshot.rows.length > 0 || cachedSnapshot.syncedAt !== null;
+      if (hasDisplaySnapshot) {
+        setProjects(cachedSnapshot.rows.filter((item) => String(item.year) === '2026'));
+      }
+      setIsLoading(!hasDisplaySnapshot);
       setLoadError('');
 
       try {
-        const rows = await fetchPublicNotices({ refresh: reloadToken > 0 });
+        const result = await loadPublicNotices({ refresh: reloadToken > 0 });
         if (active) {
-          setProjects(rows.filter((item) => String(item.year) === '2026'));
-          hasOnlineSnapshotRef.current = true;
-          setLastLoadedAt(getBeijingTimeString());
+          setProjects(result.rows.filter((item) => String(item.year) === '2026'));
+          hasOnlineSnapshotRef.current = result.syncedAt !== null;
+          if (result.syncedAt !== null) {
+            setLastLoadedAt(getBeijingTimeString(new Date(result.syncedAt)));
+          }
+          if (result.error) {
+            setLoadError(
+              result.source === 'stale'
+                ? '本次同步未完成，继续展示上次同步成功的通知。'
+                : '通知同步暂时不可用，已展示本地兜底数据。'
+            );
+          }
         }
       } catch {
         if (active) {
@@ -609,7 +635,7 @@ function NoticesPageContent() {
       }
     }
 
-    void loadPublicNotices();
+    void synchronizePublicNotices();
 
     return () => {
       active = false;

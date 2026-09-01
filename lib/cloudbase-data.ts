@@ -16,6 +16,10 @@ import { filterMainNoticeProjects } from './notice-quality';
 import { baseNoticeProjects } from './notice-source';
 import { canCreateMoreApplications } from './billing-api';
 import { createKeyedSyncRetryCoordinator } from './keyed-sync-retry';
+import {
+  createStaleWhileRevalidateCache,
+  type StaleWhileRevalidateSnapshot
+} from './stale-while-revalidate-cache';
 
 const APPLICATION_STORAGE_KEY = 'seekoffer-my-application-table';
 const MANUAL_PROJECT_STORAGE_KEY = 'seekoffer-manual-projects';
@@ -24,6 +28,10 @@ const WORKSPACE_STORAGE_VERSION = 2;
 const NOTICE_TARGET_YEAR = 2026;
 const PUBLIC_NOTICE_QUERY_LIMIT = 5000;
 const PUBLIC_NOTICE_QUERY_PAGE_SIZE = 1000;
+export const PUBLIC_NOTICE_CACHE_KEY = 'public-notices:v1:year=2026:published';
+export const PUBLIC_NOTICE_CACHE_TTL_MS = 5 * 60_000;
+export const PUBLIC_NOTICE_CACHE_RETRY_MS = 15_000;
+const PUBLIC_NOTICE_RUNTIME_CACHE_KEY = '__seekofferPublicNoticeCacheV1__';
 
 export type WorkspaceStorageOwner =
   | {
@@ -58,6 +66,18 @@ export type ApplicationRow = {
   project: PublicNoticeProject;
 };
 
+export type PublicNoticeLoadSnapshot = {
+  rows: PublicNoticeProject[];
+  source: 'remote' | 'stale' | 'fallback';
+  syncedAt: number | null;
+  attemptedAt: number | null;
+  error: unknown | null;
+  isFresh: boolean;
+  isRevalidating: boolean;
+  shouldRevalidate: boolean;
+  revalidated: boolean;
+};
+
 export type ManualProjectInput = {
   schoolName: string;
   departmentName: string;
@@ -75,7 +95,25 @@ export const WORKSPACE_SYNC_NOTICE =
 
 let hydrateWorkspacePromise: Promise<void> | null = null;
 let hydratedWorkspaceUserId = '';
-let publicNoticeCachePromise: Promise<PublicNoticeProject[]> | null = null;
+const publicNoticeFallbackProjects = filterMainNoticeProjects(baseNoticeProjects);
+
+function createPublicNoticeCache() {
+  return createStaleWhileRevalidateCache<PublicNoticeProject[]>({
+    ttlMs: PUBLIC_NOTICE_CACHE_TTL_MS,
+    retryAfterMs: PUBLIC_NOTICE_CACHE_RETRY_MS,
+    fallback: () => publicNoticeFallbackProjects
+  });
+}
+
+type PublicNoticeCacheController = ReturnType<typeof createPublicNoticeCache>;
+type PublicNoticeRuntimeScope = typeof globalThis & {
+  [PUBLIC_NOTICE_RUNTIME_CACHE_KEY]?: PublicNoticeCacheController;
+};
+
+const publicNoticeRuntimeScope = globalThis as PublicNoticeRuntimeScope;
+const publicNoticeCache =
+  publicNoticeRuntimeScope[PUBLIC_NOTICE_RUNTIME_CACHE_KEY] ?? createPublicNoticeCache();
+publicNoticeRuntimeScope[PUBLIC_NOTICE_RUNTIME_CACHE_KEY] = publicNoticeCache;
 
 function canUseBrowserStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -1303,30 +1341,44 @@ export function watchApplicationTable(callback: () => void) {
   };
 }
 
+function mapPublicNoticeSnapshot(
+  snapshot: StaleWhileRevalidateSnapshot<PublicNoticeProject[]>
+): PublicNoticeLoadSnapshot {
+  return {
+    rows: snapshot.value,
+    source: snapshot.source,
+    syncedAt: snapshot.syncedAt,
+    attemptedAt: snapshot.attemptedAt,
+    error: snapshot.error,
+    isFresh: snapshot.isFresh,
+    isRevalidating: snapshot.isRevalidating,
+    shouldRevalidate: snapshot.shouldRevalidate,
+    revalidated: snapshot.revalidated
+  };
+}
+
+export function getPublicNoticeSnapshot() {
+  return mapPublicNoticeSnapshot(publicNoticeCache.getSnapshot());
+}
+
+export async function loadPublicNotices(options: { refresh?: boolean } = {}) {
+  const snapshot = await publicNoticeCache.request(
+    async () => {
+      const remoteProjects = await readRemotePublicNotices();
+
+      // Supabase moderation is authoritative after a successful request. An
+      // empty result is therefore a valid snapshot, not a reason to restore
+      // bundled notices that may have since been hidden or deleted.
+      return sortProjectsByFreshness(filterMainNoticeProjects(remoteProjects));
+    },
+    { force: options.refresh === true }
+  );
+
+  return mapPublicNoticeSnapshot(snapshot);
+}
+
 export async function fetchPublicNotices(options: { refresh?: boolean } = {}) {
-  if (options.refresh) {
-    publicNoticeCachePromise = null;
-  }
-
-  if (!publicNoticeCachePromise) {
-    publicNoticeCachePromise = (async () => {
-      try {
-        const remoteProjects = await readRemotePublicNotices();
-        if (!remoteProjects.length) {
-          return filterMainNoticeProjects(baseNoticeProjects);
-        }
-
-        // Once Supabase has data, it becomes the moderation source of truth.
-        // Local JSON is only a disaster-recovery fallback; otherwise admin hide/delete
-        // actions would be reintroduced by the bundled static seed data.
-        return sortProjectsByFreshness(filterMainNoticeProjects(remoteProjects));
-      } catch {
-        return filterMainNoticeProjects(baseNoticeProjects);
-      }
-    })();
-  }
-
-  return publicNoticeCachePromise;
+  return (await loadPublicNotices(options)).rows;
 }
 
 async function getAllProjectsAsync(owner = getCurrentWorkspaceStorageContext().owner) {

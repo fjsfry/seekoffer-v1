@@ -158,7 +158,7 @@ describe('desktop application card responsive contract', () => {
     const school = declarationsFor('.desktop-application-object-copy strong');
     const facts = declarationsFor('.desktop-application-object-facts');
 
-    expect(noticeCss).toMatch(/\.desktop-notice-card\s*\{[\s\S]*?min-height:\s*220px[\s\S]*?padding:\s*20px[\s\S]*?border-radius:\s*18px/);
+    expect(noticeCss).toMatch(/\.desktop-notice-card\s*\{[\s\S]*?min-height:\s*0[\s\S]*?padding:\s*20px[\s\S]*?border-radius:\s*18px/);
     expect(noticeCss).toMatch(/\.desktop-notice-card-title\s*\{[\s\S]*?font-size:\s*20px[\s\S]*?line-height:\s*30px/);
     expect(row.get('min-height')).toBe('130px');
     expect(row.get('padding')).toBe('14px 20px');

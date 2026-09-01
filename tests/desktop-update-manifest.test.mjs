@@ -74,6 +74,10 @@ describe('desktop updater release contracts', () => {
   });
 
   it('enforces monotonic Stable version promotion', () => {
+    expect(assertStableDesktopUpgrade('0.2.22', '0.2.21')).toEqual({
+      candidate: '0.2.22',
+      current: '0.2.21'
+    });
     expect(compareStableDesktopVersions('0.2.20', '0.2.19')).toBe(1);
     expect(compareStableDesktopVersions('1.0.0+build.2', '1.0.0+build.1')).toBe(0);
     expect(assertStableDesktopUpgrade('0.2.20', '0.2.19')).toEqual({

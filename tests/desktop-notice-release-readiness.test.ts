@@ -46,7 +46,7 @@ describe('desktop notice release-readiness contract', () => {
 
     const compactCard = declarationsFor('.desktop-notice-card', "data-density='compact'");
     const compactLayout = declarationsFor('.desktop-notice-card-layout', "data-density='compact'");
-    expect(compactCard.get('min-height')).toBe('188px');
+    expect(compactCard.get('min-height')).toBe('0');
     expect(compactCard.get('padding')).toBe('14px');
     expect(compactLayout.get('grid-template-columns')).toBe('72px minmax(0, 1fr) 170px');
     expect(noticeCss).toMatch(
@@ -56,6 +56,15 @@ describe('desktop notice release-readiness contract', () => {
       /@container notice-cards \(max-width: 759px\)[\s\S]*?\.desktop-notice-card-actions\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) minmax\(160px, 190px\)/,
     );
     expect(noticeCss).toContain('@container notice-cards (max-width: 520px)');
+
+    const actions = declarationsFor('.desktop-notice-card-actions');
+    const buttons = declarationsFor('.desktop-notice-card-actions > .desktop-notice-card-buttons');
+    expect(actions.get('height')).toBe('auto');
+    expect(actions.get('min-height')).toBe('0');
+    expect(actions.get('grid-template-rows')).toBe('auto auto');
+    expect(actions.get('align-content')).toBe('start');
+    expect(buttons.get('align-self')).toBe('start');
+    expect(buttons.get('margin-top')).toMatch(/^(?:8|10|12)px$/);
   });
 
   it('uses full click targets and theme-aware sidebar text and badges', () => {

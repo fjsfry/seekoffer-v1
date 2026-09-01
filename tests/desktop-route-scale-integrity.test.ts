@@ -27,6 +27,10 @@ describe('desktop route full-scale integrity', () => {
 
   it('keeps notice titles, body copy, metadata and actions content-led', () => {
     const integrity = noticeCss.slice(noticeCss.indexOf('/* Full-scale integrity authority.'));
+    expect(noticeCss).toMatch(/\.desktop-notice-card\s*\{[^}]*min-height:\s*0/);
+    expect(noticeCss).toMatch(/\.desktop-notice-card-layout\s*\{[^}]*height:\s*auto[^}]*grid-template-rows:\s*auto[^}]*align-items:\s*start/);
+    expect(noticeCss).toMatch(/\.desktop-notice-card-actions\s*\{[^}]*height:\s*auto[^}]*min-height:\s*0[^}]*grid-template-rows:\s*auto auto[^}]*align-self:\s*start[^}]*align-content:\s*start/);
+    expect(noticeCss).not.toMatch(/\.desktop-notice-card-actions\s*\{[^}]*grid-template-rows:[^;}]*1fr/);
     expect(integrity).toMatch(/\.desktop-notice-card-copy\s*\{[^}]*grid-template-rows:\s*auto auto auto auto[^}]*overflow:\s*visible/);
     expect(integrity).toMatch(/\.desktop-notice-card-heading h2,[\s\S]*?white-space:\s*normal[^}]*overflow-wrap:\s*anywhere/);
     expect(integrity).toMatch(/\.desktop-notice-card-meta,[\s\S]*?height:\s*auto[^}]*flex-wrap:\s*wrap/);
