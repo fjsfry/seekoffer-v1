@@ -7,6 +7,7 @@ export const dynamic = 'force-static';
 
 const staticRoutes = [
   '/',
+  '/download',
   '/notices',
   '/deadlines',
   '/colleges',
@@ -37,7 +38,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticEntries = staticRoutes.map((route) => ({
     url: absoluteUrl(route),
     changeFrequency: route === '/' || route === '/notices' ? ('daily' as const) : ('weekly' as const),
-    priority: route === '/' ? 1 : route === '/notices' ? 0.95 : 0.75
+    priority: route === '/' ? 1 : route === '/notices' ? 0.95 : route === '/download' ? 0.85 : 0.75
   }));
 
   const noticeEntries = filterMainNoticeProjects(baseNoticeProjects).slice(0, 50000 - staticEntries.length).map((project) => ({

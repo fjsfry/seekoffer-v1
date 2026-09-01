@@ -16,3 +16,4 @@ pnpm-debug.log*
 tsconfig.tsbuildinfo
 public/site-marks/_preview/
 .local-backups/
+releases/

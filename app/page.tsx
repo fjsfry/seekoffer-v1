@@ -10,6 +10,7 @@ import {
   Building2,
   CalendarDays,
   ClipboardList,
+  Download,
   FileText,
   FolderOpen,
   GraduationCap,
@@ -39,6 +40,7 @@ import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { baseNoticeProjects } from '@/lib/notice-source';
 import { getTopCollegeNoticeStats } from '@/lib/notice-analytics';
 import { officialResourceSections } from '@/lib/portal-data';
+import { DESKTOP_RELEASE } from '@/lib/desktop-download';
 import { fetchPublicOffers } from '@/lib/offers';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
@@ -221,6 +223,14 @@ export default function HomePage() {
                 打开工作台
               </Link>
             </div>
+            <Link
+              href="/download"
+              className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-brand transition hover:bg-white/75 hover:text-brand-deep focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/10"
+            >
+              <Download className="h-4 w-4" />
+              Windows 桌面端 v{DESKTOP_RELEASE.version}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
 
           <HomeHeroPreview />

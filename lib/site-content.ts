@@ -51,7 +51,8 @@ export const footerColumns = [
       { label: '资源库', href: '/resources' },
       { label: 'Offer 圈', href: '/offers' },
       { label: '竞赛库', href: '/competitions' },
-      { label: '工作台', href: '/me' }
+      { label: '工作台', href: '/me' },
+      { label: '桌面端下载', href: '/download' }
     ]
   },
   {
