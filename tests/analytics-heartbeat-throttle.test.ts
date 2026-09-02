@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const root = process.cwd();
 const migration = readFileSync(
-  resolve(root, 'supabase/migrations/20260902092753_analytics_heartbeat_throttle_v2.sql'),
+  resolve(root, 'supabase/migrations/20260902151058_analytics_heartbeat_throttle_v2.sql'),
   'utf8'
 );
 const adminApi = readFileSync(resolve(root, 'supabase/functions/admin-api/index.ts'), 'utf8');

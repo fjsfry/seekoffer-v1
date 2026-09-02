@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const migrationPath = resolve(
   process.cwd(),
-  'supabase/migrations/20260902090225_public_notice_read_indexes_v2.sql'
+  'supabase/migrations/20260902151003_public_notice_read_indexes_v2.sql'
 );
 const migration = readFileSync(migrationPath, 'utf8');
 
