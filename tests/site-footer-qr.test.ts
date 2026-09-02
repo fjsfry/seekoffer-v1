@@ -6,7 +6,7 @@ const root = process.cwd();
 const footerSource = readFileSync(resolve(root, 'components/site-footer.tsx'), 'utf8');
 
 describe('public website footer QR entry points', () => {
-  it('keeps the WeChat QR first and places the QQ group QR directly below it', () => {
+  it('keeps the WeChat QR first and places the QQ group QR directly beside it', () => {
     const wechatIndex = footerSource.indexOf('src="/wechat-qr.jpg"');
     const qqIndex = footerSource.indexOf('src="/qq-group-qr-source.png"');
 
@@ -18,5 +18,16 @@ describe('public website footer QR entry points', () => {
     expect(statSync(resolve(root, 'public/qq-group-qr-source.png')).size).toBeGreaterThan(
       100_000
     );
+  });
+
+  it('keeps both QR entries in one responsive row without increasing footer height', () => {
+    expect(footerSource).toContain('grid grid-cols-2 justify-items-center');
+    expect(footerSource).not.toContain('lg:grid-cols-1');
+    expect(footerSource).toContain('lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)_184px]');
+    expect(footerSource).toContain(
+      'min-[1380px]:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)_17rem]'
+    );
+    expect(footerSource).toContain("width: '139.3%'");
+    expect(footerSource).toContain("height: '248.2%'");
   });
 });
