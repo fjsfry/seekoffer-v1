@@ -1,87 +1,200 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { ArrowRight, UsersRound, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { watchAuthModal } from '@/lib/auth-intent';
+import { DESKTOP_RELEASE } from '@/lib/desktop-download';
 import { SITE_ANNOUNCEMENT } from '@/lib/site-announcement';
 
+type AnnouncementState = 'checking' | 'open' | 'closed';
+
 export function SiteAnnouncement() {
-  const pathname = usePathname();
-  const [hidden, setHidden] = useState(false);
+  const [state, setState] = useState<AnnouncementState>('checking');
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
-    if (
-      document.documentElement.dataset.seekofferAnnouncementHidden === 'true' ||
-      Date.now() > Date.parse(SITE_ANNOUNCEMENT.expiresAt)
-    ) {
-      setHidden(true);
-    }
-  }, []);
-
-  function rememberDismissal() {
+  const rememberDismissal = useCallback(() => {
     try {
       window.localStorage.setItem(SITE_ANNOUNCEMENT.storageKey, 'dismissed');
     } catch {
-      // The current document still hides the announcement when storage is unavailable.
+      // Closing still works for the current document when storage is unavailable.
     }
+  }, []);
 
-    document.documentElement.dataset.seekofferAnnouncementHidden = 'true';
-    setHidden(true);
-  }
-
-  function dismissAndRestoreFocus() {
-    rememberDismissal();
+  const restorePageFocus = useCallback(() => {
     window.requestAnimationFrame(() => {
+      const previous = previousFocusRef.current;
+      if (previous && previous !== document.body && previous.isConnected) {
+        previous.focus({ preventScroll: true });
+        return;
+      }
+
       document.getElementById('main-content')?.focus({ preventScroll: true });
     });
-  }
+  }, []);
 
-  if (hidden || pathname === SITE_ANNOUNCEMENT.actionHref) {
+  const dismiss = useCallback(
+    (restoreFocus = true) => {
+      rememberDismissal();
+      if (dialogRef.current?.open) {
+        dialogRef.current.close();
+      }
+      setState('closed');
+
+      if (restoreFocus) {
+        restorePageFocus();
+      }
+    },
+    [rememberDismissal, restorePageFocus]
+  );
+
+  useEffect(() => {
+    const expired = Date.now() > Date.parse(SITE_ANNOUNCEMENT.expiresAt);
+    const onDownloadPage = window.location.pathname.replace(/\/$/, '') === SITE_ANNOUNCEMENT.actionHref;
+    let dismissed = false;
+
+    try {
+      dismissed = window.localStorage.getItem(SITE_ANNOUNCEMENT.storageKey) === 'dismissed';
+    } catch {
+      dismissed = false;
+    }
+
+    setState(expired || onDownloadPage || dismissed ? 'closed' : 'open');
+  }, []);
+
+  useEffect(() => {
+    if (state !== 'open') {
+      return undefined;
+    }
+
+    const dialog = dialogRef.current;
+    if (!dialog) {
+      return undefined;
+    }
+
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      closeButtonRef.current?.focus({ preventScroll: true });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      if (dialog.open) {
+        dialog.close();
+      }
+    };
+  }, [state]);
+
+  useEffect(() => {
+    return watchAuthModal(() => {
+      if (dialogRef.current?.open) {
+        dismiss(false);
+      }
+    });
+  }, [dismiss]);
+
+  if (state !== 'open') {
     return null;
   }
 
   return (
-    <aside
+    <dialog
+      ref={dialogRef}
       data-site-announcement={SITE_ANNOUNCEMENT.id}
       aria-labelledby="site-announcement-title"
-      className="relative mt-4 overflow-hidden rounded-[20px] border border-[#dce8e5] bg-white px-4 py-3 pr-14 shadow-[0_12px_34px_rgba(18,32,38,0.055)] sm:px-5 sm:py-3.5 sm:pr-14"
+      aria-describedby="site-announcement-summary"
+      onCancel={(event) => {
+        event.preventDefault();
+        dismiss();
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          dismiss();
+        }
+      }}
+      className="site-announcement-dialog fixed inset-0 m-0 mt-auto max-h-[94dvh] w-full max-w-none overflow-hidden rounded-t-[26px] border border-slate-200 bg-white p-0 text-left text-slate-700 shadow-[0_28px_90px_rgba(8,30,34,0.24)] sm:m-auto sm:w-[calc(100%-3rem)] sm:max-w-[820px] sm:rounded-[28px]"
     >
-      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-brand" />
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full bg-brand/[0.07] px-2.5 py-1 text-xs font-semibold text-brand">
-              <UsersRound aria-hidden="true" className="h-3.5 w-3.5" />
-              {SITE_ANNOUNCEMENT.badge}
-            </span>
-            <h2 id="site-announcement-title" className="text-sm font-semibold leading-6 text-ink sm:text-[15px]">
-              {SITE_ANNOUNCEMENT.title}
-            </h2>
-          </div>
-          <p className="mt-1 text-xs leading-5 text-slate-500 sm:text-[13px] sm:leading-6">
-            {SITE_ANNOUNCEMENT.body}
-          </p>
+      <div className="flex max-h-[94dvh] min-h-0 flex-col sm:max-h-[calc(100dvh-3rem)]">
+        <button
+          ref={closeButtonRef}
+          type="button"
+          autoFocus
+          onClick={() => dismiss()}
+          aria-label="关闭网站公告"
+          className="absolute right-3 top-3 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full text-2xl font-light leading-none text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/12 sm:right-5 sm:top-5"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+
+        <div className="min-h-0 flex-1 overscroll-contain overflow-x-hidden overflow-y-auto">
+          <article className="mx-auto max-w-[690px] px-6 pb-9 pt-14 sm:px-12 sm:pb-12 sm:pt-11">
+            <header>
+              <p className="text-sm font-medium text-brand">{SITE_ANNOUNCEMENT.eyebrow}</p>
+              <p className="mt-5 text-sm font-semibold text-slate-500">{SITE_ANNOUNCEMENT.milestone}</p>
+              <h2
+                id="site-announcement-title"
+                className="mt-2 text-[2rem] font-semibold leading-[1.25] tracking-[-0.035em] text-ink sm:text-[2.5rem]"
+              >
+                {SITE_ANNOUNCEMENT.title}
+              </h2>
+              <p id="site-announcement-summary" className="sr-only">
+                感谢超过一万位同学使用寻鹿，寻鹿 Windows 桌面端现已开放下载。
+              </p>
+            </header>
+
+            <div className="mt-7 space-y-4 text-[15px] leading-8 text-slate-600 sm:text-base sm:leading-8">
+              {SITE_ANNOUNCEMENT.letterParagraphs.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+
+            <section className="my-8 border-y border-slate-200 py-7 sm:my-10 sm:py-9">
+              <p className="text-sm font-medium text-brand">{SITE_ANNOUNCEMENT.productEyebrow}</p>
+              <h3 className="mt-2 text-2xl font-semibold leading-snug tracking-[-0.025em] text-ink sm:text-[1.8rem]">
+                {SITE_ANNOUNCEMENT.productTitle}
+              </h3>
+              <div className="mt-4 space-y-4 text-[15px] leading-8 text-slate-600 sm:text-base">
+                {SITE_ANNOUNCEMENT.productParagraphs.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+              </div>
+              <p className="mt-5 text-sm font-medium text-slate-500">
+                Windows 10 / 11 · v{DESKTOP_RELEASE.version} · {DESKTOP_RELEASE.installerSize} · 免费下载
+              </p>
+            </section>
+
+            <blockquote className="text-lg font-medium leading-8 text-ink sm:text-xl sm:leading-9">
+              {SITE_ANNOUNCEMENT.closing}
+            </blockquote>
+            <p className="mt-5 text-sm text-slate-500">{SITE_ANNOUNCEMENT.signature}</p>
+          </article>
         </div>
 
-        <Link
-          href={SITE_ANNOUNCEMENT.actionHref}
-          onClick={rememberDismissal}
-          className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15 sm:w-auto"
-        >
-          {SITE_ANNOUNCEMENT.actionLabel}
-          <ArrowRight aria-hidden="true" className="h-4 w-4" />
-        </Link>
+        <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-4 sm:px-8 sm:py-5">
+          <div className="flex w-full flex-col gap-2.5 sm:flex-row-reverse">
+            <Link
+              href={SITE_ANNOUNCEMENT.actionHref}
+              onClick={() => dismiss(false)}
+              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-brand px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15"
+            >
+              {SITE_ANNOUNCEMENT.actionLabel}
+            </Link>
+            <button
+              type="button"
+              onClick={() => dismiss()}
+              className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/10"
+            >
+              {SITE_ANNOUNCEMENT.secondaryActionLabel}
+            </button>
+          </div>
+        </div>
       </div>
-
-      <button
-        type="button"
-        onClick={dismissAndRestoreFocus}
-        aria-label="关闭网站公告"
-        className="absolute right-1.5 top-1.5 inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/10"
-      >
-        <X aria-hidden="true" className="h-4.5 w-4.5" />
-      </button>
-    </aside>
+    </dialog>
   );
 }
