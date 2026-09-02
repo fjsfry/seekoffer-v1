@@ -1,4 +1,9 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import {
+  databaseErrorMessage,
+  isTransientDatabaseError,
+  retryDatabaseOperation
+} from './database-retry.ts';
 
 type NoticePayload = {
   id: string | number;
@@ -41,13 +46,57 @@ type IngestBody = {
   summary?: Record<string, unknown>;
 };
 
-function json(status: number, body: Record<string, unknown>) {
+function json(status: number, body: Record<string, unknown>, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...extraHeaders
     }
   });
+}
+
+function databaseFailure(error: string, detail: unknown) {
+  const retryable = isTransientDatabaseError(detail);
+  return json(
+    retryable ? 503 : 500,
+    {
+      error,
+      detail: databaseErrorMessage(detail),
+      retryable
+    },
+    retryable ? { 'Retry-After': '10' } : {}
+  );
+}
+
+function databaseRetryOptions(operation: string) {
+  return {
+    baseDelayMs: 750,
+    maxAttempts: 3,
+    maxDelayMs: 4_000,
+    onRetry: ({
+      attempt,
+      delayMs,
+      error,
+      nextAttempt
+    }: {
+      attempt: number;
+      delayMs: number;
+      error: unknown;
+      nextAttempt: number;
+    }) => {
+      console.warn(
+        JSON.stringify({
+          event: 'database_operation_retry',
+          operation,
+          attempt,
+          nextAttempt,
+          delayMs,
+          error: databaseErrorMessage(error)
+        })
+      );
+    }
+  };
 }
 
 function normalizeNotice(notice: NoticePayload) {
@@ -180,20 +229,22 @@ Deno.serve(async (request) => {
       admin_deleted_at?: string | null;
     }
   >();
-  for (let index = 0; index < notices.length; index += 1000) {
-    const batchIds = notices.slice(index, index + 1000).map((notice) => notice.id);
-    const { data: existingRows, error: existingError } = await supabase
-      .from('notices')
-      .select('id,admin_status,admin_reviewed_by,admin_review_note,admin_deleted_at')
-      .in('id', batchIds);
+  for (let index = 0; index < notices.length; index += 100) {
+    const batchIds = notices.slice(index, index + 100).map((notice) => notice.id);
+    const lookup = await retryDatabaseOperation(
+      () =>
+        supabase
+          .from('notices')
+          .select('id,admin_status,admin_reviewed_by,admin_review_note,admin_deleted_at')
+          .in('id', batchIds),
+      databaseRetryOptions('existing_notice_lookup')
+    );
 
-    if (existingError) {
-      return json(500, {
-        error: 'existing_lookup_failed',
-        detail: existingError.message
-      });
+    if (lookup.error) {
+      return databaseFailure('existing_lookup_failed', lookup.error);
     }
 
+    const existingRows = lookup.result?.data || [];
     (existingRows || []).forEach((row) => existingById.set(String(row.id), row));
   }
 
@@ -222,32 +273,51 @@ Deno.serve(async (request) => {
     return Boolean(existing?.admin_deleted_at && !String(existing.admin_reviewed_by || '').trim());
   }).length;
 
-  const { error: noticeError } = await supabase.from('notices').upsert(noticesForUpsert, {
-    onConflict: 'id'
-  });
+  const upsert = await retryDatabaseOperation(
+    () =>
+      supabase.from('notices').upsert(noticesForUpsert, {
+        onConflict: 'id'
+      }),
+    databaseRetryOptions('notice_upsert')
+  );
 
-  if (noticeError) {
-    return json(500, {
-      error: 'upsert_failed',
-      detail: noticeError.message
-    });
+  if (upsert.error) {
+    return databaseFailure('upsert_failed', upsert.error);
   }
 
-  await supabase.from('crawler_runs').insert({
-    source: body.source || 'cloudbase-sync',
-    notices_received: notices.length,
-    notices_upserted: noticesForUpsert.length,
-    success: true,
-    summary: {
-      ...(body.summary || {}),
-      originalNoticesReceived: normalizedNotices.length,
-      skippedOutdatedDeadline: normalizedNotices.length - publishableNotices.length,
-      dedupedNotices: notices.length,
-      publishedNotices: noticesForUpsert.filter((notice) => notice.admin_status === 'published' && !notice.is_private).length,
-      privateNotices: noticesForUpsert.filter((notice) => notice.is_private).length,
-      restoredAutoDeleted
+  const runLog = await retryDatabaseOperation(
+    () =>
+      supabase.from('crawler_runs').insert({
+        source: body.source || 'cloudbase-sync',
+        notices_received: notices.length,
+        notices_upserted: noticesForUpsert.length,
+        success: true,
+        summary: {
+          ...(body.summary || {}),
+          originalNoticesReceived: normalizedNotices.length,
+          skippedOutdatedDeadline: normalizedNotices.length - publishableNotices.length,
+          dedupedNotices: notices.length,
+          publishedNotices: noticesForUpsert.filter(
+            (notice) => notice.admin_status === 'published' && !notice.is_private
+          ).length,
+          privateNotices: noticesForUpsert.filter((notice) => notice.is_private).length,
+          restoredAutoDeleted
+        }
+      }),
+    {
+      ...databaseRetryOptions('crawler_run_insert'),
+      maxAttempts: 2
     }
-  });
+  );
+
+  if (runLog.error) {
+    console.warn(
+      JSON.stringify({
+        event: 'crawler_run_insert_failed',
+        error: databaseErrorMessage(runLog.error)
+      })
+    );
+  }
 
   return json(200, {
     ok: true,

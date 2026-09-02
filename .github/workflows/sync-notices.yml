@@ -71,7 +71,11 @@ jobs:
       BAOYANNEWS_PAGE_DELAY_MS: '80'
       OFFICIAL_REPAIR_CONCURRENCY: '4'
       OFFICIAL_REPAIR_DELAY_MS: '80'
-      INGEST_BATCH_SIZE: '500'
+      INGEST_BATCH_SIZE: '100'
+      INGEST_MAX_ATTEMPTS: '5'
+      INGEST_RETRY_BASE_DELAY_MS: '2000'
+      INGEST_RETRY_MAX_DELAY_MS: '30000'
+      INGEST_REQUEST_TIMEOUT_MS: '60000'
       REQUEST_TIMEOUT_MS: '15000'
       MAX_RATE_LIMIT_RETRY_AFTER_SECONDS: '30'
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
@@ -85,10 +89,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
 

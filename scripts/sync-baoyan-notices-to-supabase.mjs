@@ -3,8 +3,11 @@ import https from 'node:https';
 import {
   areLikelyDuplicateNotices,
   extractDeadlineFromText as extractDeadlineFromTextCore,
+  getXingkePublishTimestamp,
+  getIngestRetryDelayMs,
   inferNoticeKind,
   inferProjectType as inferProjectTypeCore,
+  isRetryableIngestStatus,
   normalizeComparableUrl
 } from './notice-sync-core.mjs';
 
@@ -29,6 +32,10 @@ const SECONDARY_LIST_ENDPOINT = '/articles';
 const SECONDARY_DETAIL_ENDPOINT = '/articles/{id}';
 
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 30000);
+const INGEST_REQUEST_TIMEOUT_MS = Math.max(
+  REQUEST_TIMEOUT_MS,
+  Number(process.env.INGEST_REQUEST_TIMEOUT_MS || 60000)
+);
 const MAX_RATE_LIMIT_RETRY_AFTER_SECONDS = Number(process.env.MAX_RATE_LIMIT_RETRY_AFTER_SECONDS || 30);
 const PRIMARY_PAGE_SIZE = Number(process.env.PRIMARY_PAGE_SIZE || 40);
 const DEFAULT_INCREMENTAL_PRIMARY_MAX_PAGES = 2;
@@ -71,7 +78,13 @@ const OFFICIAL_REPAIR_MAX_DETAILS =
   parseOptionalInteger(process.env.OFFICIAL_REPAIR_MAX_DETAILS) || (IS_INCREMENTAL_SYNC ? 30 : 240);
 const OFFICIAL_REPAIR_CONCURRENCY = Math.max(1, Number(process.env.OFFICIAL_REPAIR_CONCURRENCY || 4));
 const OFFICIAL_REPAIR_DELAY_MS = Math.max(0, Number(process.env.OFFICIAL_REPAIR_DELAY_MS || 80));
-const INGEST_BATCH_SIZE = Math.max(50, Number(process.env.INGEST_BATCH_SIZE || 500));
+const INGEST_BATCH_SIZE = Math.min(200, Math.max(25, parseOptionalInteger(process.env.INGEST_BATCH_SIZE) || 100));
+const INGEST_MAX_ATTEMPTS = Math.min(5, Math.max(1, parseOptionalInteger(process.env.INGEST_MAX_ATTEMPTS) || 3));
+const INGEST_RETRY_BASE_DELAY_MS = Math.max(100, Number(process.env.INGEST_RETRY_BASE_DELAY_MS || 1000));
+const INGEST_RETRY_MAX_DELAY_MS = Math.max(
+  INGEST_RETRY_BASE_DELAY_MS,
+  Number(process.env.INGEST_RETRY_MAX_DELAY_MS || 30000)
+);
 const DRY_RUN = /^1|true|yes$/i.test(process.env.DRY_RUN || '');
 
 const TITLE_BODY_START_PATTERNS = [
@@ -899,7 +912,7 @@ function hasTargetYearSignal(targetYear, ...values) {
 
 function buildXingkeProject(record, targetYear = TARGET_YEAR) {
   const title = cleanTitle(record.title || record.name, 140);
-  const publishDate = normalizeDate(record.created_at || record.updated_at) || nowDateText();
+  const publishDate = normalizeDate(getXingkePublishTimestamp(record)) || nowDateText();
   const summaryText = [title, record.description, record.category, record.category_tag].map(normalizeSpace).filter(Boolean).join(' ');
   const deadlineDate =
     normalizeDateTime(record.signup_end || record.signup_end_text) ||
@@ -1984,6 +1997,82 @@ async function enrichProjectsFromPublicPages(projects) {
   };
 }
 
+async function postIngestBatch(notices, summary, batchIndex, batchCount) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= INGEST_MAX_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), INGEST_REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(SUPABASE_INGEST_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-seekoffer-ingest-secret': SUPABASE_INGEST_SECRET
+        },
+        body: JSON.stringify({
+          source: SUPABASE_INGEST_SOURCE,
+          notices,
+          summary: {
+            ...summary,
+            ingestBatch: batchIndex,
+            ingestBatchCount: batchCount
+          }
+        }),
+        signal: controller.signal
+      });
+
+      const rawText = await response.text();
+      const payload = safeJsonParse(rawText, {
+        status: response.status,
+        body: rawText
+      });
+      if (response.ok) return payload;
+
+      const error = new Error(
+        `Supabase ingest batch ${batchIndex}/${batchCount} failed with status ${response.status}: ${JSON.stringify(payload)}`
+      );
+      error.retryable = isRetryableIngestStatus(response.status);
+      error.retryAfter = response.headers.get('retry-after') || '';
+      throw error;
+    } catch (error) {
+      const normalizedError =
+        error?.name === 'AbortError'
+          ? Object.assign(
+              new Error(
+                `Supabase ingest batch ${batchIndex}/${batchCount} timed out after ${INGEST_REQUEST_TIMEOUT_MS}ms.`
+              ),
+              { retryable: true }
+            )
+          : error;
+      lastError = normalizedError;
+      const retryable = normalizedError?.retryable !== false;
+      if (!retryable || attempt === INGEST_MAX_ATTEMPTS) throw normalizedError;
+
+      const delayMs = getIngestRetryDelayMs({
+        attempt,
+        baseDelayMs: INGEST_RETRY_BASE_DELAY_MS,
+        maxDelayMs: INGEST_RETRY_MAX_DELAY_MS,
+        retryAfter: normalizedError?.retryAfter || ''
+      });
+      logEvent('supabase_ingest_batch_retry', {
+        batch: batchIndex,
+        batchCount,
+        attempt,
+        nextAttempt: attempt + 1,
+        delayMs,
+        error: toErrorMessage(normalizedError)
+      });
+      await sleep(delayMs);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw lastError || new Error(`Supabase ingest batch ${batchIndex}/${batchCount} failed.`);
+}
+
 async function pushProjectsToSupabase(projects, summary) {
   if (DRY_RUN) {
     return {
@@ -2019,52 +2108,19 @@ async function pushProjectsToSupabase(projects, summary) {
   };
 
   for (let index = 0; index < batches.length; index += 1) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    try {
-      const response = await fetch(SUPABASE_INGEST_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-seekoffer-ingest-secret': SUPABASE_INGEST_SECRET
-        },
-        body: JSON.stringify({
-          source: SUPABASE_INGEST_SOURCE,
-          notices: batches[index],
-          summary: {
-            ...summary,
-            ingestBatch: index + 1,
-            ingestBatchCount: batches.length
-          }
-        }),
-        signal: controller.signal
-      });
+    const payload = await postIngestBatch(batches[index], summary, index + 1, batches.length);
 
-      const rawText = await response.text();
-      const payload = safeJsonParse(rawText, {
-        status: response.status,
-        body: rawText
-      });
-      if (!response.ok) {
-        throw new Error(
-          `Supabase ingest batch ${index + 1}/${batches.length} failed with status ${response.status}: ${JSON.stringify(payload)}`
-        );
-      }
-
-      aggregate.noticesReceived += Number(payload?.noticesReceived || batches[index].length);
-      aggregate.noticesSkipped += Number(payload?.noticesSkipped || 0);
-      aggregate.noticesUpserted += Number(payload?.noticesUpserted || 0);
-      aggregate.noticesPublished += Number(payload?.noticesPublished || 0);
-      aggregate.noticesPrivate += Number(payload?.noticesPrivate || 0);
-      aggregate.restoredAutoDeleted += Number(payload?.restoredAutoDeleted || 0);
-      logEvent('supabase_ingest_batch_finished', {
-        batch: index + 1,
-        batchCount: batches.length,
-        notices: batches[index].length
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
+    aggregate.noticesReceived += Number(payload?.noticesReceived || batches[index].length);
+    aggregate.noticesSkipped += Number(payload?.noticesSkipped || 0);
+    aggregate.noticesUpserted += Number(payload?.noticesUpserted || 0);
+    aggregate.noticesPublished += Number(payload?.noticesPublished || 0);
+    aggregate.noticesPrivate += Number(payload?.noticesPrivate || 0);
+    aggregate.restoredAutoDeleted += Number(payload?.restoredAutoDeleted || 0);
+    logEvent('supabase_ingest_batch_finished', {
+      batch: index + 1,
+      batchCount: batches.length,
+      notices: batches[index].length
+    });
   }
 
   return aggregate;
@@ -2095,7 +2151,7 @@ function getSecondaryRecordPublishDate(record) {
 }
 
 function getXingkeRecordPublishDate(record) {
-  return normalizeDate(record.updated_at || record.created_at || record.signup_start);
+  return normalizeDate(getXingkePublishTimestamp(record));
 }
 
 function getBaoyanNewsRecordPublishDate(record) {
@@ -2247,6 +2303,9 @@ async function runSync() {
         incrementalLookbackDays: INCREMENTAL_LOOKBACK_DAYS,
         officialRepairMaxDetails: OFFICIAL_REPAIR_MAX_DETAILS,
         ingestBatchSize: INGEST_BATCH_SIZE,
+        ingestMaxAttempts: INGEST_MAX_ATTEMPTS,
+        ingestRequestTimeoutMs: INGEST_REQUEST_TIMEOUT_MS,
+        ingestRetryMaxDelayMs: INGEST_RETRY_MAX_DELAY_MS,
         secondaryRepairDetailIds: SECONDARY_REPAIR_DETAIL_IDS,
         requestTimeoutMs: REQUEST_TIMEOUT_MS,
         dryRun: DRY_RUN,

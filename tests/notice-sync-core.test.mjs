@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   areLikelyDuplicateNotices,
   extractDeadlineFromText,
-  inferProjectType
+  getIngestRetryDelayMs,
+  getXingkePublishTimestamp,
+  inferProjectType,
+  isRetryableIngestStatus,
+  parseRetryAfterMs
 } from '../scripts/notice-sync-core.mjs';
 
 function project(overrides = {}) {
@@ -51,6 +55,63 @@ describe('notice stage classification', () => {
     expect(inferProjectType('2026年夏令营优秀营员名单')).toBe('入营名单');
     expect(inferProjectType('2026年推免招生线上宣讲会')).toBe('宣讲会');
     expect(inferProjectType('pre_recommendation', '2027级推免生报名通知')).toBe('预推免');
+  });
+});
+
+describe('source publish-date normalization', () => {
+  it('uses the immutable Xingke creation time for freshness checks', () => {
+    expect(
+      getXingkePublishTimestamp({
+        created_at: '2026-08-12T23:50:10',
+        updated_at: '2026-08-13T00:32:41',
+        signup_start: '2026-08-13'
+      })
+    ).toBe('2026-08-12T23:50:10');
+  });
+
+  it('falls back to the Xingke update time when creation time is unavailable', () => {
+    expect(
+      getXingkePublishTimestamp({
+        updated_at: '2026-08-13T00:32:41',
+        signup_start: '2026-08-15'
+      })
+    ).toBe('2026-08-13T00:32:41');
+  });
+});
+
+describe('ingest retry policy', () => {
+  it('retries transient gateway, rate-limit and server failures', () => {
+    expect(isRetryableIngestStatus(408)).toBe(true);
+    expect(isRetryableIngestStatus(429)).toBe(true);
+    expect(isRetryableIngestStatus(500)).toBe(true);
+    expect(isRetryableIngestStatus(503)).toBe(true);
+  });
+
+  it('does not retry invalid payloads or authorization failures', () => {
+    expect(isRetryableIngestStatus(400)).toBe(false);
+    expect(isRetryableIngestStatus(401)).toBe(false);
+    expect(isRetryableIngestStatus(403)).toBe(false);
+  });
+
+  it('honors Retry-After while keeping exponential backoff bounded', () => {
+    expect(parseRetryAfterMs('10')).toBe(10000);
+    expect(
+      getIngestRetryDelayMs({
+        attempt: 2,
+        baseDelayMs: 2000,
+        maxDelayMs: 30000,
+        randomValue: 0,
+        retryAfter: '10'
+      })
+    ).toBe(10000);
+    expect(
+      getIngestRetryDelayMs({
+        attempt: 8,
+        baseDelayMs: 2000,
+        maxDelayMs: 30000,
+        randomValue: 1
+      })
+    ).toBe(30000);
   });
 });
 
