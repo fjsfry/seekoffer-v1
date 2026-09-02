@@ -19,12 +19,10 @@ import {
 } from 'lucide-react';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
-import { fetchPublicNotices } from '@/lib/cloudbase-data';
 import { collegeDirectory } from '@/lib/college-directory';
-import { buildCollegeNoticeStats } from '@/lib/notice-analytics';
-import { filterMainNoticeProjects } from '@/lib/notice-quality';
-import { baseNoticeProjects } from '@/lib/notice-source';
-import type { PublicNoticeProject } from '@/lib/mock-data';
+import { getEmptyCollegeNoticeStats, type CollegeNoticeStats } from '@/lib/notice-analytics';
+import { fetchPublicNoticeSearch } from '@/lib/public-notice-api';
+import type { NoticeSearchFilters } from '@/lib/notice-query';
 
 const PAGE_SIZE = 16;
 const allCityLabel = '全部城市';
@@ -40,6 +38,24 @@ const sortOptions: Array<{ label: string; value: SortOption }> = [
   { label: '按校名排序', value: 'name' },
   { label: '按城市排序', value: 'city' }
 ];
+
+const collegeNoticeFilters: NoticeSearchFilters = {
+  keyword: '',
+  schoolName: '',
+  region: '全部',
+  majorKeyword: '',
+  category: '全部',
+  discipline: '全部',
+  schoolRange: '全部',
+  progress: '全部',
+  deadlineQuick: '全部',
+  fresh: '全部',
+  publishDate: '',
+  projectType: '全部',
+  noticeKind: '全部',
+  year: '2026',
+  sortBy: 'publish'
+};
 
 function getVisiblePages(currentPage: number, totalPages: number) {
   const start = Math.max(1, currentPage - 1);
@@ -69,34 +85,35 @@ export default function CollegesPage() {
   const [jumpPage, setJumpPage] = useState('');
   const [showAllCities, setShowAllCities] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('active');
-  const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
-    filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
+  const [noticeTotal, setNoticeTotal] = useState<number | null>(null);
+  const [collegeStats, setCollegeStats] = useState<Map<string, CollegeNoticeStats>>(
+    () => new Map()
   );
   const filterKey = `${keyword.trim().toLowerCase()}|${city}|${group}|${sortBy}`;
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
 
-    fetchPublicNotices()
-      .then((rows) => {
+    fetchPublicNoticeSearch(collegeNoticeFilters, 1, {
+      pageSize: 1,
+      signal: controller.signal
+    })
+      .then((result) => {
         if (active) {
-          setProjects(rows.filter((item) => String(item.year) === '2026'));
+          setNoticeTotal(result.stats.total2026);
+          setCollegeStats(
+            new Map(result.facets.collegeStats.map((item) => [item.schoolName, item]))
+          );
         }
       })
-      .catch(() => {
-        if (active) {
-          setProjects(filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026'));
-        }
-      });
+      .catch(() => undefined);
 
     return () => {
       active = false;
+      controller.abort();
     };
   }, []);
-
-  const collegeStats = useMemo(() => {
-    return new Map(collegeDirectory.map((item) => [item.name, buildCollegeNoticeStats(projects, item.name)]));
-  }, [projects]);
 
   const filteredColleges = useMemo(() => {
     const query = keyword.trim().toLowerCase();
@@ -235,7 +252,7 @@ export default function CollegesPage() {
         <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
           {[
             { label: '收录院校', value: `${collegeDirectory.length}`, icon: GraduationCap },
-            { label: '关联通知', value: `${projects.length}`, icon: BellRing },
+            { label: '关联通知', value: noticeTotal === null ? '—' : `${noticeTotal}`, icon: BellRing },
             {
               label: '报名中',
               value: `${Array.from(collegeStats.values()).reduce((sum, item) => sum + item.active, 0)}`,
@@ -557,7 +574,7 @@ export default function CollegesPage() {
 
       <section className="grid gap-4 xl:grid-cols-2">
         {pagedColleges.map((item) => {
-          const stats = collegeStats.get(item.name) || buildCollegeNoticeStats(projects, item.name);
+          const stats = collegeStats.get(item.name) || getEmptyCollegeNoticeStats(item.name);
 
           return (
             <article

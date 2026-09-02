@@ -1,10 +1,18 @@
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { access, cp, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
 const projectRoot = process.cwd();
 const exportDir = path.join(projectRoot, '.next-web');
 const targetDir = path.join(projectRoot, 'hosting-dist');
+
+try {
+  await access(path.join(exportDir, 'index.html'));
+} catch {
+  throw new Error(
+    'CloudBase static hosting is disabled: this build requires the Next.js server runtime for same-origin notice APIs. Deploy it to Vercel or another compatible Node.js host.'
+  );
+}
 
 const excludedEntries = new Set([
   'cache',

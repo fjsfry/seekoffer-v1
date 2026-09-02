@@ -79,6 +79,8 @@ jobs:
       SUPABASE_INGEST_SECRET: ${{ secrets.SEEKOFFER_INGEST_SECRET || secrets.SUPABASE_INGEST_SECRET }}
       SUPABASE_INGEST_SOURCE: github-actions-sync
       DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
+      NOTICE_REVALIDATE_URL: ${{ secrets.NOTICE_REVALIDATE_URL }}
+      NOTICE_REVALIDATE_TOKEN: ${{ secrets.NOTICE_REVALIDATE_TOKEN }}
       VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
 
     steps:
@@ -92,6 +94,25 @@ jobs:
 
       - name: Sync notices
         run: npm run sync:notices:github
+
+      - name: Revalidate public notice cache
+        if: ${{ env.DRY_RUN != 'true' }}
+        shell: bash
+        run: |
+          if [ -z "$NOTICE_REVALIDATE_URL" ] || [ -z "$NOTICE_REVALIDATE_TOKEN" ]; then
+            echo "Notice revalidation endpoint is not configured; database sync is complete."
+            exit 0
+          fi
+
+          curl --fail --silent --show-error \
+            --connect-timeout 5 \
+            --max-time 10 \
+            --request POST \
+            --header "Content-Type: application/json" \
+            --header "x-seekoffer-revalidate-token: $NOTICE_REVALIDATE_TOKEN" \
+            --data '{"ids":[]}' \
+            "${NOTICE_REVALIDATE_URL%/}/"
+          echo "Revalidated the shared public notice cache."
 
       - name: Rebuild searchable notice pages
         if: ${{ env.DRY_RUN != 'true' }}

@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState, type ComponentType, type MouseEvent, type ReactNode } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -24,42 +24,46 @@ import { ApplicationActionButton } from '@/components/application-action-button'
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge } from '@/components/status-badge';
-import { fetchPublicNotices } from '@/lib/cloudbase-data';
 import {
   getDaysUntilDeadline,
   getDeadlineDistanceLabel,
-  getDeadlineLevelFromDate,
-  getDeadlineTimestamp
+  getDeadlineLevelFromDate
 } from '@/lib/deadline-display';
 import {
   formatNoticeDateOnly,
-  getDisplayDiscipline,
   getDisplayNoticeDepartment,
-  getDisplayProjectType,
   getDisplaySchoolName,
-  getDisplayTags,
   normalizeNoticeTitle
 } from '@/lib/notice-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
 import {
-  getNoticeRegion,
-  getNoticeRegionOptions,
-  matchesNoticeKind,
-  matchesNoticeType,
   noticeKindFilters,
   noticeTypeFilters,
   type NoticeKindFilter
 } from '@/lib/notice-analytics';
-import { filterMainNoticeProjects } from '@/lib/notice-quality';
-import { baseNoticeProjects, inferDisciplineCategory, inferSchoolRange, matchesSchoolRange } from '@/lib/notice-source';
+import {
+  getNoticeCardTags,
+  getNoticeCityTag,
+  type NoticeDeadlineFilter,
+  type NoticeFreshFilter,
+  type NoticeProgressFilter,
+  type NoticeRangeFilter,
+  type NoticeSearchFilters,
+  type NoticeSortOption
+} from '@/lib/notice-query';
+import {
+  clearPublicNoticeSearchCache,
+  fetchPublicNoticeSearch
+} from '@/lib/public-notice-api';
+import type { PublicNoticeSearchResponse } from '@/lib/public-notice-search';
+import type { NoticeListItem } from '@/lib/notice-record';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
-import type { PublicNoticeProject } from '@/lib/mock-data';
 
-type SortOption = 'deadline' | 'publish' | 'updated' | 'school';
-type ProgressFilter = '全部' | '报名中' | '未开始' | '已结束';
-type RangeFilter = '全部' | '985' | '211' | '双一流' | '其他';
-type DeadlineQuickFilter = '全部' | 'today' | 'within3days' | 'within7days';
-type FreshFilter = '全部' | 'today';
+type SortOption = NoticeSortOption;
+type ProgressFilter = NoticeProgressFilter;
+type RangeFilter = NoticeRangeFilter;
+type DeadlineQuickFilter = NoticeDeadlineFilter;
+type FreshFilter = NoticeFreshFilter;
 type SearchParamReader = Pick<URLSearchParams, 'get' | 'toString'>;
 
 const PAGE_SIZE = 16;
@@ -90,36 +94,6 @@ const defaultNoticeListState: NoticeListUrlState = {
   advancedOpen: false,
   page: 1
 };
-const CITY_TAGS = new Set([
-  '北京',
-  '上海',
-  '广州',
-  '深圳',
-  '南京',
-  '杭州',
-  '天津',
-  '武汉',
-  '成都',
-  '西安',
-  '合肥',
-  '苏州',
-  '重庆',
-  '长沙',
-  '厦门',
-  '青岛',
-  '哈尔滨',
-  '香港',
-  '澳门'
-]);
-
-function matchesProgress(filter: ProgressFilter, project: PublicNoticeProject) {
-  const deadlineLevel = getDeadlineLevelFromDate(project.deadlineDate);
-  if (filter === '全部') return true;
-  if (filter === '报名中') return deadlineLevel !== 'expired' && (project.status === '报名中' || project.status === '即将截止');
-  if (filter === '未开始') return project.status === '未开始';
-  return deadlineLevel === 'expired' || project.status === '已截止' || project.status === '已结束' || project.status === '活动中';
-}
-
 function getVisiblePages(currentPage: number, totalPages: number) {
   const start = Math.max(1, currentPage - 1);
   const end = Math.min(totalPages, currentPage + 1);
@@ -135,47 +109,8 @@ function getVisiblePages(currentPage: number, totalPages: number) {
   return Array.from(new Set(pages));
 }
 
-function getNoticeCardTags(project: PublicNoticeProject) {
-  const seen = new Set<string>();
-  const tags = [getDisplayProjectType(project.projectType), inferSchoolRange(project), ...getDisplayTags(project.tags)]
-    .map((item) => item.trim())
-    .filter((item) => {
-      if (!item || item === '其他' || item === '待分类' || item === '方向待分类') {
-        return false;
-      }
-
-      return item.length <= 8 && !/[，,、；;]/.test(item);
-    })
-    .filter((item) => {
-      if (seen.has(item)) {
-        return false;
-      }
-
-      seen.add(item);
-      return true;
-    });
-
-  return tags.slice(0, 3);
-}
-
-function parseDeadline(project: PublicNoticeProject) {
-  return getDeadlineTimestamp(project.deadlineDate);
-}
-
-function getDaysLeft(project: PublicNoticeProject) {
+function getDaysLeft(project: NoticeListItem) {
   return getDaysUntilDeadline(project.deadlineDate);
-}
-
-function getBeijingDateString(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).formatToParts(date);
-  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || '';
-
-  return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
 function getBeijingTimeString(date = new Date()) {
@@ -190,37 +125,6 @@ function getBeijingTimeString(date = new Date()) {
   return `${value('hour')}:${value('minute')}`;
 }
 
-function sortProjects(rows: PublicNoticeProject[], sortBy: SortOption) {
-  return rows.sort((left, right) => {
-    if (sortBy === 'deadline') {
-      const leftExpired = getDeadlineLevelFromDate(left.deadlineDate) === 'expired' ? 1 : 0;
-      const rightExpired = getDeadlineLevelFromDate(right.deadlineDate) === 'expired' ? 1 : 0;
-
-      if (leftExpired !== rightExpired) {
-        return leftExpired - rightExpired;
-      }
-
-      return parseDeadline(left) - parseDeadline(right);
-    }
-
-    if (sortBy === 'school') {
-      return left.schoolName.localeCompare(right.schoolName, 'zh-CN');
-    }
-
-    if (sortBy === 'updated') {
-      const leftValue = left.updatedAt || left.collectedAt || left.publishDate;
-      const rightValue = right.updatedAt || right.collectedAt || right.publishDate;
-      return rightValue.localeCompare(leftValue);
-    }
-
-    return right.publishDate.localeCompare(left.publishDate);
-  });
-}
-
-function getCityTag(project: PublicNoticeProject) {
-  return (project.tags || []).map((tag) => tag.trim()).find((tag) => CITY_TAGS.has(tag));
-}
-
 const quickFilters = [
   { label: '今日新增', kind: 'fresh', value: 'today' },
   { label: '报名中', kind: 'progress', value: '报名中' },
@@ -233,23 +137,7 @@ const quickFilters = [
   { label: '入营名单', kind: 'noticeKind', value: '入营名单' }
 ] as const;
 
-type NoticeListFilterValues = {
-  keyword: string;
-  schoolName: string;
-  region: string;
-  majorKeyword: string;
-  category: string;
-  discipline: string;
-  schoolRange: RangeFilter;
-  progress: ProgressFilter;
-  deadlineQuick: DeadlineQuickFilter;
-  fresh: FreshFilter;
-  publishDate: string;
-  projectType: string;
-  noticeKind: string;
-  year: string;
-  sortBy: SortOption;
-};
+type NoticeListFilterValues = NoticeSearchFilters;
 
 type NoticeListUrlState = NoticeListFilterValues & {
   advancedOpen: boolean;
@@ -469,18 +357,19 @@ function NoticesPageContent() {
   const searchParams = useSearchParams();
   const initialUrlState = useMemo(() => parseNoticeListUrlState(searchParams), [searchParams]);
   const initialNoticeState = initialUrlState || defaultNoticeListState;
-  const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
-    filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
-  );
+  const [searchResponse, setSearchResponse] = useState<PublicNoticeSearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const [loadedQueryKey, setLoadedQueryKey] = useState('');
   const [lastLoadedAt, setLastLoadedAt] = useState('');
   const [loadError, setLoadError] = useState('');
   const [keyword, setKeyword] = useState(initialNoticeState.keyword);
+  const [debouncedKeyword, setDebouncedKeyword] = useState(initialNoticeState.keyword);
   const [schoolName, setSchoolName] = useState(initialNoticeState.schoolName);
   const [region, setRegion] = useState(initialNoticeState.region);
   const [majorKeyword, setMajorKeyword] = useState(initialNoticeState.majorKeyword);
+  const [debouncedMajorKeyword, setDebouncedMajorKeyword] = useState(initialNoticeState.majorKeyword);
   const [category, setCategory] = useState(initialNoticeState.category);
   const [discipline, setDiscipline] = useState(initialNoticeState.discipline);
   const [schoolRange, setSchoolRange] = useState<RangeFilter>(initialNoticeState.schoolRange);
@@ -497,6 +386,7 @@ function NoticesPageContent() {
     page: initialNoticeState.page,
     filterKey: buildNoticeFilterKey(initialNoticeState)
   }));
+  const requestSequenceRef = useRef(0);
   const filterValues = useMemo<NoticeListFilterValues>(
     () => ({
       keyword,
@@ -536,160 +426,131 @@ function NoticesPageContent() {
   const filterKey = buildNoticeFilterKey(filterValues);
 
   useEffect(() => {
-    let active = true;
+    const timeout = window.setTimeout(() => setDebouncedKeyword(keyword), 350);
+    return () => window.clearTimeout(timeout);
+  }, [keyword]);
 
-    async function loadPublicNotices() {
-      setIsLoading(true);
-      setLoadError('');
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedMajorKeyword(majorKeyword), 350);
+    return () => window.clearTimeout(timeout);
+  }, [majorKeyword]);
 
-      try {
-        const rows = await fetchPublicNotices({ refresh: reloadToken > 0 });
-        if (active) {
-          setProjects(rows.filter((item) => String(item.year) === '2026'));
-          setLastLoadedAt(getBeijingTimeString());
+  const apiFilterValues = useMemo<NoticeSearchFilters>(
+    () => ({
+      keyword: debouncedKeyword,
+      schoolName,
+      region,
+      majorKeyword: debouncedMajorKeyword,
+      category,
+      discipline,
+      schoolRange,
+      progress,
+      deadlineQuick,
+      fresh,
+      publishDate,
+      projectType,
+      noticeKind,
+      year,
+      sortBy
+    }),
+    [
+      debouncedKeyword,
+      schoolName,
+      region,
+      debouncedMajorKeyword,
+      category,
+      discipline,
+      schoolRange,
+      progress,
+      deadlineQuick,
+      fresh,
+      publishDate,
+      projectType,
+      noticeKind,
+      year,
+      sortBy
+    ]
+  );
+  const apiFilterKey = buildNoticeFilterKey(apiFilterValues);
+  const requestedPage = pageState.filterKey === apiFilterKey ? pageState.page : 1;
+  const apiQueryKey = `${apiFilterKey}|page:${requestedPage}`;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const requestId = requestSequenceRef.current + 1;
+    requestSequenceRef.current = requestId;
+    setIsLoading(true);
+    setLoadError('');
+
+    fetchPublicNoticeSearch(apiFilterValues, requestedPage, {
+      pageSize: PAGE_SIZE,
+      signal: controller.signal
+    })
+      .then((response) => {
+        if (controller.signal.aborted || requestSequenceRef.current !== requestId) {
+          return;
         }
-      } catch {
-        if (active) {
-          setProjects(filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026'));
-          setLoadError('通知同步暂时不可用，已展示本地兜底数据。');
+
+        setSearchResponse(response);
+        setLoadedQueryKey(apiQueryKey);
+        setLastLoadedAt(getBeijingTimeString());
+        setLoadError(
+          response.source === 'bundled'
+            ? '云端通知暂时不可用，当前展示最近一次发布的本地兜底数据。'
+            : ''
+        );
+
+        if (response.pagination.page !== requestedPage) {
+          setPageState((current) =>
+            current.filterKey === apiFilterKey
+              ? { filterKey: apiFilterKey, page: response.pagination.page }
+              : current
+          );
         }
-      } finally {
-        if (active) {
+      })
+      .catch((error: unknown) => {
+        if (
+          controller.signal.aborted ||
+          requestSequenceRef.current !== requestId ||
+          (error instanceof DOMException && error.name === 'AbortError')
+        ) {
+          return;
+        }
+
+        setLoadError('通知加载失败，请检查网络后重试。');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted && requestSequenceRef.current === requestId) {
           setIsLoading(false);
           setIsRefreshing(false);
         }
-      }
-    }
+      });
 
-    void loadPublicNotices();
+    return () => controller.abort();
+  }, [apiFilterKey, apiFilterValues, apiQueryKey, reloadToken, requestedPage]);
 
-    return () => {
-      active = false;
-    };
-  }, [reloadToken]);
-
-  const categoryOptions = useMemo(
-    () => ['全部', ...Array.from(new Set(projects.map((item) => inferDisciplineCategory(item.discipline))))],
-    [projects]
-  );
-
-  const disciplineOptions = useMemo(() => {
-    const rows =
-      category === '全部'
-        ? projects
-        : projects.filter((item) => inferDisciplineCategory(item.discipline) === category);
-
-    return ['全部', ...Array.from(new Set(rows.map((item) => getDisplayDiscipline(item.discipline)).filter(Boolean)))];
-  }, [projects, category]);
-
-  const regionOptions = useMemo(() => ['全部', ...getNoticeRegionOptions(projects)], [projects]);
-
-  const schoolOptions = useMemo(() => {
-    const rows = region === '全部' ? projects : projects.filter((item) => getNoticeRegion(item) === region);
-    const schools = Array.from(new Set(rows.map((item) => getDisplaySchoolName(item.schoolName)).filter((item) => item && item !== '待识别院校')));
-
-    return ['全部', ...schools.sort((left, right) => left.localeCompare(right, 'zh-CN'))];
-  }, [projects, region]);
-
-  const todayInBeijing = getBeijingDateString();
-
-  const filteredProjects = useMemo(() => {
-    const noticeKeyword = keyword.trim().toLowerCase();
-    const schoolKeyword = schoolName.trim().toLowerCase();
-    const majorText = majorKeyword.trim().toLowerCase();
-
-    const rows = projects.filter((item) => {
-      const displaySchool = getDisplaySchoolName(item.schoolName);
-      const displayDepartment = getDisplayNoticeDepartment(item);
-      const displayTitle = normalizeNoticeTitle(item.projectName, 160);
-      const primaryKeywordText = [displaySchool, displayDepartment, displayTitle].join(' ').toLowerCase();
-      const secondaryKeywordText = [
-        getDisplayDiscipline(item.discipline),
-        getNoticeCardTags(item).join(' ')
-      ]
-        .join(' ')
-        .toLowerCase();
-      const canUseBroadKeyword = noticeKeyword.length >= 4 || /[a-z0-9]/i.test(noticeKeyword);
-      const matchesType = matchesNoticeType(item, projectType);
-      const matchesKind = matchesNoticeKind(item, noticeKind);
-      const matchesRange = matchesSchoolRange(item, schoolRange);
-      const matchesRegion = region === '全部' ? true : getNoticeRegion(item) === region || (item.tags || []).includes(region);
-      const matchesSchool =
-        schoolName === '全部' ||
-        !schoolKeyword ||
-        [displaySchool, displayDepartment].join(' ').toLowerCase().includes(schoolKeyword);
-      const matchesCategory = category === '全部' ? true : inferDisciplineCategory(item.discipline) === category;
-      const matchesDiscipline = discipline === '全部' ? true : getDisplayDiscipline(item.discipline) === discipline;
-      const matchesMajor =
-        !majorText ||
-        [getDisplayDiscipline(item.discipline), displayDepartment, displayTitle, getNoticeCardTags(item).join(' ')]
-          .join(' ')
-          .toLowerCase()
-          .includes(majorText);
-      const matchesProgressState = matchesProgress(progress, item);
-      const matchesDeadlineQuick =
-        deadlineQuick === '全部'
-          ? true
-          : deadlineQuick === 'today'
-            ? getDeadlineLevelFromDate(item.deadlineDate) === 'today'
-            : deadlineQuick === 'within3days'
-              ? ['today', 'within3days'].includes(getDeadlineLevelFromDate(item.deadlineDate))
-              : ['today', 'within3days', 'within7days'].includes(getDeadlineLevelFromDate(item.deadlineDate));
-      const matchesFresh = fresh === '全部' ? true : item.publishDate === todayInBeijing;
-      const matchesPublishDate = publishDate ? item.publishDate === publishDate : true;
-      const matchesYear = year === '全部' ? true : String(item.year) === year;
-      const matchesKeyword =
-        !noticeKeyword ||
-        primaryKeywordText.includes(noticeKeyword) ||
-        (canUseBroadKeyword && secondaryKeywordText.includes(noticeKeyword));
-
-      return (
-        matchesType &&
-        matchesKind &&
-        matchesRange &&
-        matchesRegion &&
-        matchesSchool &&
-        matchesCategory &&
-        matchesDiscipline &&
-        matchesMajor &&
-        matchesProgressState &&
-        matchesDeadlineQuick &&
-        matchesFresh &&
-        matchesPublishDate &&
-        matchesYear &&
-        matchesKeyword
-      );
-    });
-
-    return sortProjects(rows, sortBy);
-  }, [
-    projects,
-    keyword,
-    schoolName,
-    region,
-    majorKeyword,
-    category,
-    discipline,
-    schoolRange,
-    progress,
-    deadlineQuick,
-    fresh,
-    publishDate,
-    projectType,
-    noticeKind,
-    year,
-    sortBy,
-    todayInBeijing
-  ]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
-  const requestedPage = pageState.filterKey === filterKey ? pageState.page : 1;
-  const currentPage = Math.min(requestedPage, totalPages);
-  const pagedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const responseMatchesQuery = loadedQueryKey === apiQueryKey;
+  const visibleResponse = responseMatchesQuery ? searchResponse : null;
+  const currentPage = responseMatchesQuery
+    ? visibleResponse?.pagination.page || requestedPage
+    : pageState.filterKey === filterKey
+      ? pageState.page
+      : 1;
+  const totalResults = visibleResponse?.pagination.total || 0;
+  const totalPages = visibleResponse?.pagination.totalPages || 1;
+  const pagedProjects = visibleResponse?.items || [];
   const visiblePages = getVisiblePages(currentPage, totalPages);
-  const isNoticeLoading = isLoading && projects.length === 0;
-  const todayUpdateCount = projects.filter((item) => item.publishDate === todayInBeijing).length;
-  const latestPublishDate = projects.reduce((latest, item) => (item.publishDate > latest ? item.publishDate : latest), '');
+  const isNoticeLoading = isLoading && !visibleResponse;
+  const categoryOptions = ['全部', ...(visibleResponse?.facets.categories || [])];
+  const disciplineOptions = ['全部', ...(visibleResponse?.facets.disciplines || [])];
+  const regionOptions = ['全部', ...(visibleResponse?.facets.regions || [])];
+  const schoolOptions = ['全部', ...(visibleResponse?.facets.schools || [])];
+  const urgentProjects = visibleResponse?.sideData.urgentProjects || [];
+  const todayUpdates = visibleResponse?.sideData.todaySchoolUpdates || {
+    date: '',
+    hasTodayRows: false,
+    rows: [] as Array<[string, number]>
+  };
 
   useEffect(() => {
     const preservedHash = window.location.hash.startsWith('#notice-') ? window.location.hash : '';
@@ -702,7 +563,7 @@ function NoticesPageContent() {
   }, [filterValues, currentPage, advancedOpen]);
 
   useEffect(() => {
-    if (isNoticeLoading || !pagedProjects.length || typeof window === 'undefined') {
+    if (isLoading || !responseMatchesQuery || !pagedProjects.length || typeof window === 'undefined') {
       return;
     }
 
@@ -748,53 +609,29 @@ function NoticesPageContent() {
       });
       window.history.replaceState(null, '', buildNoticeListHref(filterValues, currentPage, advancedOpen));
     });
-  }, [isNoticeLoading, currentPage, filterKey, pagedProjects.length, filterValues, advancedOpen]);
+  }, [isLoading, responseMatchesQuery, currentPage, filterKey, pagedProjects.length, filterValues, advancedOpen]);
 
   const pageStats = [
-    { label: '2026通知', value: isNoticeLoading ? '加载中' : `${projects.length}+`, icon: BellRing },
-    { label: '今日更新', value: isNoticeLoading ? '加载中' : `${todayUpdateCount}`, icon: BookOpenText },
+    {
+      label: '2026通知',
+      value: isNoticeLoading ? '加载中' : visibleResponse ? `${visibleResponse.stats.total2026}+` : '—',
+      icon: BellRing
+    },
+    {
+      label: '今日更新',
+      value: isNoticeLoading ? '加载中' : visibleResponse ? `${visibleResponse.stats.todayUpdates}` : '—',
+      icon: BookOpenText
+    },
     {
       label: '3天内截止',
       value: isNoticeLoading
         ? '加载中'
-        : `${
-            projects.filter((item) => {
-              const level = getDeadlineLevelFromDate(item.deadlineDate);
-              return level === 'today' || level === 'within3days';
-            }).length
-          }`,
+        : visibleResponse
+          ? `${visibleResponse.stats.deadlineWithin3Days}`
+          : '—',
       icon: Clock3
     }
   ];
-
-  const urgentProjects = useMemo(
-    () =>
-      sortProjects(
-        projects.filter((item) => ['today', 'within3days', 'within7days'].includes(getDeadlineLevelFromDate(item.deadlineDate))),
-        'deadline'
-      ).slice(0, 5),
-    [projects]
-  );
-
-  const todayUpdates = useMemo(() => {
-    const counts = new Map<string, number>();
-    const todayRows = projects.filter((item) => item.publishDate === todayInBeijing);
-    const fallbackRows = latestPublishDate ? projects.filter((item) => item.publishDate === latestPublishDate) : [];
-    const rows = todayRows.length ? todayRows : fallbackRows;
-
-    rows.forEach((item) => {
-      const school = getDisplaySchoolName(item.schoolName);
-      counts.set(school, (counts.get(school) || 0) + 1);
-    });
-
-    return {
-      date: todayRows.length ? todayInBeijing : latestPublishDate,
-      hasTodayRows: todayRows.length > 0,
-      rows: Array.from(counts.entries())
-        .sort((left, right) => right[1] - left[1])
-        .slice(0, 5)
-    };
-  }, [projects, todayInBeijing, latestPublishDate]);
 
   function updatePage(nextPage: number | ((currentPage: number) => number)) {
     setPageState((current) => {
@@ -852,6 +689,7 @@ function NoticesPageContent() {
     }
 
     setIsRefreshing(true);
+    clearPublicNoticeSearchCache();
     setReloadToken((value) => value + 1);
   }
 
@@ -1113,7 +951,7 @@ function NoticesPageContent() {
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-[22px] border border-slate-200 bg-white px-5 py-4 shadow-sm">
             <div className="flex flex-wrap items-center gap-4 text-sm">
               <span className="font-semibold text-ink">
-                {isNoticeLoading ? '正在加载通知...' : `共 ${filteredProjects.length.toLocaleString('zh-CN')} 条结果`}
+                {isNoticeLoading ? '正在加载通知...' : `共 ${totalResults.toLocaleString('zh-CN')} 条结果`}
               </span>
               <span className="text-slate-400">|</span>
               <button
@@ -1134,7 +972,7 @@ function NoticesPageContent() {
               >
                 按截止时间排序
               </button>
-              {lastLoadedAt ? <span className="text-slate-400">已同步 {lastLoadedAt}</span> : null}
+              {lastLoadedAt ? <span className="text-slate-400">已加载 {lastLoadedAt}</span> : null}
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <button
@@ -1158,7 +996,7 @@ function NoticesPageContent() {
           ) : (
             pagedProjects.map((project, index) => {
               const daysLeft = getDaysLeft(project);
-              const city = getCityTag(project);
+              const city = getNoticeCityTag(project);
               const deadlineLevel = getDeadlineLevelFromDate(project.deadlineDate);
               const highlighted = currentPage === 1 && index === 0 && deadlineLevel !== 'expired';
               const returnHref = buildNoticeListHref(filterValues, currentPage, advancedOpen, project.id);
@@ -1258,7 +1096,7 @@ function NoticesPageContent() {
             </div>
           ) : null}
 
-          {!isNoticeLoading && filteredProjects.length && totalPages > 1 ? (
+          {!isNoticeLoading && totalResults > 0 && totalPages > 1 ? (
             <div className="flex flex-wrap items-center justify-center gap-3 rounded-[22px] bg-white px-5 py-5 shadow-sm">
               <button
                 onClick={() => updatePage((current) => Math.max(1, current - 1))}

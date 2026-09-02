@@ -25,8 +25,7 @@ import {
 import { DeadlineBadge } from '@/components/status-badge';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
-import { fetchPublicNotices } from '@/lib/cloudbase-data';
-import { getDeadlineDistanceLabel, getDeadlineLevelFromDate, getDeadlineTimestamp } from '@/lib/deadline-display';
+import { getDeadlineDistanceLabel, getDeadlineLevelFromDate } from '@/lib/deadline-display';
 import {
   formatNoticeDateOnly,
   getDisplayNoticeDepartment,
@@ -36,37 +35,57 @@ import {
 } from '@/lib/notice-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
 import { collegeDirectory } from '@/lib/college-directory';
-import { filterMainNoticeProjects } from '@/lib/notice-quality';
-import { baseNoticeProjects } from '@/lib/notice-source';
-import { getTopCollegeNoticeStats } from '@/lib/notice-analytics';
+import { fetchPublicNoticeSearch } from '@/lib/public-notice-api';
+import type { PublicNoticeSearchResponse } from '@/lib/public-notice-search';
+import type { NoticeSearchFilters } from '@/lib/notice-query';
+import type { NoticeListItem } from '@/lib/notice-record';
 import { officialResourceSections } from '@/lib/portal-data';
 import { DESKTOP_RELEASE } from '@/lib/desktop-download';
 import { fetchPublicOffers } from '@/lib/offers';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
-import type { PublicNoticeProject } from '@/lib/mock-data';
-
-const urgentRank = { today: 0, within3days: 1, within7days: 2, future: 3, expired: 4 } as const;
+const homeNoticeFilters: NoticeSearchFilters = {
+  keyword: '',
+  schoolName: '',
+  region: '全部',
+  majorKeyword: '',
+  category: '全部',
+  discipline: '全部',
+  schoolRange: '全部',
+  progress: '全部',
+  deadlineQuick: '全部',
+  fresh: '全部',
+  publishDate: '',
+  projectType: '全部',
+  noticeKind: '全部',
+  year: '2026',
+  sortBy: 'publish'
+};
 
 export default function HomePage() {
-  const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
-    filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
-  );
+  const [noticeOverview, setNoticeOverview] = useState<PublicNoticeSearchResponse | null>(null);
   const [noticesLoading, setNoticesLoading] = useState(true);
+  const [noticeLoadError, setNoticeLoadError] = useState(false);
   const [offerCount, setOfferCount] = useState(0);
   const [offersLoading, setOffersLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
 
-    fetchPublicNotices()
-      .then((rows) => {
+    const controller = new AbortController();
+
+    fetchPublicNoticeSearch(homeNoticeFilters, 1, {
+      pageSize: 1,
+      signal: controller.signal
+    })
+      .then((result) => {
         if (active) {
-          setProjects(rows.filter((item) => String(item.year) === '2026'));
+          setNoticeOverview(result);
+          setNoticeLoadError(false);
         }
       })
-      .catch(() => {
-        if (active) {
-          setProjects(filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026'));
+      .catch((error: unknown) => {
+        if (active && !(error instanceof DOMException && error.name === 'AbortError')) {
+          setNoticeLoadError(true);
         }
       })
       .finally(() => {
@@ -77,6 +96,7 @@ export default function HomePage() {
 
     return () => {
       active = false;
+      controller.abort();
     };
   }, []);
 
@@ -105,37 +125,27 @@ export default function HomePage() {
     };
   }, []);
 
-  const liveProjects = useMemo(
-    () => projects.filter((item) => getDeadlineLevelFromDate(item.deadlineDate) !== 'expired'),
-    [projects]
-  );
-
   const latestProjects = useMemo(
-    () => [...liveProjects].sort((left, right) => right.publishDate.localeCompare(left.publishDate)).slice(0, 5),
-    [liveProjects]
+    () => noticeOverview?.sideData.latestProjects || [],
+    [noticeOverview]
   );
-
   const deadlineProjects = useMemo(
-    () =>
-      [...liveProjects]
-        .sort(
-          (left, right) =>
-            urgentRank[getDeadlineLevelFromDate(left.deadlineDate)] - urgentRank[getDeadlineLevelFromDate(right.deadlineDate)] ||
-            getDeadlineTimestamp(left.deadlineDate) - getDeadlineTimestamp(right.deadlineDate)
-        )
-        .slice(0, 5),
-    [liveProjects]
+    () => noticeOverview?.sideData.urgentProjects || [],
+    [noticeOverview]
   );
 
   const priorityActions = useMemo(() => deadlineProjects.slice(0, 3), [deadlineProjects]);
   const totalResourceLinks = officialResourceSections.flatMap((item) => item.links).length;
-  const hotCollegeStats = useMemo(() => getTopCollegeNoticeStats(projects, 6), [projects]);
+  const hotCollegeStats = useMemo(
+    () => noticeOverview?.sideData.topColleges || [],
+    [noticeOverview]
+  );
 
   const heroMetrics = [
     {
       label: '2026 通知',
-      value: `${projects.length}+`,
-      hint: noticesLoading ? '正在同步最新通知' : '持续更新中',
+      value: noticesLoading ? '—' : noticeOverview ? `${noticeOverview.stats.total2026}+` : '暂不可用',
+      hint: noticesLoading ? '正在加载最新通知' : noticeLoadError ? '网络恢复后自动更新' : '持续更新中',
       icon: BellRing,
       href: '/notices'
     },
@@ -558,7 +568,7 @@ function HomeHeroPreview() {
   );
 }
 
-function MiniWorkbenchPanel({ projects }: { projects: PublicNoticeProject[] }) {
+function MiniWorkbenchPanel({ projects }: { projects: NoticeListItem[] }) {
   return (
     <div className="relative min-h-[260px] overflow-hidden bg-gradient-to-br from-emerald-50/80 to-white p-5 sm:p-6">
       <div className="absolute right-[-2rem] top-[-2rem] h-32 w-32 rounded-full bg-brand/10 blur-2xl" />
@@ -618,7 +628,7 @@ function NoticeIllustration() {
   );
 }
 
-function LatestNoticeList({ projects }: { projects: PublicNoticeProject[] }) {
+function LatestNoticeList({ projects }: { projects: NoticeListItem[] }) {
   return (
     <section className="product-card rounded-[24px] p-7">
       <div className="flex items-center justify-between gap-4">
@@ -667,7 +677,7 @@ function LatestNoticeList({ projects }: { projects: PublicNoticeProject[] }) {
   );
 }
 
-function DeadlineReminderList({ projects }: { projects: PublicNoticeProject[] }) {
+function DeadlineReminderList({ projects }: { projects: NoticeListItem[] }) {
   return (
     <aside className="product-card rounded-[24px] p-7">
       <div className="flex items-center justify-between gap-4">

@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   distDir: '.next-web',
-  output: 'export',
   experimental: {
     webpackBuildWorker: false,
     workerThreads: false

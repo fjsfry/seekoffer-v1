@@ -10,6 +10,7 @@ const eslintConfig = [
     ignores: [
       '.next/**',
       '.next-web/**',
+      '.next-web-corrupt-*/**',
       'node_modules/**',
       'node_modules_corrupt_*/**',
       'out/**',

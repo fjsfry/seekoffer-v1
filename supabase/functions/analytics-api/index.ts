@@ -13,7 +13,15 @@ type AnalyticsEvent = {
 
 type SupabaseService = ReturnType<typeof createClient>;
 
-const fallbackAllowedOrigins = ['https://www.seekoffer.com.cn', 'http://localhost:3000', 'http://localhost:3001'];
+const fallbackAllowedOrigins = [
+  'https://www.seekoffer.com.cn',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001',
+  'http://127.0.0.1:3002'
+];
 const visitorIdPattern = /^v_[a-zA-Z0-9_-]{16,90}$/;
 const sessionIdPattern = /^s_[a-zA-Z0-9_-]{16,90}$/;
 
@@ -50,8 +58,8 @@ function json(request: Request, status: number, body: Record<string, unknown>) {
 }
 
 function assertAllowedOrigin(request: Request) {
-  const origin = request.headers.get('origin');
-  return !origin || getAllowedOrigins().includes(origin);
+  const origin = request.headers.get('origin') || '';
+  return Boolean(origin) && getAllowedOrigins().includes(origin);
 }
 
 function text(value: unknown, maxLength: number) {
@@ -64,7 +72,11 @@ function text(value: unknown, maxLength: number) {
 function normalizeEvent(body: AnalyticsEvent, request: Request) {
   const visitorId = text(body.visitorId, 96);
   const sessionId = text(body.sessionId, 96);
-  const eventType = body.eventType === 'heartbeat' ? 'heartbeat' : 'pageview';
+
+  if (body.eventType !== 'pageview' && body.eventType !== 'heartbeat') {
+    throw new Error('invalid_event_type');
+  }
+  const eventType = body.eventType;
 
   if (!visitorIdPattern.test(visitorId)) {
     throw new Error('invalid_visitor_id');
@@ -129,7 +141,11 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const body = (await request.json()) as AnalyticsEvent;
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > 8192) {
+      return json(request, 413, { error: 'payload_too_large' });
+    }
+    const body = JSON.parse(rawBody) as AnalyticsEvent;
     const event = normalizeEvent(body, request);
     const service = createClient(serviceUrl, serviceRoleKey);
     await recordAnalytics(service, event);

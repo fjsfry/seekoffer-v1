@@ -26,6 +26,10 @@ import {
 } from 'lucide-react';
 import { refreshAdminSession, signOutAdmin, watchAdminSession, type AdminSession } from '@/lib/admin-session';
 import { getAdminErrorMessage, invokeAdminApi } from '@/lib/admin-api';
+import {
+  ADMIN_DASHBOARD_SNAPSHOT_EVENT,
+  type AdminDashboardShellSnapshot
+} from '@/lib/admin-shell-events';
 import { adminClassNames } from './admin-ui';
 
 const adminNavItems = [
@@ -206,59 +210,101 @@ export function AdminShell({
       return;
     }
 
-    let disposed = false;
-
-    const loadShellStatus = async () => {
-      const startedAt = performance.now();
-      setShellStatus((current) => ({ ...current, loading: true, error: '' }));
-
-      try {
-        const [overview, analytics] = await Promise.all([
-          invokeAdminApi<{ metrics: ShellOverviewMetrics }>({ resource: 'overview', action: 'get' }),
-          invokeAdminApi<ShellAnalyticsPayload>({ resource: 'analytics', action: 'overview' })
-        ]);
-
-        if (disposed) {
-          return;
-        }
-
-        setShellStatus({
-          loading: false,
-          error: '',
-          apiLatencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
-          pendingNotices: overview.metrics.pendingNotices || 0,
-          pendingOffers: overview.metrics.pendingOffers || 0,
-          pendingFeedback: overview.metrics.pendingFeedback || 0,
-          onlineVisitors: analytics.metrics.onlineVisitors || 0,
-          totalVisitors: analytics.metrics.totalVisitors || 0,
-          todayPageViews: analytics.metrics.todayPageViews || 0,
-          lastCheckedAt: new Date().toISOString()
-        });
-      } catch (error) {
-        if (disposed) {
-          return;
-        }
-
+    if (normalizedPathname === '/admin/dashboard') {
+      setShellStatus((current) => ({ ...current, loading: false }));
+      const syncDashboardSnapshot = (event: Event) => {
+        const snapshot = (event as CustomEvent<AdminDashboardShellSnapshot>).detail;
+        if (!snapshot) return;
         setShellStatus((current) => ({
           ...current,
+          ...snapshot,
           loading: false,
-          error: getAdminErrorMessage(error, '工作台暂时无法更新，请稍后刷新'),
-          apiLatencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
+          error: '',
           lastCheckedAt: new Date().toISOString()
         }));
+      };
+      window.addEventListener(ADMIN_DASHBOARD_SNAPSHOT_EVENT, syncDashboardSnapshot);
+      return () => {
+        window.removeEventListener(ADMIN_DASHBOARD_SNAPSHOT_EVENT, syncDashboardSnapshot);
+      };
+    }
+
+    let disposed = false;
+    let inFlight: Promise<void> | null = null;
+
+    const loadShellStatus = () => {
+      if (document.visibilityState !== 'visible') {
+        return Promise.resolve();
+      }
+
+      if (inFlight) {
+        return inFlight;
+      }
+
+      const request = (async () => {
+        const startedAt = performance.now();
+        setShellStatus((current) => ({ ...current, loading: true, error: '' }));
+
+        try {
+          const snapshot = await invokeAdminApi<{
+            overview: { metrics: ShellOverviewMetrics };
+            analytics: ShellAnalyticsPayload;
+          }>({ resource: 'shell', action: 'snapshot' });
+          const { overview, analytics } = snapshot;
+
+          if (disposed) {
+            return;
+          }
+
+          setShellStatus({
+            loading: false,
+            error: '',
+            apiLatencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
+            pendingNotices: overview.metrics.pendingNotices || 0,
+            pendingOffers: overview.metrics.pendingOffers || 0,
+            pendingFeedback: overview.metrics.pendingFeedback || 0,
+            onlineVisitors: analytics.metrics.onlineVisitors || 0,
+            totalVisitors: analytics.metrics.totalVisitors || 0,
+            todayPageViews: analytics.metrics.todayPageViews || 0,
+            lastCheckedAt: new Date().toISOString()
+          });
+        } catch (error) {
+          if (disposed) {
+            return;
+          }
+
+          setShellStatus((current) => ({
+            ...current,
+            loading: false,
+            error: getAdminErrorMessage(error, '工作台暂时无法更新，请稍后刷新'),
+            apiLatencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
+            lastCheckedAt: new Date().toISOString()
+          }));
+        } finally {
+          inFlight = null;
+        }
+      })();
+
+      inFlight = request;
+      return request;
+    };
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void loadShellStatus();
       }
     };
 
-    void loadShellStatus();
-    const interval = window.setInterval(() => {
-      void loadShellStatus();
-    }, 60_000);
+    refreshWhenVisible();
+    const interval = window.setInterval(refreshWhenVisible, 5 * 60_000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
 
     return () => {
       disposed = true;
       window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
-  }, [session]);
+  }, [normalizedPathname, session]);
 
   if (!sessionReady) {
     return (

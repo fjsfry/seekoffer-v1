@@ -1,12 +1,16 @@
 import type { PublicNoticeProject } from './mock-data';
-import { baseNoticeProjects } from './notice-source';
 
 type NoticeLinkProject = Pick<PublicNoticeProject, 'applyLink' | 'sourceLink'>;
+export type LegacyNoticeDetailSearchParams = {
+  id?: string | string[];
+  returnTo?: string | string[];
+};
 
 const APPLICATION_ONLY_LINK_PATTERN =
   /(wjx|wenjuan|jinshuju|questionnaire|survey|docs\.qq\.com\/form|feishu\.cn\/share\/base\/form|forms?\.|\/forms?\/|\/form\/|\/survey\/|\/questionnaire\/|\/collect\/)/i;
 const AGGREGATOR_LINK_PATTERN = /baoyantongzhi\.com\/notice|seekoffer\.com\.cn\/notices/i;
-const STATIC_NOTICE_IDS = new Set(baseNoticeProjects.map((project) => project.id));
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
+const ENCODED_LINE_BREAK_PATTERN = /%(?:0a|0d)/i;
 
 function normalizeExternalLink(value: string | undefined | null) {
   const link = String(value || '').trim();
@@ -60,17 +64,63 @@ export function getNoticeApplicationLink(project: NoticeLinkProject) {
 
 export function buildNoticeDetailHref(id: string, returnTo?: string) {
   const normalizedId = String(id || '').trim();
+  if (!normalizedId || normalizedId === '.' || normalizedId === '..' || CONTROL_CHARACTER_PATTERN.test(normalizedId)) {
+    return '/notices';
+  }
+
   const params = new URLSearchParams();
 
   if (returnTo) {
     params.set('returnTo', returnTo);
   }
 
-  if (STATIC_NOTICE_IDS.has(normalizedId)) {
-    const query = params.toString();
-    return `/notices/${encodeURIComponent(normalizedId)}${query ? `?${query}` : ''}`;
+  const query = params.toString();
+  return `/notices/${encodeURIComponent(normalizedId)}${query ? `?${query}` : ''}`;
+}
+
+export function getSafeNoticeReturnHref(value: string | string[] | null | undefined) {
+  if (typeof value !== 'string') {
+    return null;
   }
 
-  params.set('id', normalizedId);
-  return `/notices/detail?${params.toString()}`;
+  const candidate = value.trim();
+  if (
+    !candidate ||
+    !candidate.startsWith('/') ||
+    candidate.startsWith('//') ||
+    candidate.includes('\\') ||
+    CONTROL_CHARACTER_PATTERN.test(candidate) ||
+    ENCODED_LINE_BREAK_PATTERN.test(candidate)
+  ) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(candidate, 'https://seekoffer.invalid');
+    if (
+      parsed.origin !== 'https://seekoffer.invalid' ||
+      (parsed.pathname !== '/notices' && parsed.pathname !== '/notices/')
+    ) {
+      return null;
+    }
+
+    return candidate;
+  } catch {
+    return null;
+  }
+}
+
+export function buildLegacyNoticeDetailRedirect(searchParams: LegacyNoticeDetailSearchParams) {
+  const id = typeof searchParams.id === 'string' ? searchParams.id.trim() : '';
+  if (!id) {
+    return '/notices';
+  }
+
+  const hasReturnTo = searchParams.returnTo !== undefined;
+  const returnTo = getSafeNoticeReturnHref(searchParams.returnTo);
+  if (hasReturnTo && !returnTo) {
+    return '/notices';
+  }
+
+  return buildNoticeDetailHref(id, returnTo || undefined);
 }

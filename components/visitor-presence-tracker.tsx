@@ -6,6 +6,9 @@ import { SUPABASE_URL } from '@/lib/supabase-env';
 
 const visitorStorageKey = 'seekoffer-visitor-id';
 const sessionStorageKey = 'seekoffer-session-id';
+const HEARTBEAT_INTERVAL_MS = 5 * 60_000;
+let inMemoryVisitorId = '';
+let inMemorySessionId = '';
 
 function randomId(prefix: 'v' | 's') {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -18,26 +21,36 @@ function randomId(prefix: 'v' | 's') {
 function readPersistentVisitorId() {
   try {
     const existing = window.localStorage.getItem(visitorStorageKey);
-    if (existing?.startsWith('v_')) return existing;
+    if (existing?.startsWith('v_')) {
+      inMemoryVisitorId = existing;
+      return existing;
+    }
 
     const next = randomId('v');
     window.localStorage.setItem(visitorStorageKey, next);
+    inMemoryVisitorId = next;
     return next;
   } catch {
-    return randomId('v');
+    inMemoryVisitorId ||= randomId('v');
+    return inMemoryVisitorId;
   }
 }
 
 function readSessionId() {
   try {
     const existing = window.sessionStorage.getItem(sessionStorageKey);
-    if (existing?.startsWith('s_')) return existing;
+    if (existing?.startsWith('s_')) {
+      inMemorySessionId = existing;
+      return existing;
+    }
 
     const next = randomId('s');
     window.sessionStorage.setItem(sessionStorageKey, next);
+    inMemorySessionId = next;
     return next;
   } catch {
-    return randomId('s');
+    inMemorySessionId ||= randomId('s');
+    return inMemorySessionId;
   }
 }
 
@@ -61,13 +74,13 @@ function sendPresence(eventType: 'pageview' | 'heartbeat', pathname: string) {
   const body = JSON.stringify(buildPayload(eventType, pathname));
 
   if (navigator.sendBeacon && eventType === 'heartbeat') {
-    navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+    navigator.sendBeacon(url, new Blob([body], { type: 'text/plain;charset=UTF-8' }));
     return;
   }
 
   void fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
     body,
     keepalive: true
   }).catch(() => {
@@ -82,22 +95,18 @@ export function VisitorPresenceTracker() {
     if (pathname.startsWith('/admin')) return;
 
     sendPresence('pageview', pathname);
-    const interval = window.setInterval(() => sendPresence('heartbeat', pathname), 45_000);
-
-    const handleVisibilityChange = () => {
+    const sendHeartbeatWhenVisible = () => {
       if (document.visibilityState === 'visible') {
         sendPresence('heartbeat', pathname);
       }
     };
-    const handlePageHide = () => sendPresence('heartbeat', pathname);
+    const interval = window.setInterval(sendHeartbeatWhenVisible, HEARTBEAT_INTERVAL_MS);
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pagehide', handlePageHide);
+    document.addEventListener('visibilitychange', sendHeartbeatWhenVisible);
 
     return () => {
       window.clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pagehide', handlePageHide);
+      document.removeEventListener('visibilitychange', sendHeartbeatWhenVisible);
     };
   }, [pathname]);
 

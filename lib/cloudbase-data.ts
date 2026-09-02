@@ -2,6 +2,12 @@
 
 import { getSupabaseBrowserClient } from './supabase-browser';
 import { getDeadlineLevelFromDate, getPublicStatusForDeadlineLevel } from './deadline-display';
+import { fetchPublicNoticesByIds as fetchPublicNoticesByIdsFromApi } from './public-notice-api';
+import {
+  NOTICE_MANUAL_PROJECT_COLUMNS,
+  mapNoticeRowToProject,
+  noticeListItemToProject
+} from './notice-record';
 import { getUserSession, type UserProfile, updateUserProfile } from './user-session';
 import {
   materialChecklistDefinitions,
@@ -12,16 +18,12 @@ import {
   type UserProjectRecord,
   type UserProjectStatus
 } from './mock-data';
-import { filterMainNoticeProjects } from './notice-quality';
-import { baseNoticeProjects } from './notice-source';
 import { canCreateMoreApplications } from './billing-api';
 
 const APPLICATION_STORAGE_KEY = 'seekoffer-my-application-table';
 const MANUAL_PROJECT_STORAGE_KEY = 'seekoffer-manual-projects';
 const APPLICATION_EVENT_NAME = 'seekoffer-applications-updated';
 const NOTICE_TARGET_YEAR = 2026;
-const PUBLIC_NOTICE_QUERY_LIMIT = 5000;
-const PUBLIC_NOTICE_QUERY_PAGE_SIZE = 1000;
 
 type StoredPayload<T> = {
   updatedAt: string;
@@ -31,6 +33,8 @@ type StoredPayload<T> = {
 export type ApplicationRow = {
   item: UserProjectRecord;
   project: PublicNoticeProject;
+  noticeAvailable: boolean;
+  noticeAvailability: 'available' | 'missing' | 'lookup-failed';
 };
 
 export type ManualProjectInput = {
@@ -50,7 +54,6 @@ export const WORKSPACE_SYNC_NOTICE =
 
 let hydrateWorkspacePromise: Promise<void> | null = null;
 let hydratedWorkspaceUserId = '';
-let publicNoticeCachePromise: Promise<PublicNoticeProject[]> | null = null;
 
 function canUseBrowserStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -234,14 +237,6 @@ function normalizeRecord(record: Partial<UserProjectRecord>) {
   return normalized;
 }
 
-function getProjectFreshness(project: Pick<PublicNoticeProject, 'updatedAt' | 'lastCheckedAt' | 'publishDate'>) {
-  return project.updatedAt || project.lastCheckedAt || project.publishDate || '';
-}
-
-function sortProjectsByFreshness(projects: PublicNoticeProject[]) {
-  return [...projects].sort((left, right) => getProjectFreshness(right).localeCompare(getProjectFreshness(left)));
-}
-
 function readStoredManualProjectsPayload() {
   const payload = readStoragePayload<Partial<PublicNoticeProject>>(MANUAL_PROJECT_STORAGE_KEY);
   if (!payload) {
@@ -368,43 +363,6 @@ function getSupabaseMemberContext() {
     userId: session.userId,
     session
   };
-}
-
-function mapNoticeRowToProject(row: Record<string, unknown>) {
-  if (!row) {
-    return null;
-  }
-
-  return normalizeManualProject({
-    id: String(row.id || '').trim(),
-    schoolName: String(row.school_name || row.schoolName || '').trim(),
-    departmentName: String(row.department_name || row.departmentName || '').trim(),
-    projectName: String(row.project_name || row.projectName || '').trim(),
-    projectType: String(row.project_type || row.projectType || '夏令营') as ProjectType,
-    discipline: String(row.discipline || '').trim(),
-    publishDate: String(row.publish_date || row.publishDate || '').trim(),
-    deadlineDate: String(row.deadline_date || row.deadlineDate || '').trim(),
-    eventStartDate: String(row.event_start_date || row.eventStartDate || '').trim(),
-    eventEndDate: String(row.event_end_date || row.eventEndDate || '').trim(),
-    applyLink: String(row.apply_link || row.applyLink || '').trim(),
-    sourceLink: String(row.source_link || row.sourceLink || '').trim(),
-    requirements: String(row.requirements || '').trim(),
-    materialsRequired: normalizeStringArray(row.materials_required || row.materialsRequired),
-    examInterviewInfo: String(row.exam_interview_info || row.examInterviewInfo || '').trim(),
-    contactInfo: String(row.contact_info || row.contactInfo || '').trim(),
-    remarks: String(row.remarks || '').trim(),
-    tags: normalizeStringArray(row.tags),
-    status: String(row.status || '') as PublicNoticeProject['status'],
-    year: Number(row.year || NOTICE_TARGET_YEAR),
-    deadlineLevel: String(row.deadline_level || row.deadlineLevel || 'future') as DeadlineLevel,
-    sourceSite: String(row.source_site || row.sourceSite || '').trim(),
-    collectedAt: String(row.collected_at || row.collectedAt || '').trim(),
-    updatedAt: String(row.updated_at || row.updatedAt || '').trim(),
-    lastCheckedAt: String(row.last_checked_at || row.lastCheckedAt || '').trim(),
-    isVerified: Boolean(row.is_verified ?? row.isVerified),
-    changeLog: (Array.isArray(row.change_log) ? row.change_log : row.changeLog || []) as PublicNoticeProject['changeLog'],
-    historyRecords: (Array.isArray(row.history_records) ? row.history_records : row.historyRecords || []) as PublicNoticeProject['historyRecords']
-  });
 }
 
 function mapApplicationRowToRecord(row: Record<string, unknown>) {
@@ -613,7 +571,7 @@ async function fetchRemoteManualProjects() {
   const supabase = getSupabaseBrowserClient();
   const { data, error } = await supabase
     .from('notices')
-    .select('*')
+    .select(NOTICE_MANUAL_PROJECT_COLUMNS)
     .eq('created_by', context.userId)
     .eq('is_private', true)
     .order('updated_at_ts', { ascending: false });
@@ -622,7 +580,9 @@ async function fetchRemoteManualProjects() {
     throw error;
   }
 
-  return (data || []).map((row) => mapNoticeRowToProject(row)).filter(Boolean) as PublicNoticeProject[];
+  return ((data || []) as unknown as Record<string, unknown>[])
+    .map((row) => mapNoticeRowToProject(row))
+    .filter(Boolean) as PublicNoticeProject[];
 }
 
 async function fetchRemoteApplications() {
@@ -746,38 +706,6 @@ async function hydrateWorkspaceFromSupabase() {
   await hydrateWorkspacePromise;
 }
 
-async function readRemotePublicNotices() {
-  const supabase = getSupabaseBrowserClient();
-  const rows: Record<string, unknown>[] = [];
-
-  for (let from = 0; from < PUBLIC_NOTICE_QUERY_LIMIT; from += PUBLIC_NOTICE_QUERY_PAGE_SIZE) {
-    const to = Math.min(from + PUBLIC_NOTICE_QUERY_PAGE_SIZE - 1, PUBLIC_NOTICE_QUERY_LIMIT - 1);
-    const { data, error } = await supabase
-      .from('notices')
-      .select('*')
-      .eq('year', NOTICE_TARGET_YEAR)
-      .eq('is_private', false)
-      .eq('admin_status', 'published')
-      .is('admin_deleted_at', null)
-      .order('publish_date', { ascending: false })
-      .order('id', { ascending: true })
-      .range(from, to);
-
-    if (error) {
-      throw error;
-    }
-
-    const pageRows = (data || []) as Record<string, unknown>[];
-    rows.push(...pageRows);
-
-    if (pageRows.length < PUBLIC_NOTICE_QUERY_PAGE_SIZE) {
-      break;
-    }
-  }
-
-  return rows.map((row) => mapNoticeRowToProject(row)).filter(Boolean) as PublicNoticeProject[];
-}
-
 export function watchApplicationTable(callback: () => void) {
   if (typeof window === 'undefined') {
     return () => undefined;
@@ -793,52 +721,49 @@ export function watchApplicationTable(callback: () => void) {
   };
 }
 
-export async function fetchPublicNotices(options: { refresh?: boolean } = {}) {
-  if (options.refresh) {
-    publicNoticeCachePromise = null;
-  }
-
-  if (!publicNoticeCachePromise) {
-    publicNoticeCachePromise = (async () => {
-      try {
-        const remoteProjects = await readRemotePublicNotices();
-        if (!remoteProjects.length) {
-          return filterMainNoticeProjects(baseNoticeProjects);
-        }
-
-        // Once Supabase has data, it becomes the moderation source of truth.
-        // Local JSON is only a disaster-recovery fallback; otherwise admin hide/delete
-        // actions would be reintroduced by the bundled static seed data.
-        return sortProjectsByFreshness(filterMainNoticeProjects(remoteProjects));
-      } catch {
-        return filterMainNoticeProjects(baseNoticeProjects);
-      }
-    })();
-  }
-
-  return publicNoticeCachePromise;
-}
-
-async function getAllProjectsAsync() {
-  const noticeProjects = await fetchPublicNotices();
-  const manualProjects = readStoredManualProjects();
-  const projectMap = new Map<string, PublicNoticeProject>();
-
-  [...noticeProjects, ...manualProjects].forEach((project) => {
-    projectMap.set(project.id, project);
-  });
-
-  return Array.from(projectMap.values());
-}
-
 export async function fetchNoticeById(id: string) {
-  const source = await getAllProjectsAsync();
-  return source.find((item) => item.id === id) || null;
+  const normalizedId = id.trim();
+  if (!normalizedId) return null;
+
+  const manualProject = readStoredManualProjects().find((item) => item.id === normalizedId);
+  if (manualProject) return manualProject;
+
+  const result = await fetchPublicNoticesByIdsFromApi([normalizedId]);
+  const matched = result.items.find((item) => item.id === normalizedId);
+  return matched ? noticeListItemToProject(matched) : null;
 }
 
-export async function fetchDeadlineNotices() {
-  const projects = await fetchPublicNotices();
-  return projects.filter((item) => getDeadlineLevelFromDate(item.deadlineDate) !== 'future');
+function buildUnavailableNoticeProject(projectId: string): PublicNoticeProject {
+  return {
+    id: projectId,
+    schoolName: '原通知暂不可用',
+    departmentName: '你的申请记录仍已保留',
+    projectName: '这条通知可能已下架、删除或暂时无法访问',
+    projectType: '正式推免',
+    discipline: '原通知信息暂不可用',
+    publishDate: '',
+    deadlineDate: '',
+    eventStartDate: '',
+    eventEndDate: '',
+    applyLink: '',
+    sourceLink: '',
+    requirements: '',
+    materialsRequired: [],
+    examInterviewInfo: '',
+    contactInfo: '',
+    remarks: '',
+    tags: ['申请记录已保留'],
+    status: '报名中',
+    year: NOTICE_TARGET_YEAR,
+    deadlineLevel: 'future',
+    sourceSite: '通知暂不可用',
+    collectedAt: '',
+    updatedAt: '',
+    lastCheckedAt: '',
+    isVerified: false,
+    changeLog: [],
+    historyRecords: []
+  };
 }
 
 export async function fetchUserProjects() {
@@ -849,18 +774,47 @@ export async function fetchUserProjects() {
 export async function fetchApplicationRows() {
   await hydrateWorkspaceFromSupabase();
   const records = readStoredRecords();
-  const projects = await getAllProjectsAsync();
-  const projectMap = new Map(projects.map((project) => [project.id, project]));
+  const manualProjects = readStoredManualProjects();
+  const manualProjectMap = new Map(manualProjects.map((project) => [project.id, project]));
+  const publicIds = Array.from(
+    new Set(
+      records
+        .map((record) => record.projectId)
+        .filter((projectId) => projectId && !manualProjectMap.has(projectId))
+    )
+  );
+  const publicResult = await fetchPublicNoticesByIdsFromApi(publicIds).catch(() => ({
+    items: [] as PublicNoticeProject[],
+    source: 'bundled' as const
+  }));
+  const projectMap = new Map<string, PublicNoticeProject>([
+    ...manualProjectMap,
+    ...publicResult.items.map((item) => {
+      const project = noticeListItemToProject(item);
+      return [project.id, project] as const;
+    })
+  ]);
 
-  const rows = records.reduce<ApplicationRow[]>((list, item) => {
+  const rows = records.map<ApplicationRow>((item) => {
     const project = projectMap.get(item.projectId);
-    if (project) {
-      list.push({ item, project });
-    }
-    return list;
-  }, []);
+    return {
+      item,
+      project: project || buildUnavailableNoticeProject(item.projectId),
+      noticeAvailable: Boolean(project),
+      noticeAvailability: project
+        ? 'available'
+        : publicResult.source === 'supabase'
+          ? 'missing'
+          : 'lookup-failed'
+    };
+  });
 
-  return rows.sort((left, right) => left.project.deadlineDate.localeCompare(right.project.deadlineDate));
+  return rows.sort((left, right) => {
+    if (left.noticeAvailable !== right.noticeAvailable) {
+      return left.noticeAvailable ? -1 : 1;
+    }
+    return left.project.deadlineDate.localeCompare(right.project.deadlineDate);
+  });
 }
 
 export async function addProjectToApplicationTable(projectId: string) {
@@ -1011,9 +965,5 @@ export async function updateUserProjectStatus(userProjectId: string, myStatus: U
 
 export function getApplicationProject(projectId: string): PublicNoticeProject | null {
   const manualProject = readStoredManualProjects().find((item) => item.id === projectId);
-  if (manualProject) {
-    return manualProject;
-  }
-
-  return baseNoticeProjects.find((item) => item.id === projectId) || null;
+  return manualProject || null;
 }

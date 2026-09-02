@@ -2,15 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Clock3 } from 'lucide-react';
+import { ArrowUpRight, Clock3, LoaderCircle, RefreshCw } from 'lucide-react';
 import { ApplicationActionButton } from '@/components/application-action-button';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge, StatusBadge } from '@/components/status-badge';
-import { fetchDeadlineNotices } from '@/lib/cloudbase-data';
+import { fetchPublicDeadlineNotices } from '@/lib/public-notice-api';
 import { getDeadlineLevelFromDate } from '@/lib/deadline-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
-import { allSchoolOptions, projectTypeOptions, type PublicNoticeProject } from '@/lib/mock-data';
+import { allSchoolOptions, projectTypeOptions } from '@/lib/mock-data';
+import type { NoticeListItem } from '@/lib/notice-record';
 
 type DeadlineGroupKey = 'today' | 'within3days' | 'within7days';
 
@@ -42,23 +43,41 @@ const groupMeta: Record<
 };
 
 export default function DeadlinesPage() {
-  const [projects, setProjects] = useState<PublicNoticeProject[]>([]);
+  const [projects, setProjects] = useState<NoticeListItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [usingBundledData, setUsingBundledData] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
   const [school, setSchool] = useState<(typeof allSchoolOptions)[number]>('全部学校');
   const [projectType, setProjectType] = useState<(typeof projectTypeOptions)[number]>('全部类型');
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+    setIsLoading(true);
+    setLoadError('');
 
-    fetchDeadlineNotices().then((rows) => {
-      if (active) {
-        setProjects(rows);
-      }
-    });
+    fetchPublicDeadlineNotices(controller.signal)
+      .then((result) => {
+        if (active) {
+          setProjects(result.items);
+          setUsingBundledData(result.source === 'bundled');
+        }
+      })
+      .catch((error: unknown) => {
+        if (active && !(error instanceof DOMException && error.name === 'AbortError')) {
+          setLoadError('截止提醒暂时无法更新。已保留上一次成功结果，请稍后重试。');
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
 
     return () => {
       active = false;
+      controller.abort();
     };
-  }, []);
+  }, [reloadToken]);
 
   const filteredProjects = useMemo(() => {
     return projects
@@ -111,11 +130,40 @@ export default function DeadlinesPage() {
         </select>
 
         <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
-          共筛到 {filteredProjects.length} 个高风险项目，建议优先处理 24 小时内与 3 天内截止通知。
+          {isLoading && !projects.length
+            ? '正在核对最新截止时间，请稍等。'
+            : `共筛到 ${filteredProjects.length} 个高风险项目，建议优先处理 24 小时内与 3 天内截止通知。`}
         </div>
       </section>
 
-      <section className="grid gap-6">
+      {loadError ? (
+        <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+          <span>{loadError}</span>
+          <button
+            type="button"
+            onClick={() => setReloadToken((value) => value + 1)}
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 font-semibold shadow-sm disabled:opacity-60"
+          >
+            {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            重新加载
+          </button>
+        </section>
+      ) : usingBundledData ? (
+        <section className="mb-6 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600">
+          云端数据暂时不可用，当前展示最近一次随版本发布的备用数据。
+        </section>
+      ) : null}
+
+      {isLoading && !projects.length ? (
+        <section className="grid gap-4" aria-label="正在加载截止提醒">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="h-44 animate-pulse rounded-[30px] bg-slate-100" />
+          ))}
+        </section>
+      ) : null}
+
+      {projects.length || (!isLoading && !loadError) ? <section className="grid gap-6">
         {(Object.keys(grouped) as DeadlineGroupKey[]).map((groupKey) => {
           const meta = groupMeta[groupKey];
           const rows = grouped[groupKey];
@@ -182,7 +230,7 @@ export default function DeadlinesPage() {
             </div>
           );
         })}
-      </section>
+      </section> : null}
     </SiteShell>
   );
 }

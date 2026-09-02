@@ -67,16 +67,19 @@ function requireOneOf(value: unknown, allowedValues: string[], field: string) {
 
 type AdminPermission = 'overview:read' | 'content:write' | 'users:write' | 'settings:write' | 'logs:read';
 
-function requireAdminPermission(admin: AdminUser, permission: AdminPermission) {
-  const permissionsByRole: Record<string, Set<string>> = {
-    super_admin: new Set(['overview:read', 'content:write', 'users:write', 'settings:write', 'logs:read']),
-    ops_manager: new Set(['overview:read', 'content:write', 'users:write', 'logs:read']),
-    content_reviewer: new Set(['overview:read', 'content:write']),
-    readonly_admin: new Set(['overview:read', 'logs:read'])
-  };
-  const rolePermissions = permissionsByRole[admin.role] || new Set<string>();
+const permissionsByRole: Record<string, Set<AdminPermission>> = {
+  super_admin: new Set(['overview:read', 'content:write', 'users:write', 'settings:write', 'logs:read']),
+  ops_manager: new Set(['overview:read', 'content:write', 'users:write', 'logs:read']),
+  content_reviewer: new Set(['overview:read', 'content:write']),
+  readonly_admin: new Set(['overview:read', 'logs:read'])
+};
 
-  if (!rolePermissions.has(permission)) {
+function hasAdminPermission(admin: AdminUser, permission: AdminPermission) {
+  return permissionsByRole[admin.role]?.has(permission) || false;
+}
+
+function requireAdminPermission(admin: AdminUser, permission: AdminPermission) {
+  if (!hasAdminPermission(admin, permission)) {
     throw new Error('admin_permission_denied');
   }
 }
@@ -166,12 +169,44 @@ async function countRows(query: PromiseLike<{ count: number | null; error: unkno
   return result.count || 0;
 }
 
+async function revalidatePublicNotices(ids: string[]) {
+  const configuredUrl = Deno.env.get('NOTICE_REVALIDATE_URL') || '';
+  const token = Deno.env.get('NOTICE_REVALIDATE_TOKEN') || '';
+  if (!configuredUrl || !token) {
+    console.warn('[admin-api] public notice cache revalidation is not configured');
+    return false;
+  }
+
+  const url = `${configuredUrl.replace(/\/+$/, '')}/`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-seekoffer-revalidate-token': token
+      },
+      body: JSON.stringify({ ids: Array.from(new Set(ids)).slice(0, 100) })
+    });
+    return response.ok;
+  } catch (error) {
+    console.warn('[admin-api] public notice cache revalidation failed', error);
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function createOnlineWindowStart(minutes = 2) {
   return new Date(Date.now() - minutes * 60 * 1000).toISOString();
 }
 
 async function getAnalyticsOverview(service: SupabaseService) {
-  const activeWindowMinutes = 2;
+  const activeWindowMinutes = 6;
   const onlineSince = createOnlineWindowStart(activeWindowMinutes);
   const todayStart = getShanghaiDayStart(0).toISOString();
 
@@ -206,6 +241,55 @@ async function getAnalyticsOverview(service: SupabaseService) {
     },
     onlineVisitors: onlineRows.data || [],
     recentVisitors: recentRows.data || []
+  };
+}
+
+async function getDashboardSnapshot(service: SupabaseService, admin: AdminUser) {
+  const canReadFeedback = hasAdminPermission(admin, 'users:write');
+  const [overview, analytics, notices, offers, feedback] = await Promise.all([
+    getOverview(service),
+    getAnalyticsOverview(service),
+    listNotices(service, {
+      page: 1,
+      pageSize: 5,
+      filters: { status: 'pending' },
+      sort: 'updated_desc'
+    }, false),
+    listOffers(service, { page: 1, pageSize: 20 }, false),
+    canReadFeedback
+      ? listFeedback(service, { page: 1, pageSize: 5 }, false)
+      : Promise.resolve({ feedback: [], total: 0, page: 1, pageSize: 5 })
+  ]);
+
+  return { overview, analytics, notices, offers, feedback };
+}
+
+async function getShellSnapshot(service: SupabaseService) {
+  const onlineSince = createOnlineWindowStart(6);
+  const todayStart = getShanghaiDayStart(0).toISOString();
+  const [
+    pendingNotices,
+    pendingOffers,
+    pendingFeedback,
+    onlineVisitors,
+    totalVisitors,
+    todayPageViews
+  ] = await Promise.all([
+    countRows(service.from('notices').select('id', { count: 'exact', head: true }).is('admin_deleted_at', null).eq('admin_status', 'pending')),
+    countRows(service.from('offer_posts').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('review_status', 'pending')),
+    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
+    countRows(service.from('site_visitors').select('visitor_id', { count: 'exact', head: true }).gte('last_seen_at', onlineSince)),
+    countRows(service.from('site_visitors').select('visitor_id', { count: 'exact', head: true })),
+    countRows(service.from('site_visit_events').select('id', { count: 'exact', head: true }).eq('event_type', 'pageview').gte('created_at', todayStart))
+  ]);
+
+  return {
+    overview: {
+      metrics: { pendingNotices, pendingOffers, pendingFeedback }
+    },
+    analytics: {
+      metrics: { onlineVisitors, totalVisitors, todayPageViews, activeWindowMinutes: 6 }
+    }
   };
 }
 
@@ -398,7 +482,11 @@ async function getNoticeMetrics(service: SupabaseService) {
   return { pending, published, rejected, hidden, deleted };
 }
 
-async function listNotices(service: SupabaseService, body: Record<string, unknown>) {
+async function listNotices(
+  service: SupabaseService,
+  body: Record<string, unknown>,
+  includeMetrics = true
+) {
   const page = readPage(body);
   const pageSize = readPageSize(body);
   const filters = readFilters(body);
@@ -468,7 +556,7 @@ async function listNotices(service: SupabaseService, body: Record<string, unknow
     total: count || 0,
     page,
     pageSize,
-    metrics: await getNoticeMetrics(service)
+    metrics: includeMetrics ? await getNoticeMetrics(service) : undefined
   };
 }
 
@@ -502,7 +590,8 @@ async function updateNoticeStatus(service: SupabaseService, admin: AdminUser, re
   if (error) throw error;
 
   await logOperation(service, admin, request, validIds.length > 1 ? 'bulk_update_notice_status' : 'update_notice_status', 'notices', validIds.join(','), before.data, data, note);
-  return { notices: data || [], count: data?.length || 0 };
+  const cacheRevalidated = await revalidatePublicNotices(validIds);
+  return { notices: data || [], count: data?.length || 0, cacheRevalidated };
 }
 
 async function getOfferMetrics(service: SupabaseService) {
@@ -519,7 +608,11 @@ async function getOfferMetrics(service: SupabaseService) {
   return { pending, approved, hidden, rejected, deleted, offerPosts, discussions };
 }
 
-async function listOffers(service: SupabaseService, body: Record<string, unknown>) {
+async function listOffers(
+  service: SupabaseService,
+  body: Record<string, unknown>,
+  includeMetrics = true
+) {
   const page = readPage(body);
   const pageSize = readPageSize(body);
   const filters = readFilters(body);
@@ -566,7 +659,13 @@ async function listOffers(service: SupabaseService, body: Record<string, unknown
   const { data, error, count } = await query.order('created_at', { ascending: false }).range(from, to);
 
   if (error) throw error;
-  return { offers: data || [], total: count || 0, page, pageSize, metrics: await getOfferMetrics(service) };
+  return {
+    offers: data || [],
+    total: count || 0,
+    page,
+    pageSize,
+    metrics: includeMetrics ? await getOfferMetrics(service) : undefined
+  };
 }
 
 async function fetchAuthEmails(service: SupabaseService, userIds: string[]) {
@@ -726,7 +825,11 @@ async function listUsers(service: SupabaseService, body: Record<string, unknown>
   };
 }
 
-async function listFeedback(service: SupabaseService, body: Record<string, unknown>) {
+async function listFeedback(
+  service: SupabaseService,
+  body: Record<string, unknown>,
+  includeMetrics = true
+) {
   const page = readPage(body);
   const pageSize = readPageSize(body);
   const filters = readFilters(body);
@@ -772,14 +875,18 @@ async function listFeedback(service: SupabaseService, body: Record<string, unkno
 
   if (error) throw error;
 
-  const [pending, processing, resolved, closed] = await Promise.all([
-    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
-    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'processing')),
-    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'resolved')),
-    countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'closed'))
-  ]);
+  let metrics: { pending: number; processing: number; resolved: number; closed: number } | undefined;
+  if (includeMetrics) {
+    const [pending, processing, resolved, closed] = await Promise.all([
+      countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
+      countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'processing')),
+      countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'resolved')),
+      countRows(service.from('feedback_reports').select('id', { count: 'exact', head: true }).eq('status', 'closed'))
+    ]);
+    metrics = { pending, processing, resolved, closed };
+  }
 
-  return { feedback: data || [], total: count || 0, page, pageSize, metrics: { pending, processing, resolved, closed } };
+  return { feedback: data || [], total: count || 0, page, pageSize, metrics };
 }
 
 async function listAiWaitlistLeads(service: SupabaseService, body: Record<string, unknown>) {
@@ -934,6 +1041,17 @@ Deno.serve(async (request) => {
       return json(200, await getOverview(service));
     }
 
+    if (resource === 'dashboard' && action === 'snapshot') {
+      requireAdminPermission(admin, 'overview:read');
+      requireAdminPermission(admin, 'content:write');
+      return json(200, await getDashboardSnapshot(service, admin));
+    }
+
+    if (resource === 'shell' && action === 'snapshot') {
+      requireAdminPermission(admin, 'overview:read');
+      return json(200, await getShellSnapshot(service));
+    }
+
     if (resource === 'analytics') {
       requireAdminPermission(admin, 'overview:read');
       return json(200, await getAnalyticsOverview(service));
@@ -974,7 +1092,8 @@ Deno.serve(async (request) => {
       const { data, error } = await service.from('notices').insert(payload).select().single();
       if (error) throw error;
       await logOperation(service, admin, request, 'create_notice', 'notices', payload.id, {}, data, '管理员新建通知');
-      return json(200, { notice: data });
+      const cacheRevalidated = await revalidatePublicNotices([payload.id]);
+      return json(200, { notice: data, cacheRevalidated });
     }
 
     if (resource === 'notices' && (action === 'update_status' || action === 'bulk_update_status')) {

@@ -48,7 +48,7 @@ import {
   normalizeNoticeTitle
 } from '@/lib/notice-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
-import { matchesSchoolRange } from '@/lib/notice-source';
+import { matchesSchoolRange } from '@/lib/notice-taxonomy';
 import {
   hydrateWorkbenchState,
   saveWorkbenchState,
@@ -427,6 +427,10 @@ function getResourceToneClass(tone: string) {
 }
 
 function getWorkbenchProgressBucket(row: ApplicationRow): Exclude<WorkbenchProgressFilter, '全部'> {
+  if (!row.noticeAvailable) {
+    return '报名中';
+  }
+
   if (row.project.deadlineLevel === 'expired' || row.project.status === '已截止' || row.project.status === '已结束') {
     return '已结束';
   }
@@ -452,18 +456,23 @@ function getWorkbenchResultBucket(row: ApplicationRow): Exclude<WorkbenchResultF
 
 function matchesWorkbenchType(filter: WorkbenchTypeFilter, row: ApplicationRow) {
   if (filter === '全部') return true;
+  if (!row.noticeAvailable) return false;
   if (filter === '正式推免') return ['正式推免', '推免', '九推'].includes(row.project.projectType);
   return row.project.projectType === filter;
 }
 
 function getWorkbenchSearchText(row: ApplicationRow) {
-  return [row.project.schoolName, getDisplaySchoolName(row.project.schoolName)]
+  return [row.project.schoolName, getDisplaySchoolName(row.project.schoolName), row.item.projectId]
     .join(' ')
     .toLowerCase();
 }
 
 function sortWorkbenchRows(rows: ApplicationRow[], sortBy: WorkbenchSortOption) {
   return [...rows].sort((left, right) => {
+    if (left.noticeAvailable !== right.noticeAvailable) {
+      return left.noticeAvailable ? -1 : 1;
+    }
+
     if (sortBy === 'school') {
       return getDisplaySchoolName(left.project.schoolName).localeCompare(getDisplaySchoolName(right.project.schoolName), 'zh-CN');
     }
@@ -2397,6 +2406,11 @@ function ApplicationProgressCard({
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <h3 className="max-w-full truncate text-xl font-semibold leading-tight text-ink">{getDisplaySchoolName(project.schoolName)}</h3>
               <span className="text-sm font-semibold text-slate-500">· {getDisplayNoticeDepartment(project)}</span>
+              {!row.noticeAvailable ? (
+                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                  {row.noticeAvailability === 'missing' ? '原通知已下线' : '通知暂时无法加载'}
+                </span>
+              ) : null}
             </div>
             <p className="mt-2 line-clamp-2 max-w-2xl text-base leading-7 text-slate-600">{normalizeNoticeTitle(project.projectName, 72)}</p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
@@ -2472,10 +2486,17 @@ function ApplicationProgressCard({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-end gap-4 border-t border-slate-100 pt-4 text-xs font-semibold text-slate-500">
-        <Link href={href} className="inline-flex items-center gap-1 hover:text-brand">
-          <ExternalLink className="h-3.5 w-3.5" />
-          {project.sourceSite === '用户手动录入' ? '查看录入' : '查看通知'}
-        </Link>
+        {row.noticeAvailable ? (
+          <Link href={href} className="inline-flex items-center gap-1 hover:text-brand">
+            <ExternalLink className="h-3.5 w-3.5" />
+            {project.sourceSite === '用户手动录入' ? '查看录入' : '查看通知'}
+          </Link>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-amber-700" title={`原通知编号：${item.projectId}`}>
+            <ExternalLink className="h-3.5 w-3.5" />
+            {row.noticeAvailability === 'missing' ? '原通知已下线' : '稍后重试通知'}
+          </span>
+        )}
         <button
           type="button"
           onClick={() => setOpenChecklistId(checklistOpen ? '' : item.userProjectId)}

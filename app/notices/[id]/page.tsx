@@ -3,18 +3,10 @@ import { notFound } from 'next/navigation';
 import { NoticeDetailView } from '@/components/notice-detail-view';
 import { SiteShell } from '@/components/site-shell';
 import { formatNoticeDateOnly, getDisplayDiscipline, getDisplayNoticeDepartment, getDisplayProjectType, getDisplaySchoolName, normalizeNoticeTitle } from '@/lib/notice-display';
-import { baseNoticeProjects } from '@/lib/notice-source';
 import { sanitizeNoticeForPublicView } from '@/lib/notice-public-copy';
-import { filterMainNoticeProjects } from '@/lib/notice-quality';
+import { getSafeNoticeReturnHref } from '@/lib/notice-links';
+import { getCachedNoticeById } from '@/lib/server/public-notice-catalog';
 import { SITE_NAME, absoluteUrl, jsonLdScript } from '@/lib/seo';
-
-const visibleNoticeProjects = filterMainNoticeProjects(baseNoticeProjects);
-
-export function generateStaticParams() {
-  return visibleNoticeProjects.map((item) => ({
-    id: item.id
-  }));
-}
 
 export async function generateMetadata({
   params
@@ -22,7 +14,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const project = visibleNoticeProjects.find((item) => item.id === id);
+  const project = await getCachedNoticeById(id);
 
   if (!project) {
     return {
@@ -61,12 +53,15 @@ export async function generateMetadata({
 }
 
 export default async function NoticeDetailPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnTo?: string | string[] }>;
 }) {
   const { id } = await params;
-  const project = visibleNoticeProjects.find((item) => item.id === id);
+  const returnHref = getSafeNoticeReturnHref((await searchParams).returnTo) || '/notices';
+  const project = await getCachedNoticeById(id);
 
   if (!project) {
     notFound();
@@ -131,7 +126,7 @@ export default async function NoticeDetailPage({
   return (
     <SiteShell>
       <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(noticeJsonLd)} />
-      <NoticeDetailView project={sanitizeNoticeForPublicView(project)} returnHref="/notices" />
+      <NoticeDetailView project={sanitizeNoticeForPublicView(project)} returnHref={returnHref} />
     </SiteShell>
   );
 }
