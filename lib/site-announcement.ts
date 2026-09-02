@@ -1,6 +1,6 @@
 export const SITE_ANNOUNCEMENT = {
-  id: 'users-10000-desktop-v022-dialog-v2',
-  storageKey: 'seekoffer:site-announcement:users-10000-desktop-v022-dialog-v2',
+  id: 'users-10000-desktop-letter-v1',
+  storageKey: 'seekoffer:site-announcement:users-10000-desktop-letter-v1',
   expiresAt: '2026-09-23T23:59:59+08:00',
   eyebrow: '写给每一位正在保研路上的你',
   milestone: '10,000+ 位同学，与寻鹿同行',

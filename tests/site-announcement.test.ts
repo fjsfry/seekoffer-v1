@@ -11,7 +11,7 @@ const cssSource = readFileSync(resolve(root, 'app/globals.css'), 'utf8');
 
 describe('public website milestone announcement dialog', () => {
   it('combines the 10,000-user milestone with a detailed desktop launch story', () => {
-    expect(SITE_ANNOUNCEMENT.id).toBe('users-10000-desktop-v022-dialog-v2');
+    expect(SITE_ANNOUNCEMENT.id).toBe('users-10000-desktop-letter-v1');
     expect(SITE_ANNOUNCEMENT.milestone).toContain('10,000+');
     expect(SITE_ANNOUNCEMENT.title).toContain('一万位同行者');
     expect(SITE_ANNOUNCEMENT.letterParagraphs).toHaveLength(3);
