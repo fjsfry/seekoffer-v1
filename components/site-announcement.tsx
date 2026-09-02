@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { watchAuthModal } from '@/lib/auth-intent';
-import { DESKTOP_RELEASE } from '@/lib/desktop-download';
 import { SITE_ANNOUNCEMENT } from '@/lib/site-announcement';
 
 type AnnouncementState = 'checking' | 'open' | 'closed';
@@ -136,7 +135,7 @@ export function SiteAnnouncement() {
           <article className="mx-auto max-w-[690px] px-6 pb-9 pt-14 sm:px-12 sm:pb-12 sm:pt-11">
             <header>
               <p className="text-sm font-medium text-brand">{SITE_ANNOUNCEMENT.eyebrow}</p>
-              <p className="mt-5 text-sm font-semibold text-slate-500">{SITE_ANNOUNCEMENT.milestone}</p>
+              <p className="mt-7 text-base font-medium text-slate-600">{SITE_ANNOUNCEMENT.salutation}</p>
               <h2
                 id="site-announcement-title"
                 className="mt-2 text-[2rem] font-semibold leading-[1.25] tracking-[-0.035em] text-ink sm:text-[2.5rem]"
@@ -155,24 +154,22 @@ export function SiteAnnouncement() {
             </div>
 
             <section className="my-8 border-y border-slate-200 py-7 sm:my-10 sm:py-9">
-              <p className="text-sm font-medium text-brand">{SITE_ANNOUNCEMENT.productEyebrow}</p>
-              <h3 className="mt-2 text-2xl font-semibold leading-snug tracking-[-0.025em] text-ink sm:text-[1.8rem]">
-                {SITE_ANNOUNCEMENT.productTitle}
-              </h3>
+              <p className="text-[15px] leading-8 text-slate-600 sm:text-base">
+                {SITE_ANNOUNCEMENT.desktopIntro} <strong className="font-semibold text-ink">{SITE_ANNOUNCEMENT.desktopName}</strong>。
+              </p>
               <div className="mt-4 space-y-4 text-[15px] leading-8 text-slate-600 sm:text-base">
-                {SITE_ANNOUNCEMENT.productParagraphs.map((paragraph) => (
+                {SITE_ANNOUNCEMENT.desktopParagraphs.map((paragraph) => (
                   <p key={paragraph}>{paragraph}</p>
                 ))}
               </div>
-              <p className="mt-5 text-sm font-medium text-slate-500">
-                Windows 10 / 11 · v{DESKTOP_RELEASE.version} · {DESKTOP_RELEASE.installerSize} · 免费下载
-              </p>
             </section>
 
-            <blockquote className="text-lg font-medium leading-8 text-ink sm:text-xl sm:leading-9">
-              {SITE_ANNOUNCEMENT.closing}
-            </blockquote>
-            <p className="mt-5 text-sm text-slate-500">{SITE_ANNOUNCEMENT.signature}</p>
+            <div className="space-y-4 text-[15px] leading-8 text-slate-600 sm:text-base">
+              <p className="text-lg font-medium text-ink sm:text-xl">{SITE_ANNOUNCEMENT.journey}</p>
+              <p>{SITE_ANNOUNCEMENT.thanks}</p>
+              <p>{SITE_ANNOUNCEMENT.wish}</p>
+              <p className="pt-1 font-semibold text-ink">{SITE_ANNOUNCEMENT.signature}</p>
+            </div>
           </article>
         </div>
 
