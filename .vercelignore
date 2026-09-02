@@ -2,8 +2,11 @@ node_modules/
 node_modules_corrupt_*/
 .next/
 .next-web/
+.next-web-corrupt-*/
 hosting-dist/
 out/
+artifacts/
+backups/
 *.log
 *.err.log
 *.out.log
