@@ -135,6 +135,10 @@ select {
   box-shadow: 0 16px 38px rgba(18, 32, 38, 0.045);
 }
 
+html[data-seekoffer-announcement-hidden='true'] [data-site-announcement] {
+  display: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

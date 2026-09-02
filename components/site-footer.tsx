@@ -49,21 +49,43 @@ export function SiteFooter() {
           ))}
         </div>
 
-        <div className="lg:justify-self-end">
-          <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-            <Image
-              src="/wechat-qr.jpg"
-              alt="寻鹿 Seekoffer 公众号二维码"
-              width={116}
-              height={116}
-              loading="eager"
-              className="h-28 w-28 rounded-xl object-cover"
-            />
+        <div className="grid grid-cols-2 justify-items-center gap-4 lg:grid-cols-1 lg:gap-6 lg:justify-self-end">
+          <div className="w-fit">
+            <div className="w-fit rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+              <Image
+                src="/wechat-qr.jpg"
+                alt="寻鹿 Seekoffer 公众号二维码"
+                width={116}
+                height={116}
+                loading="eager"
+                className="h-28 w-28 rounded-xl object-cover"
+              />
+            </div>
+            <div className="mt-3 text-center text-xs leading-5 text-slate-500">
+              关注寻鹿公众号
+              <br />
+              获取最新保研资讯
+            </div>
           </div>
-          <div className="mt-3 text-center text-xs leading-5 text-slate-500">
-            关注寻鹿公众号
-            <br />
-            获取最新保研资讯
+
+          <div className="w-fit">
+            <div className="w-fit rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+              <div className="relative h-28 w-28 overflow-hidden rounded-xl bg-white">
+                <Image
+                  src="/qq-group-qr-source.png"
+                  alt="寻鹿2026保研交流群二维码"
+                  width={1284}
+                  height={2283}
+                  className="absolute max-w-none"
+                  style={{ width: 156, height: 278, left: -22, top: -83 }}
+                />
+              </div>
+            </div>
+            <div className="mt-3 text-center text-xs leading-5 text-slate-500">
+              加入寻鹿保研交流群
+              <br />
+              QQ 群：1092490793
+            </div>
           </div>
         </div>
       </div>

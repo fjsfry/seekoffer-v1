@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import { AuthActionBridge } from '@/components/auth-action-bridge';
 import { AuthModal } from '@/components/auth-modal';
 import { UserSessionProvider } from '@/components/user-session-provider';
 import { VisitorPresenceTracker } from '@/components/visitor-presence-tracker';
 import { SITE_DESCRIPTION, SITE_NAME, absoluteUrl, buildOrganizationJsonLd, buildWebSiteJsonLd, jsonLdScript } from '@/lib/seo';
+import { buildSiteAnnouncementBootstrapScript } from '@/lib/site-announcement';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -86,6 +88,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="zh-CN">
       <body>
+        <Script
+          id="seekoffer-site-announcement-bootstrap"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: buildSiteAnnouncementBootstrapScript() }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={jsonLdScript([buildWebSiteJsonLd(), buildOrganizationJsonLd()])}
