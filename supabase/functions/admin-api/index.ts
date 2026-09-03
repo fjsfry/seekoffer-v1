@@ -244,9 +244,54 @@ async function getAnalyticsOverview(service: SupabaseService) {
   };
 }
 
+const DESKTOP_DOWNLOAD_TRACKING_STARTED_AT = '2026-09-03';
+
+function createEmptyDesktopDownloadMetrics() {
+  return {
+    total: 0,
+    today: 0,
+    sevenDays: 0,
+    trackingStartedAt: DESKTOP_DOWNLOAD_TRACKING_STARTED_AT
+  };
+}
+
+function normalizeMetricCount(value: unknown) {
+  const count = Number(value);
+  return Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0;
+}
+
+function normalizeTrackingStartDate(value: unknown) {
+  if (typeof value !== 'string') return DESKTOP_DOWNLOAD_TRACKING_STARTED_AT;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return DESKTOP_DOWNLOAD_TRACKING_STARTED_AT;
+
+  return new Date(timestamp + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+async function getDesktopDownloadMetrics(service: SupabaseService) {
+  try {
+    const { data, error } = await service.rpc('seekoffer_get_desktop_download_metrics');
+    if (error) throw error;
+
+    const rawMetrics = Array.isArray(data) ? data[0] : data;
+    const metrics = rawMetrics && typeof rawMetrics === 'object'
+      ? rawMetrics as Record<string, unknown>
+      : {};
+    return {
+      total: normalizeMetricCount(metrics.total),
+      today: normalizeMetricCount(metrics.today),
+      sevenDays: normalizeMetricCount(metrics.seven_days),
+      trackingStartedAt: normalizeTrackingStartDate(metrics.tracking_started_at)
+    };
+  } catch {
+    console.warn('[admin-api] desktop download metrics unavailable');
+    return createEmptyDesktopDownloadMetrics();
+  }
+}
+
 async function getDashboardSnapshot(service: SupabaseService, admin: AdminUser) {
   const canReadFeedback = hasAdminPermission(admin, 'users:write');
-  const [overview, analytics, notices, offers, feedback] = await Promise.all([
+  const [overview, analytics, notices, offers, feedback, downloads] = await Promise.all([
     getOverview(service),
     getAnalyticsOverview(service),
     listNotices(service, {
@@ -258,10 +303,11 @@ async function getDashboardSnapshot(service: SupabaseService, admin: AdminUser) 
     listOffers(service, { page: 1, pageSize: 20 }, false),
     canReadFeedback
       ? listFeedback(service, { page: 1, pageSize: 5 }, false)
-      : Promise.resolve({ feedback: [], total: 0, page: 1, pageSize: 5 })
+      : Promise.resolve({ feedback: [], total: 0, page: 1, pageSize: 5 }),
+    getDesktopDownloadMetrics(service)
   ]);
 
-  return { overview, analytics, notices, offers, feedback };
+  return { overview, analytics, notices, offers, feedback, downloads };
 }
 
 async function getShellSnapshot(service: SupabaseService) {

@@ -29,6 +29,7 @@ import {
   type AdminDashboardShellSnapshot
 } from '@/lib/admin-shell-events';
 import { formatBeijingDateTime } from '@/lib/admin-time';
+import { DESKTOP_RELEASE } from '@/lib/desktop-download';
 
 const emptyOverview: AdminOverviewMetrics = {
   totalUsers: 0,
@@ -71,11 +72,19 @@ const emptyAnalytics: AdminAnalyticsPayload = {
   recentVisitors: []
 };
 
+const emptyDesktopDownloads: DesktopDownloadMetrics = {
+  total: 0,
+  today: 0,
+  sevenDays: 0,
+  trackingStartedAt: '2026-09-03'
+};
+
 const DASHBOARD_REFRESH_INTERVAL_MS = 5 * 60_000;
 
 export default function AdminDashboardPage() {
   const [overviewMetrics, setOverviewMetrics] = useState<AdminOverviewMetrics>(emptyOverview);
   const [analytics, setAnalytics] = useState<AdminAnalyticsPayload>(emptyAnalytics);
+  const [downloads, setDownloads] = useState<DesktopDownloadMetrics>(emptyDesktopDownloads);
   const [trends, setTrends] = useState<TrendPoint[]>(buildEmptyTrends());
   const [pendingNotices, setPendingNotices] = useState<AdminNoticeRow[]>([]);
   const [pendingOffers, setPendingOffers] = useState<AdminOfferRow[]>([]);
@@ -103,11 +112,13 @@ export default function AdminDashboardPage() {
           notices: { notices: NoticeApiRow[] };
           offers: { offers: OfferApiRow[] };
           feedback: { feedback: FeedbackApiRow[] };
+          downloads?: DesktopDownloadMetrics;
         }>({ resource: 'dashboard', action: 'snapshot' });
-        const { overview, analytics: analyticsData, notices, offers, feedback } = snapshot;
+        const { overview, analytics: analyticsData, notices, offers, feedback, downloads: downloadMetrics } = snapshot;
 
         setOverviewMetrics(overview.metrics);
         setAnalytics(analyticsData);
+        setDownloads(downloadMetrics ?? emptyDesktopDownloads);
         setTrends(overview.trends?.length ? overview.trends : buildEmptyTrends());
         setPendingNotices(notices.notices.map(mapNoticeApiRow));
         setPendingOffers(offers.offers.filter((item) => item.review_status === 'pending' || item.reports_count > 0).slice(0, 5).map(mapOfferApiRow));
@@ -212,6 +223,7 @@ export default function AdminDashboardPage() {
       generatedAt: new Date().toISOString(),
       metrics: overviewMetrics,
       analytics: analytics.metrics,
+      downloads,
       trends
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
@@ -263,8 +275,8 @@ export default function AdminDashboardPage() {
           </div>
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-2">
-          <article className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.05)] lg:p-7">
+        <section className="grid min-w-0 gap-5 xl:grid-cols-3">
+          <article className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.05)] lg:p-7">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-50 text-teal-800 ring-1 ring-inset ring-teal-100">
@@ -295,7 +307,7 @@ export default function AdminDashboardPage() {
             </dl>
           </article>
 
-          <article className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.05)] lg:p-7">
+          <article className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.05)] lg:p-7">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-100">
@@ -332,6 +344,40 @@ export default function AdminDashboardPage() {
               <div className="pl-4">
                 <dd className="text-xl font-semibold text-slate-950 tabular-nums">{formatNumber(overviewMetrics.normalUsers)}</dd>
                 <dt className="mt-1 text-sm text-slate-500">正常账号</dt>
+              </div>
+            </dl>
+          </article>
+
+          <article className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.05)] lg:p-7">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-100">
+                  <Download className="h-6 w-6" />
+                </span>
+                <h2 className="min-w-0 text-lg font-semibold text-slate-950">桌面端下载启动</h2>
+              </div>
+              <span className="rounded-lg bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 ring-1 ring-inset ring-violet-100">
+                从 {downloads.trackingStartedAt} 起统计
+              </span>
+            </div>
+
+            <div className="mt-8 text-5xl font-semibold leading-none text-slate-950 tabular-nums 2xl:text-6xl">
+              {formatNumber(downloads.total)}
+            </div>
+            <p className="mt-3 text-sm text-slate-500">官网按钮发起下载次数</p>
+
+            <dl className="mt-auto grid min-w-0 grid-cols-3 divide-x divide-slate-200 border-t border-slate-100 pt-5">
+              <div className="min-w-0 pr-3">
+                <dd className="truncate text-xl font-semibold text-slate-950 tabular-nums">{formatNumber(downloads.today)}</dd>
+                <dt className="mt-1 text-sm text-slate-500">今日</dt>
+              </div>
+              <div className="min-w-0 px-3">
+                <dd className="truncate text-xl font-semibold text-slate-950 tabular-nums">{formatNumber(downloads.sevenDays)}</dd>
+                <dt className="mt-1 text-sm text-slate-500">近 7 日</dt>
+              </div>
+              <div className="min-w-0 pl-3">
+                <dd className="truncate text-xl font-semibold text-slate-950 tabular-nums">v{DESKTOP_RELEASE.version}</dd>
+                <dt className="mt-1 text-sm text-slate-500">当前版本</dt>
               </div>
             </dl>
           </article>
@@ -551,6 +597,13 @@ type AdminAnalyticsPayload = {
   metrics: AdminAnalyticsMetrics;
   onlineVisitors: AdminVisitorRow[];
   recentVisitors: AdminVisitorRow[];
+};
+
+type DesktopDownloadMetrics = {
+  total: number;
+  today: number;
+  sevenDays: number;
+  trackingStartedAt: string;
 };
 
 function buildEmptyTrends(): TrendPoint[] {

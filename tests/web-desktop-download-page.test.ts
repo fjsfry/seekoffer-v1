@@ -67,6 +67,17 @@ describe('desktop-only addition to the production website baseline', () => {
     expect(downloadPageSource).not.toContain('官方发布与安全说明');
     expect(downloadPageSource).not.toContain('data-download-surface="security"');
     expect(downloadActionSource).toContain("platform === 'windows'");
+    expect(downloadActionSource).toContain('method="post"');
+    expect(downloadActionSource).toContain('action="/api/desktop-download/windows/"');
+    expect(downloadActionSource).toContain('name="attemptId"');
+    expect(downloadActionSource).toContain('window.crypto.randomUUID()');
+    expect(downloadActionSource.match(/window\.crypto\.randomUUID\(\)/g)).toHaveLength(1);
+    expect(downloadActionSource).toContain('onSubmit={() => setDownloadStarted(true)}');
+    expect(downloadActionSource).toContain('aria-describedby="desktop-download-platform-note"');
+    expect(downloadActionSource).not.toContain(`href={DESKTOP_RELEASE.installerUrl}`);
+    expect(downloadActionSource).not.toContain('target="_blank"');
+    expect(downloadActionSource).not.toMatch(/<a[\s\S]{0,240}\sdownload(?:=|\s|>)/);
+    expect(downloadPageSource).toContain('downloadUrl: DESKTOP_RELEASE.installerUrl');
     expect(downloadActionSource).toContain('继续使用网页版');
     expect(downloadActionSource).toContain('复制到 Windows 电脑打开');
     expect(downloadActionSource).not.toContain('GitHub');
@@ -89,6 +100,15 @@ describe('desktop-only addition to the production website baseline', () => {
     );
     expect(downloadPageSource).toContain('lg:grid-cols-5');
     expect(downloadPageSource).toContain('md:grid-cols-2');
+  });
+
+  it('describes the limited desktop download metric accurately in the privacy policy', () => {
+    const privacySource = readFileSync(resolve(root, 'app/privacy/page.tsx'), 'utf8');
+
+    expect(privacySource).toContain('更新日期：2026 年 9 月 3 日');
+    expect(privacySource).toContain('仅记录按钮发起时间、桌面端版本和设备平台');
+    expect(privacySource).toContain('不保存 IP 地址、账号信息或任何申请内容');
+    expect(privacySource).toContain('不代表安装包下载完成或软件安装完成');
   });
 
   it('adds desktop discovery without changing the production navigation taxonomy', () => {

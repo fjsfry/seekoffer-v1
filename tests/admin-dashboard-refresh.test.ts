@@ -17,6 +17,7 @@ describe('admin dashboard refresh policy', () => {
   it('preserves the last successful snapshot when a refresh fails', () => {
     expect(dashboardSource).toContain('setDataError(errorMessage)');
     expect(dashboardSource).not.toContain('setOverviewMetrics(emptyOverview);');
+    expect(dashboardSource).not.toContain('setDownloads(emptyDesktopDownloads);');
     expect(dashboardSource).not.toContain('setPendingNotices([]);');
     expect(dashboardSource).not.toContain('setPendingOffers([]);');
     expect(dashboardSource).not.toContain('setLatestFeedback([]);');

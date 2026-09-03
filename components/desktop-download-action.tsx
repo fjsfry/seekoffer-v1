@@ -3,16 +3,17 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2, Copy, Download, Monitor } from 'lucide-react';
-import { DESKTOP_RELEASE } from '@/lib/desktop-download';
 
 type DetectedPlatform = 'unknown' | 'windows' | 'other';
 
 export function DesktopDownloadAction() {
   const [platform, setPlatform] = useState<DetectedPlatform>('unknown');
+  const [downloadAttemptId, setDownloadAttemptId] = useState('');
   const [downloadStarted, setDownloadStarted] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
+    setDownloadAttemptId(window.crypto.randomUUID());
     setPlatform(/Windows/i.test(window.navigator.userAgent) ? 'windows' : 'other');
   }, []);
 
@@ -47,16 +48,22 @@ export function DesktopDownloadAction() {
     <div className="mt-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         {platform === 'windows' ? (
-          <a
-            href={DESKTOP_RELEASE.installerUrl}
-            onClick={() => setDownloadStarted(true)}
-            className="group inline-flex min-h-12 items-center justify-center gap-2.5 rounded-2xl bg-brand px-6 py-3.5 text-sm font-semibold text-white shadow-float transition duration-200 hover:-translate-y-0.5 hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20"
-            aria-describedby="desktop-download-platform-note"
+          <form
+            method="post"
+            action="/api/desktop-download/windows/"
+            onSubmit={() => setDownloadStarted(true)}
           >
-            {downloadStarted ? <CheckCircle2 className="h-5 w-5" /> : <Download className="h-5 w-5" />}
-            {downloadStarted ? '下载已开始' : '下载 Windows 版'}
-            {!downloadStarted ? <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" /> : null}
-          </a>
+            <input type="hidden" name="attemptId" value={downloadAttemptId} readOnly />
+            <button
+              type="submit"
+              className="group inline-flex min-h-12 items-center justify-center gap-2.5 rounded-2xl bg-brand px-6 py-3.5 text-sm font-semibold text-white shadow-float transition duration-200 hover:-translate-y-0.5 hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20"
+              aria-describedby="desktop-download-platform-note"
+            >
+              {downloadStarted ? <CheckCircle2 className="h-5 w-5" /> : <Download className="h-5 w-5" />}
+              {downloadStarted ? '下载已开始' : '下载 Windows 版'}
+              {!downloadStarted ? <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" /> : null}
+            </button>
+          </form>
         ) : (
           <Link
             href={platform === 'other' ? '/me' : '#windows-download'}
