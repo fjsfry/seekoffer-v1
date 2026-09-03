@@ -93,7 +93,7 @@ const softwareApplicationJsonLd = {
   applicationCategory: 'EducationalApplication',
   operatingSystem: 'Windows 10, Windows 11',
   softwareVersion: DESKTOP_RELEASE.version,
-  downloadUrl: DESKTOP_RELEASE.installerUrl,
+  downloadUrl: absoluteUrl('/download/windows/latest'),
   url: absoluteUrl('/download'),
   offers: {
     '@type': 'Offer',

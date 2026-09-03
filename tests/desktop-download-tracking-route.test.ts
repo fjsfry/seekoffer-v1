@@ -3,10 +3,17 @@ import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DESKTOP_RELEASE } from '@/lib/desktop-download';
 
+const PRIMARY_INSTALLER_URL =
+  'https://download.seekoffer.com.cn/artifacts/desktop-v0.2.22/SeekOffer-Desktop-v0.2.22-Windows-x64-Setup.exe';
 const recordDesktopDownloadAttempt = vi.hoisted(() => vi.fn());
+const getDesktopDownloadUrls = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/server/desktop-download-analytics', () => ({
   recordDesktopDownloadAttempt
+}));
+
+vi.mock('@/lib/server/desktop-download-urls', () => ({
+  getDesktopDownloadUrls
 }));
 
 import * as route from '@/app/api/desktop-download/windows/route';
@@ -43,28 +50,31 @@ function makeRequest(
   });
 }
 
-function expectInstallerRedirect(response: Response) {
+function expectCompatibilityRedirect(response: Response) {
   expect(response.status).toBe(303);
-  expect(response.headers.get('location')).toBe(DESKTOP_RELEASE.installerUrl);
+  expect(response.headers.get('location')).toBe(PRIMARY_INSTALLER_URL);
   expect(response.headers.get('cache-control')).toBe('no-store');
   expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow');
 }
 
-describe('desktop download tracking route', () => {
+describe('legacy desktop download form compatibility route', () => {
   beforeEach(() => {
     vi.useRealTimers();
     recordDesktopDownloadAttempt.mockReset();
     recordDesktopDownloadAttempt.mockResolvedValue(true);
+    getDesktopDownloadUrls.mockReset();
+    getDesktopDownloadUrls.mockReturnValue({ primaryInstallerUrl: PRIMARY_INSTALLER_URL });
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('records one fixed server-owned event and redirects to the immutable installer', async () => {
+  it('records one fixed server-owned event and redirects to the configured primary installer', async () => {
     const response = await route.POST(makeRequest());
 
-    expectInstallerRedirect(response);
+    expectCompatibilityRedirect(response);
+    expect(getDesktopDownloadUrls).toHaveBeenCalledTimes(1);
     expect(recordDesktopDownloadAttempt).toHaveBeenCalledTimes(1);
     expect(recordDesktopDownloadAttempt).toHaveBeenCalledWith(
       {
@@ -77,7 +87,7 @@ describe('desktop download tracking route', () => {
     );
   });
 
-  it('allows privacy and older browsers that omit optional Sec-Fetch metadata', async () => {
+  it('allows older browsers that omit optional navigation metadata', async () => {
     const response = await route.POST(
       makeRequest(undefined, {
         'sec-fetch-site': undefined,
@@ -86,34 +96,34 @@ describe('desktop download tracking route', () => {
       })
     );
 
-    expectInstallerRedirect(response);
+    expectCompatibilityRedirect(response);
     expect(recordDesktopDownloadAttempt).toHaveBeenCalledTimes(1);
   });
 
   it.each([
     ['cross-origin request', makeRequest(undefined, { origin: 'https://example.com' })],
-    ['invalid fetch metadata', makeRequest(undefined, { 'sec-fetch-user': '' })],
+    ['invalid navigation metadata', makeRequest(undefined, { 'sec-fetch-user': '' })],
     ['wrong media type', makeRequest(undefined, { 'content-type': 'application/json' })],
     ['invalid UUID', makeRequest('attemptId=not-a-uuid')],
     ['duplicate ID', makeRequest(`attemptId=${ATTEMPT_ID}&attemptId=${ATTEMPT_ID}`)],
     ['client-owned fields', makeRequest(`attemptId=${ATTEMPT_ID}&platform=macos`)]
-  ])('does not count a %s, but still starts the installer redirect', async (_label, request) => {
+  ])('does not count a %s, but still preserves the safe installer redirect', async (_label, request) => {
     const response = await route.POST(request);
 
-    expectInstallerRedirect(response);
+    expectCompatibilityRedirect(response);
     expect(recordDesktopDownloadAttempt).not.toHaveBeenCalled();
   });
 
-  it('does not let an analytics failure block the download', async () => {
+  it('does not let an analytics failure block the compatibility redirect', async () => {
     recordDesktopDownloadAttempt.mockRejectedValueOnce(new Error('database unavailable'));
 
     const response = await route.POST(makeRequest());
 
-    expectInstallerRedirect(response);
+    expectCompatibilityRedirect(response);
     expect(recordDesktopDownloadAttempt).toHaveBeenCalledTimes(1);
   });
 
-  it('aborts a stalled write within the bounded timeout and still redirects', async () => {
+  it('aborts a stalled compatibility write within the bounded timeout and still redirects', async () => {
     vi.useFakeTimers();
     recordDesktopDownloadAttempt.mockImplementationOnce(
       (_attempt: unknown, signal: AbortSignal) =>
@@ -128,7 +138,12 @@ describe('desktop download tracking route', () => {
 
     expect(analyticsTimeoutMs).toBeGreaterThanOrEqual(1_200);
     expect(analyticsTimeoutMs).toBeLessThanOrEqual(1_500);
-    expectInstallerRedirect(response);
+    expectCompatibilityRedirect(response);
+  });
+
+  it('uses the server-only URL policy instead of a public metadata URL', () => {
+    expect(routeSource).toContain('getDesktopDownloadUrls().primaryInstallerUrl');
+    expect(routeSource).not.toContain('DESKTOP_RELEASE.installerUrl');
   });
 
   it('does not export a GET handler that could turn crawlers into download events', () => {

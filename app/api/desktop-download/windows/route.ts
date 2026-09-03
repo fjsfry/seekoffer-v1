@@ -1,8 +1,12 @@
 import { DESKTOP_RELEASE } from '@/lib/desktop-download';
 import { recordDesktopDownloadAttempt } from '@/lib/server/desktop-download-analytics';
+import { getDesktopDownloadUrls } from '@/lib/server/desktop-download-urls';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+// Compatibility endpoint for the pre-decoupling download form. New pages use
+// POST /api/desktop-download/attempt/ plus GET /download/windows/latest/.
 
 const MAX_REQUEST_BODY_BYTES = 2_048;
 const DOWNLOAD_ANALYTICS_TIMEOUT_MS = 1_350;
@@ -16,7 +20,7 @@ function installerRedirect() {
   return new Response(null, {
     status: 303,
     headers: {
-      Location: DESKTOP_RELEASE.installerUrl,
+      Location: getDesktopDownloadUrls().primaryInstallerUrl,
       'Cache-Control': 'no-store',
       'X-Robots-Tag': 'noindex, nofollow'
     }
