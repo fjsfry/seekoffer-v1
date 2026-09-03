@@ -172,7 +172,9 @@ describe('permanent desktop download routes', () => {
   it('documents the server-only primary origin switch', () => {
     const envExample = readFileSync(resolve(process.cwd(), '.env.example'), 'utf8');
 
-    expect(envExample).toContain('DESKTOP_DOWNLOAD_PRIMARY_ORIGIN=');
-    expect(envExample).toContain('Leave empty until download.seekoffer.com.cn is verified');
+    expect(envExample).toContain(
+      'DESKTOP_DOWNLOAD_PRIMARY_ORIGIN=https://download.seekoffer.com.cn'
+    );
+    expect(envExample).toContain('unset or invalid values still fail safely to the legacy origin');
   });
 });
