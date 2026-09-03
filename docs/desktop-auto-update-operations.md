@@ -14,17 +14,25 @@
 建议地址：
 
 ```text
-Stable primary: https://seekoffer-desktop-updates.vercel.app/stable/latest.json
-Stable fallback: https://seekoffer-desktop-updates.vercel.app/latest.json
+Stable primary（下一正式发行起）: https://download.seekoffer.com.cn/stable/latest.json
+Stable fallback 1: https://seekoffer-desktop-updates.vercel.app/stable/latest.json
+Stable fallback 2: https://seekoffer-desktop-updates.vercel.app/latest.json
 Beta fallback（预留，未启用）: https://seekoffer-desktop-beta-updates.vercel.app/latest.json
 ```
 
 当前只部署 Stable 专用 Vercel 项目，不要把 updater-site 部署到主站项目。`stable/latest.json` 与根 `latest.json` 必须来自同一次原子部署并指向同一版本；客户端按上述顺序检查。未来启用 Beta 前，必须增加独立客户端配置覆盖、独立 Vercel 项目和通道一致性测试，避免 Beta 部署删除或污染 Stable 清单。
 
-截至 2026-09-03，`download.seekoffer.com.cn` 已添加到独立 updater-site 项目，
-但 Cloudflare 权威 DNS 中的 `download` CNAME 尚未生效，公网 DNS、TLS 和文件回读
-门禁均未通过。因此 v0.2.22 的 `src-tauri/tauri.conf.json` runtime endpoints、线上
-Stable 清单和已发布产物不得切换或重写；本次代码只增加新域名的受控发行支持。
+2026-09-03 已通过 Cloudflare Domain Connect 配置 `download.seekoffer.com.cn`，Vercel
+显示 `Valid Configuration`。实测自定义域名使用有效 HTTPS（TLS 1.3、Let's Encrypt），
+`stable/latest.json` 返回 `200`、`4467` 字节，SHA-256 为
+`E012FF3A175416B68E6F425A6C70E1970BAF8F7332DE6B888BB9F5516A4E1FE4`，并与 legacy
+清单逐字节一致；v0.2.22 安装包返回 `200`、`33674743` 字节、正确 Content-Type，
+完整 SHA-256 为 `34FD53CD2880EC4D254AF7532166926B474C6AC7CE9C0B8F4D39E97C8A99B4F8`。
+
+这些证据允许发行准备分支把自定义 Stable 清单配置为下一正式发行的 runtime primary，
+但不会改变已经发布的 `desktop-v0.2.22` Tag、v0.2.22 二进制或当前生产清单。已安装
+v0.2.22 客户端继续使用其二进制中原有的 legacy endpoints；正式采用新 endpoint 时必须
+先把版本号递增，并从新的不可变 Tag 完整走一遍构建、签名、验签与发布门禁。
 
 ## 密钥与 Secret
 
@@ -221,7 +229,7 @@ https://seekoffer-desktop-updates.vercel.app/artifacts/
 $env:DESKTOP_UPDATE_ASSET_BASE_URL = 'https://seekoffer-desktop-updates.vercel.app/artifacts/'
 ```
 
-新自定义域名通过下述切换门禁后，下一版候选才可以改为：
+新自定义域名已经通过基础设施切换门禁，下一版候选可以使用：
 
 ```powershell
 $env:DESKTOP_UPDATE_ASSET_BASE_URL = 'https://download.seekoffer.com.cn/artifacts/'
@@ -237,17 +245,17 @@ desktop-v<version>/<installer>
 
 不要把临时鉴权 Token 放进 URL，也不要为了临时 CDN 或测试服务器扩大白名单。
 
-### 自定义下载域名切换门禁
+### 自定义下载域名验证与下一版生效边界
 
-Cloudflare 权威 DNS 必须先把 `download` CNAME 配置为 Vercel 为 updater 项目返回的
-项目唯一目标，并等待权威查询生效。2026-09-03 的 Vercel 配置返回目标为：
+Cloudflare 权威 DNS 已把 `download` CNAME 配置为 Vercel 为 updater 项目返回的项目
+唯一目标，并已通过 Vercel、权威 DNS 和 HTTPS 验证。2026-09-03 的目标为：
 
 ```text
 e9293d71b3afe5a3.vercel-dns-017.com.
 ```
 
-只有以下检查全部通过，下一版桌面发行才允许把自定义域名作为首选资产基址，并在新的
-客户端版本中把自定义 Stable 清单作为 runtime primary：
+基础设施首次切换已经完成以下检查；每个使用自定义域名的新正式发行仍须重新执行涉及
+当版清单、安装包和签名的门禁：
 
 1. `download.seekoffer.com.cn` 的权威 CNAME 与 Vercel 当前项目配置一致。
 2. Vercel 域名状态不再是 `misconfigured`，HTTPS 证书已签发且主机名校验通过。
@@ -256,8 +264,10 @@ e9293d71b3afe5a3.vercel-dns-017.com.
 5. 安装包、签名与 `SHA256SUMS.txt` 的大小和 SHA-256 与发布候选逐字节一致。
 6. 原 `seekoffer-desktop-updates.vercel.app` 清单和历史版本化资产继续可访问。
 
-完成切换时必须保留原 Vercel endpoint 作为 legacy fallback，保证 v0.2.22 和更早安装
-客户端仍能检查更新。不得回写 v0.2.22 的 runtime endpoints、生产清单、Tag 或产物。
+发行准备分支现在保留原 Vercel Stable 与根清单两个 endpoint 作为 legacy fallback。
+该源代码配置只会进入下一正式递增版本，保证 v0.2.22 和更早安装客户端仍能沿原线路
+检查更新。不得回写 v0.2.22 的 runtime endpoints、当前生产清单、Tag、二进制或其他
+已发布产物；也不得在版本号仍为 `0.2.22` 时创建新的正式发布。
 
 ## 隔离 updater-site 目录
 
@@ -346,7 +356,7 @@ npm run desktop:updater:compose -- `
 
 - 当前 CLI 账号和 team/project 正确。
 - 目标是独立 updater-site 项目，不是寻鹿主站项目。
-- `latest.json` 的 URL、版本、签名与当前 GitHub Release 一致。
+- `latest.json` 的 URL 使用选定的精确白名单基址，版本、签名与当前 GitHub Release 一致。
 - 安装包和 `.sig` 的 SHA-256 与 `SHA256SUMS.txt` 一致。
 - Stable 目录和版本化资产完整；当前不得出现未启用的 Beta 清单。
 - 旧 endpoint 仍返回旧的完整有效清单。

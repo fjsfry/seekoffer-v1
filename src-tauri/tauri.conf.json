@@ -92,6 +92,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgyMzcwMjE1RjAyQjRFNUIKUldSYlRpdndGUUkzZ2s1SVo5Tjk3aGVDRExaeWNNY1Q2YjJQQ24rdHZHWlBzUk9VbEh1UVY1M28K",
       "endpoints": [
+        "https://download.seekoffer.com.cn/stable/latest.json",
         "https://seekoffer-desktop-updates.vercel.app/stable/latest.json",
         "https://seekoffer-desktop-updates.vercel.app/latest.json"
       ],

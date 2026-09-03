@@ -103,9 +103,10 @@ describe('desktop installer product experience', () => {
     });
   });
 
-  it('keeps updater behaviour and trust configuration unchanged', () => {
+  it('uses the verified custom updater primary and retains both legacy fallbacks', () => {
     expect(tauriConfig.plugins.updater.pubkey).toMatch(/\S{80,}/);
     expect(tauriConfig.plugins.updater.endpoints).toEqual([
+      'https://download.seekoffer.com.cn/stable/latest.json',
       'https://seekoffer-desktop-updates.vercel.app/stable/latest.json',
       'https://seekoffer-desktop-updates.vercel.app/latest.json'
     ]);
