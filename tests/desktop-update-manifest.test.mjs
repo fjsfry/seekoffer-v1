@@ -5,6 +5,7 @@ import {
   buildDesktopArtifactUrl,
   compareStableDesktopVersions,
   createDesktopUpdateManifest,
+  validateDesktopUpdateAssetBaseUrl,
   validateDesktopReleaseTag,
   validateDesktopUpdateManifest,
   validateReleaseChannel
@@ -40,25 +41,66 @@ describe('desktop updater release contracts', () => {
     ).not.toThrow();
   });
 
-  it('supports a dedicated updater CDN asset base without URL credentials', () => {
+  it.each([
+    [
+      'current repository GitHub releases',
+      'https://github.com/fjsfry/seekoffer-v1/releases/download/',
+      'https://github.com/fjsfry/seekoffer-v1/releases/download/desktop-v0.3.0/SeekOffer-Desktop-v0.3.0-Windows-x64-Setup.exe'
+    ],
+    [
+      'SeekOffer custom download domain',
+      'https://download.seekoffer.com.cn/artifacts/',
+      'https://download.seekoffer.com.cn/artifacts/desktop-v0.3.0/SeekOffer-Desktop-v0.3.0-Windows-x64-Setup.exe'
+    ],
+    [
+      'legacy Vercel updater domain',
+      'https://seekoffer-desktop-updates.vercel.app/artifacts/',
+      'https://seekoffer-desktop-updates.vercel.app/artifacts/desktop-v0.3.0/SeekOffer-Desktop-v0.3.0-Windows-x64-Setup.exe'
+    ]
+  ])('supports the allowlisted %s asset base', (_label, assetBaseUrl, expectedUrl) => {
+    expect(validateDesktopUpdateAssetBaseUrl(assetBaseUrl)).toBe(assetBaseUrl);
     expect(
       buildDesktopArtifactUrl({
         repository: 'fjsfry/seekoffer-v1',
         tag: 'desktop-v0.3.0',
         installerName: 'SeekOffer-Desktop-v0.3.0-Windows-x64-Setup.exe',
-        assetBaseUrl: 'https://seekoffer-desktop-updates.vercel.app/artifacts/'
+        assetBaseUrl
       })
-    ).toBe(
-      'https://seekoffer-desktop-updates.vercel.app/artifacts/desktop-v0.3.0/SeekOffer-Desktop-v0.3.0-Windows-x64-Setup.exe'
-    );
+    ).toBe(expectedUrl);
+  });
+
+  it.each([
+    ['arbitrary HTTPS host', 'https://downloads.example.com/seekoffer/'],
+    ['credentials', 'https://token@download.seekoffer.com.cn/artifacts/'],
+    ['explicit port', 'https://download.seekoffer.com.cn:443/artifacts/'],
+    ['query', 'https://download.seekoffer.com.cn/artifacts/?source=release'],
+    ['fragment', 'https://download.seekoffer.com.cn/artifacts/#release'],
+    ['wrong path', 'https://download.seekoffer.com.cn/releases/'],
+    ['missing trailing slash', 'https://download.seekoffer.com.cn/artifacts'],
+    [
+      'wrong GitHub repository',
+      'https://github.com/example/seekoffer-v1/releases/download/'
+    ],
+    ['HTTP', 'http://download.seekoffer.com.cn/artifacts/']
+  ])('rejects a non-canonical asset base with %s', (_label, assetBaseUrl) => {
     expect(() =>
       buildDesktopArtifactUrl({
         repository: 'fjsfry/seekoffer-v1',
         tag: 'desktop-v0.3.0',
         installerName: 'SeekOffer-Desktop-v0.3.0-Windows-x64-Setup.exe',
-        assetBaseUrl: 'https://token@example.com/artifacts/'
+        assetBaseUrl
       })
-    ).toThrow(/没有凭据/);
+    ).toThrow(/官方更新资产基址/);
+  });
+
+  it('rejects an implicit GitHub base for any repository other than seekoffer-v1', () => {
+    expect(() =>
+      buildDesktopArtifactUrl({
+        repository: 'example/seekoffer-v1',
+        tag: 'desktop-v0.3.0',
+        installerName: 'SeekOffer-Desktop-v0.3.0-Windows-x64-Setup.exe'
+      })
+    ).toThrow(/官方更新资产基址/);
   });
 
   it('enforces exact tag/version and stable/beta SemVer boundaries', () => {

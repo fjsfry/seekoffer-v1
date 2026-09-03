@@ -565,10 +565,10 @@ describe('desktop release packaging guard', () => {
     expect(`${result.stdout}\n${result.stderr}`).toContain('发布文档包含敏感材料');
   });
 
-  it('uses DESKTOP_UPDATE_ASSET_BASE_URL without leaking credentials into latest.json', async () => {
+  it('uses an allowlisted DESKTOP_UPDATE_ASSET_BASE_URL in latest.json', async () => {
     const fixture = await createFixture();
     const result = runPackagingScript(fixture, {
-      DESKTOP_UPDATE_ASSET_BASE_URL: 'https://downloads.example.com/seekoffer/'
+      DESKTOP_UPDATE_ASSET_BASE_URL: 'https://download.seekoffer.com.cn/artifacts/'
     });
     expect(result.status, result.stderr).toBe(0);
     const manifestPath = path.join(
@@ -577,7 +577,19 @@ describe('desktop release packaging guard', () => {
     );
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
     expect(manifest.platforms['windows-x86_64'].url).toBe(
-      'https://downloads.example.com/seekoffer/desktop-v0.2.5/SeekOffer-Desktop-v0.2.5-Windows-x64-Setup.exe'
+      'https://download.seekoffer.com.cn/artifacts/desktop-v0.2.5/SeekOffer-Desktop-v0.2.5-Windows-x64-Setup.exe'
+    );
+  });
+
+  it('rejects an arbitrary DESKTOP_UPDATE_ASSET_BASE_URL before packaging', async () => {
+    const fixture = await createFixture();
+    const result = runPackagingScript(fixture, {
+      DESKTOP_UPDATE_ASSET_BASE_URL: 'https://downloads.example.com/seekoffer/'
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(`${result.stdout}\n${result.stderr}`).toContain(
+      'DESKTOP_UPDATE_ASSET_BASE_URL 必须精确匹配受信任的官方更新资产基址'
     );
   });
 

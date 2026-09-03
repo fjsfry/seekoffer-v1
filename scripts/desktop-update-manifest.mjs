@@ -5,6 +5,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const WINDOWS_X64_TARGET = 'windows-x86_64';
 const RELEASE_CHANNELS = new Set(['stable', 'beta', 'internal-test']);
+const OFFICIAL_DESKTOP_UPDATE_ASSET_BASE_URLS = new Set([
+  'https://github.com/fjsfry/seekoffer-v1/releases/download/',
+  'https://download.seekoffer.com.cn/artifacts/',
+  'https://seekoffer-desktop-updates.vercel.app/artifacts/'
+]);
 const SEMVER_PATTERN =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
@@ -111,6 +116,18 @@ export function validateUpdaterSignature(signature) {
   return normalized;
 }
 
+export function validateDesktopUpdateAssetBaseUrl(assetBaseUrl) {
+  if (
+    typeof assetBaseUrl !== 'string' ||
+    !OFFICIAL_DESKTOP_UPDATE_ASSET_BASE_URLS.has(assetBaseUrl)
+  ) {
+    throw new Error(
+      'DESKTOP_UPDATE_ASSET_BASE_URL 必须精确匹配受信任的官方更新资产基址'
+    );
+  }
+  return assetBaseUrl;
+}
+
 export function buildDesktopArtifactUrl({
   repository,
   tag,
@@ -129,11 +146,10 @@ export function buildDesktopArtifactUrl({
   }
 
   const base = new URL(
-    assetBaseUrl || `https://github.com/${repositorySlug}/releases/download/`
+    validateDesktopUpdateAssetBaseUrl(
+      assetBaseUrl ?? `https://github.com/${repositorySlug}/releases/download/`
+    )
   );
-  if (base.protocol !== 'https:' || base.username || base.password) {
-    throw new Error('更新资产基础地址必须是没有凭据的 HTTPS URL');
-  }
   const encodedPath = [tag, installerName].map(encodeURIComponent).join('/');
   return new URL(encodedPath, `${base.href.replace(/\/$/, '')}/`).href;
 }
