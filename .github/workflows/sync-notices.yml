@@ -1,131 +1,70 @@
-name: Sync notices to Supabase
+name: Sync notices to D1
 
 on:
   schedule:
-    # Hourly incremental sync. GitHub cron uses UTC; this is hourly in Beijing time too.
+    # GitHub schedules use UTC and can be delayed by runner availability.
     - cron: '20 * * * *'
-    # Nightly full reconciliation at 02:10 Beijing time.
-    - cron: '10 18 * * *'
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - '.github/workflows/sync-notices.yml'
       - 'scripts/sync-baoyan-notices-to-supabase.mjs'
       - 'scripts/notice-sync-core.mjs'
-      - 'lib/notice-quality.ts'
-      - 'tests/notice-sync-core.test.mjs'
-      - 'tests/notice-quality.test.ts'
-      - 'supabase/functions/ingest-notices/**'
+      - 'scripts/notice-d1-transport.mjs'
+      - 'tests/notice-d1-transport.test.mjs'
   workflow_dispatch:
     inputs:
-      sync_mode:
-        description: 'Sync mode'
-        required: false
-        default: 'incremental'
-        type: choice
-        options:
-          - incremental
-          - full
-      target_year:
-        description: 'Notice target year'
-        required: false
-        default: '2026'
-      primary_max_pages:
-        description: 'Optional max pages for a quick/manual test. Leave empty for full sync.'
-        required: false
-        default: ''
-      primary_max_details:
-        description: 'Optional max detail requests for smoke tests. Leave empty for full sync.'
-        required: false
-        default: ''
       dry_run:
-        description: 'Parse notices without writing to Supabase'
-        required: false
+        description: 'Acquire and validate public notices without D1 writes'
         type: boolean
         default: false
 
 concurrency:
-  group: sync-notices-to-supabase
+  group: seekoffer-notice-ingestion
   cancel-in-progress: false
+permissions:
+  contents: read
 
 jobs:
   sync:
-    name: Sync public notices
+    name: Acquire, validate and update D1 notices
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    permissions:
-      contents: read
-
+    timeout-minutes: 30
     env:
-      SYNC_MODE: ${{ github.event.inputs.sync_mode || (github.event_name == 'push' && 'full' || (github.event.schedule == '10 18 * * *' && 'full' || 'incremental')) }}
-      TARGET_YEAR: ${{ github.event.inputs.target_year || '2026' }}
+      SEEKOFFER_INGEST_BACKEND: d1
+      SEEKOFFER_INGEST_SECRET: ${{ secrets.SEEKOFFER_INGEST_SECRET }}
+      SUPABASE_INGEST_SOURCE: github-actions-sync
+      SYNC_MODE: incremental
+      TARGET_YEAR: '2026'
       PRIMARY_ORDER_BY: publishTime
-      PRIMARY_MAX_PAGES: ${{ github.event.inputs.primary_max_pages }}
-      PRIMARY_MAX_DETAILS: ${{ github.event.inputs.primary_max_details }}
-      PRIMARY_DETAIL_CONCURRENCY: '6'
-      PRIMARY_DETAIL_DELAY_MS: '50'
+      PRIMARY_MAX_PAGES: '2'
+      PRIMARY_MAX_DETAILS: '40'
+      PRIMARY_DETAIL_CONCURRENCY: '2'
+      PRIMARY_DETAIL_DELAY_MS: '150'
       ENABLE_XINGKE_SOURCE: 'true'
       ENABLE_BAOYANNEWS_SOURCE: 'true'
       INCREMENTAL_LOOKBACK_DAYS: '10'
-      BAOYANNEWS_PAGE_DELAY_MS: '80'
-      OFFICIAL_REPAIR_CONCURRENCY: '4'
-      OFFICIAL_REPAIR_DELAY_MS: '80'
-      INGEST_BATCH_SIZE: '100'
-      INGEST_MAX_ATTEMPTS: '5'
-      INGEST_RETRY_BASE_DELAY_MS: '2000'
-      INGEST_RETRY_MAX_DELAY_MS: '30000'
-      INGEST_REQUEST_TIMEOUT_MS: '60000'
+      OFFICIAL_REPAIR_CONCURRENCY: '2'
+      OFFICIAL_REPAIR_DELAY_MS: '150'
+      INGEST_BATCH_SIZE: '6'
+      INGEST_MAX_ATTEMPTS: '2'
+      INGEST_REQUEST_TIMEOUT_MS: '30000'
       REQUEST_TIMEOUT_MS: '15000'
       MAX_RATE_LIMIT_RETRY_AFTER_SECONDS: '30'
-      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-      SUPABASE_INGEST_URL: ${{ secrets.SUPABASE_INGEST_URL }}
-      SUPABASE_INGEST_SECRET: ${{ secrets.SEEKOFFER_INGEST_SECRET || secrets.SUPABASE_INGEST_SECRET }}
-      SUPABASE_INGEST_SOURCE: github-actions-sync
-      DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
-      NOTICE_REVALIDATE_URL: ${{ secrets.NOTICE_REVALIDATE_URL }}
-      NOTICE_REVALIDATE_TOKEN: ${{ secrets.NOTICE_REVALIDATE_TOKEN }}
-      VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
-
+      DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
+        with:
+          persist-credentials: false
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
-
-      - name: Sync notices
-        run: npm run sync:notices:github
-
-      - name: Revalidate public notice cache
-        if: ${{ env.DRY_RUN != 'true' }}
-        shell: bash
-        run: |
-          if [ -z "$NOTICE_REVALIDATE_URL" ] || [ -z "$NOTICE_REVALIDATE_TOKEN" ]; then
-            echo "Notice revalidation endpoint is not configured; database sync is complete."
-            exit 0
-          fi
-
-          curl --fail --silent --show-error \
-            --connect-timeout 5 \
-            --max-time 10 \
-            --request POST \
-            --header "Content-Type: application/json" \
-            --header "x-seekoffer-revalidate-token: $NOTICE_REVALIDATE_TOKEN" \
-            --data '{"ids":[]}' \
-            "${NOTICE_REVALIDATE_URL%/}/"
-          echo "Revalidated the shared public notice cache."
-
-      - name: Rebuild searchable notice pages
-        if: ${{ env.DRY_RUN != 'true' }}
-        shell: bash
-        run: |
-          if [ -z "$VERCEL_DEPLOY_HOOK_URL" ]; then
-            echo "VERCEL_DEPLOY_HOOK_URL is not configured; database sync is complete, static pages refresh on the next deployment."
-            exit 0
-          fi
-
-          curl --fail --silent --show-error --request POST "$VERCEL_DEPLOY_HOOK_URL"
-          echo "Triggered Vercel rebuild for notice detail pages and sitemap."
+      - name: Check D1 transport boundaries
+        run: node --test tests/notice-d1-transport.test.mjs
+      - name: Sync notices through authenticated D1 ingestion
+        run: node scripts/sync-baoyan-notices-to-supabase.mjs
+      # The authenticated Worker atomically updates notices + public overrides.
+      # No Supabase calls, database tokens, Vercel hooks, frontend build or deploy.
+      # A 300-change UTC-day cap stops safely and reports remaining candidates.
