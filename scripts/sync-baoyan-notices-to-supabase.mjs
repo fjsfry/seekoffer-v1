@@ -3,6 +3,7 @@ import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 import {orderD1Notices, ingestionShouldRetry} from './notice-d1-transport.mjs';
+import {saveNoticeSyncReceipt} from './notice-sync-report.mjs';
 import {
   areLikelyDuplicateNotices,
   extractDeadlineFromText as extractDeadlineFromTextCore,
@@ -2041,6 +2042,7 @@ async function postIngestBatch(notices, summary, batchIndex, batchCount) {
         `Supabase ingest batch ${batchIndex}/${batchCount} failed with status ${response.status}: ${USE_D1_INGEST ? String(payload?.error || 'INGEST_FAILED').replace(/[^A-Z_]/g, '') : JSON.stringify(payload)}`
       );
       error.ingestCode = USE_D1_INGEST ? String(payload?.error || 'INGEST_FAILED') : '';
+      error.ingestStatus = response.status;
       error.retryable = USE_D1_INGEST ? ingestionShouldRetry(response.status,payload?.error) : isRetryableIngestStatus(response.status);
       error.retryAfter = response.headers.get('retry-after') || '';
       throw error;
@@ -2121,8 +2123,9 @@ async function pushProjectsToSupabase(projects, summary) {
     let payload;
     try { payload = await postIngestBatch(batches[index], summary, index + 1, batches.length); }
     catch(error) {
-      if(USE_D1_INGEST && error.ingestCode==='INGEST_DAILY_BUDGET') {
-        return {...aggregate,complete:false,stoppedReason:'INGEST_DAILY_BUDGET',remainingCandidates:batches.slice(index).reduce((n,b)=>n+b.length,0)};
+      if(USE_D1_INGEST) {
+        const code=error.ingestStatus===402?'SERVICE_QUOTA_EXCEEDED':/^[A-Z_0-9]{1,80}$/.test(error.ingestCode||'')?error.ingestCode:'INGEST_FAILED';
+        return {...aggregate,complete:false,stoppedReason:code,remainingCandidates:batches.slice(index).reduce((n,b)=>n+b.length,0)};
       }
       throw error;
     }
@@ -2566,6 +2569,14 @@ async function runSync() {
   };
 
   console.log(JSON.stringify(result, null, 2));
+  if (USE_D1_INGEST) {
+    saveNoticeSyncReceipt(result);
+    if (!result.complete) {
+      // A successful partial batch must not make the complete workflow green.
+      console.error('::warning::Notice sync paused with remaining candidates; see the job summary.');
+      process.exitCode = 2;
+    }
+  }
   return result;
 }
 

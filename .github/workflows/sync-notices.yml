@@ -11,7 +11,10 @@ on:
       - 'scripts/sync-baoyan-notices-to-supabase.mjs'
       - 'scripts/notice-sync-core.mjs'
       - 'scripts/notice-d1-transport.mjs'
+      - 'scripts/notice-sync-report.mjs'
+      - 'scripts/verify-notice-website-sync.mjs'
       - 'tests/notice-d1-transport.test.mjs'
+      - 'tests/notice-website-sync.test.mjs'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -52,6 +55,8 @@ jobs:
       REQUEST_TIMEOUT_MS: '15000'
       MAX_RATE_LIMIT_RETRY_AFTER_SECONDS: '30'
       DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+      NOTICE_SYNC_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-sync.json
+      NOTICE_WEBSITE_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-website.json
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,9 +67,16 @@ jobs:
         with:
           node-version: '24'
       - name: Check D1 transport boundaries
-        run: node --test tests/notice-d1-transport.test.mjs
+        run: node --test tests/notice-d1-transport.test.mjs tests/notice-website-sync.test.mjs
       - name: Sync notices through authenticated D1 ingestion
+        id: ingest
         run: node scripts/sync-baoyan-notices-to-supabase.mjs
+      - name: Verify live website version, ordering and detail
+        if: ${{ !cancelled() && steps.ingest.outcome != 'skipped' && env.DRY_RUN != 'true' }}
+        # Fixed public endpoints only. No ingest secret is needed by this step.
+        env:
+          SEEKOFFER_INGEST_SECRET: ''
+        run: node scripts/verify-notice-website-sync.mjs
       # The authenticated Worker atomically updates notices + public overrides.
       # No Supabase calls, database tokens, Vercel hooks, frontend build or deploy.
       # A 300-change UTC-day cap stops safely and reports remaining candidates.
