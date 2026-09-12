@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import {ADMIN_DASHBOARD_SNAPSHOT_EVENT,type AdminDashboardShellSnapshot} from '@/lib/admin-shell-events';
 import { usePathname, useRouter } from 'next/navigation';
 import type React from 'react';
 import { useEffect, useState } from 'react';
@@ -27,6 +28,7 @@ import {
 import { refreshAdminSession, signOutAdmin, watchAdminSession, type AdminSession } from '@/lib/admin-session';
 import { getAdminErrorMessage, invokeAdminApi } from '@/lib/admin-api';
 import { adminClassNames } from './admin-ui';
+import {isD1Backend} from '@/lib/backend-mode';import {useUserSessionState} from '@/hooks/use-user-session';
 
 const adminNavItems = [
   { href: '/admin/dashboard', label: '数据概览', icon: LayoutDashboard },
@@ -53,9 +55,9 @@ type ShellOverviewMetrics = {
 
 type ShellAnalyticsPayload = {
   metrics: {
-    onlineVisitors: number;
-    totalVisitors: number;
-    todayPageViews: number;
+    onlineVisitors: number|null;
+    totalVisitors: number|null;
+    todayPageViews: number|null;
     activeWindowMinutes: number;
   };
 };
@@ -67,9 +69,9 @@ type ShellStatus = {
   pendingNotices: number;
   pendingOffers: number;
   pendingFeedback: number;
-  onlineVisitors: number;
-  totalVisitors: number;
-  todayPageViews: number;
+  onlineVisitors: number|null;
+  totalVisitors: number|null;
+  todayPageViews: number|null;
   lastCheckedAt: string;
 };
 
@@ -135,7 +137,9 @@ export function AdminShell({
   const pathname = usePathname();
   const router = useRouter();
   const [session, setSession] = useState<AdminSession | null>(null);
+  const {ready:accountReady,session:accountSession}=useUserSessionState();
   const [sessionReady, setSessionReady] = useState(false);
+  const [sessionOwner,setSessionOwner]=useState('');
   const [globalSearch, setGlobalSearch] = useState('');
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -144,6 +148,7 @@ export function AdminShell({
   const normalizedPathname = pathname.replace(/\/$/, '') || '/';
 
   useEffect(() => {
+    if(isD1Backend()&&!accountReady)return;
     let disposed = false;
 
     const syncSession = async () => {
@@ -151,6 +156,7 @@ export function AdminShell({
         const verifiedSession = await refreshAdminSession();
         if (!disposed) {
           setSession(verifiedSession);
+          setSessionOwner(accountSession?.userId||'');
         }
       } catch {
         if (!disposed) {
@@ -172,7 +178,7 @@ export function AdminShell({
       disposed = true;
       dispose();
     };
-  }, []);
+  }, [accountReady,accountSession?.userId]);
 
   useEffect(() => {
     if (!sessionReady || session) {
@@ -206,61 +212,90 @@ export function AdminShell({
       return;
     }
 
-    let disposed = false;
-
-    const loadShellStatus = async () => {
-      const startedAt = performance.now();
-      setShellStatus((current) => ({ ...current, loading: true, error: '' }));
-
-      try {
-        const [overview, analytics] = await Promise.all([
-          invokeAdminApi<{ metrics: ShellOverviewMetrics }>({ resource: 'overview', action: 'get' }),
-          invokeAdminApi<ShellAnalyticsPayload>({ resource: 'analytics', action: 'overview' })
-        ]);
-
-        if (disposed) {
-          return;
-        }
-
-        setShellStatus({
-          loading: false,
-          error: '',
-          apiLatencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
-          pendingNotices: overview.metrics.pendingNotices || 0,
-          pendingOffers: overview.metrics.pendingOffers || 0,
-          pendingFeedback: overview.metrics.pendingFeedback || 0,
-          onlineVisitors: analytics.metrics.onlineVisitors || 0,
-          totalVisitors: analytics.metrics.totalVisitors || 0,
-          todayPageViews: analytics.metrics.todayPageViews || 0,
-          lastCheckedAt: new Date().toISOString()
-        });
-      } catch (error) {
-        if (disposed) {
-          return;
-        }
-
+    if (normalizedPathname === '/admin/dashboard') {
+      setShellStatus((current) => ({ ...current, loading: false }));
+      const syncDashboardSnapshot = (event: Event) => {
+        const snapshot = (event as CustomEvent<AdminDashboardShellSnapshot>).detail;
+        if (!snapshot) return;
         setShellStatus((current) => ({
           ...current,
+          ...snapshot,
           loading: false,
-          error: getAdminErrorMessage(error, '工作台暂时无法更新，请稍后刷新'),
-          apiLatencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
+          error: '',
           lastCheckedAt: new Date().toISOString()
         }));
+      };
+      window.addEventListener(ADMIN_DASHBOARD_SNAPSHOT_EVENT, syncDashboardSnapshot);
+      return () => {
+        window.removeEventListener(ADMIN_DASHBOARD_SNAPSHOT_EVENT, syncDashboardSnapshot);
+      };
+    }
+
+    let disposed = false;
+    let inFlight: Promise<void> | null = null;
+
+    const loadShellStatus = () => {
+      if (document.visibilityState !== 'visible') {
+        return Promise.resolve();
       }
+
+      if (inFlight) {
+        return inFlight;
+      }
+
+      const request = (async () => {
+        const startedAt = performance.now();
+        setShellStatus((current) => ({ ...current, loading: true, error: '' }));
+
+        try {
+          const snapshot = await invokeAdminApi<{
+            overview: { metrics: ShellOverviewMetrics };
+            analytics: ShellAnalyticsPayload;
+          }>({ resource: 'shell', action: 'snapshot' });
+          const { overview, analytics } = snapshot;
+
+          if (disposed) {
+            return;
+          }
+
+          setShellStatus({
+            loading: false,
+            error: '',
+            apiLatencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
+            pendingNotices: overview.metrics.pendingNotices || 0,
+            pendingOffers: overview.metrics.pendingOffers || 0,
+            pendingFeedback: overview.metrics.pendingFeedback || 0,
+            onlineVisitors: analytics.metrics.onlineVisitors,
+            totalVisitors: analytics.metrics.totalVisitors,
+            todayPageViews: analytics.metrics.todayPageViews,
+            lastCheckedAt: new Date().toISOString()
+          });
+        } catch (error) {
+          if (disposed) {
+            return;
+          }
+
+          setShellStatus((current) => ({
+            ...current,
+            loading: false,
+            error: getAdminErrorMessage(error, '工作台暂时无法更新，请稍后刷新'),
+            apiLatencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
+            lastCheckedAt: new Date().toISOString()
+          }));
+        } finally {
+          inFlight = null;
+        }
+      })();
+
+      inFlight = request;
+      return request;
     };
 
     void loadShellStatus();
-    const interval = window.setInterval(() => {
-      void loadShellStatus();
-    }, 60_000);
+    return () => { disposed = true; };
+  }, [normalizedPathname, session]);
 
-    return () => {
-      disposed = true;
-      window.clearInterval(interval);
-    };
-  }, [session]);
-
-  if (!sessionReady) {
+  if (!sessionReady || isD1Backend()&&(!accountReady||sessionOwner!==(accountSession?.userId||''))) {
     return (
       <AdminAuthGate title="正在加载" />
     );

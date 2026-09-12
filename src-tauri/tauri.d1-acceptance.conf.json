@@ -1,0 +1,6 @@
+{
+  "productName": "寻鹿 SeekOffer 迁移验收",
+  "identifier": "com.seekoffer.desktop.d1acceptance",
+  "build": {"beforeBuildCommand": ""},
+  "bundle": {"active": false, "createUpdaterArtifacts": false}
+}

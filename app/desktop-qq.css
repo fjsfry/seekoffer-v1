@@ -1572,6 +1572,69 @@
   font-size: 14px;
 }
 
+.desktop-project-notes-panel {
+  min-height: 360px;
+}
+
+.desktop-project-notes-panel > header {
+  align-items: flex-start;
+}
+
+.desktop-project-notes-count {
+  color: var(--desktop-text-tertiary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.desktop-project-notes-field {
+  display: block;
+  margin-top: 20px;
+}
+
+.desktop-project-notes-field textarea {
+  box-sizing: border-box;
+  display: block;
+  min-height: 220px;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--desktop-border-strong);
+  border-radius: 12px;
+  color: var(--desktop-text);
+  background: var(--desktop-surface-subtle);
+  font: inherit;
+  line-height: 1.7;
+  padding: 14px 16px;
+}
+
+.desktop-project-notes-field textarea:focus {
+  border-color: var(--desktop-accent);
+  outline: 3px solid var(--desktop-accent-muted);
+}
+
+.desktop-project-notes-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.desktop-project-notes-actions > span {
+  color: var(--desktop-text-tertiary);
+  font-size: 12px;
+}
+
+@media (max-width: 680px) {
+  .desktop-project-notes-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .desktop-project-notes-actions .desktop-project-workspace-primary {
+    justify-content: center;
+  }
+}
+
 .desktop-project-related-empty strong {
   color: var(--desktop-text);
   font-size: 15px;

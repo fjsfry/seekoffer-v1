@@ -190,9 +190,7 @@ jobs:
       SEEKOFFER_REQUIRE_CLEAN_SOURCE: 'true'
       SEEKOFFER_REQUIRE_PUBLIC_REPOSITORY: 'true'
       SEEKOFFER_REPOSITORY_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_BACKEND_PROVIDER: 'd1'
     steps:
       - name: Checkout exact release tag
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -212,18 +210,8 @@ jobs:
       - name: Install locked frontend dependencies
         run: npm ci
 
-      - name: Require public desktop authentication configuration
-        shell: pwsh
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:NEXT_PUBLIC_SUPABASE_URL)) {
-            throw 'NEXT_PUBLIC_SUPABASE_URL is not configured in the protected release environment.'
-          }
-          if (
-            [string]::IsNullOrWhiteSpace($env:NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) -and
-            [string]::IsNullOrWhiteSpace($env:NEXT_PUBLIC_SUPABASE_ANON_KEY)
-          ) {
-            throw 'A public Supabase publishable or legacy anon key is required for the desktop export.'
-          }
+      - name: Require reviewed D1 desktop configuration
+        run: node --input-type=module -e "import {resolveDesktopD1BuildEnvironment} from './scripts/desktop-d1-build-config.mjs'; resolveDesktopD1BuildEnvironment(process.env);"
 
       - name: Verify locked Rust dependencies
         shell: pwsh
@@ -234,6 +222,9 @@ jobs:
       - name: Compile desktop application without signing secrets
         shell: pwsh
         run: npm run desktop:compile
+
+      - name: Verify compiled D1 desktop authentication
+        run: npm run desktop:auth:verify
 
       - name: Bind unsigned compile payload to the release tag
         shell: pwsh
@@ -294,9 +285,7 @@ jobs:
       SEEKOFFER_REQUIRE_PUBLIC_REPOSITORY: 'true'
       SEEKOFFER_REPOSITORY_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
       SEEKOFFER_REQUIRE_VALID_AUTHENTICODE: 'true'
-      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_BACKEND_PROVIDER: 'd1'
     steps:
       - name: Checkout exact release tag
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

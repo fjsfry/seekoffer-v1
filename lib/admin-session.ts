@@ -3,6 +3,7 @@
 import type { AdminRole } from './admin-data';
 import { invokeAdminApi, isAdminApiConfigured } from './admin-api';
 import { getSupabaseBrowserClient } from './supabase-browser';
+import {isD1Backend} from './backend-mode';import {getUserSession,signOutUser} from './user-session';
 
 export type AdminSession = {
   email: string;
@@ -12,9 +13,11 @@ export type AdminSession = {
 };
 
 const ADMIN_SESSION_KEY = 'seekoffer-admin-session';
+function sessionKey(){return isD1Backend()?ADMIN_SESSION_KEY+':d1:'+(getUserSession()?.userId||'signed-out'):ADMIN_SESSION_KEY;}
 const ADMIN_EVENT_NAME = 'seekoffer-admin-session-updated';
 const ADMIN_SESSION_TTL_MS = 5 * 60 * 1000;
 let refreshInFlight: Promise<AdminSession | null> | null = null;
+let refreshOwner='';
 
 function canUseStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -36,7 +39,7 @@ function readAdminSessionFromStorage(): AdminSession | null {
   }
 
   try {
-    const raw = window.localStorage.getItem(ADMIN_SESSION_KEY);
+    const raw = window.localStorage.getItem(sessionKey());
     if (!raw) {
       return null;
     }
@@ -84,9 +87,9 @@ function writeAdminSession(session: AdminSession | null) {
 
   const previous = readAdminSessionFromStorage();
   if (session) {
-    window.localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
+    window.localStorage.setItem(sessionKey(), JSON.stringify(session));
   } else {
-    window.localStorage.removeItem(ADMIN_SESSION_KEY);
+    window.localStorage.removeItem(sessionKey());
   }
 
   if (!isSameAdminSession(previous, session)) {
@@ -95,6 +98,7 @@ function writeAdminSession(session: AdminSession | null) {
 }
 
 export async function signInAdmin(email: string, password: string) {
+  if(isD1Backend())throw Error('请通过当前后台登录表单完成安全验证。');
   const normalizedEmail = email.trim().toLowerCase();
 
   if (!isAdminApiConfigured()) {
@@ -121,6 +125,7 @@ export async function signInAdmin(email: string, password: string) {
 }
 
 export async function refreshAdminSession(options: { force?: boolean } = {}) {
+  const owner=isD1Backend()?getUserSession()?.userId||'':'';
   if (!isAdminApiConfigured()) {
     writeAdminSession(null);
     return null;
@@ -133,10 +138,11 @@ export async function refreshAdminSession(options: { force?: boolean } = {}) {
     }
   }
 
-  if (!options.force && refreshInFlight) {
+  if (!options.force && refreshInFlight && refreshOwner===owner) {
     return refreshInFlight;
   }
 
+  refreshOwner=owner;
   refreshInFlight = (async () => {
     try {
       const { admin } = await invokeAdminApi<{
@@ -154,13 +160,14 @@ export async function refreshAdminSession(options: { force?: boolean } = {}) {
         verifiedAt: Date.now()
       };
 
+      if(isD1Backend()&&(getUserSession()?.userId||'')!==owner)return null;
       writeAdminSession(session);
       return session;
     } catch {
-      writeAdminSession(null);
+      if(!isD1Backend()||(getUserSession()?.userId||'')===owner)writeAdminSession(null);
       return null;
     } finally {
-      refreshInFlight = null;
+      if(refreshOwner===owner)refreshInFlight = null;
     }
   })();
 
@@ -168,6 +175,7 @@ export async function refreshAdminSession(options: { force?: boolean } = {}) {
 }
 
 export function signOutAdmin() {
+  if(isD1Backend()){writeAdminSession(null);void signOutUser();return;}
   if (isAdminApiConfigured()) {
     getSupabaseBrowserClient().auth.signOut().catch(() => undefined);
   }

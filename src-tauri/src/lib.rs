@@ -12,6 +12,8 @@ use tauri::{
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 mod mentor_photo;
+mod native_auth;
+mod native_acceptance;
 
 const MAX_PENDING_TRAY_COMMANDS: usize = 32;
 const DESKTOP_UPDATER_PROGRESS_EVENT: &str = "seekoffer-updater-progress";
@@ -293,6 +295,10 @@ async fn check_for_desktop_update(
     state: tauri::State<'_, DesktopUpdaterState>,
     manual: bool,
 ) -> Result<DesktopUpdateSnapshot, DesktopUpdateCommandError> {
+    // An isolated acceptance build must never follow the production installer feed.
+    if native_acceptance::isolated(&app) {
+        return Ok(updater_state_lock(&state).snapshot.clone());
+    }
     {
         let mut inner = updater_state_lock(&state);
         if is_update_operation_active(inner.snapshot.phase) {
@@ -635,7 +641,13 @@ pub fn run() {
         .manage(TrayCommandState::default())
         .manage(DesktopUpdaterState::default())
         .manage(mentor_photo::MentorPhotoState::default())
+        .manage(native_auth::NativeAuthState::default())
         .invoke_handler(tauri::generate_handler![
+            native_acceptance::native_acceptance_report,
+            native_auth::native_public_request,
+            native_auth::native_auth_login,
+            native_auth::native_auth_session,
+            native_auth::native_auth_sign_out,
             take_pending_tray_command,
             acknowledge_tray_command,
             desktop_frontend_ready,
@@ -655,6 +667,7 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            native_acceptance::start(app.handle());
             let open_item = MenuItem::with_id(app, "show-main", "打开寻鹿", true, None::<&str>)?;
             let workbench_item =
                 MenuItem::with_id(app, "open-workbench", "全部申请", true, None::<&str>)?;

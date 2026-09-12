@@ -215,6 +215,10 @@ async function createFixture() {
       'name: fixture desktop release\n'
     ),
     writeFixtureFile(root, 'scripts/run-desktop-next.mjs', ''),
+    writeFixtureFile(root, 'scripts/run-desktop-d1.mjs', ''),
+    writeFixtureFile(root, 'scripts/emergency-network-guard.cjs', ''),
+    writeFixtureFile(root, 'scripts/desktop-d1-build-config.mjs', 'export function resolveDesktopD1BuildEnvironment() { return {}; }'),
+    writeFixtureFile(root, 'scripts/verify-desktop-d1-export.mjs', 'export async function verifyDesktopD1Export() {}'),
     writeFixtureFile(root, 'scripts/verify-build-target-isolation.mjs', ''),
     writeFixtureFile(root, 'scripts/verify-desktop-auth-export.mjs', ''),
     writeFixtureFile(
@@ -627,7 +631,7 @@ describe('desktop release packaging guard', () => {
     expect(output).toContain('"cargoLock":"9.9.9"');
   });
 
-  it('keeps the current desktop release metadata aligned at v0.2.22', async () => {
+  it('keeps the current desktop release metadata aligned at v0.2.23', async () => {
     const [packageRaw, packageLockRaw, tauriRaw, cargoTomlRaw, cargoLockRaw, releaseNotes, designQa] =
       await Promise.all([
         readFile(path.join(projectRoot, 'package.json'), 'utf8'),
@@ -649,7 +653,7 @@ describe('desktop release packaging guard', () => {
       /\[\[package\]\]\s*\nname\s*=\s*"seekoffer-desktop"\s*\nversion\s*=\s*"([^"]+)"/
     )?.[1];
 
-    expect(packageJson.version).toBe('0.2.22');
+    expect(packageJson.version).toBe('0.2.23');
     expect(packageLock.version).toBe(packageJson.version);
     expect(packageLock.packages[''].version).toBe(packageJson.version);
     expect(tauriConfig.version).toBe(packageJson.version);

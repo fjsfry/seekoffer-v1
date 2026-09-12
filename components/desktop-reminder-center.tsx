@@ -1,5 +1,6 @@
 'use client';
 
+import {isD1Backend} from '@/lib/backend-mode';
 import {
   BellOff,
   CalendarClock,
@@ -643,8 +644,8 @@ export function DesktopReminderCenter({
         setApplicationsError('');
       } catch {
         if (!active) return;
-        setApplicationsError('提醒数据暂时无法同步，30 秒后会自动重试。');
-        if (retryTimer === null) {
+        setApplicationsError(isD1Backend()?'提醒数据暂时无法同步，请保留本地数据后手动刷新。':'提醒数据暂时无法同步，30 秒后会自动重试。');
+        if (!isD1Backend() && retryTimer === null) {
           retryTimer = window.setTimeout(() => {
             retryTimer = null;
             void refresh(true);

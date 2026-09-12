@@ -1,6 +1,6 @@
 'use client';
 
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type ReactNode, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2, Loader2, PencilLine, ShieldCheck } from 'lucide-react';
 import { LoginRequiredCard } from '@/components/login-required-card';
@@ -9,6 +9,7 @@ import { SiteShell } from '@/components/site-shell';
 import { useUserSessionState } from '@/hooks/use-user-session';
 import { offerProjectTypes, offerResultTypes, submitOfferPost, type OfferProjectType, type OfferResultType } from '@/lib/offers';
 import { isMemberSession } from '@/lib/user-session';
+import {isD1Backend} from '@/lib/backend-mode';import {readCommunityDraft,saveCommunityDraft} from '@/lib/community-drafts';
 
 type OfferFormState = {
   authorName: string;
@@ -22,11 +23,15 @@ type OfferFormState = {
 };
 
 export default function PublishPage() {
+  const {session}=useUserSessionState();return <PublishContent key={isD1Backend()?session?.userId||'signed-out':'legacy'}/>;
+}
+function PublishContent(){
   const { ready, loggedIn, session } = useUserSessionState();
   const canPublish = isMemberSession(session) && Boolean(session?.userId);
   const profileNickname = session?.profile.nickname?.trim() || '';
   const defaultAuthorName = profileNickname || (session?.email ? session.email.split('@')[0] : 'Seekoffer用户');
-  const [form, setForm] = useState<OfferFormState>({
+  const draftKey=isD1Backend()&&session?.userId?'seekoffer-community-draft:'+session.userId+':offer':'';
+  const [form, setForm] = useState<OfferFormState>(()=>readCommunityDraft(draftKey,{
     authorName: '',
     schoolName: '',
     major: '',
@@ -35,10 +40,11 @@ export default function PublishPage() {
     undergraduateBackground: '',
     content: '',
     isAnonymous: true
-  });
+  }));
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('提交后会先核验，通过后才会展示到 Offer 圈。');
   const [submitted, setSubmitted] = useState(false);
+  useEffect(()=>{if(ready&&canPublish)saveCommunityDraft(draftKey,form);},[draftKey,form,ready,canPublish]);
 
   function updateForm<K extends keyof OfferFormState>(key: K, value: OfferFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));

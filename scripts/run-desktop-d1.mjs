@@ -1,0 +1,10 @@
+import {spawnSync} from 'node:child_process';import path from 'node:path';import fs from 'node:fs';
+import {verifyBuildTargetIsolation} from './verify-build-target-isolation.mjs';
+import {resolveDesktopD1BuildEnvironment} from './desktop-d1-build-config.mjs';
+import {verifyDesktopD1Export} from './verify-desktop-d1-export.mjs';
+const env=resolveDesktopD1BuildEnvironment(process.env);
+env.NODE_OPTIONS=[env.NODE_OPTIONS||'','--require "'+path.resolve('scripts/emergency-network-guard.cjs').replaceAll('\\','/')+'"'].join(' ').trim();
+console.log(JSON.stringify({target:'desktop',backend:'d1',auth:'official-Clerk-PKCE',sourceNetwork:'blocked-during-build',originalUserDataTouched:false}));
+const r=spawnSync(process.execPath,['node_modules/next/dist/bin/next','build'],{env,stdio:'inherit',windowsHide:true});if(r.status!==0)throw Error('DESKTOP_NEXT_BUILD_FAILED');
+await verifyDesktopD1Export(path.resolve('.next-desktop'));
+const result=verifyBuildTargetIsolation({target:'desktop',distDirectory:path.resolve('.next-desktop')});fs.mkdirSync('artifacts/d1-migration',{recursive:true});fs.writeFileSync('artifacts/d1-migration/desktop-build.json',JSON.stringify({at:new Date().toISOString(),...result,productionReleased:false},null,2));console.log(JSON.stringify(result));

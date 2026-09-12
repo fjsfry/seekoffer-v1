@@ -14,7 +14,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import type React from 'react';
-import { useEffect, useState } from 'react';
+import {useEffect,useState,useCallback,useRef} from 'react';
+import {ADMIN_DASHBOARD_SNAPSHOT_EVENT,type AdminDashboardShellSnapshot} from '@/lib/admin-shell-events';
 import { AdminShell } from '@/components/admin-shell';
 import {
   AdminMiniBars,
@@ -67,7 +68,13 @@ const emptyAnalytics: AdminAnalyticsPayload = {
   recentVisitors: []
 };
 
+
+
+
 export default function AdminDashboardPage() {
+  const refreshInFlightRef=useRef<Promise<void>|null>(null);
+  const [isRefreshing,setIsRefreshing]=useState(false);
+  const [hasDashboardData,setHasDashboardData]=useState(false);
   const [overviewMetrics, setOverviewMetrics] = useState<AdminOverviewMetrics>(emptyOverview);
   const [analytics, setAnalytics] = useState<AdminAnalyticsPayload>(emptyAnalytics);
   const [trends, setTrends] = useState<TrendPoint[]>(buildEmptyTrends());
@@ -77,67 +84,74 @@ export default function AdminDashboardPage() {
   const [message, setMessage] = useState('');
   const [dataError, setDataError] = useState('');
 
-  async function loadDashboard() {
-    try {
-      const [overview, analyticsData, notices, offers, feedback] = await Promise.all([
-        invokeAdminApi<{ metrics: AdminOverviewMetrics; trends: TrendPoint[] }>({ resource: 'overview', action: 'get' }),
-        invokeAdminApi<AdminAnalyticsPayload>({ resource: 'analytics', action: 'overview' }),
-        invokeAdminApi<{ notices: NoticeApiRow[] }>({
-          resource: 'notices',
-          action: 'list',
-          page: 1,
-          pageSize: 5,
-          filters: { status: 'pending' },
-          sort: 'updated_desc'
-        }),
-        invokeAdminApi<{ offers: OfferApiRow[] }>({ resource: 'offers', action: 'list', page: 1, pageSize: 20 }),
-        invokeAdminApi<{ feedback: FeedbackApiRow[] }>({ resource: 'feedback', action: 'list', page: 1, pageSize: 5 })
-      ]);
-
-      setOverviewMetrics(overview.metrics);
-      setAnalytics(analyticsData);
-      setTrends(overview.trends?.length ? overview.trends : buildEmptyTrends());
-      setPendingNotices(notices.notices.map(mapNoticeApiRow));
-      setPendingOffers(offers.offers.filter((item) => item.review_status === 'pending' || item.reports_count > 0).slice(0, 5).map(mapOfferApiRow));
-      setLatestFeedback(feedback.feedback.map(mapFeedbackApiRow));
-      setDataError('');
-      setMessage('');
-    } catch (error) {
-      const errorMessage = getAdminErrorMessage(error, '数据暂时无法更新，请稍后重试。');
-      setOverviewMetrics(emptyOverview);
-      setAnalytics(emptyAnalytics);
-      setTrends(buildEmptyTrends());
-      setPendingNotices([]);
-      setPendingOffers([]);
-      setLatestFeedback([]);
-      setDataError(errorMessage);
-      setMessage(errorMessage);
+  const loadDashboard = useCallback(() => {
+    if (document.visibilityState !== 'visible') {
+      return Promise.resolve();
     }
-  }
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadDashboard();
-    }, 0);
-    const interval = window.setInterval(() => {
-      void loadDashboard();
-    }, 30_000);
+    if (refreshInFlightRef.current) {
+      return refreshInFlightRef.current;
+    }
 
-    return () => {
-      window.clearTimeout(timer);
-      window.clearInterval(interval);
-    };
+    setIsRefreshing(true);
+    const request = (async () => {
+      try {
+        const snapshot = await invokeAdminApi<{
+          overview: { metrics: AdminOverviewMetrics; trends: TrendPoint[] };
+          analytics: AdminAnalyticsPayload;
+          notices: { notices: NoticeApiRow[] };
+          offers: { offers: OfferApiRow[] };
+          feedback: { feedback: FeedbackApiRow[] };
+          downloads?: DesktopDownloadMetrics;
+        }>({ resource: 'dashboard', action: 'snapshot' });
+        const { overview, analytics: analyticsData, notices, offers, feedback } = snapshot;
+
+        setOverviewMetrics(overview.metrics);
+        setAnalytics(analyticsData);
+        setTrends(overview.trends?.length ? overview.trends : buildEmptyTrends());
+        setPendingNotices(notices.notices.map(mapNoticeApiRow));
+        setPendingOffers(offers.offers.filter((item) => item.review_status === 'pending' || item.reports_count > 0).slice(0, 5).map(mapOfferApiRow));
+        setLatestFeedback(feedback.feedback.map(mapFeedbackApiRow));
+        window.dispatchEvent(
+          new CustomEvent<AdminDashboardShellSnapshot>(ADMIN_DASHBOARD_SNAPSHOT_EVENT, {
+            detail: {
+              pendingNotices: overview.metrics.pendingNotices,
+              pendingOffers: overview.metrics.pendingOffers,
+              pendingFeedback: overview.metrics.pendingFeedback,
+              onlineVisitors: analyticsData.metrics.onlineVisitors,
+              totalVisitors: analyticsData.metrics.totalVisitors,
+              todayPageViews: analyticsData.metrics.todayPageViews
+            }
+          })
+        );
+        setHasDashboardData(true);
+        setDataError('');
+        setMessage('');
+      } catch (error) {
+        const errorMessage = getAdminErrorMessage(error, '数据暂时无法更新，请稍后重试。');
+        setDataError(errorMessage);
+        setMessage(errorMessage);
+      } finally {
+        refreshInFlightRef.current = null;
+        setIsRefreshing(false);
+      }
+    })();
+
+    refreshInFlightRef.current = request;
+    return request;
   }, []);
+
+  useEffect(() => { void loadDashboard(); }, [loadDashboard]);
 
   const maxNotices = Math.max(...trends.map((item) => item.notices), 1);
   const maxOffers = Math.max(...trends.map((item) => item.offers), 1);
   const dataHealthy = !dataError;
   const pendingTotal = overviewMetrics.pendingNotices + overviewMetrics.pendingOffers + overviewMetrics.pendingFeedback;
   const recentRegistrations = trends.reduce((total, item) => total + item.users, 0);
-  const totalAudienceUsers = Math.max(analytics.metrics.totalVisitors, overviewMetrics.totalUsers);
-  const registrationConversion = totalAudienceUsers > 0
-    ? Math.min((overviewMetrics.totalUsers / totalAudienceUsers) * 100, 100)
-    : 0;
+  const totalBrowserVisitors = analytics.metrics.totalVisitors;
+  const registrationConversion = totalBrowserVisitors !== null && totalBrowserVisitors > 0
+    ? Math.min((overviewMetrics.totalUsers / totalBrowserVisitors) * 100, 100)
+    : null;
   const todoCards = [
     { href: '/admin/notices', label: '待审核通知', value: overviewMetrics.pendingNotices, hint: '确认后进入通知库', icon: Bell, tone: 'bg-amber-50 text-amber-700' },
     { href: '/admin/offers', label: '待审核 Offer', value: overviewMetrics.pendingOffers, hint: '核验投稿真实性', icon: ClipboardList, tone: 'bg-violet-50 text-violet-700' },
@@ -148,7 +162,7 @@ export default function AdminDashboardPage() {
       href: '/admin/dashboard',
       label: '今日新增访客',
       value: formatNumber(analytics.metrics.todayVisitors),
-      hint: `实时在线 ${formatNumber(analytics.metrics.onlineVisitors)}`,
+      hint: `近期访问 ${formatNumber(analytics.metrics.onlineVisitors)}`,
       icon: Activity,
       tone: 'bg-emerald-50 text-emerald-700'
     },
@@ -194,6 +208,8 @@ export default function AdminDashboardPage() {
     setMessage('已导出当前数据概览快照。');
   }
 
+  if(!hasDashboardData)return <AdminShell title="后台概览" description="核对当前业务状态"><div role={dataError?'alert':'status'} className="rounded-2xl border bg-white p-6">{dataError||'正在读取后台数据…'}{dataError&&<button className="ml-4 text-brand" onClick={()=>void loadDashboard()}>重新加载</button>}</div></AdminShell>;
+
   return (
     <AdminShell title="数据概览" description="聚焦用户增长、内容质量与今日待办，快速判断下一步。">
       <div className="space-y-5">
@@ -215,7 +231,7 @@ export default function AdminDashboardPage() {
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <button
               type="button"
-              onClick={() => void loadDashboard()}
+              disabled={isRefreshing} onClick={() => void loadDashboard()}
               className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-emerald-50/60 hover:text-teal-800"
             >
               <RefreshCw className="h-4 w-4" />
@@ -232,6 +248,7 @@ export default function AdminDashboardPage() {
           </div>
         </section>
 
+        {analytics.available===false?<p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">访问统计暂停，历史访问记录尚未迁完；访客与下载指标暂不可用，不代表实际为零。账号数据来自已建立的工作台资料。</p>:null}
         <section className="grid gap-5 xl:grid-cols-2">
           <article className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.05)] lg:p-7">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -239,14 +256,14 @@ export default function AdminDashboardPage() {
                 <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-50 text-teal-800 ring-1 ring-inset ring-teal-100">
                   <UsersRound className="h-6 w-6" />
                 </span>
-                <h2 className="text-lg font-semibold text-slate-950">累计用户</h2>
+                <h2 className="text-lg font-semibold text-slate-950">累计访客</h2>
               </div>
               <span className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-100">
                 今日新增 {formatNumber(analytics.metrics.todayVisitors)}
               </span>
             </div>
 
-            <div className="mt-8 text-6xl font-semibold leading-none text-slate-950 tabular-nums">{formatNumber(totalAudienceUsers)}</div>
+            <div className="mt-8 text-6xl font-semibold leading-none text-slate-950 tabular-nums">{formatNumber(totalBrowserVisitors)}</div>
 
             <dl className="mt-8 grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-100 pt-5">
               <div className="pr-4">
@@ -259,7 +276,7 @@ export default function AdminDashboardPage() {
               </div>
               <div className="pl-4">
                 <dd className="text-xl font-semibold text-slate-950 tabular-nums">{formatNumber(analytics.metrics.onlineVisitors)}</dd>
-                <dt className="mt-1 text-sm text-slate-500">实时在线</dt>
+                <dt className="mt-1 text-sm text-slate-500">近期访问</dt>
               </div>
             </dl>
           </article>
@@ -273,7 +290,7 @@ export default function AdminDashboardPage() {
                 <h2 className="text-lg font-semibold text-slate-950">注册用户</h2>
               </div>
               <span className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 ring-1 ring-inset ring-blue-100">
-                转化率 {registrationConversion.toFixed(1)}%
+                注册 / 访客比 {registrationConversion===null?'暂不可用':registrationConversion.toFixed(1)+'%'}
               </span>
             </div>
 
@@ -284,9 +301,10 @@ export default function AdminDashboardPage() {
               aria-label="注册转化率"
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-valuenow={Number(registrationConversion.toFixed(1))}
+              aria-valuenow={registrationConversion===null?undefined:Number(registrationConversion.toFixed(1))}
+              aria-valuetext={registrationConversion===null?'访问统计暂不可用':undefined}
             >
-              <div className="h-full rounded-full bg-blue-600" style={{ width: `${registrationConversion}%` }} />
+              <div className="h-full rounded-full bg-blue-600" style={{ width: `${registrationConversion??0}%` }} />
             </div>
 
             <dl className="mt-6 grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-100 pt-5">
@@ -340,9 +358,9 @@ export default function AdminDashboardPage() {
           >
             <AdminMiniBars data={trends} valueKey="users" color="bg-teal-700" />
             <div className="grid grid-cols-3 border-t border-slate-100 text-center">
-              <div className="px-3 py-4"><div className="text-xs text-slate-400">累计用户</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(totalAudienceUsers)}</div></div>
+              <div className="px-3 py-4"><div className="text-xs text-slate-400">累计访客</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(totalBrowserVisitors)}</div></div>
               <div className="border-x border-slate-100 px-3 py-4"><div className="text-xs text-slate-400">注册用户</div><div className="mt-1 font-semibold text-slate-900">{formatNumber(overviewMetrics.totalUsers)}</div></div>
-              <div className="px-3 py-4"><div className="text-xs text-slate-400">注册转化率</div><div className="mt-1 font-semibold text-slate-900">{registrationConversion.toFixed(1)}%</div></div>
+              <div className="px-3 py-4"><div className="text-xs text-slate-400">注册 / 访客比</div><div className="mt-1 font-semibold text-slate-900">{registrationConversion===null?'暂不可用':registrationConversion.toFixed(1)+'%'}</div></div>
             </div>
           </AdminPanel>
 
@@ -408,14 +426,14 @@ export default function AdminDashboardPage() {
 
         <section className="grid gap-5 xl:grid-cols-2">
           <VisitorPanel
-            title="实时在线用户"
+            title="近期访问用户"
             rows={analytics.onlineVisitors}
-            empty="当前暂无在线用户。"
+            empty={analytics.available===false?'访问统计暂停，暂无可用的实时数据。':'当前暂无在线用户。'}
           />
           <VisitorPanel
             title="最近活跃用户"
             rows={analytics.recentVisitors}
-            empty="暂无用户活跃记录。"
+            empty={analytics.available===false?'访问统计暂停，历史日志尚未完整迁入。':'暂无用户活跃记录。'}
           />
         </section>
 
@@ -496,10 +514,10 @@ type AdminOverviewMetrics = {
 };
 
 type AdminAnalyticsMetrics = {
-  onlineVisitors: number;
-  totalVisitors: number;
-  todayVisitors: number;
-  todayPageViews: number;
+  onlineVisitors: number|null;
+  totalVisitors: number|null;
+  todayVisitors: number|null;
+  todayPageViews: number|null;
   activeWindowMinutes: number;
 };
 
@@ -517,9 +535,17 @@ type AdminVisitorRow = {
 };
 
 type AdminAnalyticsPayload = {
+  available?:boolean;
   metrics: AdminAnalyticsMetrics;
   onlineVisitors: AdminVisitorRow[];
   recentVisitors: AdminVisitorRow[];
+};
+
+type DesktopDownloadMetrics = {
+  total: number|null;
+  today: number|null;
+  sevenDays: number|null;
+  trackingStartedAt: string;
 };
 
 function buildEmptyTrends(): TrendPoint[] {
@@ -532,7 +558,8 @@ function buildEmptyTrends(): TrendPoint[] {
   }));
 }
 
-function formatNumber(value: number) {
+function formatNumber(value: number|null) {
+  if(value===null)return '—';
   return new Intl.NumberFormat('zh-CN').format(value || 0);
 }
 

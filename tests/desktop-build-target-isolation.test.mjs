@@ -74,8 +74,11 @@ describe('desktop build target isolation', () => {
     expect(nextConfig).toContain("process.env.SEEKOFFER_BUILD_TARGET");
     expect(nextConfig).toContain("'seekoffer-build-surface': buildSurfaceRelativeModule");
     expect(nextConfig).toContain("config.resolve.alias['seekoffer-build-surface'] = buildSurfaceModule");
-    expect(desktopRunner).toContain("childEnv.SEEKOFFER_BUILD_TARGET = 'desktop'");
-    expect(desktopRunner).toContain('verifyBuildTargetIsolation({');
+    expect(desktopRunner).toContain("import('./run-desktop-d1.mjs')");
+    expect(desktopRunner).not.toContain('resolveDesktopAuthConfig');
+    const d1Runner = await readFile(path.join(root, 'scripts', 'run-desktop-d1.mjs'), 'utf8');
+    expect(d1Runner).toContain('resolveDesktopD1BuildEnvironment(process.env)');
+    expect(d1Runner).toContain('verifyBuildTargetIsolation({');
     const packageScripts = JSON.parse(packageRaw).scripts;
     expect(packageScripts.dev).toContain(
       'SEEKOFFER_BUILD_TARGET=web NEXT_PUBLIC_SEEKOFFER_SURFACE=web next dev'

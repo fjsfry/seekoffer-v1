@@ -4,10 +4,8 @@ import { readFileSync } from 'node:fs';
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  resolveDesktopAuthConfig,
-  verifyDesktopAuthExport
-} from './desktop-auth-config.mjs';
+import {verifyDesktopD1Export} from './verify-desktop-d1-export.mjs';
+import {resolveDesktopD1BuildEnvironment} from './desktop-d1-build-config.mjs';
 import {
   assertStableDesktopUpgrade,
   assertNoReleaseSecretLeak,
@@ -228,11 +226,8 @@ if (stableRelease || process.env.SEEKOFFER_REQUIRE_CLEAN_SOURCE === 'true') {
     throw new Error('自动更新发布拒绝脏工作区；请提交或移除所有变更后重试');
   }
 }
-const desktopAuthConfig = await resolveDesktopAuthConfig({ projectRoot });
-await verifyDesktopAuthExport({
-  distDirectory: path.join(projectRoot, '.next-desktop'),
-  config: desktopAuthConfig
-});
+resolveDesktopD1BuildEnvironment(process.env);
+await verifyDesktopD1Export(path.join(projectRoot,'.next-desktop'));
 
 async function listFilesRecursively(targetPath) {
   const targetStats = await stat(targetPath);
@@ -297,6 +292,10 @@ const buildInputPaths = [
   path.join(projectRoot, 'scripts', 'prepare-windows-signing-certificate.ps1'),
   path.join(projectRoot, 'scripts', 'sign-windows-artifact.ps1'),
   path.join(projectRoot, 'scripts', 'run-desktop-next.mjs'),
+  path.join(projectRoot, 'scripts', 'run-desktop-d1.mjs'),
+  path.join(projectRoot, 'scripts', 'desktop-d1-build-config.mjs'),
+  path.join(projectRoot, 'scripts', 'verify-desktop-d1-export.mjs'),
+  path.join(projectRoot, 'scripts', 'emergency-network-guard.cjs'),
   path.join(projectRoot, 'scripts', 'verify-build-target-isolation.mjs'),
   path.join(projectRoot, 'scripts', 'verify-desktop-auth-export.mjs'),
   updateManifestHelperPath,

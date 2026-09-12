@@ -1,7 +1,9 @@
 'use client';
 
+import { accountServiceFetch, ServiceUnavailableError } from './service-availability';
 import { getSupabaseBrowserClient } from './supabase-browser';
 import { SUPABASE_URL, isSupabaseConfigured } from './supabase-env';
+import {isD1Backend} from './backend-mode';import {getUserSession} from './user-session';import {d1ClientForUser} from './clerk-d1-session';
 
 export type AdminApiPayload = {
   resource: string;
@@ -47,10 +49,25 @@ function toSafeAdminMessage(message?: string) {
 }
 
 export function isAdminApiConfigured() {
+  if(isD1Backend())return Boolean(process.env.NEXT_PUBLIC_D1_API_URL);
   return isSupabaseConfigured() && Boolean(SUPABASE_URL);
 }
 
 export async function invokeAdminApi<T>(payload: AdminApiPayload): Promise<AdminApiResponse<T>> {
+  if(isD1Backend()){
+    const owner=getUserSession()?.userId;if(!owner)throw Error('请先登录管理员账号。');const client=await d1ClientForUser(owner);
+    if(payload.resource==='notices'&&payload.action==='bulk_update_status'&&payload.ids){
+      const ids=[...new Set(payload.ids)];if(!ids.length||ids.length>100)throw Error('每次请选择1至100条通知。');let completed=0;const notices:unknown[]=[];
+      try{for(let i=0;i<ids.length;i+=6){const result=await client.admin({...payload,ids:ids.slice(i,i+6)}) as {notices:unknown[];count:number};if(!Array.isArray(result.notices))throw Error('变更结果未确认。');completed+=result.count;notices.push(...result.notices);}}
+      catch(error){throw Error(`已处理 ${completed}/${ids.length} 条；其余尚未完成，请刷新核对后再试。${error instanceof Error?error.message:''}`);}
+      return{notices,count:completed,cacheRevalidated:true} as unknown as AdminApiResponse<T>;
+    }
+    if(payload.resource==='notices'&&payload.action==='create'&&payload.notice&&!payload.notice.id){
+      const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(payload.notice))))].map(x=>x.toString(16).padStart(2,'0')).join('');const key='seekoffer-admin-create:'+owner+':'+hash;let id=localStorage.getItem(key);if(!id){id=crypto.randomUUID();localStorage.setItem(key,id);}
+      const result=await client.admin({...payload,notice:{...payload.notice,id}}) as {notice?:{id?:string}};if(result?.notice?.id!==id)throw Error('新建结果尚未确认，请保留草稿后重试。');localStorage.removeItem(key);return result as AdminApiResponse<T>;
+    }
+    return await client.admin(payload) as AdminApiResponse<T>;
+  }
   if (!isAdminApiConfigured()) {
     throw new Error('当前无法完成登录，请稍后再试或联系管理员。');
   }
@@ -70,7 +87,7 @@ export async function invokeAdminApi<T>(payload: AdminApiPayload): Promise<Admin
 
   let response: Response;
   try {
-    response = await fetch(`${SUPABASE_URL}/functions/v1/admin-api`, {
+    response = await accountServiceFetch(`${SUPABASE_URL}/functions/v1/admin-api`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -83,11 +100,13 @@ export async function invokeAdminApi<T>(payload: AdminApiPayload): Promise<Admin
     if (error instanceof DOMException && error.name === 'AbortError') {
       throw new Error('操作响应超时，请稍后重试。');
     }
+    if (error instanceof ServiceUnavailableError) throw error;
     throw new Error('网络连接不稳定，请稍后重试。');
   } finally {
     window.clearTimeout(timeout);
   }
 
+  if (response.status === 402) throw new ServiceUnavailableError(402);
   const body = (await response.json().catch(() => ({}))) as AdminApiResponse<T>;
   if (!response.ok) {
     throw new Error(toSafeAdminMessage(body.message || body.error));

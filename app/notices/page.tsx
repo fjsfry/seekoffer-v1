@@ -2,6 +2,11 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent, type ReactNode } from 'react';
 import Link from 'next/link';
+import {isD1Backend} from '@/lib/backend-mode';
+import {nativeNoticeSearch} from '@/lib/native-public-notices';
+import type {PublicNoticeSearchResponse} from '@/lib/public-notice-search';
+import {noticeListItemToProject} from '@/lib/notice-record';
+const nativeData=isD1Backend();
 import { useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
@@ -471,6 +476,8 @@ function NoticesPageFallback() {
 }
 
 function NoticesPageContent() {
+  const [nativeResult,setNativeResult]=useState<PublicNoticeSearchResponse|null>(null);
+  const [composing,setComposing]=useState(false);
   const searchParams = useSearchParams();
   const initialUrlState = useMemo(() => parseNoticeListUrlState(searchParams), [searchParams]);
   const initialNoticeState = initialUrlState || defaultNoticeListState;
@@ -594,6 +601,7 @@ function NoticesPageContent() {
     let active = true;
 
     async function synchronizePublicNotices() {
+      if(nativeData)return;
       const cachedSnapshot = getPublicNoticeSnapshot();
       const hasDisplaySnapshot = cachedSnapshot.rows.length > 0 || cachedSnapshot.syncedAt !== null;
       if (hasDisplaySnapshot) {
@@ -643,31 +651,34 @@ function NoticesPageContent() {
   }, [reloadToken]);
 
   const categoryOptions = useMemo(
-    () => ['全部', ...Array.from(new Set(projects.map((item) => inferDisciplineCategory(item.discipline))))],
-    [projects]
+    ()=>nativeData?['全部',...(nativeResult?.facets.categories||[])]:['全部',...Array.from(new Set(projects.map(item=>inferDisciplineCategory(item.discipline))))],
+    [projects,nativeResult]
   );
 
   const disciplineOptions = useMemo(() => {
+    if(nativeData)return ['全部',...(nativeResult?.facets.disciplines||[])];
     const rows =
       category === '全部'
         ? projects
         : projects.filter((item) => inferDisciplineCategory(item.discipline) === category);
 
     return ['全部', ...Array.from(new Set(rows.map((item) => getDisplayDiscipline(item.discipline)).filter(Boolean)))];
-  }, [projects, category]);
+  }, [projects, category,nativeResult]);
 
-  const regionOptions = useMemo(() => ['全部', ...getNoticeRegionOptions(projects)], [projects]);
+  const regionOptions = useMemo(()=>nativeData?['全部',...(nativeResult?.facets.regions||[])]:['全部',...getNoticeRegionOptions(projects)],[projects,nativeResult]);
 
   const schoolOptions = useMemo(() => {
+    if(nativeData)return ['全部',...(nativeResult?.facets.schools||[])];
     const rows = region === '全部' ? projects : projects.filter((item) => getNoticeRegion(item) === region);
     const schools = Array.from(new Set(rows.map((item) => getDisplaySchoolName(item.schoolName)).filter((item) => item && item !== '待识别院校')));
 
     return ['全部', ...schools.sort((left, right) => left.localeCompare(right, 'zh-CN'))];
-  }, [projects, region]);
+  }, [projects, region,nativeResult]);
 
   const todayInBeijing = getBeijingDateString();
 
   const filteredProjects = useMemo(() => {
+    if(nativeData)return projects;
     const noticeKeyword = keyword.trim().toLowerCase();
     const schoolKeyword = schoolName.trim().toLowerCase();
     const majorText = majorKeyword.trim().toLowerCase();
@@ -756,13 +767,15 @@ function NoticesPageContent() {
     todayInBeijing
   ]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
   const requestedPage = pageState.filterKey === filterKey ? pageState.page : 1;
+  const totalCount=nativeData?nativeResult?.pagination.total??0:filteredProjects.length;
+  const totalPages=nativeData?nativeResult?.pagination.totalPages??Math.max(1,requestedPage):Math.max(1,Math.ceil(totalCount/PAGE_SIZE));
   const currentPage = Math.min(requestedPage, totalPages);
-  const pagedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pagedProjects = nativeData?projects:filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  useEffect(()=>{if(!nativeData||composing)return;const controller=new AbortController();let active=true;const timer=setTimeout(()=>{setIsLoading(true);setIsRefreshing(true);setLoadError('');void nativeNoticeSearch(filterValues,requestedPage,controller.signal).then(result=>{if(!active)return;setNativeResult(result);setProjects(result.items.map(noticeListItemToProject));setLastLoadedAt(getBeijingTimeString(new Date(result.servedAt)));}).catch(error=>{if(active&&error?.name!=='AbortError'){setProjects([]);setLoadError('通知服务暂不可用，原浏览位置已保留，请手动重试。');}}).finally(()=>{if(active){setIsLoading(false);setIsRefreshing(false);}});},350);return()=>{active=false;clearTimeout(timer);controller.abort();};},[filterValues,requestedPage,reloadToken,composing]);
   const visiblePages = getVisiblePages(currentPage, totalPages);
   const isNoticeLoading = isLoading && projects.length === 0;
-  const latestPublishDate = projects.reduce((latest, item) => (item.publishDate > latest ? item.publishDate : latest), '');
+  const latestPublishDate = nativeData?nativeResult?.sideData.latestPublishDate??'':projects.reduce((latest,item)=>item.publishDate>latest?item.publishDate:latest,'');
 
   useEffect(() => {
     const preservedHash = window.location.hash.startsWith('#notice-') ? window.location.hash : '';
@@ -850,15 +863,16 @@ function NoticesPageContent() {
   }, [isNoticeLoading, currentPage, filterKey, pagedProjects.length, filterValues, advancedOpen]);
 
   const urgentProjects = useMemo(
-    () =>
+    () => nativeData?(nativeResult?.sideData.urgentProjects||[]).map(noticeListItemToProject):
       sortProjects(
         projects.filter((item) => ['today', 'within3days', 'within7days'].includes(getDeadlineLevelFromDate(item.deadlineDate))),
         'deadline'
       ).slice(0, 5),
-    [projects]
+    [projects,nativeResult]
   );
 
   const todayUpdates = useMemo(() => {
+    if(nativeData)return nativeResult?.sideData.todaySchoolUpdates||{date:'',hasTodayRows:false,rows:[]};
     const counts = new Map<string, number>();
     const todayRows = projects.filter((item) => item.publishDate === todayInBeijing);
     const fallbackRows = latestPublishDate ? projects.filter((item) => item.publishDate === latestPublishDate) : [];
@@ -876,7 +890,7 @@ function NoticesPageContent() {
         .sort((left, right) => right[1] - left[1])
         .slice(0, 5)
     };
-  }, [projects, todayInBeijing, latestPublishDate]);
+  }, [projects, todayInBeijing, latestPublishDate,nativeResult]);
 
   function updatePage(nextPage: number | ((currentPage: number) => number)) {
     setPageState((current) => {
@@ -941,7 +955,7 @@ function NoticesPageContent() {
     <div className="desktop-notice-toolbar flex flex-wrap items-center justify-between gap-4 rounded-[22px] border border-slate-200 bg-white px-5 py-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <span className="font-semibold text-ink">
-          {isNoticeLoading ? '正在加载通知...' : `共 ${filteredProjects.length.toLocaleString('zh-CN')} 条结果`}
+          {isNoticeLoading?'正在加载通知...':loadError?'暂未能读取结果':`共 ${totalCount.toLocaleString('zh-CN')} 条结果`}
         </span>
         {!isDesktopSurface && lastLoadedAt ? <span className="text-slate-400">已同步 {lastLoadedAt}</span> : null}
       </div>
@@ -965,7 +979,7 @@ function NoticesPageContent() {
 
   return (
     <SiteShell>
-      <div className="desktop-core-page desktop-core-page--scroll desktop-notice-library">
+      <div className="desktop-core-page desktop-core-page--scroll desktop-notice-library" onCompositionStart={()=>setComposing(true)} onCompositionEnd={()=>setComposing(false)}>
       <section className={`desktop-core-page-header desktop-notice-hero page-hero${
         isDesktopSurface ? ' desktop-page-header desktop-page-header--directory' : ''
       }`}>

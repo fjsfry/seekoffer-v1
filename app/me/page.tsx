@@ -22,6 +22,7 @@ import {
   type ScheduleDoneFilter,
   type ScheduleTypeFilter
 } from '@/components/desktop-schedule-workspace';
+import {prepareExplicitD1SignInRetry} from '@/lib/clerk-d1-session';
 import { LoginRequiredCard } from '@/components/login-required-card';
 import { SiteShell } from '@/components/site-shell';
 import { useUserSessionState } from '@/hooks/use-user-session';
@@ -37,6 +38,7 @@ import {
 import {
   createWorkbenchSaveCoordinator,
   hydrateWorkbenchState,
+  normalizeCustomTodos,
   normalizeMentorPhotoCacheKey,
   normalizeMentorPhotoSourceUrl,
   normalizeWorkbenchTodoCategory,
@@ -74,23 +76,7 @@ function readCustomTodos(ownerId: string) {
     const raw = readAccountScopedWorkbenchValue(WORKBENCH_CUSTOM_TODOS_KEY, ownerId);
     if (!raw) return [] as WorkbenchCustomTodo[];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed
-          .filter((item): item is WorkbenchCustomTodo => Boolean(item?.id) && Boolean(item?.text))
-          .map((item) => ({
-            id: String(item.id),
-            text: String(item.text),
-            ...(item.date ? { date: String(item.date) } : {}),
-            ...(item.type ? { type: String(item.type) } : {}),
-            category: normalizeWorkbenchTodoCategory(item.category),
-            priority: normalizeWorkbenchTodoPriority(item.priority),
-            ...(item.note ? { note: String(item.note) } : {}),
-            ...(item.createdAt ? { createdAt: String(item.createdAt) } : {}),
-            ...(item.updatedAt ? { updatedAt: String(item.updatedAt) } : {}),
-            ...(typeof item.completed === 'boolean' ? { completed: item.completed } : {}),
-            ...(item.deletedAt ? { deletedAt: String(item.deletedAt) } : {})
-          }))
-      : [];
+    return normalizeCustomTodos(parsed);
   } catch {
     return [] as WorkbenchCustomTodo[];
   }
@@ -255,7 +241,7 @@ function MePageContent() {
   const router = useRouter();
   const { session, ready, loggedIn } = useUserSessionState();
   const profileOwnerId = session?.userId || session?.email || session?.phone || 'guest';
-  const syncableUserId = session?.loggedIn && session.authProvider !== 'anonymous' && session.userId ? session.userId : '';
+  const syncableUserId = ready && session?.loggedIn && session.authProvider !== 'anonymous' && session.userId ? session.userId : '';
   const activeSection = normalizeWorkbenchSection(searchParams.get('view'));
   const [completedTodoIds, setCompletedTodoIds] = useState<string[]>([]);
   const [customTodos, setCustomTodos] = useState<WorkbenchCustomTodo[]>([]);
@@ -333,14 +319,11 @@ function MePageContent() {
         setContacts(mergedState.contacts.map((contact) => normalizeContact(contact)));
         setLastSyncedAt(new Date().toISOString());
         setWorkbenchSyncStatus('synced');
+        setTodoSyncOwnerId(syncableUserId);
+        setTodoSyncReady(true);
       } catch (error) {
         console.error('[Seekoffer][workbench] hydrate workbench state failed', error);
         if (active) setWorkbenchSyncStatus('error');
-      } finally {
-        if (active) {
-          setTodoSyncOwnerId(syncableUserId);
-          setTodoSyncReady(true);
-        }
       }
     };
 
@@ -454,7 +437,7 @@ function MePageContent() {
   }, [activeContacts, contactDeliveryFilter, contactDraft, contactFeedbackFilter, contactKeyword, contactRangeFilter, contactSort]);
 
   function markLocalChange() {
-    setWorkbenchSyncStatus(syncableUserId ? 'syncing' : 'local');
+    setWorkbenchSyncStatus(current => current === 'error' ? 'error' : syncableUserId ? 'syncing' : 'local');
   }
 
   function handleScheduleDoneChange(id: string, done: boolean) {
@@ -579,6 +562,7 @@ function MePageContent() {
 
   function handleRetrySync() {
     if (!syncableUserId) return;
+    try { prepareExplicitD1SignInRetry(); } catch { setWorkbenchSyncStatus('error'); return; }
     setWorkbenchSyncStatus('syncing');
     setSyncRetryNonce((current) => current + 1);
   }

@@ -1,4 +1,29 @@
 import { getSupabaseBrowserClient } from './supabase-browser';
+import {isD1Backend} from './backend-mode';
+import {d1ClientForUser} from './clerk-d1-session';
+import {reconcileWorkbench} from './workbench-reconciliation';
+const d1Revisions=new Map<string,number>();
+const d1SavedSnapshots=new Map<string,string>();
+const d1ReadFlights=new Map<string,Promise<unknown>>();
+const d1SaveFlights=new Map<string,Promise<void>>();
+const baselines=new Map<string,WorkbenchState>();
+function snapshot(state:WorkbenchState){return {completed_todo_ids:normalizeCompletedTodoIds(state.completedTodoIds),custom_todos:normalizeCustomTodos(state.customTodos),mentor_contacts:normalizeContacts(state.contacts)};}
+function normalizedState(state:WorkbenchState):WorkbenchState {const data=snapshot(state);return {completedTodoIds:data.completed_todo_ids,customTodos:data.custom_todos,contacts:data.mentor_contacts};}
+function baselineKey(userId:string){return 'seekoffer:workbench-baseline:v1:'+userId;}
+function readBaseline(userId:string):WorkbenchState|undefined {
+  let text:string|null=null;
+  try {if(typeof localStorage!=='undefined')text=localStorage.getItem(baselineKey(userId));}catch{/* In-memory baseline remains available when browser storage is blocked. */}
+  if(text){
+    let value:WorkbenchState;try{value=JSON.parse(text);}catch{throw new Error('本机同步基线无法读取，原日程和联系人已保留，请先导出资料后核对。');}
+    if(!value||!Array.isArray(value.completedTodoIds)||!Array.isArray(value.customTodos)||!Array.isArray(value.contacts))throw new Error('本机同步基线不完整，原日程和联系人已保留。');
+    return normalizedState(value);
+  }
+  return baselines.get(userId);
+}
+function rememberBaseline(userId:string,state:WorkbenchState){
+  const value=normalizedState(state);baselines.set(userId,value);
+  try{if(typeof localStorage!=='undefined')localStorage.setItem(baselineKey(userId),JSON.stringify(value));}catch{/* Do not turn an acknowledged cloud save into an unhandled browser-storage error. */}
+}
 
 export const WORKBENCH_TODO_CATEGORIES = ['申请', '学习', '作业', '工作', '生活', '其他'] as const;
 export const WORKBENCH_TODO_PRIORITIES = ['重要且紧急', '重要不紧急', '不重要紧急', '不重要不紧急'] as const;
@@ -67,7 +92,7 @@ export function normalizeMentorPhotoCacheKey(value: unknown) {
 }
 
 export function normalizeMentorPhotoSourceUrl(value: unknown) {
-  const text = String(value || '').trim().slice(0, 500);
+  const text = String(value || '').trim();
   if (!text) return '';
   try {
     const url = new URL(text);
@@ -92,7 +117,7 @@ function normalizeCompletedTodoIds(value: unknown) {
   return Array.from(new Set(value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)));
 }
 
-function normalizeCustomTodos(value: unknown) {
+export function normalizeCustomTodos(value: unknown) {
   if (!Array.isArray(value)) {
     return [] as WorkbenchCustomTodo[];
   }
@@ -104,23 +129,24 @@ function normalizeCustomTodos(value: unknown) {
       return;
     }
 
-    const id = String((item as { id?: unknown }).id || '').trim().slice(0, 160);
-    const text = String((item as { text?: unknown }).text || '').trim().slice(0, 160);
+    const id = String((item as { id?: unknown }).id || '').trim();
+    const text = String((item as { text?: unknown }).text || '').trim();
     if (!id || !text) {
       return;
     }
 
-    const date = String((item as { date?: unknown }).date || '').trim().slice(0, 20);
-    const type = String((item as { type?: unknown }).type || '').trim().slice(0, 40);
+    const date = String((item as { date?: unknown }).date || '').trim();
+    const type = String((item as { type?: unknown }).type || '').trim();
     const category = normalizeWorkbenchTodoCategory((item as { category?: unknown }).category);
     const priority = normalizeWorkbenchTodoPriority((item as { priority?: unknown }).priority);
-    const note = String((item as { note?: unknown }).note || '').trim().slice(0, 1000);
+    const note = String((item as { note?: unknown }).note || '').trim();
     const createdAt = String((item as { createdAt?: unknown }).createdAt || '').trim();
     const updatedAt = String((item as { updatedAt?: unknown }).updatedAt || '').trim();
     const completed = (item as { completed?: unknown }).completed;
     const deletedAt = String((item as { deletedAt?: unknown }).deletedAt || '').trim();
 
     todoMap.set(id, {
+      ...item,
       id,
       text,
       ...(date ? { date } : {}),
@@ -138,7 +164,7 @@ function normalizeCustomTodos(value: unknown) {
   return [...todoMap.values()];
 }
 
-function normalizeContacts(value: unknown) {
+export function normalizeContacts(value: unknown) {
   if (!Array.isArray(value)) {
     return [] as WorkbenchMentorContact[];
   }
@@ -148,27 +174,28 @@ function normalizeContacts(value: unknown) {
     .map((item) => {
       const deletedAt = String(item.deletedAt || '').trim();
       return {
-        id: String(item.id || '').trim().slice(0, 160),
-        schoolName: String(item.schoolName || '').trim().slice(0, 80),
-        departmentName: String(item.departmentName || '').trim().slice(0, 80),
-        mentorName: String(item.mentorName || '').trim().slice(0, 80),
-        mentorTitle: String(item.mentorTitle || '').trim().slice(0, 80),
-        schoolRange: String(item.schoolRange || '普通高校').trim().slice(0, 20),
-        email: String(item.email || '').trim().slice(0, 160),
-        researchDirection: String(item.researchDirection || '').trim().slice(0, 240),
-        homepage: String(item.homepage || '').trim().slice(0, 500),
+        ...item,
+        id: String(item.id || '').trim(),
+        schoolName: String(item.schoolName || '').trim(),
+        departmentName: String(item.departmentName || '').trim(),
+        mentorName: String(item.mentorName || '').trim(),
+        mentorTitle: String(item.mentorTitle || '').trim(),
+        schoolRange: String(item.schoolRange || '普通高校').trim(),
+        email: String(item.email || '').trim(),
+        researchDirection: String(item.researchDirection || '').trim(),
+        homepage: String(item.homepage || '').trim(),
         photoCacheKey: normalizeMentorPhotoCacheKey(item.photoCacheKey),
         photoSourceUrl: normalizeMentorPhotoSourceUrl(item.photoSourceUrl),
         photoPageUrl: normalizeMentorPhotoSourceUrl(item.photoPageUrl),
-        photoUpdatedAt: String(item.photoUpdatedAt || '').trim().slice(0, 40),
-        deliveryStatus: String(item.deliveryStatus || '未投递').trim().slice(0, 20),
-        feedbackStatus: String(item.feedbackStatus || '未联系').trim().slice(0, 20),
-        contactChannel: String(item.contactChannel || '').trim().slice(0, 40),
-        lastContactDate: String(item.lastContactDate || '').trim().slice(0, 20),
-        nextFollowUpDate: String(item.nextFollowUpDate || '').trim().slice(0, 20),
-        contactNotes: String(item.contactNotes || '').trim().slice(0, 1000),
-        notes: String(item.notes || '').trim().slice(0, 1000),
-        privacyNotice: String(item.privacyNotice || '').trim().slice(0, 240),
+        photoUpdatedAt: String(item.photoUpdatedAt || '').trim(),
+        deliveryStatus: String(item.deliveryStatus || '未投递').trim(),
+        feedbackStatus: String(item.feedbackStatus || '未联系').trim(),
+        contactChannel: String(item.contactChannel || '').trim(),
+        lastContactDate: String(item.lastContactDate || '').trim(),
+        nextFollowUpDate: String(item.nextFollowUpDate || '').trim(),
+        contactNotes: String(item.contactNotes || '').trim(),
+        notes: String(item.notes || '').trim(),
+        privacyNotice: String(item.privacyNotice || '').trim(),
         updatedAt: String(item.updatedAt || '').trim() || deletedAt || new Date(0).toISOString(),
         ...(deletedAt ? { deletedAt } : {})
       };
@@ -277,6 +304,24 @@ export function mergeWorkbenchState(localState: WorkbenchState, remoteState: Par
 }
 
 export async function hydrateWorkbenchState(userId: string, localState: WorkbenchState) {
+  if(isD1Backend()){
+    const client=await d1ClientForUser(userId);
+    const key=userId+':'+client.sessionScope;
+    await d1SaveFlights.get(key);
+    let flight=d1ReadFlights.get(key);if(!flight){flight=client.workbench();d1ReadFlights.set(key,flight);}
+    let data:{completed_todo_ids:unknown[];custom_todos:unknown[];mentor_contacts:unknown[];sync_revision:number}|null;
+    try{data=await flight as typeof data;}finally{if(d1ReadFlights.get(key)===flight)d1ReadFlights.delete(key);}
+    if(data===null){
+      const empty={completedTodoIds:[],customTodos:[],contacts:[]},baseline=readBaseline(userId);
+      const merged=baseline?reconcileWorkbench(baseline,normalizedState(localState),empty):localState;
+      d1Revisions.set(key,0);d1SavedSnapshots.set(key,JSON.stringify(snapshot(empty)));rememberBaseline(userId,empty);return merged;
+    }
+    if(!data||!Array.isArray(data.completed_todo_ids)||!Array.isArray(data.custom_todos)||!Array.isArray(data.mentor_contacts)||!Number.isSafeInteger(data.sync_revision)||data.sync_revision<1)throw new Error('工作台响应不完整，已保留本地数据。');
+    const remote=normalizedState({completedTodoIds:data.completed_todo_ids,customTodos:data.custom_todos,contacts:data.mentor_contacts} as WorkbenchState),baseline=readBaseline(userId);
+    const merged=baseline?reconcileWorkbench(baseline,normalizedState(localState),remote):mergeWorkbenchState(localState,remote);
+    d1Revisions.set(key,data.sync_revision);d1SavedSnapshots.set(key,JSON.stringify(snapshot(remote)));rememberBaseline(userId,remote);
+    return merged;
+  }
   const supabase = getSupabaseBrowserClient();
   const { data, error } = await supabase
     .from('workbench_states')
@@ -299,6 +344,20 @@ export async function hydrateWorkbenchState(userId: string, localState: Workbenc
 }
 
 export async function saveWorkbenchState(userId: string, state: WorkbenchState) {
+  if(isD1Backend()){
+    const client=await d1ClientForUser(userId);
+    const key=userId+':'+client.sessionScope,payload=snapshot(state),serialized=JSON.stringify(payload);
+    const save=async()=>{
+      const expected=d1Revisions.get(key);if(expected===undefined)throw new Error('请先同步工作台基线，本地修改已保留。');
+      if(d1SavedSnapshots.get(key)===serialized)return;
+      const result=await client.saveWorkbench(expected,payload) as {sync_revision:number};
+      if(!result||!Number.isSafeInteger(result.sync_revision)||result.sync_revision<=expected)throw new Error('保存结果未确认，请保留本地修改。');
+      d1Revisions.set(key,result.sync_revision);d1SavedSnapshots.set(key,serialized);rememberBaseline(userId,{completedTodoIds:payload.completed_todo_ids,customTodos:payload.custom_todos,contacts:payload.mentor_contacts});
+    };
+    // A failed predecessor also stops queued saves, instead of repeatedly hitting a quota or overwriting a conflict.
+    const previous=d1SaveFlights.get(key),flight=previous?previous.then(save):save();d1SaveFlights.set(key,flight);
+    try{await flight;}finally{if(d1SaveFlights.get(key)===flight)d1SaveFlights.delete(key);}return;
+  }
   const supabase = getSupabaseBrowserClient();
   const payload = {
     user_id: userId,

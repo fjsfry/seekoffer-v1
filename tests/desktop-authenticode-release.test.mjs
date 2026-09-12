@@ -225,7 +225,9 @@ describe('desktop Stable Authenticode release contract', () => {
     expect(workflowSource).toContain('Downloaded Tauri updater Minisign verification failed.');
     expect(workflowSource).toContain('Downloaded artifact is not Authenticode-valid');
     expect(workflowSource).toContain('signed-seekoffer-desktop.exe');
-    expect(workflowSource).toContain('NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}');
+    expect(workflowSource).toContain("NEXT_PUBLIC_BACKEND_PROVIDER: 'd1'");
+    expect(workflowSource).not.toContain('NEXT_PUBLIC_SUPABASE_');
+    expect(workflowSource).toContain('npm run desktop:auth:verify');
     expect(workflowSource).toContain("- verify\n");
     expect(packagingSource).toContain('Stable 发布缺少 Tauri 恢复前的已签主程序证据');
   });

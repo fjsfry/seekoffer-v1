@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import {isD1Backend} from '@/lib/backend-mode';
+import {NativeDetailCompatibility} from '@/components/native-detail-compatibility';
 import { notFound } from 'next/navigation';
 import { NoticeDetailView } from '@/components/notice-detail-view';
 import { SiteShell } from '@/components/site-shell';
@@ -21,6 +23,7 @@ export async function generateMetadata({
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
+  if(isD1Backend())return {title:'通知详情 - 寻鹿 SeekOffer'};
   const { id } = await params;
   const project = visibleNoticeProjects.find((item) => item.id === id);
 
@@ -66,6 +69,7 @@ export default async function NoticeDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  if(isD1Backend())return <NativeDetailCompatibility id={id}/>;
   const project = visibleNoticeProjects.find((item) => item.id === id);
 
   if (!project) {

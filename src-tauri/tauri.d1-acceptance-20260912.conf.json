@@ -1,0 +1,53 @@
+{
+  "productName": "寻鹿 SeekOffer 本地合成验收",
+  "identifier": "com.seekoffer.desktop.d1acceptance20260912",
+  "build": {
+    "beforeBuildCommand": ""
+  },
+  "bundle": {
+    "active": false,
+    "createUpdaterArtifacts": false
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "寻鹿 SeekOffer",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 960,
+        "minHeight": 640,
+        "center": true,
+        "visible": false,
+        "focus": false,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false,
+        "backgroundColor": "#e6e7ed",
+        "zoomHotkeysEnabled": false,
+        "devtools": true,
+        "dataDirectory": "synthetic-workbench-v1",
+        "additionalBrowserArgs": "--remote-debugging-address=127.0.0.1 --remote-debugging-port=54387"
+      },
+      {
+        "label": "splashscreen",
+        "url": "desktop-splash.html",
+        "title": "寻鹿 SeekOffer",
+        "width": 520,
+        "height": 320,
+        "center": true,
+        "visible": true,
+        "focus": true,
+        "decorations": false,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "fullscreen": false,
+        "shadow": true,
+        "skipTaskbar": true,
+        "backgroundColor": "#e6e7ed"
+      }
+    ]
+  }
+}

@@ -20,6 +20,13 @@ import {
   createStaleWhileRevalidateCache,
   type StaleWhileRevalidateSnapshot
 } from './stale-while-revalidate-cache';
+import {workspaceStorageKey} from './workspace-storage-scope';
+import {isD1Backend} from './backend-mode';
+import {desktopApplicationPatch} from './desktop-application-patch';
+import {updateD1Profile,d1ClientForUser,D1SessionChangedError} from './clerk-d1-session';
+import {D1RequestError} from './d1-backend-client';
+import {createApplicationWorkspace} from './d1-application-workspace';
+import {readApplicationNoticeLabels,rememberApplicationNoticeLabels,type ApplicationNoticeLabel} from './application-notice-labels';
 
 const APPLICATION_STORAGE_KEY = 'seekoffer-my-application-table';
 const MANUAL_PROJECT_STORAGE_KEY = 'seekoffer-manual-projects';
@@ -64,6 +71,9 @@ type WorkspaceSessionIdentity = Pick<UserSession, 'loggedIn' | 'authProvider' | 
 export type ApplicationRow = {
   item: UserProjectRecord;
   project: PublicNoticeProject;
+  noticeAvailable?: boolean;
+  noticeAvailability?: 'available' | 'missing' | 'lookup-failed';
+  syncStatus?: 'synced' | 'pending' | 'offline';
 };
 
 export type PublicNoticeLoadSnapshot = {
@@ -114,6 +124,30 @@ const publicNoticeRuntimeScope = globalThis as PublicNoticeRuntimeScope;
 const publicNoticeCache =
   publicNoticeRuntimeScope[PUBLIC_NOTICE_RUNTIME_CACHE_KEY] ?? createPublicNoticeCache();
 publicNoticeRuntimeScope[PUBLIC_NOTICE_RUNTIME_CACHE_KEY] = publicNoticeCache;
+const d1Workspaces=new Map<string,ReturnType<typeof createApplicationWorkspace>>();
+const d1NoticeFlights=new Map<string,Promise<{items:Record<string,unknown>[];unavailableIds:string[]}>>();
+async function d1AssociatedNotices(owner:string,ids:string[]){
+ const client=await d1ClientForUser(owner),unique=[...new Set(ids)].sort();
+ const key=owner+':'+client.sessionScope+':'+JSON.stringify(unique);
+ let flight=d1NoticeFlights.get(key);if(!flight){flight=client.applicationNotices(unique);d1NoticeFlights.set(key,flight);}
+ try{return await flight;}finally{if(d1NoticeFlights.get(key)===flight)d1NoticeFlights.delete(key);}
+}
+function d1WorkspaceContext(){
+ if(!isD1Backend())return null;
+ const session=getUserSession();if(!session?.loggedIn||session.authProvider==='anonymous'||!session.userId)return null;
+ const owner=session.userId;
+ const isCurrent=()=>{const s=getUserSession();return Boolean(s?.loggedIn&&s.authProvider!=='anonymous'&&s.userId===owner);};
+ let workspace=d1Workspaces.get(owner);
+ if(!workspace){workspace=createApplicationWorkspace(owner,window.localStorage,()=>d1ClientForUser(owner),isCurrent);d1Workspaces.set(owner,workspace);}
+ return {owner,workspace,isCurrent};
+}
+function d1Record(row:Record<string,unknown>,owner:string){return mapApplicationRowToRecord({...row,user_id:owner,project_id:row.project_id||'unavailable:'+row.id});}
+
+export function hasPendingApplicationEdits(expectedUserId: string, applicationId?: string) {
+ const ctx=d1WorkspaceContext();if(!ctx||ctx.owner!==expectedUserId)return false;
+ const pending=ctx.workspace.pending();
+ return applicationId ? pending.updates.includes(applicationId) : Boolean(pending.updates.length||pending.deletes.length||pending.adds.length||pending.manualCount);
+}
 
 function canUseBrowserStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -226,7 +260,7 @@ function readStoragePayload<T>(storageKey: string): ParsedStoredPayload<T> | nul
   }
 
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    const raw = window.localStorage.getItem(workspaceStorageKey(storageKey));
     if (!raw) {
       return null;
     }
@@ -1125,6 +1159,11 @@ async function fetchRemoteProfile(expectedUserId?: string) {
 }
 
 async function hydrateWorkspaceFromSupabase() {
+  if(isD1Backend()){
+    const session=getUserSession();
+    if(session?.loggedIn&&session.authProvider!=='anonymous')throw new Error('申请工作区接口正在迁移，已保留本地数据并停止连接旧服务。');
+    return;
+  }
   const context = getSupabaseMemberContext();
   if (!context) {
     hydratedWorkspaceUserId = '';
@@ -1233,6 +1272,15 @@ async function hydrateWorkspaceFromSupabase() {
  * success or error state without navigating to the workbench.
  */
 export async function synchronizeApplicationWorkspace(expectedUserId: string) {
+  if(isD1Backend()){
+    const ctx=d1WorkspaceContext();if(!ctx||ctx.owner!==expectedUserId)throw new D1SessionChangedError();
+    try{
+      const result=await ctx.workspace.resumePending();
+      if(result.remaining)throw new Error(`本次已同步${result.completed}项，仍有${result.remaining}项待同步，请再次点击立即同步。`);
+      await ctx.workspace.read();
+    }finally{if(ctx.isCurrent())emitApplicationUpdate();}
+    return;
+  }
   const userId = expectedUserId.trim();
   const context = getSupabaseMemberContext();
   if (!userId || !context || context.userId !== userId || !isActiveWorkspaceMember(userId)) {
@@ -1358,10 +1406,12 @@ function mapPublicNoticeSnapshot(
 }
 
 export function getPublicNoticeSnapshot() {
+  if(isD1Backend())return {rows:[],source:'remote' as const,syncedAt:null,attemptedAt:null,error:null,isFresh:false,isRevalidating:false,shouldRevalidate:true,revalidated:false};
   return mapPublicNoticeSnapshot(publicNoticeCache.getSnapshot());
 }
 
 export async function loadPublicNotices(options: { refresh?: boolean } = {}) {
+  if(isD1Backend())throw new Error('完整目录读取已停用，请使用通知分页或院校统计接口。');
   const snapshot = await publicNoticeCache.request(
     async () => {
       const remoteProjects = await readRemotePublicNotices();
@@ -1378,6 +1428,7 @@ export async function loadPublicNotices(options: { refresh?: boolean } = {}) {
 }
 
 export async function fetchPublicNotices(options: { refresh?: boolean } = {}) {
+  if(isD1Backend()){const {nativeNoticeSearch}=await import('./native-public-notices');const {noticeListItemToProject}=await import('./notice-record');return (await nativeNoticeSearch()).items.map(noticeListItemToProject);}
   return (await loadPublicNotices(options)).rows;
 }
 
@@ -1394,6 +1445,7 @@ async function getAllProjectsAsync(owner = getCurrentWorkspaceStorageContext().o
 }
 
 export async function fetchNoticeById(id: string) {
+  if(isD1Backend())return (await import('./native-public-notices')).nativeNoticeDetail(id);
   const source = await getAllProjectsAsync();
   return source.find((item) => item.id === id) || null;
 }
@@ -1404,11 +1456,70 @@ export async function fetchDeadlineNotices() {
 }
 
 export async function fetchUserProjects() {
+  const d1=d1WorkspaceContext();if(d1)return (await d1.workspace.read()).map(r=>d1Record(r,d1.owner));
   await hydrateWorkspaceFromSupabase();
   return readStoredRecords();
 }
 
+function buildUnavailableNoticeProject(projectId: string, reason:'missing'|'lookup-failed'='missing', label?:ApplicationNoticeLabel): PublicNoticeProject {
+  return {
+    id: projectId,
+    schoolName: reason==='lookup-failed' ? label?.schoolName||'通知待同步' : '原通知暂不可用',
+    departmentName: reason==='lookup-failed'&&label ? label.departmentName : '你的申请与备注仍已保留',
+    projectName: reason==='lookup-failed' ? label ? label.projectName+'（上次同步标题，待核实）' : '暂时无法核对关联通知，请重试同步' : '该通知已撤回或不再公开，申请记录仍保留',
+    projectType: '正式推免',
+    discipline: reason==='lookup-failed'?'通知关联尚未完成同步':'原通知信息暂不可用',
+    publishDate: '',
+    deadlineDate: '',
+    eventStartDate: '',
+    eventEndDate: '',
+    applyLink: '',
+    sourceLink: '',
+    requirements: '',
+    materialsRequired: [],
+    examInterviewInfo: '',
+    contactInfo: '',
+    remarks: '',
+    tags: ['申请记录已保留'],
+    status: '报名中',
+    year: NOTICE_TARGET_YEAR,
+    deadlineLevel: 'future',
+    sourceSite: '通知暂不可用',
+    collectedAt: '',
+    updatedAt: '',
+    lastCheckedAt: '',
+    isVerified: false,
+    changeLog: [],
+    historyRecords: []
+  };
+}
+
 export async function fetchApplicationRows(expectedUserId?: string) {
+  const d1=d1WorkspaceContext();
+  if(d1){
+    if(expectedUserId&&expectedUserId!==d1.owner)throw new Error('账号已切换，请重新加载。');
+    let raw:Awaited<ReturnType<typeof d1.workspace.read>>,offline=false;
+    try{raw=await d1.workspace.read();}catch(error){
+      if(!d1.isCurrent()||error instanceof D1SessionChangedError||(error instanceof D1RequestError&&[401,403].includes(error.status)))throw error;
+      // A cached display still requires the currently verified Clerk-to-original-UUID binding.
+      await d1ClientForUser(d1.owner);if(!d1.isCurrent())throw error;
+      raw=d1.workspace.cached();if(!raw.length)throw error;offline=true;
+    }
+    if(!d1.isCurrent())throw new Error('账号已切换，请重新加载。');
+    const pending=d1.workspace.pending(),pendingIds=new Set([...pending.updates,...pending.deletes]);
+    const ids=raw.map(r=>r.project_id).filter((id):id is string=>Boolean(id));
+    let projects=new Map<string,PublicNoticeProject>(),lookupFailed=offline;
+    let labels=readApplicationNoticeLabels(window.localStorage,d1.owner);
+    if(!offline)try{
+      const result=await d1AssociatedNotices(d1.owner,ids);
+      const allowed=new Set(ids);
+      if(result.items.some(p=>typeof p.id!=='string'||!allowed.has(p.id)))throw new Error('关联通知响应不匹配。');
+      projects=new Map(result.items.map(p=>[String(p.id),p as unknown as PublicNoticeProject]));
+      labels=rememberApplicationNoticeLabels(window.localStorage,d1.owner,ids,result.items,result.unavailableIds);
+    }catch(error){if(!d1.isCurrent())throw error;lookupFailed=true;}
+    if(!d1.isCurrent())throw new Error('账号已切换，请重新加载。');
+    return raw.map<ApplicationRow>(r=>{const item=d1Record(r,d1.owner),project=projects.get(item.projectId);return {item,project:project||buildUnavailableNoticeProject(item.projectId,lookupFailed?'lookup-failed':'missing',lookupFailed?labels[item.projectId]:undefined),noticeAvailable:Boolean(project),noticeAvailability:project?'available':lookupFailed?'lookup-failed':'missing',syncStatus:offline?'offline':pendingIds.has(r.id)?'pending':'synced'};}).sort((a,b)=>Number(b.noticeAvailable)-Number(a.noticeAvailable)||a.project.deadlineDate.localeCompare(b.project.deadlineDate));
+  }
   const owner: WorkspaceStorageOwner = expectedUserId
     ? { kind: 'member', userId: expectedUserId }
     : getCurrentWorkspaceStorageContext().owner;
@@ -1437,6 +1548,26 @@ export function readLocalApplicationRows(expectedUserId: string) {
   const normalizedUserId = expectedUserId.trim();
   if (!normalizedUserId) return [];
 
+  if (isD1Backend()) {
+    const ctx = d1WorkspaceContext();
+    if (!ctx || ctx.owner !== normalizedUserId) return [];
+    const pending = ctx.workspace.pending();
+    const pendingIds = new Set([...pending.updates, ...pending.deletes]);
+    const labels=readApplicationNoticeLabels(window.localStorage,ctx.owner);
+    // The journal belongs to the original UUID. A missing notice must not hide
+    // its application, and old bundled notices cannot establish visibility.
+    return ctx.workspace.cached().map<ApplicationRow>((row) => {
+      const item = d1Record(row, ctx.owner);
+      return {
+        item,
+        project: buildUnavailableNoticeProject(item.projectId,'lookup-failed',labels[item.projectId]),
+        noticeAvailable: false,
+        noticeAvailability: 'lookup-failed',
+        syncStatus: pendingIds.has(row.id) ? 'pending' : 'offline'
+      };
+    });
+  }
+
   const owner: WorkspaceStorageOwner = { kind: 'member', userId: normalizedUserId };
   const records = readStoredRecords(owner);
   const projectMap = new Map<string, PublicNoticeProject>();
@@ -1455,6 +1586,7 @@ export function readLocalApplicationRows(expectedUserId: string) {
 }
 
 export async function addProjectToApplicationTable(projectId: string) {
+  const d1=d1WorkspaceContext();if(d1){try{return d1Record(await d1.workspace.add(projectId),d1.owner);}finally{if(d1.isCurrent())emitApplicationUpdate();}}
   await hydrateWorkspaceFromSupabase();
   const storageOwner = getCurrentWorkspaceStorageContext().owner;
   const current = readStoredRecords(storageOwner);
@@ -1544,6 +1676,12 @@ export async function createManualApplicationEntry(
   input: ManualProjectInput,
   expectedUserId?: string
 ) {
+  const d1=d1WorkspaceContext();if(d1){
+    if(expectedUserId&&expectedUserId!==d1.owner)throw new Error('账号已切换，请重新打开添加窗口。');
+    try{const created=await d1.workspace.manual({...input});
+      return {item:d1Record(created.row,d1.owner),project:created.project as unknown as PublicNoticeProject};
+    }finally{if(d1.isCurrent())emitApplicationUpdate();}
+  }
   // Capture and verify the account before any quota/network await. Manual
   // entries are never allowed to fall back to anonymous/local workspace keys.
   const storageOwner = getCurrentWorkspaceStorageContext().owner;
@@ -1615,6 +1753,10 @@ export async function createManualApplicationEntry(
 }
 
 export async function saveUserProfileToWorkspace(profile: UserProfile) {
+  if(isD1Backend()){
+    const session=getUserSession();if(!session?.userId||session.authProvider==='anonymous')return false;
+    await updateD1Profile(session.userId,{nickname:profile.nickname,age:profile.age,undergraduate_school:profile.undergraduateSchool,major:profile.major,grade:profile.grade,target_major:profile.targetMajor,target_region:profile.targetRegion});return true;
+  }
   const context = getSupabaseMemberContext();
   if (!context) {
     return false;
@@ -1625,6 +1767,16 @@ export async function saveUserProfileToWorkspace(profile: UserProfile) {
 }
 
 export async function updateUserProject(userProjectId: string, patch: Partial<UserProjectRecord>) {
+  const d1=d1WorkspaceContext();if(d1){
+    const raw=d1.workspace.cached().find(r=>r.id===userProjectId);if(!raw)throw new Error('请先读取当前申请，修改未发送。');
+    const prior=d1Record(raw,d1.owner);
+    if((patch.userId&&patch.userId!==d1.owner)||(patch.projectId&&patch.projectId!==prior.projectId)||(patch.userProjectId&&patch.userProjectId!==userProjectId))throw new Error('不能修改申请的账号或通知关联。');
+    let merged=normalizeRecord({...prior,...patch});const changed={...patch};
+    if(hasMaterialChecklistPatch(patch)){merged={...merged,materialsProgress:calculateMaterialsProgress(merged)};changed.materialsProgress=merged.materialsProgress;}
+    if(patch.myStatus==='已提交'&&!merged.submittedAt){merged={...merged,submittedAt:nowText()};changed.submittedAt=merged.submittedAt;}
+    const payload=desktopApplicationPatch(merged,changed);
+    try{return d1Record(await d1.workspace.update(userProjectId,payload),d1.owner);}finally{if(d1.isCurrent())emitApplicationUpdate();}
+  }
   await hydrateWorkspaceFromSupabase();
   const storageOwner = getCurrentWorkspaceStorageContext().owner;
   const recordUserId = getRecordUserIdForOwner(storageOwner);
@@ -1668,6 +1820,7 @@ export async function updateUserProject(userProjectId: string, patch: Partial<Us
 }
 
 export async function deleteUserProject(userProjectId: string) {
+  const d1=d1WorkspaceContext();if(d1){try{return await d1.workspace.remove(userProjectId);}finally{if(d1.isCurrent())emitApplicationUpdate();}}
   await hydrateWorkspaceFromSupabase();
 
   const storageOwner = getCurrentWorkspaceStorageContext().owner;

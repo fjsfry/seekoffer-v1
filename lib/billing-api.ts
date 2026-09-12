@@ -2,6 +2,9 @@
 
 import { getSupabaseBrowserClient } from './supabase-browser';
 import { SUPABASE_URL } from './supabase-env';
+import {isD1Backend} from './backend-mode';
+import {createD1BackendClient} from './d1-backend-client';
+import {hydrateClerkD1Session,d1ClientForUser} from './clerk-d1-session';
 
 export const FREE_APPLICATION_LIMIT = 5;
 export const PRO_FEATURE_ENABLED = false;
@@ -71,6 +74,7 @@ let entitlementCache: {
 } | null = null;
 
 function getBillingFunctionUrl() {
+  if(isD1Backend())throw new Error('支付接口正在迁移，暂不支持新购买。');
   if (!SUPABASE_URL) {
     throw new Error('暂时无法读取 Pro 权益，请稍后再试。');
   }
@@ -95,6 +99,11 @@ async function getAccessToken() {
 }
 
 async function invokeBillingApi<T>(payload: Record<string, unknown>, requiresAuth = true): Promise<T> {
+  if(isD1Backend()){
+    if(!requiresAuth){if(payload.action!=='list-plans')throw new Error('当前操作需要登录。');return createD1BackendClient('https://migration.seekoffer.com.cn',async()=>null).billingPlans() as Promise<T>;}
+    const session=await hydrateClerkD1Session();if(!session?.userId)throw new Error('请先登录正式账号。');
+    return (await d1ClientForUser(session.userId)).billing(payload) as Promise<T>;
+  }
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
   };
@@ -123,6 +132,9 @@ export async function fetchBillingPlans() {
 }
 
 export async function fetchBillingEntitlement(options: { force?: boolean } = {}) {
+  // The D1 branch pins each request to the active verified Clerk session. Never
+  // reuse this legacy process-global entitlement cache across account switches.
+  if(isD1Backend())return invokeBillingApi<BillingEntitlementResponse>({action:'get-entitlement'});
   if (!options.force && entitlementCache && Date.now() - entitlementCache.timestamp < 60_000) {
     return entitlementCache.value;
   }

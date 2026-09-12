@@ -25,10 +25,12 @@ import { SiteShell } from '@/components/site-shell';
 import { useAccessibleModal } from '@/hooks/use-accessible-modal';
 import { useUserSessionState } from '@/hooks/use-user-session';
 import { openAuthModal, writeAuthIntent } from '@/lib/auth-intent';
+import {isD1Backend} from '@/lib/backend-mode';import {readCommunityDraft,saveCommunityDraft} from '@/lib/community-drafts';
 import {
   fetchFollowedOfferPostIds,
   fetchOfferComments,
   fetchPublicCommunityPosts,
+  fetchPublicCommunityPage,
   formatOfferTime,
   getOfferAuthorLabel,
   getOfferAvatar,
@@ -75,7 +77,13 @@ function openMemberLogin() {
 }
 
 export default function OffersPage() {
+  const {session}=useUserSessionState();return <OffersContent key={isD1Backend()?session?.userId||'signed-out':'legacy'}/>;
+}
+function OffersContent(){
   const { ready, isMember, session } = useUserSessionState();
+  const [feedPage,setFeedPage]=useState(1),[feedPages,setFeedPages]=useState(1),[reload,setReload]=useState(0);
+  const [feedMetrics,setFeedMetrics]=useState<{offers:number;discussions:number;recent:number;schools:number}|null>(null);
+  const [searchQuery,setSearchQuery]=useState(''),[composing,setComposing]=useState(false);
   const [posts, setPosts] = useState<PublicOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -84,6 +92,7 @@ export default function OffersPage() {
   const [resultFilter, setResultFilter] = useState<'全部' | OfferResultType>('全部');
   const [discussionFilter, setDiscussionFilter] = useState<'全部' | OfferDiscussionCategory>('全部');
   const [selectedPost, setSelectedPost] = useState<PublicOffer | null>(null);
+  const selectedPostId=useRef<string|null>(null);useEffect(()=>{selectedPostId.current=selectedPost?.id||null;},[selectedPost?.id]);
   const [comments, setComments] = useState<OfferComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [followedIds, setFollowedIds] = useState<string[]>([]);
@@ -97,35 +106,32 @@ export default function OffersPage() {
   const [discussionOpen, setDiscussionOpen] = useState(false);
   const [discussionPending, setDiscussionPending] = useState(false);
   const [discussionMessage, setDiscussionMessage] = useState('');
-  const [discussionForm, setDiscussionForm] = useState(emptyDiscussionForm);
+  const discussionDraftKey=isD1Backend()&&session?.userId?'seekoffer-community-draft:'+session.userId+':discussion':'';
+  const [discussionForm, setDiscussionForm] = useState(()=>readCommunityDraft(discussionDraftKey,emptyDiscussionForm));
 
   const memberUserId = isMember && session?.userId ? session.userId : '';
+  useEffect(()=>{if(ready&&memberUserId)saveCommunityDraft(discussionDraftKey,discussionForm);},[ready,memberUserId,discussionDraftKey,discussionForm]);
   const defaultAuthorName =
     session?.profile.nickname?.trim() || (session?.email ? session.email.split('@')[0] : '寻鹿用户');
 
-  async function loadPosts() {
-    setLoading(true);
-    setLoadError('');
-    try {
-      setPosts(await fetchPublicCommunityPosts());
-    } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'Offer 圈暂时无法加载，请稍后重试。');
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(()=>{if(composing)return;const timer=setTimeout(()=>{setSearchQuery(keyword);setFeedPage(1);},350);return()=>clearTimeout(timer);},[keyword,composing]);
+  useEffect(()=>{
+    let active=true;const controller=new AbortController();setLoading(true);setLoadError('');
+    const query=new URLSearchParams({page:String(feedPage),pageSize:'16',type:activeTab==='offers'?'offer':'discussion'});
+    if(searchQuery)query.set('q',searchQuery);if(activeTab==='offers'&&resultFilter!=='全部')query.set('result',resultFilter);if(activeTab==='discussions'&&discussionFilter!=='全部')query.set('category',discussionFilter);
+    const work=isD1Backend()?fetchPublicCommunityPage(query,controller.signal).then(result=>{if(active){setPosts(result.items);setFeedPages(result.pagination.totalPages);setFeedMetrics(result.metrics);}}):fetchPublicCommunityPosts().then(items=>{if(active)setPosts(items);});
+    void work.catch(error=>{if(active&&!controller.signal.aborted)setLoadError(error instanceof Error?error.message:'社区暂不可用。');}).finally(()=>{if(active)setLoading(false);});
+    return()=>{active=false;controller.abort();};
+  },[activeTab,discussionFilter,feedPage,reload,resultFilter,searchQuery]);
 
   useEffect(() => {
-    void loadPosts();
-  }, []);
-
-  useEffect(() => {
+    if(!ready)return;
     if (!memberUserId) {
       setFollowedIds([]);
       return;
     }
-    void fetchFollowedOfferPostIds(memberUserId).then(setFollowedIds);
-  }, [memberUserId]);
+    let active=true;void fetchFollowedOfferPostIds(memberUserId).then(ids=>{if(active)setFollowedIds(ids);}).catch(error=>{if(active)setActionMessage(error instanceof Error?error.message:'关注记录暂不可用。');});return()=>{active=false;};
+  }, [ready,memberUserId]);
 
   useEffect(() => {
     if (!selectedPost) {
@@ -136,6 +142,7 @@ export default function OffersPage() {
       return;
     }
 
+    setReplyText(readCommunityDraft(memberUserId?'seekoffer-community-reply:'+memberUserId+':'+selectedPost.id:'',{text:''}).text);
     let active = true;
     setCommentsLoading(true);
     void fetchOfferComments(selectedPost.id)
@@ -152,7 +159,7 @@ export default function OffersPage() {
     return () => {
       active = false;
     };
-  }, [selectedPost]);
+  }, [selectedPost,memberUserId]);
 
   const offerPosts = useMemo(() => posts.filter((post) => post.contentType === 'offer'), [posts]);
   const discussionPosts = useMemo(() => posts.filter((post) => post.contentType === 'discussion'), [posts]);
@@ -166,6 +173,7 @@ export default function OffersPage() {
   );
 
   const filteredPosts = useMemo(() => {
+    if(isD1Backend())return posts;
     const source = activeTab === 'offers' ? offerPosts : discussionPosts;
     const normalizedKeyword = keyword.trim().toLowerCase();
     return source.filter((post) => {
@@ -177,7 +185,7 @@ export default function OffersPage() {
         .toLowerCase()
         .includes(normalizedKeyword);
     });
-  }, [activeTab, discussionFilter, discussionPosts, keyword, offerPosts, resultFilter]);
+  }, [activeTab, discussionFilter, discussionPosts, keyword, offerPosts, resultFilter,posts]);
 
   function openDiscussionComposer() {
     if (!ready || !memberUserId) {
@@ -230,13 +238,13 @@ export default function OffersPage() {
         content: replyText,
         isAnonymous: true
       });
-      setReplyText('');
-      setComments(await fetchOfferComments(selectedPost.id));
+      if(selectedPostId.current===selectedPost.id)setReplyText('');saveCommunityDraft('seekoffer-community-reply:'+memberUserId+':'+selectedPost.id,{text:''});
+      try{const nextComments=await fetchOfferComments(selectedPost.id);if(selectedPostId.current===selectedPost.id)setComments(nextComments);}catch{if(selectedPostId.current===selectedPost.id)setActionMessage('回复已保存，列表暂未刷新，请稍后重新打开。');return;}
       setPosts((current) =>
         current.map((post) => (post.id === selectedPost.id ? { ...post, commentsCount: post.commentsCount + 1 } : post))
       );
-      setSelectedPost((current) => (current ? { ...current, commentsCount: current.commentsCount + 1 } : current));
-      setActionMessage('回复已发布。');
+      setSelectedPost((current) => (current?.id===selectedPost.id ? { ...current, commentsCount: current.commentsCount + 1 } : current));
+      if(selectedPostId.current===selectedPost.id)setActionMessage('回复已发布。');
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : '回复失败，请稍后重试。');
     } finally {
@@ -265,7 +273,7 @@ export default function OffersPage() {
         )
       );
       setSelectedPost((current) =>
-        current ? { ...current, followsCount: Math.max(0, current.followsCount + delta) } : current
+        current?.id===selectedPost.id ? { ...current, followsCount: Math.max(0, current.followsCount + delta) } : current
       );
       setActionMessage(nextFollowed ? '已加入关注，可随时返回查看讨论进展。' : '已取消关注。');
     } catch (error) {
@@ -281,9 +289,7 @@ export default function OffersPage() {
     setReportPending(true);
     try {
       await reportOfferPost(selectedPost.id, reportReason, session?.userId);
-      setReportReason('');
-      setReportOpen(false);
-      setActionMessage('反馈已提交，运营人员会核查处理。');
+      if(selectedPostId.current===selectedPost.id){setReportReason('');setReportOpen(false);setActionMessage('反馈已提交，运营人员会核查处理。');}
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : '反馈提交失败。');
     } finally {
@@ -307,8 +313,8 @@ export default function OffersPage() {
           </div>
           <div className="desktop-offers-metrics grid grid-cols-3 gap-2 sm:gap-3">
             <Metric label="公开动态" value={loading ? '—' : String(offerPosts.length)} />
-            <Metric label="近 7 天更新" value={loading ? '—' : String(recentCount)} />
-            <Metric label="覆盖院校" value={loading ? '—' : String(schoolCount)} />
+            <Metric label="近 7 天更新" value={loading ? '—' : String(feedMetrics?.recent??recentCount)} />
+            <Metric label="覆盖院校" value={loading ? '—' : String(feedMetrics?.schools??schoolCount)} />
           </div>
         </div>
       </section>
@@ -320,13 +326,13 @@ export default function OffersPage() {
               <div className="desktop-offers-tabs inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Offer 圈内容类型">
                 <TabButton
                   active={activeTab === 'offers'}
-                  label={`Offer 动态 ${offerPosts.length}`}
-                  onClick={() => setActiveTab('offers')}
+                  label={`Offer 动态 ${feedMetrics?.offers??offerPosts.length}`}
+                  onClick={() => {setActiveTab('offers');setFeedPage(1);}}
                 />
                 <TabButton
                   active={activeTab === 'discussions'}
-                  label={`讨论广场 ${discussionPosts.length}`}
-                  onClick={() => setActiveTab('discussions')}
+                  label={`讨论广场 ${feedMetrics?.discussions??discussionPosts.length}`}
+                  onClick={() => {setActiveTab('discussions');setFeedPage(1);}}
                 />
               </div>
               <div className="desktop-offers-toolbar-actions flex flex-wrap gap-2">
@@ -353,6 +359,9 @@ export default function OffersPage() {
               <input
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
+                onCompositionStart={()=>setComposing(true)}
+                onCompositionEnd={()=>setComposing(false)}
+                maxLength={80}
                 placeholder="搜索学校、专业或讨论关键词"
                 className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
               />
@@ -366,12 +375,12 @@ export default function OffersPage() {
             <div className="desktop-offers-filters mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="内容筛选">
               {activeTab === 'offers'
                 ? (['全部', ...offerResultTypes] as const).map((item) => (
-                    <FilterButton key={item} active={resultFilter === item} onClick={() => setResultFilter(item)}>
+                    <FilterButton key={item} active={resultFilter === item} onClick={() => {setResultFilter(item);setFeedPage(1);}}>
                       {item}
                     </FilterButton>
                   ))
                 : (['全部', ...offerDiscussionCategories] as const).map((item) => (
-                    <FilterButton key={item} active={discussionFilter === item} onClick={() => setDiscussionFilter(item)}>
+                    <FilterButton key={item} active={discussionFilter === item} onClick={() => {setDiscussionFilter(item);setFeedPage(1);}}>
                       {item}
                     </FilterButton>
                   ))}
@@ -385,7 +394,7 @@ export default function OffersPage() {
               icon={RefreshCw}
               title="暂时无法加载 Offer 圈"
               description={loadError}
-              action={<button onClick={() => void loadPosts()} className="font-semibold text-brand">重新加载</button>}
+              action={<button onClick={() => setReload(n=>n+1)} className="font-semibold text-brand">重新加载</button>}
             />
           ) : filteredPosts.length === 0 ? (
             <StatePanel
@@ -411,6 +420,7 @@ export default function OffersPage() {
               ))}
             </div>
           )}
+          {isD1Backend()&&!loading&&!loadError&&<nav aria-label="社区分页" className="mt-4 flex items-center justify-center gap-4"><button disabled={feedPage<=1} onClick={()=>setFeedPage(p=>p-1)} className="rounded-xl border px-4 py-2 disabled:opacity-40">上一页</button><span>第 {feedPage} / {feedPages} 页</span><button disabled={feedPage>=feedPages} onClick={()=>setFeedPage(p=>p+1)} className="rounded-xl border px-4 py-2 disabled:opacity-40">下一页</button></nav>}
         </div>
 
         <aside className="desktop-offers-aside space-y-4 xl:sticky xl:top-24 xl:self-start">
@@ -449,7 +459,7 @@ export default function OffersPage() {
           reportPending={reportPending}
           onClose={() => setSelectedPost(null)}
           onFollow={() => void handleFollow()}
-          onReplyText={setReplyText}
+          onReplyText={text=>{setReplyText(text);if(memberUserId&&selectedPost)saveCommunityDraft('seekoffer-community-reply:'+memberUserId+':'+selectedPost.id,{text});}}
           onReply={handleReplySubmit}
           onLogin={openMemberLogin}
           onReportOpen={() => setReportOpen((current) => !current)}

@@ -41,6 +41,7 @@ import {
 } from '@/lib/deadline-display';
 import { getDisplaySchoolName } from '@/lib/notice-display';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
+import {isD1Backend} from '@/lib/backend-mode';
 import { baseNoticeProjects } from '@/lib/notice-source';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import { materialChecklistDefinitions, type PublicNoticeProject } from '@/lib/mock-data';
@@ -252,8 +253,8 @@ export function DesktopToday({
   unreadReminderCount: number;
   onOpenReminders: () => void;
 }) {
-  const { session } = useUserSessionState();
-  const [projects, setProjects] = useState<PublicNoticeProject[]>(fallbackProjects);
+  const { session,ready } = useUserSessionState();
+  const [projects, setProjects] = useState<PublicNoticeProject[]>(isD1Backend()?[]:fallbackProjects);
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [scheduleItems, setScheduleItems] = useState<LocalScheduleItem[]>([]);
@@ -272,7 +273,7 @@ export function DesktopToday({
   const quickAddCloseTimerRef = useRef<number | null>(null);
   const displayManagerTriggerRef = useRef<HTMLButtonElement>(null);
   const displayManagerRef = useRef<HTMLDivElement>(null);
-  const scheduleOwnerId = session?.userId || '';
+  const scheduleOwnerId = ready?session?.userId||'':'';
 
   const closeDisplayManager = useCallback((restoreFocus = true) => {
     setDisplayManagerOpen(false);

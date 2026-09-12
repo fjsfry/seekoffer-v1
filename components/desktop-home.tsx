@@ -46,6 +46,7 @@ import {
 import { useUserSessionState } from '@/hooks/use-user-session';
 import {
   fetchApplicationRows,
+  hasPendingApplicationEdits,
   readLocalApplicationRows,
   updateUserProject,
   watchApplicationTable,
@@ -66,6 +67,9 @@ import {
   emitDesktopSyncStatus
 } from '@/lib/desktop-route-events';
 import { trackDesktopPendingWrite } from '@/lib/desktop-pending-writes';
+import {isD1Backend} from '@/lib/backend-mode';
+import {D1RequestError} from '@/lib/d1-backend-client';
+import {reconnectDesktopAccount} from '@/lib/desktop-account-reconnect';
 import { clampDesktopFloatingSurface } from '@/lib/desktop-floating-surface';
 import { createKeyedRequestCache } from '@/lib/keyed-request-cache';
 import {
@@ -126,7 +130,7 @@ import {
 type SortOption = 'priority' | 'deadline' | 'school' | 'status';
 type ProjectStatusFilter = '全部' | UserProjectStatus;
 type MaterialFilter = 'all' | 'incomplete' | 'complete';
-type ProjectWorkspaceTab = 'overview' | 'materials' | 'schedule' | 'contacts' | 'activity';
+type ProjectWorkspaceTab = 'overview' | 'materials' | 'schedule' | 'contacts' | 'notes' | 'activity';
 type DesktopLayoutMode = 'wide' | 'split' | 'drawer';
 type ProjectPatch = Partial<UserProjectRecord>;
 type ProjectActionPhase = 'pending' | 'success' | 'error';
@@ -183,6 +187,7 @@ const projectWorkspaceTabs: Array<{ value: ProjectWorkspaceTab; label: string }>
   { value: 'materials', label: '材料' },
   { value: 'schedule', label: '日程' },
   { value: 'contacts', label: '导师' },
+  { value: 'notes', label: '备注' },
   { value: 'activity', label: '动态' }
 ];
 const applicationCacheTtlMs = 45_000;
@@ -350,6 +355,7 @@ function getProjectActionCopy(fieldKey: string) {
   if (fieldKey === 'status') return '申请阶段';
   if (fieldKey === 'priority') return '重点标记';
   if (fieldKey === 'contact') return '导师联系状态';
+  if (fieldKey === 'notes') return '申请备注';
   return '材料清单';
 }
 
@@ -418,6 +424,7 @@ export function DesktopHome({
   const [manualApplicationOpen, setManualApplicationOpen] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<ProjectWorkspaceTab>('overview');
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, {text: string; base: string}>>({});
   const [stageTimelineExpanded, setStageTimelineExpanded] = useState(false);
   const [projectMaterialMeta, setProjectMaterialMeta] = useState<Record<string, DesktopProjectMaterialMeta>>({});
   const [mentorContacts, setMentorContacts] = useState<WorkbenchMentorContact[]>([]);
@@ -665,7 +672,7 @@ export function DesktopHome({
 
 
   const refreshApplications = useCallback(async (
-    options: { allowFreshCache?: boolean; bypassPendingRequest?: boolean } = {}
+    options: { allowFreshCache?: boolean; bypassPendingRequest?: boolean; reconnect?: boolean } = {}
   ) => {
     const requestUserId = userId;
     if (!requestUserId) {
@@ -681,8 +688,9 @@ export function DesktopHome({
     if (options.allowFreshCache && applicationRequestCache.isFresh(requestUserId)) {
       setApplications(cached?.value || []);
       setLoading(false);
-      setLoadError('');
-      emitDesktopSyncStatus('synced');
+      const incomplete = cached?.value.some(row => row.syncStatus === 'offline' || row.noticeAvailability === 'lookup-failed');
+      setLoadError(incomplete ? '通知关联暂未同步完成，申请与备注已保留。可重试同步；这不代表通知已下架。' : '');
+      emitDesktopSyncStatus(incomplete || hasPendingApplicationEdits(requestUserId) ? 'error' : 'synced');
       return;
     }
 
@@ -692,6 +700,8 @@ export function DesktopHome({
     }
     emitDesktopSyncStatus('syncing');
     try {
+      if (options.reconnect) await reconnectDesktopAccount(requestUserId);
+      if (activeUserIdRef.current !== requestUserId || refreshSequenceRef.current !== refreshSequence) return;
       const rows = await fetchApplicationsForUser(requestUserId, options.bypassPendingRequest);
       if (
         activeUserIdRef.current !== requestUserId ||
@@ -700,8 +710,10 @@ export function DesktopHome({
         return;
       }
       setApplications(rows);
-      emitDesktopSyncStatus('synced');
-    } catch {
+      const incomplete=rows.some(row=>row.syncStatus==='offline'||row.noticeAvailability==='lookup-failed');
+      if(incomplete)setLoadError('通知关联暂未同步完成，申请与备注已保留。可重试同步；这不代表通知已下架。');
+      emitDesktopSyncStatus(incomplete||hasPendingApplicationEdits(requestUserId) ? 'error' : 'synced');
+    } catch (error) {
       if (
         activeUserIdRef.current !== requestUserId ||
         refreshSequenceRef.current !== refreshSequence
@@ -709,7 +721,7 @@ export function DesktopHome({
         return;
       }
       setLoadError(
-        hasCachedRows
+        error instanceof D1RequestError || (options.reconnect && error instanceof Error) ? error.message : hasCachedRows
           ? '申请项目暂时无法同步，当前显示上次同步的数据。'
           : '申请项目暂时无法同步，请检查网络后重试。'
       );
@@ -888,6 +900,31 @@ export function DesktopHome({
   const onlyExpiredProjectsHidden =
     hideExpired && expiredMatchingCount > 0 && filteredRows.length === 0;
 
+  const noteKey = `${userId}:${selectedRow?.item.userProjectId || ''}`;
+  const currentNoteDraft = noteDrafts[noteKey];
+  const noteDraft = currentNoteDraft?.text ?? selectedRow?.item.myNotes ?? '';
+  const notePending = Boolean(selectedRow && hasPendingApplicationEdits(userId, selectedRow.item.userProjectId));
+  function editNote(text: string) {
+    if (!selectedRow) return;
+    const base = selectedRow.item.myNotes;
+    setNoteDrafts(current => ({...current, [noteKey]: {text, base: current[noteKey]?.base ?? base}}));
+  }
+  async function saveSelectedNote() {
+    if (!selectedRow) return;
+    const row = selectedRow, key = noteKey, text = noteDraft;
+    if (currentNoteDraft && currentNoteDraft.base !== row.item.myNotes && text !== row.item.myNotes) {
+      setSaveError('备注已在其他页面更新，当前编辑内容已保留，请先核对，未覆盖云端内容。');
+      return;
+    }
+    const saved = await updateProjectRecord(row, {myNotes: text}, 'notes', {allowUndo: false});
+    if (saved && activeUserIdRef.current === userId) {
+      setNoteDrafts(current => {
+        if (current[key]?.text !== text) return current;
+        const next = {...current}; delete next[key]; return next;
+      });
+    }
+  }
+
   const selectedMaterialMeta = selectedRow
     ? getDesktopProjectMaterialMeta(projectMaterialMeta, selectedRow.item.userProjectId)
     : createDefaultProjectMaterialMeta();
@@ -946,6 +983,7 @@ export function DesktopHome({
       focus === 'materials' ||
       focus === 'schedule' ||
       focus === 'contacts' ||
+      focus === 'notes' ||
       focus === 'activity'
     ) {
       setActiveWorkspaceTab(focus);
@@ -955,7 +993,13 @@ export function DesktopHome({
   useEffect(() => {
     const handleFocusProjectTab = (event: Event) => {
       const tab = (event as CustomEvent<string>).detail;
-      if (tab === 'materials' || tab === 'schedule' || tab === 'contacts' || tab === 'activity') {
+      if (
+        tab === 'materials' ||
+        tab === 'schedule' ||
+        tab === 'contacts' ||
+        tab === 'notes' ||
+        tab === 'activity'
+      ) {
         setActiveWorkspaceTab(tab);
         if (selectedId) {
           detailInitialFocusRef.current = 'close';
@@ -1169,6 +1213,7 @@ export function DesktopHome({
     options: ProjectUpdateOptions = {}
   ) {
     const projectId = targetRow.item.userProjectId;
+    if (!userId || activeUserIdRef.current !== userId) return false;
     if (pendingProjectIdsRef.current.has(projectId)) return false;
 
     const currentRows = applicationsRef.current;
@@ -1191,13 +1236,14 @@ export function DesktopHome({
       await trackDesktopPendingWrite('home-project-update', () =>
         updateUserProject(projectId, patch)
       );
+      if (activeUserIdRef.current !== userId) return false;
 
       const persistedApplications = applyProjectPatch(applicationsRef.current, projectId, patch);
       setApplications(persistedApplications);
       if (userId) {
         applicationRequestCache.set(userId, persistedApplications, 0);
       }
-      emitDesktopSyncStatus('synced');
+      emitDesktopSyncStatus(hasPendingApplicationEdits(userId) ? 'error' : 'synced');
       setProjectActionState(projectId, {
         phase: 'success',
         fieldKey,
@@ -1233,32 +1279,48 @@ export function DesktopHome({
           : undefined
       });
       return true;
-    } catch {
-      const restoredApplications = restoreProjectPatch(
+    } catch (error) {
+      if (activeUserIdRef.current !== userId) return false;
+      let restoredApplications = restoreProjectPatch(
         applicationsRef.current,
         projectId,
         previousPatch
       );
+      let retained = false;
+      if (isD1Backend()) {
+        try {
+          retained = hasPendingApplicationEdits(userId, projectId);
+          if (retained) {
+            const localRow = readLocalApplicationRows(userId).find(row => row.item.userProjectId === projectId);
+            if (localRow) restoredApplications = applicationsRef.current.map(row =>
+              row.item.userProjectId === projectId
+                ? {...row, item: localRow.item, syncStatus: localRow.syncStatus}
+                : row
+            );
+          }
+        } catch { /* Keep the visible draft if local storage is unavailable. */ }
+      }
       setApplications(restoredApplications);
       if (userId) {
         applicationRequestCache.set(userId, restoredApplications, 0);
       }
-      setSaveError('本次修改未保存，请检查网络后重试。');
+      setSaveError((retained ? '本机修改已保留，云端尚未确认保存。' : '本次修改未保存，编辑内容仍保留在当前页面。') +
+        (error instanceof D1RequestError ? error.message : '请检查网络后重试。'));
       emitDesktopSyncStatus('error');
       setProjectActionState(projectId, {
         phase: 'error',
         fieldKey,
-        message: `${getProjectActionCopy(fieldKey)}未保存`
+        message: `${getProjectActionCopy(fieldKey)}${retained ? '待同步' : '未保存'}`
       }, 4200);
       emitDesktopFeedback({
-        message: '修改未保存',
-        detail: '仅本次字段已恢复，其他项目和修改保持不变',
+        message: retained ? '修改待同步' : '修改未保存',
+        detail: retained ? '内容已保留在本机，联网后可在设置中点击立即同步' : '请保留当前编辑内容后重试',
         tone: 'error',
         duration: 5200
       });
       return false;
     } finally {
-      pendingProjectIdsRef.current.delete(projectId);
+      if (activeUserIdRef.current === userId) pendingProjectIdsRef.current.delete(projectId);
     }
   }
 
@@ -1815,7 +1877,7 @@ export function DesktopHome({
               aria-live="polite"
             >
               <span>{loadError}</span>
-              <button type="button" onClick={() => void refreshApplications()}>
+              <button type="button" onClick={() => void refreshApplications({reconnect:true,bypassPendingRequest:true})}>
                 重试同步
               </button>
             </div>
@@ -1876,7 +1938,7 @@ export function DesktopHome({
                     <strong>暂时无法加载申请项目</strong>
                     <p>{loadError}</p>
                   </div>
-                  <button type="button" onClick={() => void refreshApplications()}>
+                  <button type="button" onClick={() => void refreshApplications({reconnect:true,bypassPendingRequest:true})}>
                     重试同步
                   </button>
                 </div>
@@ -2472,6 +2534,41 @@ export function DesktopHome({
                       {renderMaterialChecklist(selectedRow)}
                     </section>
                   </>
+                ) : activeWorkspaceTab === 'notes' ? (
+                  <section className="desktop-project-workspace-section desktop-project-related-panel desktop-project-notes-panel">
+                    <header>
+                      <div>
+                        <h3>申请备注</h3>
+                        <p>记录材料进度、沟通结果和下一步安排，会同步到你的寻鹿账号。</p>
+                      </div>
+                      <span className="desktop-project-notes-count" aria-live="polite">
+                        {noteDraft.length} / 20000
+                      </span>
+                    </header>
+                    <label className="desktop-project-notes-field">
+                      <span className="sr-only">申请备注内容</span>
+                      <textarea
+                        value={noteDraft}
+                        maxLength={20000}
+                        onChange={(event) => editNote(event.target.value)}
+                        placeholder="例如：已联系导师，等待回复；还需准备排名证明。"
+                        aria-label="申请备注内容"
+                        disabled={isProjectActionPending(selectedRow)}
+                      />
+                    </label>
+                    <div className="desktop-project-notes-actions">
+                      <span role="status">{notePending ? '本机有待同步的备注；联网后可在设置中点击立即同步。' : '修改后点击保存，云端确认后会显示保存成功。'}</span>
+                      <button
+                        type="button"
+                        className="desktop-project-workspace-primary"
+                        disabled={isProjectActionPending(selectedRow) || (!notePending && noteDraft === selectedRow.item.myNotes)}
+                        onClick={() => void saveSelectedNote()}
+                      >
+                        {isProjectActionPending(selectedRow, 'notes') ? '保存中…' : '保存备注'}
+                        <Checkmark20Regular aria-hidden="true" />
+                      </button>
+                    </div>
+                  </section>
                 ) : activeWorkspaceTab === 'materials' ? (
                   <section className="desktop-project-workspace-section desktop-project-material-panel">
                     <header>

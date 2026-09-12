@@ -36,6 +36,7 @@ import {
 import { buildNoticeDetailHref } from '@/lib/notice-links';
 import { collegeDirectory } from '@/lib/college-directory';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
+import {isD1Backend} from '@/lib/backend-mode';
 import { baseNoticeProjects } from '@/lib/notice-source';
 import { getTopCollegeNoticeStats } from '@/lib/notice-analytics';
 import { officialResourceSections } from '@/lib/portal-data';
@@ -47,7 +48,7 @@ const urgentRank = { today: 0, within3days: 1, within7days: 2, future: 3, expire
 
 export default function HomePage() {
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
-    filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
+    isD1Backend()?[]:filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
   );
   const [noticesLoading, setNoticesLoading] = useState(true);
   const [offerCount, setOfferCount] = useState(0);
@@ -64,7 +65,7 @@ export default function HomePage() {
       })
       .catch(() => {
         if (active) {
-          setProjects(filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026'));
+          setProjects(isD1Backend()?[]:filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026'));
         }
       })
       .finally(() => {

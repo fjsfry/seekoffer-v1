@@ -1,4 +1,11 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "main": false,
+      "codex/notice-source-reconnect-20260911": false,
+      "codex/d1-desktop-migration-20260910": false
+    }
+  },
   "rewrites": [
     {
       "source": "/googlef6d37ad2e103e5b2.html",

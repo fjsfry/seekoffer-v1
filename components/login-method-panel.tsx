@@ -1,6 +1,8 @@
 'use client';
 
 import Image from 'next/image';
+import {isD1Backend} from '@/lib/backend-mode';
+import {NativeLoginPanel} from './native-login-panel';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
@@ -113,7 +115,7 @@ function IconInput({
   );
 }
 
-export function LoginMethodPanel({
+function LegacyLoginMethodPanel({
   mode = 'modal',
   allowGuest = SUPABASE_ENABLE_ANONYMOUS,
   onClose,
@@ -1166,3 +1168,5 @@ export function LoginMethodPanel({
     </section>
   );
 }
+
+export function LoginMethodPanel(props:Parameters<typeof LegacyLoginMethodPanel>[0]){if(isD1Backend()&&process.env.NEXT_PUBLIC_SEEKOFFER_SURFACE==='desktop')return <NativeLoginPanel onClose={props.onClose} onSuccess={props.onSuccess}/>;return <LegacyLoginMethodPanel {...props}/>;}

@@ -1,3 +1,4 @@
+import {isD1Backend} from './backend-mode';
 import type { PublicNoticeProject } from './mock-data';
 import { baseNoticeProjects } from './notice-source';
 
@@ -66,7 +67,7 @@ export function buildNoticeDetailHref(id: string, returnTo?: string) {
     params.set('returnTo', returnTo);
   }
 
-  if (STATIC_NOTICE_IDS.has(normalizedId)) {
+  if (!isD1Backend() && STATIC_NOTICE_IDS.has(normalizedId)) {
     const query = params.toString();
     return `/notices/${encodeURIComponent(normalizedId)}${query ? `?${query}` : ''}`;
   }

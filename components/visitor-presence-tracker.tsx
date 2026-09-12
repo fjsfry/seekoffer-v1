@@ -2,10 +2,15 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { accountServiceFetch } from '@/lib/service-availability';
 import { SUPABASE_URL } from '@/lib/supabase-env';
+import {isD1Backend} from '@/lib/backend-mode';
 
 const visitorStorageKey = 'seekoffer-visitor-id';
 const sessionStorageKey = 'seekoffer-session-id';
+const seenPageviews = new Map<string, number>();
+let inMemoryVisitorId = '';
+let inMemorySessionId = '';
 
 function randomId(prefix: 'v' | 's') {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -18,26 +23,36 @@ function randomId(prefix: 'v' | 's') {
 function readPersistentVisitorId() {
   try {
     const existing = window.localStorage.getItem(visitorStorageKey);
-    if (existing?.startsWith('v_')) return existing;
+    if (existing?.startsWith('v_')) {
+      inMemoryVisitorId = existing;
+      return existing;
+    }
 
     const next = randomId('v');
     window.localStorage.setItem(visitorStorageKey, next);
+    inMemoryVisitorId = next;
     return next;
   } catch {
-    return randomId('v');
+    inMemoryVisitorId ||= randomId('v');
+    return inMemoryVisitorId;
   }
 }
 
 function readSessionId() {
   try {
     const existing = window.sessionStorage.getItem(sessionStorageKey);
-    if (existing?.startsWith('s_')) return existing;
+    if (existing?.startsWith('s_')) {
+      inMemorySessionId = existing;
+      return existing;
+    }
 
     const next = randomId('s');
     window.sessionStorage.setItem(sessionStorageKey, next);
+    inMemorySessionId = next;
     return next;
   } catch {
-    return randomId('s');
+    inMemorySessionId ||= randomId('s');
+    return inMemorySessionId;
   }
 }
 
@@ -60,14 +75,14 @@ function sendPresence(eventType: 'pageview' | 'heartbeat', pathname: string) {
   const url = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/analytics-api`;
   const body = JSON.stringify(buildPayload(eventType, pathname));
 
-  if (navigator.sendBeacon && eventType === 'heartbeat') {
-    navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
-    return;
-  }
-
-  void fetch(url, {
+  const key = pathname;
+  const now = Date.now();
+  if (now - (seenPageviews.get(key) || 0) < 30_000) return;
+  seenPageviews.set(key, now);
+  if (seenPageviews.size > 100) seenPageviews.delete(seenPageviews.keys().next().value!);
+  void accountServiceFetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
     body,
     keepalive: true
   }).catch(() => {
@@ -79,26 +94,11 @@ export function VisitorPresenceTracker() {
   const pathname = usePathname() || '/';
 
   useEffect(() => {
+    if(isD1Backend())return; // New analytics must be explicitly implemented before activation.
     if (pathname.startsWith('/admin')) return;
 
     sendPresence('pageview', pathname);
-    const interval = window.setInterval(() => sendPresence('heartbeat', pathname), 45_000);
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        sendPresence('heartbeat', pathname);
-      }
-    };
-    const handlePageHide = () => sendPresence('heartbeat', pathname);
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pagehide', handlePageHide);
-
-    return () => {
-      window.clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pagehide', handlePageHide);
-    };
+    // Emergency mode: retain deduplicated pageviews, disable optional heartbeat.
   }, [pathname]);
 
   return null;

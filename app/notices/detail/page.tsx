@@ -7,7 +7,8 @@ import { ArrowRight, LoaderCircle } from 'lucide-react';
 import { NoticeDetailView } from '@/components/notice-detail-view';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
-import { fetchPublicNotices } from '@/lib/cloudbase-data';
+import {fetchNoticeById} from '@/lib/cloudbase-data';
+import {isD1Backend} from '@/lib/backend-mode';
 import { sanitizeNoticeForPublicView } from '@/lib/notice-public-copy';
 import { baseNoticeProjects } from '@/lib/notice-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
@@ -29,6 +30,7 @@ function NoticeDetailContent() {
   const id = searchParams.get('id') || '';
   const returnHref = getSafeNoticeReturnHref(searchParams.get('returnTo'));
   const initialProject = useMemo(() => {
+    if(isD1Backend())return null;
     const matchedProject = baseNoticeProjects.find((item) => item.id === id) || null;
     return matchedProject ? sanitizeNoticeForPublicView(matchedProject) : null;
   }, [id]);
@@ -56,13 +58,12 @@ function NoticeDetailContent() {
 
     let active = true;
 
-    fetchPublicNotices()
-      .then((rows) => {
+    fetchNoticeById(id)
+      .then((matchedProject) => {
         if (!active) {
           return;
         }
 
-        const matchedProject = rows.find((item) => item.id === id) || null;
         setRemoteState({
           id,
           project: matchedProject ? sanitizeNoticeForPublicView(matchedProject) : null,

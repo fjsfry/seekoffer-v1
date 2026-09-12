@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
 import Link from 'next/link';
+import {isD1Backend} from '@/lib/backend-mode';
+import {nativeNoticeSearch} from '@/lib/native-public-notices';
+import {getEmptyCollegeNoticeStats,type CollegeNoticeStats} from '@/lib/notice-analytics';
 import {
   ArrowSync20Regular,
   BuildingBank20Regular,
@@ -258,11 +261,11 @@ function DesktopCollegeFilters({
   );
 }
 
-function DesktopCollegeCard({ item, stats }: { item: CollegeEntry; stats: CollegeStats }) {
+function DesktopCollegeCard({ item, stats, known=true }: { item: CollegeEntry; stats: CollegeStats; known?:boolean }) {
   const hasActiveNotices = stats.active > 0;
   const hasSchoolNotices = stats.total > 0;
-  const noticeHref = hasSchoolNotices ? `/notices?school=${encodeURIComponent(item.name)}` : '/notices';
-  const noticeActionLabel = hasActiveNotices
+  const noticeHref = hasSchoolNotices || !known ? `/notices?school=${encodeURIComponent(item.name)}` : '/notices';
+  const noticeActionLabel = !known?'查看学校通知':hasActiveNotices
     ? '查看报名通知'
     : hasSchoolNotices
       ? '查看历史通知'
@@ -281,17 +284,17 @@ function DesktopCollegeCard({ item, stats }: { item: CollegeEntry; stats: Colleg
         </div>
         <time dateTime={stats.latestPublishDate || undefined}>
           <Clock3 aria-hidden="true" />
-          {formatDesktopCollegeDate(stats.latestPublishDate)}
+          {known?formatDesktopCollegeDate(stats.latestPublishDate):'通知状态待同步'}
         </time>
       </div>
       <div className={styles.collegeStats} data-active={hasActiveNotices ? 'true' : 'false'} aria-label={`${item.name}通知统计`}>
         <span className={styles.noticeLabel}><BellRing aria-hidden="true" />报名通知</span>
         <div className={styles.noticePrimary}>
-          <strong>{stats.active}</strong>
+          <strong>{known?stats.active:'—'}</strong>
           <span>条正在报名</span>
         </div>
         <div className={styles.noticeSecondary}>
-          <span>共 {stats.total} 条</span>
+          <span>共 {known?stats.total:'—'} 条</span>
         </div>
       </div>
       <div className={`${styles.collegeActions} desktop-college-card-actions-final`}>
@@ -361,6 +364,7 @@ function DesktopCollegePagination({
 }
 
 export default function CollegesPage() {
+  const [nativeStats,setNativeStats]=useState<CollegeNoticeStats[]|null>(null);
   const [initialPublicNoticeSnapshot] = useState(() => getPublicNoticeSnapshot());
   const [keyword, setKeyword] = useState('');
   const [city, setCity] = useState(allCityLabel);
@@ -391,6 +395,7 @@ export default function CollegesPage() {
   const filterKey = `${keyword.trim().toLowerCase()}|${city}|${group}|${sortBy}`;
 
   const loadProjects = useCallback(async (options: { force?: boolean } = {}) => {
+    if(isD1Backend()){const sequence=++requestSequenceRef.current;setNoticeSyncStatus('loading');try{const result=await nativeNoticeSearch();if(sequence!==requestSequenceRef.current)return;setNativeStats(result.facets.collegeStats);setNoticeSyncAttemptedAt(new Date(result.servedAt));setNoticeSyncStatus('online');}catch{if(sequence===requestSequenceRef.current)setNoticeSyncStatus('stale');}return;}
     const requestSequence = requestSequenceRef.current + 1;
     requestSequenceRef.current = requestSequence;
     const cachedSnapshot = getPublicNoticeSnapshot();
@@ -481,8 +486,9 @@ export default function CollegesPage() {
   }, [city, filterKey, group, keyword, pageState, showAllCities, sortBy, viewRestored]);
 
   const collegeStats = useMemo(() => {
+    if(isD1Backend())return new Map(collegeDirectory.map(item=>[item.name,nativeStats?.find(s=>s.schoolName===item.name)||getEmptyCollegeNoticeStats(item.name)]));
     return new Map(collegeDirectory.map((item) => [item.name, buildCollegeNoticeStats(projects, item.name)]));
-  }, [projects]);
+  }, [projects,nativeStats]);
 
   const filteredColleges = useMemo(() => {
     const query = keyword.trim().toLowerCase();
@@ -780,6 +786,7 @@ export default function CollegesPage() {
             <DesktopCollegeCard
               key={item.name}
               item={item}
+              known={!isD1Backend()||nativeStats!==null}
               stats={collegeStats.get(item.name) || buildCollegeNoticeStats(projects, item.name)}
             />
           ))}

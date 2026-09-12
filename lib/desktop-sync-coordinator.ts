@@ -1,5 +1,6 @@
 'use client';
 
+import {reconnectDesktopAccount} from './desktop-account-reconnect';
 import { synchronizeApplicationWorkspace } from './cloudbase-data';
 import { emitDesktopSyncStatus, type DesktopSyncStatus } from './desktop-route-events';
 import { getUserSession } from './user-session';
@@ -20,6 +21,7 @@ export type DesktopSyncResult = {
 };
 
 export type DesktopSyncCoordinatorDependencies = {
+  prepareAccount?: (userId:string) => Promise<void>;
   syncApplications: (userId: string) => Promise<void>;
   syncWorkbench: (userId: string) => Promise<void>;
   isActiveUser: (userId: string) => boolean;
@@ -113,6 +115,8 @@ export function createDesktopSyncCoordinator(dependencies: DesktopSyncCoordinato
       const task = (async () => {
         dependencies.emitStatus('syncing');
         try {
+          await dependencies.prepareAccount?.(normalizedUserId);
+          if (!dependencies.isActiveUser(normalizedUserId)) throw new Error('The active account changed during synchronization.');
           await withTimeout(
             Promise.all([
               dependencies.syncApplications(normalizedUserId),
@@ -142,6 +146,7 @@ export function createDesktopSyncCoordinator(dependencies: DesktopSyncCoordinato
 }
 
 const desktopSyncCoordinator = createDesktopSyncCoordinator({
+  prepareAccount: reconnectDesktopAccount,
   syncApplications: synchronizeApplicationWorkspace,
   syncWorkbench: syncWorkbenchWorkspace,
   isActiveUser: (userId) => getUserSession()?.userId === userId,
