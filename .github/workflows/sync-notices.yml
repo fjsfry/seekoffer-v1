@@ -80,4 +80,5 @@ jobs:
         run: node scripts/verify-notice-website-sync.mjs
       # The authenticated Worker atomically updates notices + public overrides.
       # No Supabase calls, database tokens, Vercel hooks, frontend build or deploy.
-      # A 300-change UTC-day cap stops safely and reports remaining candidates.
+      # No application-level daily count cap. Official quota errors stop safely
+      # and retain an explicit incomplete result and remaining candidate count.
