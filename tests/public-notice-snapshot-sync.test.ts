@@ -11,7 +11,7 @@ describe('public notice snapshot sync', () => {
   it('uses an explicit public projection and stable pagination order', () => {
     expect(source).not.toContain("endpoint.searchParams.set('select', '*')");
     expect(source).toContain("endpoint.searchParams.set('order', 'publish_date.desc,id.asc')");
-    expect(source).toContain("'history_records'");
+    expect(source).not.toContain("'history_records'");
     expect(source).not.toContain("'admin_review_note'");
     expect(source).not.toContain("'admin_reviewed_by'");
     expect(source).not.toContain("'created_by'");
@@ -20,9 +20,7 @@ describe('public notice snapshot sync', () => {
   it('treats a successful empty Supabase response as authoritative', () => {
     expect(source).toContain('if (supabaseResult.ok)');
     expect(source).toContain('supabaseRows.forEach((item) => merged.set(item.id, item))');
-    expect(source).toContain('exportRows.forEach((item) => merged.set(item.id, item))');
-    expect(source.indexOf('if (supabaseResult.ok)')).toBeLessThan(
-      source.indexOf('exportRows.forEach((item) => merged.set(item.id, item))')
-    );
+    expect(source).not.toContain('exportRows.forEach((item) => merged.set(item.id, item))');
+    expect(source).toContain('NOTICE_SYNC_NOT_AUTHORITATIVE');
   });
 });

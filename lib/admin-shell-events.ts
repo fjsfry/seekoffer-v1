@@ -4,7 +4,7 @@ export type AdminDashboardShellSnapshot = {
   pendingNotices: number;
   pendingOffers: number;
   pendingFeedback: number;
-  onlineVisitors: number;
-  totalVisitors: number;
-  todayPageViews: number;
+  onlineVisitors: number|null;
+  totalVisitors: number|null;
+  todayPageViews: number|null;
 };

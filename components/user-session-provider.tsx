@@ -3,6 +3,7 @@
 import { createContext, startTransition, useContext, useEffect, useState } from 'react';
 import {
   getUserSession,
+  getSessionHydrationError,
   hydrateSupabaseSession,
   isLoggedInSession,
   isMemberSession,
@@ -14,6 +15,7 @@ import {
 type UserSessionContextValue = {
   session: UserSession | null;
   ready: boolean;
+  authError: string;
   loggedIn: boolean;
   isMember: boolean;
   refresh: () => Promise<UserSession | null>;
@@ -24,6 +26,7 @@ const UserSessionContext = createContext<UserSessionContextValue | null>(null);
 export function UserSessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<UserSession | null>(null);
   const [ready, setReady] = useState(false);
+  const [authError,setAuthError]=useState('');
 
   useEffect(() => {
     let active = true;
@@ -40,6 +43,7 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
 
       startTransition(() => {
         setSession(hydrated ?? getUserSession());
+        setAuthError(getSessionHydrationError());
         setReady(true);
       });
     };
@@ -53,6 +57,7 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
 
       startTransition(() => {
         setSession(getUserSession());
+        setAuthError(getSessionHydrationError());
       });
     });
 
@@ -63,6 +68,7 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
 
       startTransition(() => {
         setSession(getUserSession());
+        setAuthError(getSessionHydrationError());
         setReady(true);
       });
     });
@@ -80,6 +86,7 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
 
     startTransition(() => {
       setSession(nextSession);
+      setAuthError(getSessionHydrationError());
       setReady(true);
     });
 
@@ -91,6 +98,7 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
       value={{
         session,
         ready,
+        authError,
         loggedIn: isLoggedInSession(session),
         isMember: isMemberSession(session),
         refresh

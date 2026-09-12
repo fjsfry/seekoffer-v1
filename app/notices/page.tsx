@@ -364,6 +364,8 @@ function NoticesPageContent() {
   const [loadedQueryKey, setLoadedQueryKey] = useState('');
   const [lastLoadedAt, setLastLoadedAt] = useState('');
   const [loadError, setLoadError] = useState('');
+  const [keywordComposing, setKeywordComposing] = useState(false);
+  const [majorComposing, setMajorComposing] = useState(false);
   const [keyword, setKeyword] = useState(initialNoticeState.keyword);
   const [debouncedKeyword, setDebouncedKeyword] = useState(initialNoticeState.keyword);
   const [schoolName, setSchoolName] = useState(initialNoticeState.schoolName);
@@ -426,14 +428,16 @@ function NoticesPageContent() {
   const filterKey = buildNoticeFilterKey(filterValues);
 
   useEffect(() => {
+    if (keywordComposing) return;
     const timeout = window.setTimeout(() => setDebouncedKeyword(keyword), 350);
     return () => window.clearTimeout(timeout);
-  }, [keyword]);
+  }, [keyword, keywordComposing]);
 
   useEffect(() => {
+    if (majorComposing) return;
     const timeout = window.setTimeout(() => setDebouncedMajorKeyword(majorKeyword), 350);
     return () => window.clearTimeout(timeout);
-  }, [majorKeyword]);
+  }, [majorKeyword, majorComposing]);
 
   const apiFilterValues = useMemo<NoticeSearchFilters>(
     () => ({
@@ -517,7 +521,8 @@ function NoticesPageContent() {
           return;
         }
 
-        setLoadError('通知加载失败，请检查网络后重试。');
+        setSearchResponse(null);
+        setLoadError('通知暂时不可用，已保留你的本地数据，请稍后重试。');
       })
       .finally(() => {
         if (!controller.signal.aborted && requestSequenceRef.current === requestId) {
@@ -800,6 +805,8 @@ function NoticesPageContent() {
             <Search className="h-5 w-5 text-slate-400" />
             <input
               value={keyword}
+              onCompositionStart={() => setKeywordComposing(true)}
+              onCompositionEnd={() => setKeywordComposing(false)}
               onChange={(event) => setKeyword(event.target.value)}
               placeholder="搜索学校 / 学院 / 专业关键词"
               className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
@@ -923,7 +930,7 @@ function NoticesPageContent() {
               <option value="within3days">3天内截止</option>
               <option value="within7days">7天内截止</option>
             </FilterSelect>
-            <FilterInput label="专业关键词" value={majorKeyword} onChange={setMajorKeyword} placeholder="例如 人工智能" />
+            <FilterInput label="专业关键词" value={majorKeyword} onCompositionChange={setMajorComposing} onChange={setMajorKeyword} placeholder="例如 人工智能" />
             <FilterSelect label="细分专业" value={discipline} onChange={setDiscipline}>
               {disciplineOptions.map((item) => (
                 <option key={item} value={item}>
@@ -1227,11 +1234,13 @@ function FilterInput({
   label,
   value,
   onChange,
+  onCompositionChange,
   placeholder
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onCompositionChange?: (value: boolean) => void;
   placeholder: string;
 }) {
   return (
@@ -1239,6 +1248,8 @@ function FilterInput({
       <span className="mb-2 block text-xs font-semibold text-slate-500">{label}</span>
       <input
         value={value}
+        onCompositionStart={() => onCompositionChange?.(true)}
+        onCompositionEnd={() => onCompositionChange?.(false)}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         className="soft-input h-12 w-full rounded-xl px-4 text-sm text-slate-700 outline-none placeholder:text-slate-400"

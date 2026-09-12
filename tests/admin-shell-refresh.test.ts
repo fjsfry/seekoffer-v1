@@ -7,11 +7,12 @@ const shell = readFileSync(resolve(root, 'components/admin-shell.tsx'), 'utf8');
 const adminApi = readFileSync(resolve(root, 'supabase/functions/admin-api/index.ts'), 'utf8');
 
 describe('admin shell refresh policy', () => {
-  it('uses one visible-only five-minute snapshot request outside the dashboard', () => {
+  it('uses one initial snapshot outside the dashboard without visibility polling', () => {
     expect(shell).toContain("normalizedPathname === '/admin/dashboard'");
     expect(shell).toContain("{ resource: 'shell', action: 'snapshot' }");
     expect(shell).toContain("document.visibilityState !== 'visible'");
-    expect(shell).toContain('window.setInterval(refreshWhenVisible, 5 * 60_000)');
+    expect(shell).not.toContain('window.setInterval');
+    expect(shell).not.toContain("document.addEventListener('visibilitychange'");
     expect(shell).not.toContain('}, 60_000)');
     expect(shell).not.toContain("resource: 'overview', action: 'get'");
     expect(shell).not.toContain("resource: 'analytics', action: 'overview'");

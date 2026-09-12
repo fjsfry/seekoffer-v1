@@ -1,6 +1,8 @@
 import type { DeadlineLevel, PublicProjectStatus } from './mock-data';
 
 const DAY_MS = 1000 * 60 * 60 * 24;
+// Parsing a date is pure; its changing deadline level is never cached.
+const parsedDeadlineCache = new Map<string, number>();
 
 function normalizeDeadlineInput(value: string | undefined | null) {
   const text = String(value || '').trim();
@@ -14,11 +16,21 @@ function normalizeDeadlineInput(value: string | undefined | null) {
 }
 
 export function getDeadlineTimestamp(value: string | undefined | null) {
+  const key = typeof value === 'string' && value.length <= 120 ? value : null;
+  if (key !== null) {
+    const known = parsedDeadlineCache.get(key);
+    if (known !== undefined) return known;
+  }
   const normalized = normalizeDeadlineInput(value);
   if (!normalized) return Number.MAX_SAFE_INTEGER;
 
   const timestamp = new Date(normalized).getTime();
-  return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp;
+  const result = Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp;
+  if (key !== null) {
+    if (parsedDeadlineCache.size >= 2048) parsedDeadlineCache.clear();
+    parsedDeadlineCache.set(key, result);
+  }
+  return result;
 }
 
 export function getDeadlineLevelFromDate(value: string | undefined | null, now = Date.now()): DeadlineLevel {

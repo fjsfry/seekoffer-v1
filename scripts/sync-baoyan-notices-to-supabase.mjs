@@ -1,5 +1,9 @@
 import http from 'node:http';
 import https from 'node:https';
+import fs from 'node:fs';
+import path from 'node:path';
+import {orderD1Notices, ingestionShouldRetry} from './notice-d1-transport.mjs';
+import {saveNoticeSyncReceipt} from './notice-sync-report.mjs';
 import {
   areLikelyDuplicateNotices,
   extractDeadlineFromText as extractDeadlineFromTextCore,
@@ -15,11 +19,13 @@ const PRIMARY_API_BASE_URL = process.env.API_BASE_URL || 'https://ajqwsiasyqyi.s
 const SECONDARY_API_BASE_URL = process.env.BAOYANWANG_API_BASE_URL || 'http://api.baoyanwang.com.cn/api/v1';
 const XINGKE_DATA_URL = process.env.XINGKE_DATA_URL || 'https://www.xingkebaoyan.com/data.json';
 const BAOYANNEWS_LIST_URL = process.env.BAOYANNEWS_LIST_URL || 'https://www.baoyannews.com/notices';
+const USE_D1_INGEST = process.env.SEEKOFFER_INGEST_BACKEND === 'd1';
 const SUPABASE_PROJECT_REF = process.env.SUPABASE_PROJECT_REF || '';
 const SUPABASE_INGEST_URL =
+  (USE_D1_INGEST ? 'https://migration.seekoffer.com.cn/v1/internal/ingest-notices' : '') ||
   process.env.SUPABASE_INGEST_URL ||
   (SUPABASE_PROJECT_REF ? `https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/ingest-notices` : '');
-const SUPABASE_INGEST_SECRET = process.env.SUPABASE_INGEST_SECRET || process.env.SEEKOFFER_INGEST_SECRET || '';
+const SUPABASE_INGEST_SECRET = USE_D1_INGEST ? process.env.SEEKOFFER_INGEST_SECRET || '' : process.env.SUPABASE_INGEST_SECRET || process.env.SEEKOFFER_INGEST_SECRET || '';
 const SUPABASE_INGEST_SOURCE = process.env.SUPABASE_INGEST_SOURCE || 'github-actions-sync';
 const TARGET_YEAR = Number(process.env.TARGET_YEAR || '2026');
 const SYNC_MODE = normalizeSyncMode(process.env.SYNC_MODE || 'full');
@@ -78,14 +84,14 @@ const OFFICIAL_REPAIR_MAX_DETAILS =
   parseOptionalInteger(process.env.OFFICIAL_REPAIR_MAX_DETAILS) || (IS_INCREMENTAL_SYNC ? 30 : 240);
 const OFFICIAL_REPAIR_CONCURRENCY = Math.max(1, Number(process.env.OFFICIAL_REPAIR_CONCURRENCY || 4));
 const OFFICIAL_REPAIR_DELAY_MS = Math.max(0, Number(process.env.OFFICIAL_REPAIR_DELAY_MS || 80));
-const INGEST_BATCH_SIZE = Math.min(200, Math.max(25, parseOptionalInteger(process.env.INGEST_BATCH_SIZE) || 100));
-const INGEST_MAX_ATTEMPTS = Math.min(5, Math.max(1, parseOptionalInteger(process.env.INGEST_MAX_ATTEMPTS) || 3));
+const INGEST_BATCH_SIZE = USE_D1_INGEST ? Math.min(6, Math.max(1, parseOptionalInteger(process.env.INGEST_BATCH_SIZE) || 6)) : Math.min(200, Math.max(25, parseOptionalInteger(process.env.INGEST_BATCH_SIZE) || 100));
+const INGEST_MAX_ATTEMPTS = Math.min(USE_D1_INGEST ? 2 : 5, Math.max(1, parseOptionalInteger(process.env.INGEST_MAX_ATTEMPTS) || 3));
 const INGEST_RETRY_BASE_DELAY_MS = Math.max(100, Number(process.env.INGEST_RETRY_BASE_DELAY_MS || 1000));
 const INGEST_RETRY_MAX_DELAY_MS = Math.max(
   INGEST_RETRY_BASE_DELAY_MS,
   Number(process.env.INGEST_RETRY_MAX_DELAY_MS || 30000)
 );
-const DRY_RUN = /^1|true|yes$/i.test(process.env.DRY_RUN || '');
+const DRY_RUN = /^(?:1|true|yes)$/i.test(process.env.DRY_RUN || '');
 
 const TITLE_BODY_START_PATTERNS = [
   /发布时间[:：]?\s*20\d{2}/i,
@@ -691,6 +697,7 @@ function buildPrimaryProject(record, detail = {}, targetYear = TARGET_YEAR) {
   return {
     id: `baoyantongzhi-${recordId}`,
     source_record_id: recordId,
+    source_detail_complete: Boolean(plainText),
     school_name: normalizeSpace(detail.school || record.school) || '待识别学校',
     department_name: normalizeSpace(detail.college || record.college) || '待补充院系',
     project_name: title,
@@ -2020,6 +2027,7 @@ async function postIngestBatch(notices, summary, batchIndex, batchCount) {
             ingestBatchCount: batchCount
           }
         }),
+        redirect: 'error',
         signal: controller.signal
       });
 
@@ -2028,12 +2036,14 @@ async function postIngestBatch(notices, summary, batchIndex, batchCount) {
         status: response.status,
         body: rawText
       });
-      if (response.ok) return payload;
+      if (response.ok) return {...payload,rowsRead:Number(response.headers.get('x-d1-rows-read')||0),rowsWritten:Number(response.headers.get('x-d1-rows-written')||0)};
 
       const error = new Error(
-        `Supabase ingest batch ${batchIndex}/${batchCount} failed with status ${response.status}: ${JSON.stringify(payload)}`
+        `Supabase ingest batch ${batchIndex}/${batchCount} failed with status ${response.status}: ${USE_D1_INGEST ? String(payload?.error || 'INGEST_FAILED').replace(/[^A-Z_]/g, '') : JSON.stringify(payload)}`
       );
-      error.retryable = isRetryableIngestStatus(response.status);
+      error.ingestCode = USE_D1_INGEST ? String(payload?.error || 'INGEST_FAILED') : '';
+      error.ingestStatus = response.status;
+      error.retryable = USE_D1_INGEST ? ingestionShouldRetry(response.status,payload?.error) : isRetryableIngestStatus(response.status);
       error.retryAfter = response.headers.get('retry-after') || '';
       throw error;
     } catch (error) {
@@ -2074,6 +2084,7 @@ async function postIngestBatch(notices, summary, batchIndex, batchCount) {
 }
 
 async function pushProjectsToSupabase(projects, summary) {
+  if (USE_D1_INGEST) projects = orderD1Notices(projects);
   if (DRY_RUN) {
     return {
       ok: true,
@@ -2104,11 +2115,20 @@ async function pushProjectsToSupabase(projects, summary) {
     noticesUpserted: 0,
     noticesPublished: 0,
     noticesPrivate: 0,
-    restoredAutoDeleted: 0
+    restoredAutoDeleted: 0,
+    unchanged: 0, protected: 0, rowsRead: 0, rowsWritten: 0, completedBatches: 0
   };
 
   for (let index = 0; index < batches.length; index += 1) {
-    const payload = await postIngestBatch(batches[index], summary, index + 1, batches.length);
+    let payload;
+    try { payload = await postIngestBatch(batches[index], summary, index + 1, batches.length); }
+    catch(error) {
+      if(USE_D1_INGEST) {
+        const code=error.ingestStatus===402?'SERVICE_QUOTA_EXCEEDED':/^[A-Z_0-9]{1,80}$/.test(error.ingestCode||'')?error.ingestCode:'INGEST_FAILED';
+        return {...aggregate,complete:false,stoppedReason:code,remainingCandidates:batches.slice(index).reduce((n,b)=>n+b.length,0)};
+      }
+      throw error;
+    }
 
     aggregate.noticesReceived += Number(payload?.noticesReceived || batches[index].length);
     aggregate.noticesSkipped += Number(payload?.noticesSkipped || 0);
@@ -2116,10 +2136,14 @@ async function pushProjectsToSupabase(projects, summary) {
     aggregate.noticesPublished += Number(payload?.noticesPublished || 0);
     aggregate.noticesPrivate += Number(payload?.noticesPrivate || 0);
     aggregate.restoredAutoDeleted += Number(payload?.restoredAutoDeleted || 0);
-    logEvent('supabase_ingest_batch_finished', {
+    for (const key of ['unchanged','protected','rowsRead','rowsWritten']) aggregate[key] += Number(payload?.[key] || 0);
+    aggregate.completedBatches += 1;
+    logEvent(USE_D1_INGEST ? 'd1_ingest_batch_finished' : 'supabase_ingest_batch_finished', {
       batch: index + 1,
       batchCount: batches.length,
-      notices: batches[index].length
+      notices: batches[index].length,
+      upserted: payload.noticesUpserted, unchanged: payload.unchanged, protected: payload.protected,
+      rowsRead: payload.rowsRead, rowsWritten: payload.rowsWritten
     });
   }
 
@@ -2516,19 +2540,43 @@ async function runSync() {
     dryRun: DRY_RUN
   };
 
+  // An explicit local capture reuses one acquisition for validation and ingestion.
+  // This file contains source/review metadata; never upload it as a public artifact.
+  if (process.env.NOTICE_CAPTURE_PATH) {
+    if (!DRY_RUN) throw new Error('NOTICE_CAPTURE_REQUIRES_DRY_RUN');
+    const destination = path.resolve(process.env.NOTICE_CAPTURE_PATH);
+    fs.mkdirSync(path.dirname(destination), {recursive: true});
+    fs.writeFileSync(destination, JSON.stringify({version: 1, summary, notices: merged}), {flag: 'wx'});
+  }
   const ingestResult = await pushProjectsToSupabase(merged, summary);
   const result = {
     ok: true,
-    destination: DRY_RUN ? 'dry-run' : 'supabase.notices',
+    destination: DRY_RUN ? 'dry-run' : USE_D1_INGEST ? 'd1.main__notices' : 'supabase.notices',
     source: SUPABASE_INGEST_SOURCE,
     ...summary,
-    noticesReceived: Number(ingestResult?.noticesReceived || merged.length),
+    noticesReceived: Number(ingestResult?.noticesReceived ?? merged.length),
     noticesUpserted: Number(ingestResult?.noticesUpserted || 0),
     ingestBatchCount: Number(ingestResult?.batchCount || 1),
+    completedBatches: Number(ingestResult?.completedBatches || 0),
+    complete: ingestResult?.complete !== false,
+    stoppedReason: ingestResult?.stoppedReason || null,
+    remainingCandidates: Number(ingestResult?.remainingCandidates || 0),
+    unchanged: Number(ingestResult?.unchanged || 0),
+    protected: Number(ingestResult?.protected || 0),
+    rowsRead: Number(ingestResult?.rowsRead || 0),
+    rowsWritten: Number(ingestResult?.rowsWritten || 0),
     restoredAutoDeleted: Number(ingestResult?.restoredAutoDeleted || 0)
   };
 
   console.log(JSON.stringify(result, null, 2));
+  if (USE_D1_INGEST) {
+    saveNoticeSyncReceipt(result);
+    if (!result.complete) {
+      // A successful partial batch must not make the complete workflow green.
+      console.error('::warning::Notice sync paused with remaining candidates; see the job summary.');
+      process.exitCode = 2;
+    }
+  }
   return result;
 }
 

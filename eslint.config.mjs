@@ -9,6 +9,8 @@ const eslintConfig = [
   {
     ignores: [
       '.next/**',
+      '.next-emergency/**',
+      'artifacts/**',
       '.next-web/**',
       '.next-web-corrupt-*/**',
       'node_modules/**',

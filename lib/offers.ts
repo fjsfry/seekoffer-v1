@@ -2,6 +2,8 @@
 
 import { getSupabaseBrowserClient } from './supabase-browser';
 import { isSupabaseConfigured } from './supabase-env';
+import {isD1Backend} from './backend-mode';
+import {readCommunityPage,readCommunityPosts,readCommunityComments,readCommunityFollows,writeCommunity,writeCommunityReport} from './d1-community';
 
 export const offerResultTypes = ['录取', '放弃', '候补', '补录传闻', '官方确认'] as const;
 export const offerProjectTypes = ['夏令营', '预推免', '九推', '直博', '硕士', '博士', '其他'] as const;
@@ -117,11 +119,11 @@ const publicPostColumns = [
 ].join(',');
 
 function cleanText(value: string, maxLength: number) {
-  return value.replace(/\s+/g, ' ').trim().slice(0, maxLength);
+  const result=value.replace(/\s+/g,' ').trim();if(result.length>maxLength)throw new Error(`内容最多${maxLength}个字符，请缩短后提交。`);return result;
 }
 
 function cleanMultiline(value: string, maxLength: number) {
-  return value.trim().replace(/\n{3,}/g, '\n\n').slice(0, maxLength);
+  const result=value.trim().replace(/\n{3,}/g,'\n\n');if(result.length>maxLength)throw new Error(`内容最多${maxLength}个字符，请缩短后提交。`);return result;
 }
 
 function normalizeResult(value: string | null | undefined): OfferResultType {
@@ -198,7 +200,9 @@ export function getOfferAvatar(label: string) {
   return normalized ? normalized.slice(0, 1).toUpperCase() : '鹿';
 }
 
+export async function fetchPublicCommunityPage(query:URLSearchParams,signal?:AbortSignal){const result=await readCommunityPage(query,signal);return{...result,items:(result.items as unknown as OfferPostRow[]).map(mapOfferRow)};}
 export async function fetchPublicCommunityPosts() {
+  if(isD1Backend())return (await readCommunityPosts() as unknown as OfferPostRow[]).map(mapOfferRow);
   ensureConfigured('Offer 圈暂时无法加载，请稍后重试。');
   const supabase = getSupabaseBrowserClient();
   const { data, error } = await supabase
@@ -220,6 +224,7 @@ export async function fetchPublicOffers() {
 }
 
 export async function fetchOfferComments(postId: string) {
+  if(isD1Backend())return (await readCommunityComments(postId) as unknown as OfferCommentRow[]).map(mapCommentRow);
   ensureConfigured('回复暂时无法加载，请稍后重试。');
   const supabase = getSupabaseBrowserClient();
   const { data, error } = await supabase
@@ -237,6 +242,7 @@ export async function fetchOfferComments(postId: string) {
 }
 
 export async function fetchFollowedOfferPostIds(userId: string) {
+  if(isD1Backend())return userId?readCommunityFollows(userId):[];
   if (!userId || !isSupabaseConfigured()) return [] as string[];
   const supabase = getSupabaseBrowserClient();
   const { data, error } = await supabase.from('offer_post_follows').select('post_id').eq('user_id', userId);
@@ -245,6 +251,7 @@ export async function fetchFollowedOfferPostIds(userId: string) {
 }
 
 export async function toggleOfferPostFollow(postId: string, userId: string, followed: boolean) {
+  if(isD1Backend()){const result=await writeCommunity(userId,'follows',{postId,follow:!followed}) as {followed:boolean};if(typeof result.followed!=='boolean')throw Error('关注保存结果未确认。');return result.followed;}
   ensureConfigured('关注状态暂时无法保存，请稍后重试。');
   if (!userId) throw new Error('请登录后关注讨论。');
 
@@ -280,6 +287,7 @@ export function validateOfferSubmitInput(input: OfferSubmitInput) {
 }
 
 export async function submitOfferPost(input: OfferSubmitInput) {
+  if(isD1Backend()){const validated=validateOfferSubmitInput(input);const {userId,...payload}=validated;await writeCommunity(userId,'posts',{...payload,contentType:'offer'});return;}
   ensureConfigured('发布入口正在维护中，请稍后再试。');
   const validated = validateOfferSubmitInput(input);
   const supabase = getSupabaseBrowserClient();
@@ -302,6 +310,7 @@ export async function submitOfferPost(input: OfferSubmitInput) {
 }
 
 export async function submitOfferDiscussion(input: OfferDiscussionSubmitInput) {
+  if(isD1Backend()){const {userId,...payload}=input;await writeCommunity(userId,'posts',{...payload,contentType:'discussion'});return;}
   ensureConfigured('讨论发布入口正在维护中，请稍后再试。');
   const authorName = cleanText(input.authorName, 80);
   const schoolName = cleanText(input.schoolName, 80);
@@ -343,6 +352,7 @@ export async function submitOfferComment(input: {
   content: string;
   isAnonymous: boolean;
 }) {
+  if(isD1Backend()){const {userId,...payload}=input;await writeCommunity(userId,'comments',payload);return;}
   ensureConfigured('回复入口正在维护中，请稍后再试。');
   const authorName = cleanText(input.authorName, 80);
   const content = cleanMultiline(input.content, 800);
@@ -363,6 +373,7 @@ export async function submitOfferComment(input: {
 }
 
 export async function reportOfferPost(offerId: string, content: string, userId?: string | null) {
+  if(isD1Backend()){await writeCommunityReport(offerId,content,userId);return;}
   ensureConfigured('反馈入口正在维护中，请稍后再试。');
   const cleanContent = cleanMultiline(content, 800);
   if (cleanContent.length < 8) throw new Error('请至少用 8 个字说明举报原因。');

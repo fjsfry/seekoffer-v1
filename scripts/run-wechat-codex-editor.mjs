@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { invokeD1Digest } from './wechat-d1-runner.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -31,76 +31,6 @@ function validateDate(value) {
   return value;
 }
 
-function parseJsonCandidates(output) {
-  const normalized = String(output).replace(/\u001b\[[0-9;]*m/g, '');
-  const candidates = normalized
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .reverse();
-
-  for (const candidate of candidates) {
-    try {
-      return JSON.parse(candidate);
-    } catch {
-      // CloudBase prints progress lines before its final JSON payload.
-    }
-  }
-
-  for (let index = normalized.indexOf('{'); index >= 0; index = normalized.indexOf('{', index + 1)) {
-    try {
-      return JSON.parse(normalized.slice(index).trim());
-    } catch {
-      // Try the next object boundary.
-    }
-  }
-  throw new Error('CloudBase did not return a JSON payload');
-}
-
-function findNested(value, predicate, seen = new Set()) {
-  if (typeof value === 'string') {
-    try {
-      return findNested(JSON.parse(value), predicate, seen);
-    } catch {
-      return null;
-    }
-  }
-  if (!value || typeof value !== 'object' || seen.has(value)) return null;
-  seen.add(value);
-  if (predicate(value)) return value;
-  for (const child of Object.values(value)) {
-    const result = findNested(child, predicate, seen);
-    if (result) return result;
-  }
-  return null;
-}
-
-function invokeCloudBase(event) {
-  const executable = process.platform === 'win32' ? process.execPath : 'npx';
-  const npxArguments = process.platform === 'win32'
-    ? [path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js')]
-    : [];
-  const output = execFileSync(executable, [
-    ...npxArguments,
-    '--yes',
-    '--package',
-    '@cloudbase/cli',
-    'tcb',
-    'fn',
-    'invoke',
-    'wechat-daily-digest',
-    '--params',
-    JSON.stringify(event),
-    '--json'
-  ], {
-    cwd: repositoryRoot,
-    encoding: 'utf8',
-    maxBuffer: 16 * 1024 * 1024,
-    stdio: ['ignore', 'pipe', 'pipe']
-  });
-  return parseJsonCandidates(output);
-}
-
 function validateEditorialFile(editorial) {
   const keys = editorial && typeof editorial === 'object' && !Array.isArray(editorial)
     ? Object.keys(editorial).sort()
@@ -111,20 +41,19 @@ function validateEditorialFile(editorial) {
   if (typeof editorial.titleHook !== 'string' || typeof editorial.lead !== 'string') {
     throw new Error('Editorial titleHook and lead must be strings');
   }
-  if (!Array.isArray(editorial.selectedNoticeIds) || editorial.selectedNoticeIds.length < 1) {
+  if (!Array.isArray(editorial.selectedNoticeIds) || editorial.selectedNoticeIds.length < 1 || editorial.selectedNoticeIds.length > 3) {
     throw new Error('Editorial selectedNoticeIds must contain 1-3 notice IDs');
   }
   return editorial;
 }
 
 async function createBrief(targetDate) {
-  const payload = invokeCloudBase({
+  const result = await invokeD1Digest({
     dryRun: true,
     includeEditorialBrief: true,
     targetDate
   });
-  const result = findNested(payload, (value) => value?.ok === true && value?.editorialBrief?.targetDate);
-  if (!result) throw new Error('CloudBase response did not contain an editorial brief');
+  if (!result?.ok || !result.editorialBrief?.targetDate) throw new Error('D1_DIGEST_BRIEF_MISSING');
 
   await mkdir(workingDirectory, { recursive: true });
   const briefPath = path.join(workingDirectory, `brief-${targetDate}.json`);
@@ -140,12 +69,8 @@ async function createBrief(targetDate) {
 
 async function publishEditorial(targetDate, editorialPath) {
   const editorial = validateEditorialFile(JSON.parse(await readFile(editorialPath, 'utf8')));
-  const payload = invokeCloudBase({ targetDate, force: true, editorial });
-  const result = findNested(
-    payload,
-    (value) => value?.ok === true && value?.targetDate === targetDate && value?.editorialSource
-  );
-  if (!result) throw new Error('CloudBase response did not contain a publish result');
+  const result = await invokeD1Digest({ targetDate, editorial });
+  if (!result?.ok) throw new Error('D1_DIGEST_PUBLISH_UNCONFIRMED');
   if (result.editorialSource !== 'codex') {
     throw new Error(`Unexpected editorial source: ${result.editorialSource}`);
   }
@@ -160,8 +85,7 @@ async function publishEditorial(targetDate, editorialPath) {
     articleTitle: String(result.articleTitle || ''),
     editorialSource: result.editorialSource,
     editorialModel: String(result.editorialModel || ''),
-    mediaId: String(result.mediaId || ''),
-    thumbMediaId: String(result.thumbMediaId || '')
+    receiptPresent: Boolean(result.mediaId)
   };
   await writeFile(resultPath, `${JSON.stringify(auditResult, null, 2)}\n`, 'utf8');
   return { ...auditResult, mode: 'publish', resultPath };

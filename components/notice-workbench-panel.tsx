@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Bell, LoaderCircle, Plus, Save } from 'lucide-react';
 import {
@@ -21,13 +21,20 @@ import {
   type UserProjectRecord
 } from '@/lib/mock-data';
 
-export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
+export function NoticeWorkbenchPanel({projectId}:{projectId:string}){
+  const {session}=useUserSessionState();
+  return <NoticeWorkbenchPanelContent key={(session?.userId||'guest')+':'+projectId} projectId={projectId}/>;
+}
+function NoticeWorkbenchPanelContent({ projectId }: { projectId: string }) {
   const pathname = usePathname();
   const { loggedIn, ready: sessionReady } = useUserSessionState();
   const [row, setRow] = useState<ApplicationRow | null>(null);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState('');
+  const [syncError,setSyncError]=useState('');
+  const noteEdited=useRef(false);
+  const noteValue=useRef('');
 
   useEffect(() => {
     let active = true;
@@ -45,13 +52,14 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
         return;
       }
 
-      const rows = await fetchApplicationRows();
+      try{const rows = await fetchApplicationRows();
       if (active) {
         const current = rows.find((item) => item.project.id === projectId) || null;
         setRow(current);
-        setNote(current?.item.myNotes || '');
+        if(!noteEdited.current){noteValue.current=current?.item.myNotes||'';setNote(noteValue.current);}
         setReady(true);
       }
+      }catch(error){if(active){setSyncError(error instanceof Error?error.message:'工作台暂不可读取，本地数据已保留。');setReady(true);}}
     };
 
     void load();
@@ -67,6 +75,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
 
   async function handleJoin() {
     setSaving(true);
+    setSyncError('');
 
     try {
       if (!loggedIn) {
@@ -87,6 +96,8 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
       const current = rows.find((item) => item.project.id === projectId) || null;
       setRow(current);
       setNote(current?.item.myNotes || '');
+    } catch(error) {
+      setSyncError(error instanceof Error?error.message:'加入申请未确认，请稍后重试。');
     } finally {
       setSaving(false);
     }
@@ -98,13 +109,17 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
     }
 
     setSaving(true);
+    setSyncError('');
     try {
       const next = await updateUserProject(row.item.userProjectId, patch);
       if (next) {
+        if(patch.myNotes!==undefined&&noteValue.current===patch.myNotes)noteEdited.current=false;
         const rows = await fetchApplicationRows();
         const current = rows.find((item) => item.project.id === projectId) || null;
         setRow(current);
       }
+    } catch(error) {
+      setSyncError(error instanceof Error?error.message:'申请修改待同步，本地草稿已保留。');
     } finally {
       setSaving(false);
     }
@@ -148,6 +163,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
   if (!row) {
     return (
       <section className="surface-card rounded-[32px] p-6">
+        {syncError&&<p role="alert" className="mb-4 text-sm text-amber-800">{syncError}</p>}
         <div className="text-lg font-semibold text-ink">加入我的工作台</div>
         <p className="mt-3 text-sm leading-7 text-slate-600">
           一旦加入，这条通知会立刻接到你的申请表、待办和提醒逻辑里，后续就不需要重复整理。
@@ -171,6 +187,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
 
   return (
     <section className="surface-card rounded-[32px] p-6">
+      {(syncError||(row.syncStatus&&row.syncStatus!=='synced'))&&<p role="status" className="mb-4 text-sm text-amber-800">{syncError||'本地修改已保留，云端同步尚未确认。'}</p>}
       <div className="flex items-center justify-between gap-3">
         <div className="text-lg font-semibold text-ink">我的工作台</div>
         <span className="rounded-full bg-brand-cream px-3 py-1 text-xs font-semibold text-brand">
@@ -241,7 +258,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
           <textarea
             rows={4}
             value={note}
-            onChange={(event) => setNote(event.target.value)}
+            onChange={(event) => {noteEdited.current=true;noteValue.current=event.target.value;setNote(event.target.value);}}
             placeholder="例如：导师已回信、材料待老师签字、周五前完成提交。"
             className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
           />

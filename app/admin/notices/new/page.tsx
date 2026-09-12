@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import {useUserSessionState} from '@/hooks/use-user-session';
+import {isD1Backend} from '@/lib/backend-mode';
+import {readCommunityDraft} from '@/lib/community-drafts';
 import { ArrowLeft, Save } from 'lucide-react';
 import { AdminShell } from '@/components/admin-shell';
 import { AdminButton, AdminInput, AdminPanel, AdminSelect } from '@/components/admin-ui';
@@ -20,22 +23,18 @@ const emptyForm = {
   remarks: ''
 };
 
-export default function AdminNewNoticePage() {
+export default function AdminNewNoticePage(){const {session}=useUserSessionState();return <AdminNewNoticeContent key={isD1Backend()?session?.userId||'guest':'legacy'} owner={session?.userId||''}/>;}
+function AdminNewNoticeContent({owner}:{owner:string}) {
+  const draftKey=isD1Backend()?'seekoffer-admin-notice-draft:d1:'+owner:'seekoffer-admin-notice-draft';
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(()=>readCommunityDraft(draftKey,emptyForm));
 
   function updateField(key: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function saveDraft() {
-    window.localStorage.setItem(
-      'seekoffer-admin-notice-draft',
-      JSON.stringify({ ...form, savedAt: new Date().toISOString() })
-    );
-    setMessage('草稿已保存。');
-  }
+  function saveDraft() {try{window.localStorage.setItem(draftKey,JSON.stringify(form));setMessage('草稿已保存在当前账号的本机工作区。');}catch{setMessage('本机空间不足，草稿仍在当前页面，请保留页面。');}}
 
   async function submitNotice() {
     if (!form.school_name.trim() || !form.project_name.trim()) {
@@ -52,7 +51,7 @@ export default function AdminNewNoticePage() {
         notice: form
       });
       setMessage('通知已提交，当前状态为待审核。');
-      setForm(emptyForm);
+      setForm(emptyForm);try{window.localStorage.removeItem(draftKey);}catch{/* Cloud creation is already acknowledged; retain any old local draft. */}
     } catch (error) {
       setMessage(getAdminErrorMessage(error, '提交失败，请稍后重试。'));
     } finally {

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node ./scripts/sync-public-notice-data.mjs && next build",
+    "build": "node ./scripts/build-website.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
@@ -22,7 +22,8 @@
     "seo:submit": "node ./scripts/submit-search-indexing.mjs",
     "import:cloudbase-export": "node ./scripts/import-cloudbase-export-to-supabase.mjs",
     "build:hosting": "npm run build && node ./scripts/prepare-hosting.mjs",
-    "deploy:cloudbase": "npm run build:hosting && tcb hosting deploy ./hosting-dist --env-id cloudbase-4gonuep215f23af4"
+    "deploy:cloudbase": "npm run build:hosting && tcb hosting deploy ./hosting-dist --env-id cloudbase-4gonuep215f23af4",
+    "build:emergency:offline": "node scripts/build-emergency-offline.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2",

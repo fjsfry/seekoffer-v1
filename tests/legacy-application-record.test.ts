@@ -1,0 +1,8 @@
+import {it,expect} from 'vitest';
+import {normalizeLegacyApplication,planLegacyApplications} from '../lib/legacy-application-record';
+const owner='00000000-0000-4000-8000-000000000001';
+const row={userId:owner,userProjectId:'local-a',projectId:'notice-a',myStatus:'已提交',myNotes:'原笔记\n不截断'};
+it('deduplicates identical caches by project without losing notes or submission state',()=>{const p=planLegacyApplications([row,{...row,userProjectId:'another-local-id'}],owner);expect(p.records).toHaveLength(1);expect(p.duplicates).toBe(1);expect(normalizeLegacyApplication(p.records[0],owner).fields.my_notes).toBe(row.myNotes);expect(normalizeLegacyApplication(row,owner).fields.my_status).toBe('已提交');});
+it('different content never wins silently over another cache',()=>{const p=planLegacyApplications([row,{...row,myNotes:'另一个版本'}],owner);expect(p.records).toEqual([]);expect(p.conflicts).toBe(1);});
+it('a real original application UUID is preserved, while conflicting UUIDs require review',()=>{const one={...row,userProjectId:'11111111-1111-4111-8111-111111111111'},two={...row,userProjectId:'22222222-2222-4222-8222-222222222222'};expect(planLegacyApplications([row,one],owner).records[0].userProjectId).toBe(one.userProjectId);expect(planLegacyApplications([one,two],owner).conflicts).toBe(1);});
+it('foreign owners, unsupported fields, excessive text and invalid progress fail explicitly',()=>{for(const r of [{...row,userId:'00000000-0000-4000-8000-000000000002'},{...row,service_role:'forbidden'},{...row,myNotes:'x'.repeat(20001)},{...row,materialsProgress:-1}])expect(()=>normalizeLegacyApplication(r,owner)).toThrow();});

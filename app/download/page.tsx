@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { DesktopDownloadAction } from '@/components/desktop-download-action';
 import { SiteShell } from '@/components/site-shell';
-import { DESKTOP_RELEASE } from '@/lib/desktop-download';
+import { PUBLISHED_DESKTOP_RELEASE as DESKTOP_RELEASE } from '@/lib/desktop-public-release';
 import { absoluteUrl, buildPageMetadata, jsonLdScript } from '@/lib/seo';
 
 export const dynamic = 'force-static';
@@ -48,7 +48,7 @@ const desktopBenefits = [
 const trustItems = [
   { icon: MonitorCheck, label: 'Windows 10 / 11', detail: '64 位适配，稳定运行' },
   { icon: FileCheck2, label: '官方发布渠道', detail: '来源可核验，持续维护' },
-  { icon: RefreshCw, label: '自动检查更新', detail: '新版本及时推送' },
+  { icon: RefreshCw, label: '持续版本维护', detail: '官网获取最新版本' },
   { icon: Download, label: '免费下载安装', detail: '轻量安装，简单便捷' }
 ] as const;
 
@@ -56,14 +56,14 @@ const heroFacts = [
   { icon: ShieldCheck, label: '版本号', value: `v${DESKTOP_RELEASE.version}` },
   { icon: Download, label: '安装包大小', value: DESKTOP_RELEASE.installerSize },
   { icon: CalendarDays, label: '发布日期', value: DESKTOP_RELEASE.releaseDate },
-  { icon: RefreshCw, label: '自动检查更新', value: '应用内更新' },
+  { icon: RefreshCw, label: '更新方式', value: '官网下载更新' },
   { icon: MonitorCheck, label: '适配系统', value: 'Windows 10 / 11' }
 ] as const;
 
 const installationSteps = [
   ['下载安装包', '点击“下载 Windows 版”，从寻鹿官方下载地址获取安装程序。'],
   ['完成 Windows 安装', '打开安装包并按提示完成安装；首次启动后使用寻鹿账号登录。'],
-  ['开始管理申请', '收藏通知、建立申请、补充日程与材料，后续版本由应用内更新。']
+  ['开始管理申请', '收藏通知、建立申请、补充日程与材料，后续版本可在本页下载更新。']
 ] as const;
 
 const desktopFaq = [
@@ -73,11 +73,15 @@ const desktopFaq = [
   },
   {
     question: '以后需要重新下载安装吗？',
-    answer: '通常不需要。桌面端会检查正式更新通道，发现新版本后可在应用内下载并重启更新。'
+    answer: '当前版本需要从本页下载并覆盖安装，暂不通过应用内自动更新推送。安装前请保存编辑并退出寻鹿，保留原有本地资料。'
   },
   {
     question: '我的申请数据会保留吗？',
     answer: '覆盖安装不会主动清除寻鹿本地数据。登录同一账号后，可继续使用已同步的申请、日程与导师联系信息；重要资料仍建议保留自己的原始文件。'
+  },
+  {
+    question: '安装时提示“未知发布者”怎么办？',
+    answer: '当前安装包尚无 Windows 发布者签名。请使用本页官方链接，并通过“安装说明与文件校验”核对 SHA-256，再决定是否安装。'
   },
   {
     question: 'macOS 或手机可以安装吗？',
@@ -93,7 +97,7 @@ const softwareApplicationJsonLd = {
   applicationCategory: 'EducationalApplication',
   operatingSystem: 'Windows 10, Windows 11',
   softwareVersion: DESKTOP_RELEASE.version,
-  downloadUrl: absoluteUrl('/download/windows/latest'),
+  downloadUrl: DESKTOP_RELEASE.installerUrl,
   url: absoluteUrl('/download'),
   offers: {
     '@type': 'Offer',
@@ -247,7 +251,7 @@ export default function DesktopDownloadPage() {
             <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
               <div className="text-sm font-semibold text-brand">安装后你将获得</div>
               <div className="mt-3 grid gap-3 text-sm text-slate-500 sm:grid-cols-3">
-                {['在桌面推进申请', '接收关键节点提醒', '应用内检查更新'].map((item) => (
+                {['在桌面推进申请', '接收关键节点提醒', '官网获取版本更新'].map((item) => (
                   <span key={item} className="inline-flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-brand" />
                     {item}
@@ -268,7 +272,7 @@ export default function DesktopDownloadPage() {
                 ['系统架构', 'x64 · 64 位'],
                 ['运行环境', 'Microsoft Edge WebView2'],
                 ['安装包大小', DESKTOP_RELEASE.installerSize],
-                ['更新方式', '应用内自动检查']
+                ['更新方式', '官网下载更新']
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between gap-4 py-3">
                   <dt className="text-slate-500">{label}</dt>

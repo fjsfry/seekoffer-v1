@@ -2,13 +2,17 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { accountServiceFetch } from '@/lib/service-availability';
 import { SUPABASE_URL } from '@/lib/supabase-env';
+import {isD1Backend} from '@/lib/backend-mode';
+import {createAnalyticsPresence} from '@/lib/client/analytics-presence';
 
 const visitorStorageKey = 'seekoffer-visitor-id';
 const sessionStorageKey = 'seekoffer-session-id';
-const HEARTBEAT_INTERVAL_MS = 5 * 60_000;
+const seenPageviews = new Map<string, number>();
 let inMemoryVisitorId = '';
 let inMemorySessionId = '';
+let d1Presence:ReturnType<typeof createAnalyticsPresence>|undefined;
 
 function randomId(prefix: 'v' | 's') {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -73,12 +77,12 @@ function sendPresence(eventType: 'pageview' | 'heartbeat', pathname: string) {
   const url = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/analytics-api`;
   const body = JSON.stringify(buildPayload(eventType, pathname));
 
-  if (navigator.sendBeacon && eventType === 'heartbeat') {
-    navigator.sendBeacon(url, new Blob([body], { type: 'text/plain;charset=UTF-8' }));
-    return;
-  }
-
-  void fetch(url, {
+  const key = pathname;
+  const now = Date.now();
+  if (now - (seenPageviews.get(key) || 0) < 30_000) return;
+  seenPageviews.set(key, now);
+  if (seenPageviews.size > 100) seenPageviews.delete(seenPageviews.keys().next().value!);
+  void accountServiceFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
     body,
@@ -92,22 +96,16 @@ export function VisitorPresenceTracker() {
   const pathname = usePathname() || '/';
 
   useEffect(() => {
+    if(isD1Backend()){
+      if(process.env.NEXT_PUBLIC_ANALYTICS_RECOVERY!=='true'||pathname.startsWith('/admin')||document.visibilityState!=='visible')return;
+      d1Presence??=createAnalyticsPresence(fetch,{getItem:key=>window.localStorage.getItem(key),setItem:(key,value)=>window.localStorage.setItem(key,value)});
+      void d1Presence({...buildPayload('pageview',pathname),eventType:'pageview',title:document.title.slice(0,180)});
+      return;
+    }
     if (pathname.startsWith('/admin')) return;
 
     sendPresence('pageview', pathname);
-    const sendHeartbeatWhenVisible = () => {
-      if (document.visibilityState === 'visible') {
-        sendPresence('heartbeat', pathname);
-      }
-    };
-    const interval = window.setInterval(sendHeartbeatWhenVisible, HEARTBEAT_INTERVAL_MS);
-
-    document.addEventListener('visibilitychange', sendHeartbeatWhenVisible);
-
-    return () => {
-      window.clearInterval(interval);
-      document.removeEventListener('visibilitychange', sendHeartbeatWhenVisible);
-    };
+    // Emergency mode: retain deduplicated pageviews, disable optional heartbeat.
   }, [pathname]);
 
   return null;

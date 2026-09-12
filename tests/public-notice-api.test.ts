@@ -44,18 +44,15 @@ describe('public notice API v2 contracts', () => {
   it('uses canonical trailing-slash API URLs', () => {
     const clientSource = readFileSync(resolve(root, 'lib/public-notice-api.ts'), 'utf8');
     expect(clientSource).toContain('const requestUrl = `/api/public/notices/?${params.toString()}`');
-    expect(clientSource).toContain('fetch(requestUrl');
-    expect(clientSource).toContain("fetch('/api/public/notices/by-ids/'");
-    expect(clientSource).toContain("fetch('/api/public/notices/deadlines/'");
+    expect(clientSource).toContain('publicNoticeFetch(requestUrl');
+    expect(clientSource).toContain("publicNoticeFetch('/api/public/notices/by-ids/'");
+    expect(clientSource).toContain("publicNoticeFetch('/api/public/notices/deadlines/'");
   });
 
-  it('keeps a bounded five-minute client cache for repeat navigation', () => {
-    const clientSource = readFileSync(resolve(root, 'lib/public-notice-api.ts'), 'utf8');
-    expect(clientSource).toContain('const CLIENT_CACHE_TTL_MS = 5 * 60_000');
-    expect(clientSource).toContain('const CLIENT_CACHE_MAX_ENTRIES = 80');
-    expect(clientSource).toContain('readFreshCache(noticeSearchCache.get(requestUrl))');
-    expect(clientSource).toContain('writeNoticeSearchCache(requestUrl, data)');
-    expect(clientSource).toContain('export function clearPublicNoticeSearchCache()');
+  it('does not reuse stale client publication data after server invalidation', () => {
+    const source = readFileSync(resolve(root, 'lib/public-notice-api.ts'), 'utf8');
+    expect(source).not.toContain('noticeSearchCache');
+    expect(source).not.toContain('deadlineNoticeCache');
   });
 
   it('caps page size at 40 and preserves combined URL filters', () => {

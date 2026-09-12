@@ -1,4 +1,5 @@
 import { DESKTOP_RELEASE } from '@/lib/desktop-download';
+import {isWebsiteRecovery} from '@/lib/website-recovery';
 import { recordDesktopDownloadAttempt } from '@/lib/server/desktop-download-analytics';
 
 export const runtime = 'nodejs';
@@ -126,6 +127,7 @@ export async function POST(request: Request) {
     return emptyResponse(parsed.status);
   }
 
+  if(isWebsiteRecovery())return emptyResponse(503);
   await recordAttemptWithinTimeout(parsed.attemptId);
   return emptyResponse(204);
 }

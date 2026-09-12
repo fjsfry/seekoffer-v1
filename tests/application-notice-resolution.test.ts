@@ -32,8 +32,9 @@ describe('application notice resolution', () => {
     expect(workspace).not.toContain('const rows = records.reduce<ApplicationRow[]>');
   });
 
-  it('resolves workbench rows from the shared cache instead of direct Supabase fan-out', () => {
-    expect(repository).toContain('items: await loadRemotePublicNoticeCatalog(false)');
+  it('queries bounded ID batches instead of loading the full catalog', () => {
+    expect(repository).not.toContain('loadRemotePublicNoticeCatalog(false)');
+    expect(repository).toContain(".in('id', normalizedIds.slice(offset, offset + 100))");
     expect(repository).toContain('.map(toNoticeListItem)');
     expect(repository).not.toContain(".in('id', chunk)");
     expect(apiClient).toContain('uniqueIds.slice(index * 100, (index + 1) * 100)');

@@ -59,9 +59,7 @@ export const NOTICE_DETAIL_COLUMNS = [
   'updated_at',
   'updated_at_ts',
   'last_checked_at',
-  'is_verified',
-  'change_log',
-  'history_records'
+  'is_verified'
 ].join(',');
 
 export const NOTICE_MANUAL_PROJECT_COLUMNS = [

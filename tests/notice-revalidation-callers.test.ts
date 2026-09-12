@@ -7,15 +7,14 @@ const workflow = readFileSync(resolve(root, '.github/workflows/sync-notices.yml'
 const adminApi = readFileSync(resolve(root, 'supabase/functions/admin-api/index.ts'), 'utf8');
 
 describe('public notice cache revalidation callers', () => {
-  it('revalidates the global cache after a successful GitHub notice sync', () => {
-    expect(workflow).toContain('NOTICE_REVALIDATE_URL: ${{ secrets.NOTICE_REVALIDATE_URL }}');
-    expect(workflow).toContain('NOTICE_REVALIDATE_TOKEN: ${{ secrets.NOTICE_REVALIDATE_TOKEN }}');
-    expect(workflow).toContain('x-seekoffer-revalidate-token: $NOTICE_REVALIDATE_TOKEN');
-    expect(workflow).toContain("--data '{\"ids\":[]}'");
-    expect(workflow).toContain('--connect-timeout 5');
-    expect(workflow).toContain('--max-time 10');
-    expect(workflow).toContain('"${NOTICE_REVALIDATE_URL%/}/"');
-    expect(workflow).toContain("if: ${{ env.DRY_RUN != 'true' }}");
+  it('uses the atomic D1 ingestion path without a second rebuild or global refresh', () => {
+    expect(workflow).toContain('SEEKOFFER_INGEST_BACKEND: d1');
+    expect(workflow).toContain('SEEKOFFER_INGEST_SECRET: ${{ secrets.SEEKOFFER_INGEST_SECRET }}');
+    expect(workflow).toContain('cancel-in-progress: false');
+    expect(workflow).not.toContain('NOTICE_REVALIDATE_URL:');
+    expect(workflow).not.toContain('NOTICE_REVALIDATE_TOKEN:');
+    expect(workflow).not.toContain('VERCEL_DEPLOY_HOOK');
+    expect(workflow).not.toContain('npm run build');
   });
 
   it('revalidates affected IDs after admin notice mutations without exposing the token', () => {

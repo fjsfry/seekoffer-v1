@@ -2,8 +2,10 @@ import type { MetadataRoute } from 'next';
 import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { baseNoticeProjects } from '@/lib/notice-source';
 import { SITE_URL, absoluteUrl } from '@/lib/seo';
+import {isWebsiteRecovery} from '@/lib/website-recovery';
+import {getLiveRecoveryCatalog} from '@/lib/server/recovery-public-catalog';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 const staticRoutes = [
   '/',
@@ -33,7 +35,7 @@ function parseDate(value: string | undefined, fallback: Date) {
   return Number.isNaN(parsed.getTime()) ? fallback : parsed;
 }
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
   const staticEntries = staticRoutes.map((route) => ({
     url: absoluteUrl(route),
@@ -41,7 +43,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: route === '/' ? 1 : route === '/notices' ? 0.95 : route === '/download' ? 0.85 : 0.75
   }));
 
-  const noticeEntries = filterMainNoticeProjects(baseNoticeProjects).slice(0, 50000 - staticEntries.length).map((project) => ({
+  const noticeEntries = (isWebsiteRecovery()?(await getLiveRecoveryCatalog()).items:filterMainNoticeProjects(baseNoticeProjects)).slice(0, 50000 - staticEntries.length).map((project) => ({
     url: new URL(`/notices/${encodeURIComponent(project.id)}`, SITE_URL).toString(),
     lastModified: parseDate(project.updatedAt || project.collectedAt || project.publishDate, now),
     changeFrequency: 'weekly' as const,

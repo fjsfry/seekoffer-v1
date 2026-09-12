@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const migration = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/20260903024640_desktop_download_analytics.sql'),
   'utf8'
-).toLowerCase();
+).replace(/\r\n/g, '\n').toLowerCase();
 
 describe('desktop download analytics migration', () => {
   it('stores private, append-only and idempotent download-start attempts', () => {

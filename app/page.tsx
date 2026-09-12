@@ -41,7 +41,8 @@ import type { NoticeSearchFilters } from '@/lib/notice-query';
 import type { NoticeListItem } from '@/lib/notice-record';
 import { officialResourceSections } from '@/lib/portal-data';
 import { DESKTOP_RELEASE } from '@/lib/desktop-download';
-import { fetchPublicOffers } from '@/lib/offers';
+import { fetchPublicOffers,fetchPublicCommunityPage } from '@/lib/offers';
+import {isWebsiteRecovery,communityRecoveryEnabled} from '@/lib/website-recovery';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 const homeNoticeFilters: NoticeSearchFilters = {
   keyword: '',
@@ -65,7 +66,7 @@ export default function HomePage() {
   const [noticeOverview, setNoticeOverview] = useState<PublicNoticeSearchResponse | null>(null);
   const [noticesLoading, setNoticesLoading] = useState(true);
   const [noticeLoadError, setNoticeLoadError] = useState(false);
-  const [offerCount, setOfferCount] = useState(0);
+  const [offerCount, setOfferCount] = useState<number|null>(null);
   const [offersLoading, setOffersLoading] = useState(true);
 
   useEffect(() => {
@@ -103,7 +104,7 @@ export default function HomePage() {
   useEffect(() => {
     let active = true;
 
-    fetchPublicOffers()
+    (isWebsiteRecovery()?(communityRecoveryEnabled()?fetchPublicCommunityPage(new URLSearchParams({page:'1',pageSize:'1',type:'offer'})).then(r=>({length:r.pagination.total})):Promise.reject(new Error('COMMUNITY_MAINTENANCE'))):fetchPublicOffers())
       .then((rows) => {
         if (active) {
           setOfferCount(rows.length);
@@ -111,7 +112,7 @@ export default function HomePage() {
       })
       .catch(() => {
         if (active) {
-          setOfferCount(0);
+          setOfferCount(null);
         }
       })
       .finally(() => {
@@ -145,7 +146,7 @@ export default function HomePage() {
     {
       label: '2026 通知',
       value: noticesLoading ? '—' : noticeOverview ? `${noticeOverview.stats.total2026}+` : '暂不可用',
-      hint: noticesLoading ? '正在加载最新通知' : noticeLoadError ? '网络恢复后自动更新' : '持续更新中',
+      hint: noticesLoading ? '正在加载通知' : noticeLoadError ? '请稍后刷新' : '持续更新中',
       icon: BellRing,
       href: '/notices'
     },
@@ -165,8 +166,8 @@ export default function HomePage() {
     },
     {
       label: 'Offer 动态',
-      value: offerCount ? `${offerCount}` : '开放中',
-      hint: offersLoading ? '正在同步公开动态' : '核验后展示',
+      value: isWebsiteRecovery()&&!communityRecoveryEnabled()?'维护中':offersLoading?'—':offerCount===null?'暂不可用':`${offerCount}`,
+      hint: isWebsiteRecovery()&&!communityRecoveryEnabled()?'原记录已保留':offersLoading ? '正在同步公开动态' : offerCount===null?'请稍后刷新':'核验后展示',
       icon: CalendarDays,
       href: '/offers'
     }

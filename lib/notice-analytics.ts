@@ -104,7 +104,16 @@ export function getNoticeKindBucket(project: PublicNoticeProject): Exclude<Notic
   return '申请通知';
 }
 
+const immutableTypeBuckets = new WeakMap<PublicNoticeProject, Exclude<NoticeTypeFilter, '全部'>>();
 export function getNoticeTypeBucket(project: PublicNoticeProject): Exclude<NoticeTypeFilter, '全部'> {
+  if (!Object.isFrozen(project) || !Object.isFrozen(project.tags)) return computeNoticeTypeBucket(project);
+  const known = immutableTypeBuckets.get(project);
+  if (known) return known;
+  const bucket = computeNoticeTypeBucket(project);
+  immutableTypeBuckets.set(project, bucket);
+  return bucket;
+}
+function computeNoticeTypeBucket(project: PublicNoticeProject): Exclude<NoticeTypeFilter, '全部'> {
   const text = getNoticeClassificationText(project);
   const projectType = getDisplayProjectType(project.projectType);
   const publishMonth = getDateMonth(project.publishDate);

@@ -114,7 +114,16 @@ function extractSchoolWideScope(projectName: string | undefined | null) {
   return SCHOOL_WIDE_NOTICE_PATTERN.test(title) ? '全校通知' : '';
 }
 
+const immutableDepartments = new WeakMap<NoticeDepartmentFields, string>();
 export function getDisplayNoticeDepartment(project: NoticeDepartmentFields) {
+  if (!Object.isFrozen(project)) return computeDisplayNoticeDepartment(project);
+  const known = immutableDepartments.get(project);
+  if (known !== undefined) return known;
+  const value = computeDisplayNoticeDepartment(project);
+  immutableDepartments.set(project, value);
+  return value;
+}
+function computeDisplayNoticeDepartment(project: NoticeDepartmentFields) {
   const schoolName = getDisplaySchoolName(project.schoolName);
   const storedDepartment = getDisplayDepartmentName(project.departmentName);
   const storedRaw = compactText(String(project.departmentName || ''));

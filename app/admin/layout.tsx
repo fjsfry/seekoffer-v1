@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import {AdminAccountBoundary} from '@/components/admin-account-boundary';
 
 export const metadata: Metadata = {
   title: '运营管理平台',
@@ -13,5 +14,5 @@ export const metadata: Metadata = {
 };
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  return children;
+  return <AdminAccountBoundary>{children}</AdminAccountBoundary>;
 }

@@ -20,3 +20,14 @@ tsconfig.tsbuildinfo
 public/site-marks/_preview/
 .local-backups/
 releases/
+workers/
+scripts/migration/
+tests/
+docs/ops/
+migrations/
+.codex/
+.agents/
+.next*/
+functions/
+supabase/
+.env*

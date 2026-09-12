@@ -1,0 +1,15 @@
+{
+  "extends": "../seekoffer-api/tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "types": ["node"],
+    "typeRoots": ["../seekoffer-api/node_modules/@types"]
+  },
+  "include": [
+    "static-preview.ts",
+    "public-entry.ts",
+    "../seekoffer-api/node_modules/@cloudflare/workers-types/index.d.ts"
+  ]
+}

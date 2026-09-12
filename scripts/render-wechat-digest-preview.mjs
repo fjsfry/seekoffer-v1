@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { invokeD1Digest } from './wechat-d1-runner.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -27,87 +27,6 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
-}
-
-function parseJsonCandidates(output) {
-  const normalized = String(output).replace(/\u001b\[[0-9;]*m/g, '');
-  const candidates = normalized
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .reverse();
-
-  for (const candidate of candidates) {
-    try {
-      return JSON.parse(candidate);
-    } catch {
-      // CloudBase can print progress lines before its final JSON payload.
-    }
-  }
-
-  for (let index = normalized.indexOf('{'); index >= 0; index = normalized.indexOf('{', index + 1)) {
-    try {
-      return JSON.parse(normalized.slice(index).trim());
-    } catch {
-      // Try the next object boundary when a progress message contains braces.
-    }
-  }
-
-  throw new Error('CloudBase did not return a JSON payload');
-}
-
-function findDigestResult(value, seen = new Set()) {
-  if (typeof value === 'string') {
-    try {
-      return findDigestResult(JSON.parse(value), seen);
-    } catch {
-      return null;
-    }
-  }
-
-  if (!value || typeof value !== 'object' || seen.has(value)) return null;
-  seen.add(value);
-
-  if (value.article?.content && value.targetDate && Number.isFinite(Number(value.noticeCount))) {
-    return value;
-  }
-
-  for (const child of Object.values(value)) {
-    const result = findDigestResult(child, seen);
-    if (result) return result;
-  }
-
-  return null;
-}
-
-function invokeCloudPreview(targetDate, editorial = undefined) {
-  const executable = process.platform === 'win32' ? process.execPath : 'npx';
-  const npxArguments = process.platform === 'win32'
-    ? [path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js')]
-    : [];
-  const output = execFileSync(executable, [
-    ...npxArguments,
-    '--yes',
-    '--package',
-    '@cloudbase/cli',
-    'tcb',
-    'fn',
-    'invoke',
-    'wechat-daily-digest',
-    '--params',
-    JSON.stringify({ dryRun: true, targetDate, ...(editorial ? { editorial } : {}) }),
-    '--json'
-  ], {
-    cwd: repositoryRoot,
-    encoding: 'utf8',
-    maxBuffer: 16 * 1024 * 1024,
-    stdio: ['ignore', 'pipe', 'pipe']
-  });
-
-  const payload = parseJsonCandidates(output);
-  const result = findDigestResult(payload);
-  if (!result) throw new Error('CloudBase response did not contain a daily digest result');
-  return result;
 }
 
 function buildPreviewDocument(result, coverFilename) {
@@ -188,7 +107,8 @@ function buildPreviewDocument(result, coverFilename) {
 </html>`;
 }
 
-const targetDate = validateDate(readArgument('--target-date', '2026-07-13'));
+const beijingDate = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const targetDate = validateDate(readArgument('--target-date', beijingDate));
 const editorialFile = readArgument('--editorial-file');
 const editorial = editorialFile
   ? JSON.parse(await readFile(path.resolve(repositoryRoot, editorialFile), 'utf8'))
@@ -197,7 +117,7 @@ const outputDirectory = path.resolve(
   repositoryRoot,
   readArgument('--out', 'docs/previews/wechat-daily-digest-v3')
 );
-const result = invokeCloudPreview(targetDate, editorial);
+const result = await invokeD1Digest({dryRun:true,targetDate,...(editorial ? {editorial} : {})});
 const coverFilename = `cover-${targetDate}.jpg`;
 const cover = await renderCoverJpeg({ targetDate, noticeCount: Number(result.noticeCount) });
 const preview = buildPreviewDocument(result, coverFilename);
@@ -211,11 +131,11 @@ const manifest = {
   title: result.article.title,
   sourceUrl: result.article.sourceUrl,
   dimensions: { previewWidth: 390, coverWidth: 900, coverHeight: 383 },
-  renderer: 'editorial HTML with optional OpenAI copy and a deterministic JPEG cover',
+  renderer: 'D1 public notices, reviewed copy and a deterministic JPEG cover',
   generatedLayers: [],
   editorial: result.editorial || { source: 'unknown', model: '', fallbackReason: '' },
   provenance: {
-    content: 'CloudBase production dry-run using Supabase notice records',
+    content: 'D1-backed public API; dry-run without external model calls',
     fonts: 'Lato and a SeekOffer subset of Noto Sans SC from Google Fonts, licensed under SIL Open Font License 1.1'
   }
 };

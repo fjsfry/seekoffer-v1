@@ -6,11 +6,11 @@ const root = process.cwd();
 const dashboardSource = readFileSync(resolve(root, 'app/admin/dashboard/page.tsx'), 'utf8');
 
 describe('admin dashboard refresh policy', () => {
-  it('refreshes no more than every five minutes and only while visible', () => {
-    expect(dashboardSource).toContain('const DASHBOARD_REFRESH_INTERVAL_MS = 5 * 60_000');
+  it('loads once and retains manual refresh without visibility-triggered polling', () => {
+    expect(dashboardSource).not.toContain('window.setInterval');
     expect(dashboardSource).toContain("document.visibilityState !== 'visible'");
-    expect(dashboardSource).toContain("document.visibilityState === 'visible'");
-    expect(dashboardSource).toContain("document.addEventListener('visibilitychange', refreshWhenVisible)");
+
+    expect(dashboardSource).not.toContain("document.addEventListener('visibilitychange'");
     expect(dashboardSource).not.toContain('}, 30_000)');
   });
 

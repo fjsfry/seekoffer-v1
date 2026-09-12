@@ -1,4 +1,5 @@
 import 'server-only';
+import {isWebsiteRecovery} from '@/lib/website-recovery';
 
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -33,6 +34,7 @@ type DesktopDownloadAnalyticsDatabase = {
 let serviceClient: SupabaseClient<DesktopDownloadAnalyticsDatabase> | null = null;
 
 function getDesktopDownloadAnalyticsClient() {
+  if(isWebsiteRecovery())throw new Error('DOWNLOAD_ANALYTICS_MAINTENANCE');
   if (serviceClient) return serviceClient;
 
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';

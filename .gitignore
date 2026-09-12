@@ -33,3 +33,22 @@ public/site-marks/_preview/
 .wechat-codex/
 
 .env*
+
+# isolated emergency fixture build
+.next-emergency/
+
+# isolated D1 development state
+.wrangler/
+workers/seekoffer-api/.dev.vars*
+artifacts/
+releases/
+.next*/
+scripts/migration/.parity-*.mjs
+scripts/migration/.compiled-*.mjs
+
+# Local Python migration tooling caches
+__pycache__/
+*.py[cod]
+
+# Reviewed deployment snapshots remain local inputs, not permanent Git history.
+/data/recovery-public/

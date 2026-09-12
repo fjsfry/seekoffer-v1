@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2, Copy, Download, Monitor } from 'lucide-react';
 import { queueDesktopDownloadAttempt } from '@/lib/client/desktop-download-attempt';
+import { PUBLISHED_DESKTOP_RELEASE } from '@/lib/desktop-public-release';
 
 type DetectedPlatform = 'unknown' | 'windows' | 'other';
 type CopyStatus = 'idle' | 'success' | 'error';
 
-const PERMANENT_DOWNLOAD_PATH = '/download/windows/latest/';
-const BACKUP_DOWNLOAD_PATH = '/download/windows/github/';
-const PERMANENT_DOWNLOAD_URL = 'https://www.seekoffer.com.cn/download/windows/latest';
+const PERMANENT_DOWNLOAD_PATH = PUBLISHED_DESKTOP_RELEASE.installerUrl;
+const BACKUP_DOWNLOAD_PATH = PUBLISHED_DESKTOP_RELEASE.verificationUrl;
+const PERMANENT_DOWNLOAD_URL = PUBLISHED_DESKTOP_RELEASE.pageUrl;
 
 export function DesktopDownloadAction() {
   const [platform, setPlatform] = useState<DetectedPlatform>('unknown');
@@ -125,7 +126,7 @@ export function DesktopDownloadAction() {
               onClick={handleDownloadClick}
               className="font-medium text-brand underline decoration-brand/25 underline-offset-4 transition hover:decoration-brand"
             >
-              备用下载线路
+              安装说明与文件校验
               <span className="sr-only">，在新标签页打开</span>
             </a>
             <button
@@ -140,7 +141,7 @@ export function DesktopDownloadAction() {
       </div>
       <p id="desktop-download-status" role="status" aria-live="polite" className="mt-2 min-h-5 break-words text-xs leading-5 text-slate-500">
         {downloadRequested
-          ? '已发起下载请求，请查看新标签页。若浏览器没有自动开始下载，请使用备用下载线路。'
+          ? '已发起下载请求，请查看新标签页或浏览器下载列表。若未开始，请通过安装说明页重新下载。'
           : copyStatus === 'error'
             ? `复制失败，请手动复制：${PERMANENT_DOWNLOAD_URL}`
             : ''}

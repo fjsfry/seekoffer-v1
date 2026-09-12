@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { revalidateTag } from 'next/cache';
+import {isWebsiteRecovery} from '@/lib/website-recovery';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,8 @@ const MAX_NOTICE_IDS = 100;
 const MAX_NOTICE_ID_LENGTH = 160;
 const MAX_REQUEST_BODY_BYTES = 32 * 1024;
 const MIN_REVALIDATE_TOKEN_LENGTH = 32;
+let rateWindowStart = 0;
+let rateWindowCount = 0;
 
 type RevalidateRequestBody = {
   ids?: unknown;
@@ -94,6 +97,7 @@ async function readRequestBody(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if(isWebsiteRecovery())return jsonResponse({error:'RECOVERY_DATA_IS_VERSIONED_DEPLOYMENT'},503);
   const expectedToken = process.env.NOTICE_REVALIDATE_TOKEN || '';
   if (expectedToken.length < MIN_REVALIDATE_TOKEN_LENGTH) {
     return jsonResponse({ ok: false, error: '通知缓存失效服务尚未配置。' }, 503);
@@ -113,6 +117,12 @@ export async function POST(request: Request) {
   if ('error' in normalized) {
     return jsonResponse({ ok: false, error: normalized.error }, 400);
   }
+
+  // Per-instance protection; global concurrency remains a deployment verification gate.
+  const now = Date.now();
+  if (now - rateWindowStart >= 60_000) { rateWindowStart = now; rateWindowCount = 0; }
+  rateWindowCount += 1;
+  if (rateWindowCount > 60) return jsonResponse({ ok: false, error: '请求过于频繁，请稍后重试。' }, 429);
 
   try {
     revalidateTag(PUBLIC_NOTICES_TAG);

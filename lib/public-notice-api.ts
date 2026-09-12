@@ -1,47 +1,21 @@
+import { publicNoticeFetch, ServiceUnavailableError } from './service-availability';
 import type { PublicNoticeSearchResponse } from './public-notice-search';
 import type { NoticeSearchFilters } from './notice-query';
 import type { NoticeListItem } from './notice-record';
+import {mergePublicNoticeParts,clearPublicMetadataParts} from './public-notice-parts';
 
 type NoticeByIdsResponse = {
   items: NoticeListItem[];
-  source: 'supabase' | 'bundled';
+  source: 'supabase' | 'bundled' | 'recovery';
 };
 
 type DeadlineNoticeResponse = {
   items: NoticeListItem[];
-  source: 'supabase' | 'bundled';
+  source: 'supabase' | 'bundled' | 'recovery';
   servedAt: string;
 };
 
-type ClientCacheEntry<T> = {
-  data: T;
-  cachedAt: number;
-};
-
-const CLIENT_CACHE_TTL_MS = 5 * 60_000;
-const CLIENT_CACHE_MAX_ENTRIES = 80;
-const noticeSearchCache = new Map<string, ClientCacheEntry<PublicNoticeSearchResponse>>();
-let deadlineNoticeCache: ClientCacheEntry<DeadlineNoticeResponse> | null = null;
-
-function readFreshCache<T>(entry: ClientCacheEntry<T> | undefined | null) {
-  if (!entry || Date.now() - entry.cachedAt >= CLIENT_CACHE_TTL_MS) {
-    return null;
-  }
-  return entry.data;
-}
-
-function writeNoticeSearchCache(key: string, data: PublicNoticeSearchResponse) {
-  noticeSearchCache.delete(key);
-  noticeSearchCache.set(key, { data, cachedAt: Date.now() });
-  if (noticeSearchCache.size > CLIENT_CACHE_MAX_ENTRIES) {
-    const oldestKey = noticeSearchCache.keys().next().value;
-    if (oldestKey) noticeSearchCache.delete(oldestKey);
-  }
-}
-
-export function clearPublicNoticeSearchCache() {
-  noticeSearchCache.clear();
-}
+export function clearPublicNoticeSearchCache() { clearPublicMetadataParts(); /* Server caches still revalidate by version. */ }
 
 function setIfMeaningful(params: URLSearchParams, key: string, value: string) {
   const normalized = value.trim();
@@ -81,7 +55,7 @@ export function buildPublicNoticeApiSearchParams(
 
 async function readJsonResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    throw new Error(`Public notice request failed with status ${response.status}.`);
+    throw new ServiceUnavailableError(response.status);
   }
 
   return (await response.json()) as T;
@@ -98,18 +72,16 @@ export async function fetchPublicNoticeSearch(
     options.pageSize || 16
   );
   const requestUrl = `/api/public/notices/?${params.toString()}`;
-  const cached = readFreshCache(noticeSearchCache.get(requestUrl));
-  if (cached) return cached;
 
-  const response = await fetch(requestUrl, {
+  const response = await publicNoticeFetch(requestUrl, {
     method: 'GET',
     signal: options.signal,
     headers: { Accept: 'application/json' }
   });
 
   const data = await readJsonResponse<PublicNoticeSearchResponse>(response);
-  writeNoticeSearchCache(requestUrl, data);
-  return data;
+
+  return mergePublicNoticeParts(data,params,options.signal);
 }
 
 export async function fetchPublicNoticesByIds(ids: string[], signal?: AbortSignal) {
@@ -120,40 +92,39 @@ export async function fetchPublicNoticesByIds(ids: string[], signal?: AbortSigna
     { length: Math.ceil(uniqueIds.length / 100) },
     (_, index) => uniqueIds.slice(index * 100, (index + 1) * 100)
   );
-  const responses = await Promise.all(
-    batches.map(async (batch) => {
-      const response = await fetch('/api/public/notices/by-ids/', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ ids: batch }),
-        signal
-      });
-      return readJsonResponse<NoticeByIdsResponse>(response);
-    })
-  );
+  const responses: NoticeByIdsResponse[] = [];
+  for (const batch of batches) {
+    const response = await publicNoticeFetch('/api/public/notices/by-ids/', {
+      method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: batch }), signal
+    });
+    responses.push(await readJsonResponse<NoticeByIdsResponse>(response));
+  }
 
   return {
     items: responses.flatMap((response) => response.items),
     source: responses.every((response) => response.source === 'supabase')
       ? 'supabase'
-      : 'bundled'
+      : responses.every(response=>response.source==='recovery')?'recovery':'bundled'
   };
 }
 
 export async function fetchPublicDeadlineNotices(signal?: AbortSignal) {
-  const cached = readFreshCache(deadlineNoticeCache);
-  if (cached) return cached;
 
-  const response = await fetch('/api/public/notices/deadlines/', {
+  const response = await publicNoticeFetch('/api/public/notices/deadlines/', {
     method: 'GET',
     signal,
     headers: { Accept: 'application/json' }
   });
 
-  const data = await readJsonResponse<DeadlineNoticeResponse>(response);
-  deadlineNoticeCache = { data, cachedAt: Date.now() };
+  const data = await readJsonResponse<DeadlineNoticeResponse&{nextCursor?:string|null;version?:string}>(response);
+  let next=data.nextCursor;const seen=new Set<string>();const ids=new Set(data.items.map(i=>i.id));
+  while(next){
+    if(typeof next!=='string'||next.length>120||seen.has(next)||seen.size>=100||!data.version)throw new ServiceUnavailableError(503,'DEADLINE_PAGINATION_INVALID');seen.add(next);
+    const page=await publicNoticeFetch('/api/public/notices/deadlines/?'+new URLSearchParams({cursor:next,version:data.version}),{method:'GET',signal,headers:{Accept:'application/json'}});
+    const batch=await readJsonResponse<DeadlineNoticeResponse&{nextCursor?:string|null;version?:string}>(page);
+    if(batch.version!==data.version||batch.source!==data.source||batch.items.some(i=>ids.has(i.id)))throw new ServiceUnavailableError(503,'DEADLINE_VERSION_CHANGED');
+    batch.items.forEach(i=>ids.add(i.id));data.items.push(...batch.items);next=batch.nextCursor;
+  }
   return data;
 }

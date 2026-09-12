@@ -39,12 +39,13 @@ export function ApplicationActionButton({
   addedLabel?: string;
 }) {
   const pathname = usePathname();
-  const { loggedIn } = useUserSessionState();
+  const { loggedIn,session,ready } = useUserSessionState();
   const [added, setAdded] = useState(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
+    if (!ready) return;
     let active = true;
 
     async function load() {
@@ -55,10 +56,9 @@ export function ApplicationActionButton({
         return;
       }
 
-      const rows = await fetchUserProjects();
-      if (active) {
-        setAdded(rows.some((item) => item.projectId === projectId));
-      }
+      try{const rows = await fetchUserProjects();
+        if(active){setAdded(rows.some((item) => item.projectId === projectId));setMessage('');}
+      }catch(error){if(active){setAdded(false);setMessage(getActionErrorMessage(error));}}
     }
 
     void load();
@@ -68,10 +68,10 @@ export function ApplicationActionButton({
       active = false;
       disposeApplications();
     };
-  }, [loggedIn, projectId]);
+  }, [ready, loggedIn, projectId,session?.userId]);
 
   async function handleAdd() {
-    if (pending || added) {
+    if (!ready || pending || added) {
       return;
     }
 
@@ -108,7 +108,7 @@ export function ApplicationActionButton({
 
   return (
     <div className="space-y-2">
-      <button onClick={handleAdd} className={className} disabled={pending}>
+      <button onClick={handleAdd} className={className} disabled={!ready || pending}>
         <span className="inline-flex items-center gap-2">
           {pending ? (
             <LoaderCircle className="h-4 w-4 animate-spin" />

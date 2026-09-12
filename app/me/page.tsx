@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import {prepareExplicitD1SignInRetry} from '@/lib/clerk-d1-session';
 import Link from 'next/link';
 import {
   BookCheck,
@@ -51,6 +52,7 @@ import { buildNoticeDetailHref } from '@/lib/notice-links';
 import { matchesSchoolRange } from '@/lib/notice-taxonomy';
 import {
   hydrateWorkbenchState,
+  normalizeCustomTodos,
   saveWorkbenchState,
   type WorkbenchCustomTodo,
   type WorkbenchMentorContact
@@ -64,6 +66,9 @@ import {
 } from '@/lib/mock-data';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
 import { updateUserProfile, type UserProfile } from '@/lib/user-session';
+import {isD1Backend} from '@/lib/backend-mode';
+import {workspaceStorageKey} from '@/lib/workspace-storage-scope';
+import {LegacyApplicationRecoveryPanel} from '@/components/legacy-application-recovery-panel';
 
 const emptyProfile: UserProfile = {
   nickname: '',
@@ -86,7 +91,7 @@ type WorkbenchApplicationStatusFilter = '全部' | '未申请' | '已申请';
 type WorkbenchResultFilter = '全部' | '未出结果' | '未入营' | '已入营' | '已优营';
 type WorkbenchSortOption = 'deadline' | 'school' | 'status';
 type WorkbenchSection = 'applications' | 'schedule' | 'contacts';
-type WorkbenchArchiveFilter = 'active' | 'archived';
+type WorkbenchArchiveFilter = 'all' | 'active' | 'archived';
 type ScheduleTypeFilter = '全部' | '申请截止' | '材料准备' | '套磁' | '笔试' | '面试' | '其他';
 type ScheduleDoneFilter = '全部' | '未完成' | '已完成';
 type ContactRangeFilter = '全部' | 'C9' | '985' | '211' | '双一流' | '普通高校' | '科研院所' | '其它';
@@ -129,13 +134,13 @@ function isProfileComplete(profile: UserProfile) {
   return Boolean(profile.undergraduateSchool && profile.major && profile.targetMajor && profile.targetRegion);
 }
 
-function readBrowserArray(key: string) {
+function readBrowserArray(key: string, ownerId?: string) {
   if (typeof window === 'undefined') {
     return [] as string[];
   }
 
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = window.localStorage.getItem(workspaceStorageKey(key,ownerId));
     if (!raw) {
       return [] as string[];
     }
@@ -146,31 +151,19 @@ function readBrowserArray(key: string) {
   }
 }
 
-function readCustomTodos() {
+function readCustomTodos(ownerId?: string) {
   if (typeof window === 'undefined') {
     return [] as WorkbenchCustomTodo[];
   }
 
   try {
-    const raw = window.localStorage.getItem(TODO_CUSTOM_STORAGE_KEY);
+    const raw = window.localStorage.getItem(workspaceStorageKey(TODO_CUSTOM_STORAGE_KEY,ownerId));
     if (!raw) {
       return [] as WorkbenchCustomTodo[];
     }
 
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed
-          .filter((item): item is WorkbenchCustomTodo => Boolean(item?.id) && Boolean(item?.text))
-          .map((item) => ({
-            id: String(item.id),
-            text: String(item.text),
-            ...(item.date ? { date: String(item.date) } : {}),
-            ...(item.type ? { type: String(item.type) } : {}),
-            ...(item.note ? { note: String(item.note) } : {}),
-            ...(item.createdAt ? { createdAt: String(item.createdAt) } : {}),
-            ...(item.updatedAt ? { updatedAt: String(item.updatedAt) } : {})
-          }))
-      : [];
+    return normalizeCustomTodos(parsed);
   } catch {
     return [] as WorkbenchCustomTodo[];
   }
@@ -187,9 +180,16 @@ function createEmptyContact(): MentorContact {
     email: '',
     researchDirection: '',
     homepage: '',
+    photoCacheKey: '',
+    photoSourceUrl: '',
+    photoPageUrl: '',
+    photoUpdatedAt: '',
     deliveryStatus: '未投递',
     feedbackStatus: '未联系',
     lastContactDate: '',
+    contactChannel: '',
+    nextFollowUpDate: '',
+    privacyNotice: '',
     contactNotes: '',
     notes: '',
     updatedAt: new Date().toISOString()
@@ -216,13 +216,13 @@ function normalizeContact(raw: Partial<WorkbenchMentorContact>): MentorContact {
   };
 }
 
-function readStoredContacts() {
+function readStoredContacts(ownerId?: string) {
   if (typeof window === 'undefined') {
     return [] as MentorContact[];
   }
 
   try {
-    const raw = window.localStorage.getItem(CONTACTS_STORAGE_KEY);
+    const raw = window.localStorage.getItem(workspaceStorageKey(CONTACTS_STORAGE_KEY,ownerId));
     if (!raw) {
       return [] as MentorContact[];
     }
@@ -486,7 +486,12 @@ function sortWorkbenchRows(rows: ApplicationRow[], sortBy: WorkbenchSortOption) 
 }
 
 export default function MePage() {
-  const { session, ready, loggedIn } = useUserSessionState();
+  const {session}=useUserSessionState();
+  return <MePageContent key={isD1Backend()?(session?.userId||'guest'):'legacy'} />;
+}
+
+function MePageContent() {
+  const { session, ready, loggedIn, authError } = useUserSessionState();
   const sessionProfile = session?.profile || emptyProfile;
   const profileOwnerId = session?.userId || session?.email || session?.phone || 'guest';
   const [draftFormState, setDraftFormState] = useState<{ ownerId: string; value: UserProfile }>({
@@ -502,12 +507,18 @@ export default function MePage() {
     ownerId: '',
     value: true
   });
-  const [completedTodoIds, setCompletedTodoIds] = useState<string[]>(() => readBrowserArray(TODO_COMPLETED_STORAGE_KEY));
-  const [customTodos, setCustomTodos] = useState<WorkbenchCustomTodo[]>(() => readCustomTodos());
+  const [completedTodoState, setCompletedTodoIds] = useState<string[]>(() => readBrowserArray(TODO_COMPLETED_STORAGE_KEY));
+  const [customTodoState, setCustomTodos] = useState<WorkbenchCustomTodo[]>(() => readCustomTodos());
   const [todoSyncOwnerId, setTodoSyncOwnerId] = useState('');
   const [todoSyncReady, setTodoSyncReady] = useState(false);
   const [workbenchSyncStatus, setWorkbenchSyncStatus] = useState<'local' | 'syncing' | 'synced' | 'error'>('local');
+  const [workbenchSyncError,setWorkbenchSyncError]=useState('');
+  const [workbenchRetry,setWorkbenchRetry]=useState(0);
+  const [profileSaving,setProfileSaving]=useState(false);
+  const profileSaveLock=useRef(false);
   const [rowsLoading, setRowsLoading] = useState(true);
+  const [rowsError,setRowsError]=useState('');
+  const [applicationSaveNotice,setApplicationSaveNotice]=useState('');
   const [deletingProjectId, setDeletingProjectId] = useState('');
   const [activeSection, setActiveSection] = useState<WorkbenchSection>('applications');
   const [applicationTypeFilter, setApplicationTypeFilter] = useState<WorkbenchTypeFilter>('全部');
@@ -517,19 +528,20 @@ export default function MePage() {
   const [resultFilter, setResultFilter] = useState<WorkbenchResultFilter>('全部');
   const [applicationKeyword, setApplicationKeyword] = useState('');
   const [applicationSort, setApplicationSort] = useState<WorkbenchSortOption>('deadline');
-  const [applicationArchiveFilter, setApplicationArchiveFilter] = useState<WorkbenchArchiveFilter>('active');
+  const [applicationArchiveFilter, setApplicationArchiveFilter] = useState<WorkbenchArchiveFilter>('all');
   const [openChecklistId, setOpenChecklistId] = useState('');
   const [scheduleTypeFilter, setScheduleTypeFilter] = useState<ScheduleTypeFilter>('全部');
   const [scheduleDoneFilter, setScheduleDoneFilter] = useState<ScheduleDoneFilter>('全部');
   const [scheduleKeyword, setScheduleKeyword] = useState('');
   const [calendarMonth, setCalendarMonth] = useState(() => getMonthKey());
-  const [contacts, setContacts] = useState<MentorContact[]>(() => readStoredContacts());
+  const [contactState, setContacts] = useState<MentorContact[]>(() => readStoredContacts());
   const [contactRangeFilter, setContactRangeFilter] = useState<ContactRangeFilter>('全部');
   const [contactFeedbackFilter, setContactFeedbackFilter] = useState<'全部' | ContactFeedbackStatus>('全部');
   const [contactDeliveryFilter, setContactDeliveryFilter] = useState<'全部' | ContactDeliveryStatus>('全部');
   const [contactKeyword, setContactKeyword] = useState('');
   const [contactSort, setContactSort] = useState<ContactSortOption>('updated');
   const form = draftFormState.ownerId === profileOwnerId ? draftFormState.value : sessionProfile;
+  const latestProfileForm=useRef(form);latestProfileForm.current=form;
   const saveMessage = saveMessageState.ownerId === profileOwnerId ? saveMessageState.value : '';
   const profileExpanded =
     profileExpandedState.ownerId === profileOwnerId
@@ -537,6 +549,11 @@ export default function MePage() {
       : !isProfileComplete(sessionProfile);
   const syncableUserId =
     session?.loggedIn && session.authProvider !== 'anonymous' && session.userId ? session.userId : '';
+  const workspaceSessionDependency=isD1Backend()?syncableUserId:'';
+  const scopeMatches=!isD1Backend()||todoSyncOwnerId===syncableUserId;
+  const completedTodoIds=useMemo(()=>scopeMatches?completedTodoState:[],[scopeMatches,completedTodoState]);
+  const customTodos=useMemo(()=>scopeMatches?customTodoState:[],[scopeMatches,customTodoState]);
+  const contacts=useMemo(()=>scopeMatches?contactState:[],[scopeMatches,contactState]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -553,8 +570,20 @@ export default function MePage() {
     });
   }
 
+  useEffect(()=>{
+    if(!ready||!syncableUserId)return;
+    try {
+      const raw=localStorage.getItem('seekoffer:profile-draft:v1:'+syncableUserId);
+      if(!raw)return;const value=JSON.parse(raw) as UserProfile;
+      if(Object.keys(emptyProfile).some(key=>typeof value?.[key as keyof UserProfile]!=='string'))return;
+      setDraftFormState({ownerId:profileOwnerId,value});
+      setProfileExpandedState({ownerId:profileOwnerId,value:true});
+      setSaveMessageState({ownerId:profileOwnerId,value:'已恢复本机待同步的基本信息，请核对后保存。'});
+    }catch{/* Keep the original draft intact if storage is unavailable or malformed. */}
+  },[ready,syncableUserId,profileOwnerId]);
+
   useEffect(() => {
-    if (!loggedIn) {
+    if (!ready || !loggedIn) {
       return () => undefined;
     }
 
@@ -566,7 +595,10 @@ export default function MePage() {
         const merged = await fetchApplicationRows();
         if (active) {
           setRows(merged);
+          setRowsError('');
         }
+      } catch(error) {
+        if(active)setRowsError(error instanceof Error?error.message:'申请清单暂时无法同步，本地数据已保留。');
       } finally {
         if (active) {
           setRowsLoading(false);
@@ -581,10 +613,14 @@ export default function MePage() {
       active = false;
       dispose();
     };
-  }, [loggedIn]);
+  }, [ready, loggedIn, workspaceSessionDependency]);
 
   useEffect(() => {
+    if (!ready) {
+      return () => undefined;
+    }
     if (!syncableUserId) {
+      if(isD1Backend()){setCompletedTodoIds(readBrowserArray(TODO_COMPLETED_STORAGE_KEY,''));setCustomTodos(readCustomTodos(''));setContacts(readStoredContacts(''));}
       setTodoSyncOwnerId('');
       setTodoSyncReady(false);
       setWorkbenchSyncStatus('local');
@@ -594,12 +630,14 @@ export default function MePage() {
     let active = true;
 
     const hydrateRemoteTodos = async () => {
+      if(isD1Backend()){setTodoSyncReady(false);setTodoSyncOwnerId(syncableUserId);setCompletedTodoIds(readBrowserArray(TODO_COMPLETED_STORAGE_KEY,syncableUserId));setCustomTodos(readCustomTodos(syncableUserId));setContacts(readStoredContacts(syncableUserId));}
       setWorkbenchSyncStatus('syncing');
+      setWorkbenchSyncError('');
       try {
         const mergedState = await hydrateWorkbenchState(syncableUserId, {
-          completedTodoIds: readBrowserArray(TODO_COMPLETED_STORAGE_KEY),
-          customTodos: readCustomTodos(),
-          contacts: readStoredContacts()
+          completedTodoIds: readBrowserArray(TODO_COMPLETED_STORAGE_KEY,syncableUserId),
+          customTodos: readCustomTodos(syncableUserId),
+          contacts: readStoredContacts(syncableUserId)
         });
 
         if (!active) {
@@ -609,15 +647,11 @@ export default function MePage() {
         setCompletedTodoIds(mergedState.completedTodoIds);
         setCustomTodos(mergedState.customTodos);
         setContacts(mergedState.contacts.map((contact) => normalizeContact(contact)));
-        setWorkbenchSyncStatus('synced');
+        setWorkbenchSyncStatus(isD1Backend()?'local':'synced');
+        setTodoSyncOwnerId(syncableUserId);
+        setTodoSyncReady(true);
       } catch (error) {
-        console.error('[Seekoffer][workbench] hydrate workbench state failed', error);
-        setWorkbenchSyncStatus('error');
-      } finally {
-        if (active) {
-          setTodoSyncOwnerId(syncableUserId);
-          setTodoSyncReady(true);
-        }
+        if(active){setWorkbenchSyncError(error instanceof Error?error.message:'暂时无法读取云端日程和联系人。');setWorkbenchSyncStatus('error');}
       }
     };
 
@@ -626,28 +660,36 @@ export default function MePage() {
     return () => {
       active = false;
     };
-  }, [syncableUserId]);
+  }, [ready, syncableUserId,workbenchRetry]);
+
+  const persistLocalWorkbench=useCallback((key:string,value:unknown[])=>{
+    try {
+      const scopedKey=workspaceStorageKey(key,syncableUserId),raw=window.localStorage.getItem(scopedKey);
+      if(raw&&!Array.isArray(JSON.parse(raw)))throw new Error('INVALID_LOCAL_ARRAY');
+      window.localStorage.setItem(scopedKey,JSON.stringify(value));
+    }catch{setWorkbenchSyncError('浏览器未能保存本机副本，请保留当前页面并导出资料。');setWorkbenchSyncStatus('error');}
+  },[syncableUserId]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(TODO_COMPLETED_STORAGE_KEY, JSON.stringify(completedTodoIds));
+    if (typeof window !== 'undefined' && (!isD1Backend() || scopeMatches)) {
+      persistLocalWorkbench(TODO_COMPLETED_STORAGE_KEY,completedTodoIds);
     }
-  }, [completedTodoIds]);
+  }, [completedTodoIds,scopeMatches,persistLocalWorkbench]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(TODO_CUSTOM_STORAGE_KEY, JSON.stringify(customTodos));
+    if (typeof window !== 'undefined' && (!isD1Backend() || scopeMatches)) {
+      persistLocalWorkbench(TODO_CUSTOM_STORAGE_KEY,customTodos);
     }
-  }, [customTodos]);
+  }, [customTodos,scopeMatches,persistLocalWorkbench]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(CONTACTS_STORAGE_KEY, JSON.stringify(contacts));
+    if (typeof window !== 'undefined' && (!isD1Backend() || scopeMatches)) {
+      persistLocalWorkbench(CONTACTS_STORAGE_KEY,contacts);
     }
-  }, [contacts]);
+  }, [contacts,scopeMatches,persistLocalWorkbench]);
 
   useEffect(() => {
-    if (!todoSyncReady || !syncableUserId || todoSyncOwnerId !== syncableUserId) {
+    if (!ready || !todoSyncReady || !syncableUserId || todoSyncOwnerId !== syncableUserId) {
       return () => undefined;
     }
 
@@ -665,7 +707,7 @@ export default function MePage() {
         }
       } catch (error) {
         if (!cancelled) {
-          console.error('[Seekoffer][workbench] save workbench state failed', error);
+          setWorkbenchSyncError(error instanceof Error?error.message:'保存结果尚未确认。');
           setWorkbenchSyncStatus('error');
         }
       }
@@ -679,11 +721,12 @@ export default function MePage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [completedTodoIds, contacts, customTodos, syncableUserId, todoSyncOwnerId, todoSyncReady]);
+  }, [ready, completedTodoIds, contacts, customTodos, syncableUserId, todoSyncOwnerId, todoSyncReady]);
 
   const stats = useMemo(
     () => ({
       total: rows.length,
+      archived: rows.filter((row) => getWorkbenchProgressBucket(row) === '已结束').length,
       materialPending: rows.filter((row) => row.item.materialsProgress < 100).length
     }),
     [rows]
@@ -719,6 +762,7 @@ export default function MePage() {
   const applicationPreview = filteredApplicationRows;
   const scheduleItems = useMemo<ScheduleItem[]>(() => {
     return customTodos
+      .filter((task) => !task.deletedAt)
       .map((task) => ({
         id: task.id,
         title: task.text,
@@ -726,7 +770,7 @@ export default function MePage() {
         date: task.date,
         dateLabel: formatManualScheduleDate(task.date),
         type: getManualScheduleType(task.type),
-        done: completedTodoIds.includes(task.id)
+        done: typeof task.completed === 'boolean' ? task.completed : completedTodoIds.includes(task.id)
       }))
       .sort((left, right) => {
         const dateCompare = (left.date || '9999-12-31').localeCompare(right.date || '9999-12-31');
@@ -747,19 +791,20 @@ export default function MePage() {
     });
   }, [scheduleDoneFilter, scheduleItems, scheduleKeyword, scheduleTypeFilter]);
 
+  const activeContacts = useMemo(() => contacts.filter((item) => !item.deletedAt), [contacts]);
   const contactSummary = useMemo(
     () => ({
-      total: contacts.length,
-      delivered: contacts.filter((item) => item.deliveryStatus === '已投递').length,
-      replied: contacts.filter((item) => item.feedbackStatus === '已回复' || item.feedbackStatus === '已offer').length,
-      followUp: contacts.filter((item) => item.feedbackStatus === '需跟进' || item.feedbackStatus === '无回复').length
+      total: activeContacts.length,
+      delivered: activeContacts.filter((item) => item.deliveryStatus === '已投递').length,
+      replied: activeContacts.filter((item) => item.feedbackStatus === '已回复' || item.feedbackStatus === '已offer').length,
+      followUp: activeContacts.filter((item) => item.feedbackStatus === '需跟进' || item.feedbackStatus === '无回复').length
     }),
-    [contacts]
+    [activeContacts]
   );
 
   const filteredContacts = useMemo(() => {
     const keyword = contactKeyword.trim().toLowerCase();
-    const filtered = contacts.filter((contact) => {
+    const filtered = activeContacts.filter((contact) => {
       if (!matchesContactRange(contact.schoolRange, contactRangeFilter)) return false;
       if (contactFeedbackFilter !== '全部' && contact.feedbackStatus !== contactFeedbackFilter) return false;
       if (contactDeliveryFilter !== '全部' && contact.deliveryStatus !== contactDeliveryFilter) return false;
@@ -768,7 +813,7 @@ export default function MePage() {
     });
 
     return sortContacts(filtered, contactSort);
-  }, [contactDeliveryFilter, contactFeedbackFilter, contactKeyword, contactRangeFilter, contactSort, contacts]);
+  }, [contactDeliveryFilter, contactFeedbackFilter, contactKeyword, contactRangeFilter, contactSort, activeContacts]);
 
   function handleProfileChange<K extends keyof UserProfile>(key: K, value: UserProfile[K]) {
     setDraftFormState({
@@ -781,19 +826,25 @@ export default function MePage() {
   }
 
   async function handleSaveProfile() {
-    updateUserProfile(form);
-    const synced = await saveUserProfileToWorkspace(form);
-    setSaveMessage(synced ? '基本信息已保存并同步。' : '基本信息已保存。');
-
-    if (isProfileComplete(form)) {
-      setProfileExpandedState({
-        ownerId: profileOwnerId,
-        value: false
-      });
-    }
+    if(profileSaveLock.current)return;profileSaveLock.current=true;setProfileSaving(true);setSaveMessage('正在保存基本信息…');
+    const submitted={...form},key='seekoffer:profile-draft:v1:'+profileOwnerId;let draftSaved=false;
+    try{localStorage.setItem(key,JSON.stringify(submitted));draftSaved=true;}catch{/* The editable form remains intact. */}
+    try {
+      const synced=await saveUserProfileToWorkspace(submitted);
+      if(isD1Backend()&&!synced)throw new Error('请重新登录后同步基本信息。');
+      updateUserProfile(submitted);
+      try{if(localStorage.getItem(key)===JSON.stringify(submitted))localStorage.removeItem(key);}catch{}
+      const unchanged=JSON.stringify(latestProfileForm.current)===JSON.stringify(submitted);
+      setSaveMessage(unchanged?(synced?'基本信息已保存并同步。':'基本信息已保存。'):'此前修改已保存，当前编辑尚未保存。');
+      if(unchanged&&isProfileComplete(submitted))setProfileExpandedState({ownerId:profileOwnerId,value:false});
+    }catch(error){
+      setSaveMessage((draftSaved?'基本信息待同步，草稿已保存在本机。':'基本信息尚未同步，请保留当前页面。')+(error instanceof Error?error.message:''));
+    }finally{profileSaveLock.current=false;setProfileSaving(false);}
   }
 
   function handleScheduleDoneChange(id: string, done: boolean) {
+    const updatedAt = new Date().toISOString();
+    setCustomTodos((current) => current.map((item) => item.id === id && !item.deletedAt ? { ...item, completed: done, updatedAt } : item));
     setCompletedTodoIds((current) => {
       if (done) {
         return current.includes(id) ? current : [...current, id];
@@ -805,7 +856,8 @@ export default function MePage() {
 
   function handleClearCompleted() {
     const customTodoIds = new Set(customTodos.map((item) => item.id));
-    setCustomTodos((current) => current.filter((item) => !completedTodoIds.includes(item.id)));
+    const deletedAt = new Date().toISOString();
+    setCustomTodos((current) => current.map((item) => completedTodoIds.includes(item.id) ? { ...item, deletedAt, updatedAt: deletedAt } : item));
     setCompletedTodoIds((current) => current.filter((id) => !customTodoIds.has(id)));
   }
 
@@ -878,7 +930,8 @@ export default function MePage() {
   }
 
   function handleDeleteScheduleTodo(id: string) {
-    setCustomTodos((current) => current.filter((todo) => todo.id !== id));
+    const deletedAt = new Date().toISOString();
+    setCustomTodos((current) => current.map((todo) => todo.id === id ? { ...todo, deletedAt, updatedAt: deletedAt } : todo));
     setCompletedTodoIds((current) => current.filter((item) => item !== id));
   }
 
@@ -909,7 +962,8 @@ export default function MePage() {
   }
 
   function handleDeleteContact(id: string) {
-    setContacts((current) => current.filter((contact) => contact.id !== id));
+    const deletedAt = new Date().toISOString();
+    setContacts((current) => current.map((contact) => contact.id === id ? { ...contact, deletedAt, updatedAt: deletedAt } : contact));
   }
 
   if (!ready) {
@@ -924,8 +978,10 @@ export default function MePage() {
   }
 
   async function refreshApplicationRows() {
-    const merged = await fetchApplicationRows();
-    setRows(merged);
+    setRowsLoading(true);
+    try{const merged = await fetchApplicationRows();setRows(merged);setRowsError('');}
+    catch(error){setRowsError(error instanceof Error?error.message:'申请清单暂时无法同步，本地数据已保留。');}
+    finally{setRowsLoading(false);}
   }
 
   async function handleDeleteApplication(row: ApplicationRow) {
@@ -936,12 +992,15 @@ export default function MePage() {
     }
 
     setDeletingProjectId(row.item.userProjectId);
+    setApplicationSaveNotice('');
     try {
       await deleteUserProject(row.item.userProjectId);
       await refreshApplicationRows();
       if (openChecklistId === row.item.userProjectId) {
         setOpenChecklistId('');
       }
+    } catch(error) {
+      setApplicationSaveNotice(error instanceof Error?error.message:'删除未确认，原申请已保留。');
     } finally {
       setDeletingProjectId('');
     }
@@ -950,8 +1009,9 @@ export default function MePage() {
   const baoYanCountdownDays = getAnnualCountdownDays(BAOYAN_DATE_MONTH, BAOYAN_DATE_DAY);
 
   async function handleRecordChange(userProjectId: string, patch: Partial<UserProjectRecord>) {
-    await updateUserProject(userProjectId, patch);
-    await refreshApplicationRows();
+    setApplicationSaveNotice('');
+    try{await updateUserProject(userProjectId, patch);await refreshApplicationRows();}
+    catch(error){setApplicationSaveNotice(error instanceof Error?error.message:'申请修改待同步，本地数据已保留。');await refreshApplicationRows();}
   }
 
   async function handleToggleChecklist(userProjectId: string, field: MaterialChecklistKey, currentValue: boolean) {
@@ -961,6 +1021,7 @@ export default function MePage() {
   if (!loggedIn) {
     return (
       <SiteShell>
+        {authError?<p role="alert" className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{authError}</p>:null}
         <LoginRequiredCard
           title="别再用 Excel 追保研截止了"
           description="登录后可以保存目标项目、管理申请状态、记录材料进度，并集中维护申请清单。"
@@ -971,6 +1032,7 @@ export default function MePage() {
 
   return (
     <SiteShell>
+      {authError?<p role="alert" className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{authError}</p>:null}
       <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">申请工作台</h1>
@@ -984,15 +1046,16 @@ export default function MePage() {
               : workbenchSyncStatus === 'error'
                 ? '云端同步失败，修改已保存在本机'
                 : workbenchSyncStatus === 'synced'
-                  ? '申请、日程和联系人已同步'
+                  ? rowsError||rowsLoading||rows.some(r=>r.syncStatus&&r.syncStatus!=='synced')?'日程和联系人已同步，申请仍需核对':'申请、日程和联系人已同步'
                   : '当前修改保存在本机'}
           </div>
+          {workbenchSyncStatus==='error'&&<div className="mt-3 space-y-2 text-sm text-rose-700"><p role="alert">{workbenchSyncError}</p><button type="button" className="btn-secondary" onClick={()=>{try{prepareExplicitD1SignInRetry();setWorkbenchRetry(value=>value+1);}catch{setWorkbenchSyncError('服务暂时受限，请至少一分钟后重试；本机资料仍保留。');}}}>重新核对并同步日程和联系人</button></div>}
         </div>
 
         <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
           {[
-            { label: '申请项目', value: rowsLoading ? '—' : stats.total.toString(), icon: ClipboardList },
-            { label: '待补材料', value: rowsLoading ? '—' : stats.materialPending.toString(), icon: BookCheck },
+            { label: '申请项目', value: rowsLoading||rowsError ? '—' : stats.total.toString(), icon: ClipboardList },
+            { label: '待补材料', value: rowsLoading||rowsError ? '—' : stats.materialPending.toString(), icon: BookCheck },
             { label: '保研倒计时', value: `${baoYanCountdownDays}天`, hint: '距 9.22', icon: CalendarDays, featured: true }
           ].map((item) => {
             const Icon = item.icon;
@@ -1031,7 +1094,7 @@ export default function MePage() {
         <section className="product-card rounded-[30px] p-3">
           <div className="grid gap-2 sm:grid-cols-3" role="tablist" aria-label="工作台视图">
             {[
-              { id: 'applications' as const, label: '申请清单', detail: `${stats.total} 个项目`, icon: ClipboardList },
+              { id: 'applications' as const, label: '申请清单', detail: rowsError?'暂未同步':`${stats.total} 个项目`, icon: ClipboardList },
               { id: 'schedule' as const, label: '我的日程', detail: `${filteredScheduleItems.length} 条日程`, icon: CalendarDays },
               { id: 'contacts' as const, label: '我的联系', detail: `${contactSummary.total} 位联系人`, icon: ListChecks }
             ].map((item) => {
@@ -1065,6 +1128,7 @@ export default function MePage() {
 
       {activeSection === 'applications' ? (
         <section id="application-board" className="grid gap-5">
+            {isD1Backend()&&ready&&syncableUserId&&<LegacyApplicationRecoveryPanel key={syncableUserId} owner={syncableUserId}/>}
             <section className="product-card rounded-[30px] p-5 lg:p-6">
               <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
@@ -1085,8 +1149,9 @@ export default function MePage() {
               <div className="mt-5 flex flex-wrap gap-2">
                 <div className="mr-2 inline-flex rounded-2xl bg-slate-100 p-1" aria-label="项目范围">
                   {([
-                    ['active', '进行中'],
-                    ['archived', '已归档']
+                    ['all', `全部申请 (${stats.total})`],
+                    ['active', `进行中 (${stats.total - stats.archived})`],
+                    ['archived', `已截止/结束 (${stats.archived})`]
                   ] as const).map(([value, label]) => (
                     <button
                       key={value}
@@ -1147,7 +1212,7 @@ export default function MePage() {
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                 <div>
                   <h2 className="text-xl font-semibold text-ink">申请进度</h2>
-                  <p className="mt-1 text-sm text-slate-500">当前筛选出 {filteredApplicationRows.length} 个项目，所有状态、优先级和材料清单都在这里维护。</p>
+                  <p className="mt-1 text-sm text-slate-500">共 {rows.length} 条申请，当前显示 {filteredApplicationRows.length} 条。已截止的通知仍保留申请、备注和材料进度。</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {[
@@ -1181,11 +1246,14 @@ export default function MePage() {
                 </div>
               </details>
 
+              {(applicationSaveNotice||rows.some(r=>r.syncStatus&&r.syncStatus!=='synced'))&&<div role="status" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{applicationSaveNotice||'申请包含本地待同步修改或离线记录，云端保存尚未确认。'}</div>}
               <div className="mt-5 grid gap-3">
                 {rowsLoading ? (
                   [0, 1, 2].map((item) => (
                     <div key={item} className="h-44 animate-pulse rounded-[24px] border border-slate-100 bg-slate-50" />
                   ))
+                ) : rowsError ? (
+                  <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">{rowsError}</div>
                 ) : applicationPreview.length ? (
                   applicationPreview.map((row) => (
                     <ApplicationProgressCard
@@ -1204,7 +1272,7 @@ export default function MePage() {
                     <div className="text-lg font-semibold text-ink">
                       {rows.length
                         ? applicationArchiveFilter === 'archived'
-                          ? '还没有已归档项目'
+                          ? '当前筛选下没有已截止或结束的项目'
                           : '没有匹配的申请项目'
                         : '你的申请表还是空的'}
                     </div>
@@ -1214,6 +1282,10 @@ export default function MePage() {
                         : '从通知库加入一个目标项目，或手动录入正在跟进的院校，工作台会立刻开始维护申请状态和材料清单。'}
                     </p>
                     <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                      {rows.length > 0 && <button type="button" className="rounded-2xl bg-brand px-4 py-2 text-sm font-semibold text-white" onClick={() => {
+                        setApplicationArchiveFilter('all');setApplicationTypeFilter('全部');setSchoolRangeFilter('全部');
+                        setProgressFilter('全部');setApplicationStatusFilter('全部');setResultFilter('全部');setApplicationKeyword('');
+                      }}>清除筛选，显示全部 {rows.length} 条申请</button>}
                       <Link href="/notices" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white">
                         去通知库添加
                       </Link>
@@ -1257,7 +1329,7 @@ export default function MePage() {
       {activeSection === 'contacts' ? (
         <ContactsWorkspace
           contacts={filteredContacts}
-          totalCount={contacts.length}
+          totalCount={activeContacts.length}
           summary={contactSummary}
           rangeFilter={contactRangeFilter}
           feedbackFilter={contactFeedbackFilter}
@@ -1325,11 +1397,11 @@ export default function MePage() {
                 <input value={form.targetRegion} onChange={(event) => handleProfileChange('targetRegion', event.target.value)} placeholder="例如 北京 / 上海 / 杭州" className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none" />
               </CompactField>
               <div className="md:col-span-2">
-                <button onClick={handleSaveProfile} className="inline-flex items-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white">
+                <button onClick={handleSaveProfile} disabled={profileSaving} className="inline-flex items-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">
                   <Save className="h-4 w-4" />
-                  保存基本信息
+                  {profileSaving?'正在保存…':'保存基本信息'}
                 </button>
-                {saveMessage ? <span className="ml-3 text-xs text-slate-500">{saveMessage}</span> : null}
+                {saveMessage ? <span role="status" className="ml-3 text-xs text-slate-500">{saveMessage}</span> : null}
               </div>
             </div>
           ) : (
@@ -1351,6 +1423,7 @@ export default function MePage() {
 
         <section className="surface-card rounded-[30px] p-5">
           <h2 className="text-xl font-semibold text-ink">常用资源</h2>
+          <Link href="/me/account/" className="mt-4 inline-block text-sm text-teal-700">账号安全与注销申请</Link>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             {resourceShortcuts.map((item) => {
               const Icon = item.icon;

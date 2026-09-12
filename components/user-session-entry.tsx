@@ -7,6 +7,7 @@ import { ArrowUpRight, LayoutGrid, LoaderCircle, LogIn, LogOut } from 'lucide-re
 import { openAuthModal, writeAuthIntent } from '@/lib/auth-intent';
 import { useUserSessionState } from '@/hooks/use-user-session';
 import { signOutUser } from '@/lib/user-session';
+import {AuthEntryLink} from './auth-entry-link';
 
 export function UserSessionEntry() {
   const pathname = usePathname();
@@ -52,27 +53,15 @@ export function UserSessionEntry() {
     }
   }
 
-  if (!ready) {
+  if (!ready || !session) {
     return (
-      <button
-        onClick={handleOpenLogin}
+      <AuthEntryLink
+        onActivate={handleOpenLogin}
         className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-brand-deep md:h-11 md:px-4"
       >
         <LogIn className="h-4 w-4" />
         登录 / 注册
-      </button>
-    );
-  }
-
-  if (!session) {
-    return (
-      <button
-        onClick={handleOpenLogin}
-        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-brand-deep md:h-11 md:px-4"
-      >
-        <LogIn className="h-4 w-4" />
-        登录 / 注册
-      </button>
+      </AuthEntryLink>
     );
   }
 

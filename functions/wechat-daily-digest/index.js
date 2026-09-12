@@ -1,8 +1,8 @@
 'use strict';
 
 exports.main = async (event = {}, context = {}) => {
-  const { runDailyDigest } = await import('./digest-core.mjs');
-  const result = await runDailyDigest({ event, env: process.env });
+  const { invokeD1Digest } = await import('./d1-runner.mjs');
+  const result = await invokeD1Digest(event);
 
   console.log(JSON.stringify({
     requestId: context.requestId || context.request_id || '',

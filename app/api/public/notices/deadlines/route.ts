@@ -1,3 +1,4 @@
+import { publicServiceErrorResponse } from '@/lib/service-availability';
 import { getCachedDeadlineNotices } from '@/lib/server/public-notice-catalog';
 import { toNoticeListItem } from '@/lib/notice-record';
 
@@ -5,6 +6,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  try {
   const result = await getCachedDeadlineNotices();
 
   return Response.json(
@@ -15,8 +17,9 @@ export async function GET() {
     },
     {
       headers: {
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=1800'
+        'Cache-Control': 'no-store'
       }
     }
   );
+  } catch (error) { return publicServiceErrorResponse(error); }
 }

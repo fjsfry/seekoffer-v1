@@ -18,6 +18,9 @@ import {
   X
 } from 'lucide-react';
 import { SUPABASE_ENABLE_ANONYMOUS, SUPABASE_ENABLE_PHONE_AUTH } from '@/lib/supabase-env';
+import {isD1Backend} from '@/lib/backend-mode';
+import {loadClerkBrowser} from '@/lib/clerk-d1-session';
+import {clerkAuthFlow,clerkFlowError,type AuthChallenge,type AuthFlowResult} from '@/lib/clerk-auth-flow';
 import {
   isEmailIdentifier,
   resendSignupConfirmationCode,
@@ -68,14 +71,16 @@ function PrimaryButton({
   pending?: boolean;
   children: React.ReactNode;
 }) {
+  const [hydrated,setHydrated]=useState(false);
+  useEffect(()=>setHydrated(true),[]);
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending||!hydrated}
       className="group inline-flex min-h-16 w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#0f5b5b] via-[#0d6764] to-[#064849] px-5 text-lg font-semibold text-white shadow-[0_22px_46px_rgba(6,72,73,0.26)] transition hover:-translate-y-0.5 hover:shadow-[0_26px_56px_rgba(6,72,73,0.32)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70"
     >
-      {pending ? <LoaderCircle className="h-5 w-5 animate-spin" /> : icon}
-      {children}
+      {pending||!hydrated ? <LoaderCircle className="h-5 w-5 animate-spin" /> : icon}
+      {!hydrated?'正在准备登录…':children}
       {!pending ? <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" /> : null}
     </button>
   );
@@ -133,6 +138,10 @@ export function LoginMethodPanel({
   >('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [d1Challenge,setD1Challenge]=useState<AuthChallenge|null>(null);
+  const [canResume,setCanResume]=useState(false);
+  const [resumeEmail,setResumeEmail]=useState('');
+  useEffect(()=>{if(!isD1Backend())return;let active=true;void loadClerkBrowser().then(sdk=>{if(active){setCanResume(Boolean(sdk.session));setResumeEmail(sdk.user?.primaryEmailAddress?.emailAddress||'');}}).catch(()=>{});return()=>{active=false;};},[]);
 
   const accountLabel = SUPABASE_ENABLE_PHONE_AUTH ? '邮箱或手机号' : '邮箱';
   const accountPlaceholder = SUPABASE_ENABLE_PHONE_AUTH ? '请输入邮箱或手机号' : '请输入邮箱地址';
@@ -266,17 +275,40 @@ export function LoginMethodPanel({
 
       return result;
     } catch (taskError) {
-      setError(taskError instanceof Error ? taskError.message : '当前登录暂时不可用，请稍后重试。');
+      setError(isD1Backend()?clerkFlowError(taskError):taskError instanceof Error ? taskError.message : '当前登录暂时不可用，请稍后重试。');
       return null;
     } finally {
       setPending('');
     }
   }
 
+  async function runD1Action(key:typeof pending,action:()=>Promise<AuthFlowResult>){
+    const result=await runTask(key,action,{closeOnSuccess:false});
+    if(!result){void loadClerkBrowser().then(sdk=>{setCanResume(Boolean(sdk.session));setResumeEmail(sdk.user?.primaryEmailAddress?.emailAddress||'');}).catch(()=>{});return;}
+    if(result.status==='signed_in'){setD1Challenge(null);setPassword('');setPasswordConfirm('');setOtpCode('');setMessage('登录成功，账号资料已同步。');onSuccess?.();return;}
+    setD1Challenge(result.challenge);setPassword('');setPasswordConfirm('');setOtpCode('');setResendIn(60);
+    setMessage(result.challenge.kind==='device'?'密码已验证。新设备还需要邮箱验证码，完成后才会登录。':'验证码已请求发送，请检查收件箱和垃圾邮件箱；邮件可能延迟几分钟。');
+  }
+
+  async function verifyD1Challenge(){
+    if(!d1Challenge)return;
+    if(d1Challenge.kind==='reset'&&password!==passwordConfirm){setError('两次输入的新密码不一致。');return;}
+    await runD1Action('verify-code',()=>clerkAuthFlow.verify(d1Challenge.email,otpCode.trim(),d1Challenge.kind==='reset'?password:undefined));
+  }
+
   async function handlePasswordSubmit() {
     const identifier = validateAccount();
     if (!identifier) {
       return;
+    }
+
+    if(isD1Backend()){
+      if(passwordMode==='login'&&canResume&&resumeEmail.trim().toLowerCase()===identifier.trim().toLowerCase()){
+        await runD1Action('password',()=>clerkAuthFlow.resume(identifier));return;
+      }
+      if(!password){setError('请输入密码。');return;}
+      if(passwordMode==='register'&&password!==passwordConfirm){setError('两次输入的密码不一致。');return;}
+      await runD1Action(passwordMode==='register'?'register':'password',()=>passwordMode==='register'?clerkAuthFlow.signUp(identifier,password):clerkAuthFlow.password(identifier,password));return;
     }
 
     if (passwordMode === 'register' && signupCodeSent) {
@@ -368,6 +400,7 @@ export function LoginMethodPanel({
     if (!email) {
       return;
     }
+    if(isD1Backend()){await runD1Action('reset-password',()=>clerkAuthFlow.resetPassword(email));return;}
 
     await runTask('reset-password', () => sendPasswordResetEmail(email), {
       closeOnSuccess: false,
@@ -380,6 +413,7 @@ export function LoginMethodPanel({
     if (!email || resendIn > 0) {
       return;
     }
+    if(isD1Backend()){await runD1Action('send-code',()=>clerkAuthFlow.emailCode(email));return;}
 
     const result = await runTask('send-code', () => sendEmailLoginCode(email), {
       closeOnSuccess: false,
@@ -397,6 +431,7 @@ export function LoginMethodPanel({
   }
 
   async function handleVerifyCode() {
+    if(isD1Backend()){await verifyD1Challenge();return;}
     const email = validateAccount({ emailOnly: true });
     if (!email) {
       return;
@@ -411,6 +446,8 @@ export function LoginMethodPanel({
   }
 
   function switchToLogin(nextView: AuthView = 'password') {
+    if(pending)return;
+    if(isD1Backend()){if(!clerkAuthFlow.cancel())return;setD1Challenge(null);setOtpCode('');}
     resetFeedback();
     resetSignupChallenge();
     setPasswordMode('login');
@@ -418,6 +455,8 @@ export function LoginMethodPanel({
   }
 
   function switchToRegister() {
+    if(pending)return;
+    if(isD1Backend()){if(!clerkAuthFlow.cancel())return;setD1Challenge(null);setOtpCode('');}
     resetFeedback();
     resetSignupChallenge();
     setActiveView('password');
@@ -426,6 +465,7 @@ export function LoginMethodPanel({
 
   function handleFormSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if(isD1Backend()&&d1Challenge){void verifyD1Challenge();return;}
     if (activeView === 'password') {
       void handlePasswordSubmit();
       return;
@@ -581,6 +621,7 @@ export function LoginMethodPanel({
                 inputMode={SUPABASE_ENABLE_PHONE_AUTH ? 'text' : 'email'}
                 autoComplete="email"
                 value={account}
+                disabled={Boolean(d1Challenge)||Boolean(pending)}
                 onChange={(event) => {
                   setAccount(event.target.value);
                   resetFeedback();
@@ -595,7 +636,18 @@ export function LoginMethodPanel({
             </span>
           </label>
 
-          {activeView === 'password' ? (
+          {d1Challenge ? (
+            <div className="space-y-5">
+              <p className="text-sm leading-6 text-slate-600">{d1Challenge.kind==='device'?'新设备邮箱验证':d1Challenge.kind==='reset'?'重设密码':d1Challenge.kind==='signup'?'验证注册邮箱':'邮箱验证码登录'}</p>
+              <IconInput icon={<ShieldCheck className="h-5 w-5"/>}><input aria-label="邮箱验证码" inputMode="numeric" autoComplete="one-time-code" value={otpCode} onChange={event=>{setOtpCode(event.target.value.replace(/\D/g,'').slice(0,6));resetFeedback();}} placeholder="6 位验证码" className="h-full min-w-0 flex-1 bg-transparent text-base outline-none"/></IconInput>
+              {d1Challenge.kind==='reset'?<>
+                <IconInput icon={<KeyRound className="h-5 w-5"/>}><input type="password" autoComplete="new-password" aria-label="新密码" placeholder="新密码（至少15个字符）" value={password} onChange={e=>setPassword(e.target.value)} className="h-full min-w-0 flex-1 bg-transparent text-base outline-none"/></IconInput>
+                <IconInput icon={<KeyRound className="h-5 w-5"/>}><input type="password" autoComplete="new-password" aria-label="确认新密码" placeholder="再次输入新密码" value={passwordConfirm} onChange={e=>setPasswordConfirm(e.target.value)} className="h-full min-w-0 flex-1 bg-transparent text-base outline-none"/></IconInput>
+              </>:null}
+              <PrimaryButton icon={<ShieldCheck className="h-5 w-5"/>} pending={Boolean(pending)}>{d1Challenge.kind==='reset'?'重设密码并登录':'验证并登录'}</PrimaryButton>
+              <button type="button" disabled={Boolean(pending)||resendIn>0} className="text-sm font-semibold text-brand disabled:text-slate-400" onClick={()=>void runD1Action('send-code',()=>clerkAuthFlow.resend(d1Challenge.email))}>{resendIn>0?`${resendIn}s 后可重发`:'重新发送验证码'}</button>
+            </div>
+          ) : activeView === 'password' ? (
             <div className="space-y-6">
               {!signupCodeSent ? (
                 <>
@@ -610,7 +662,7 @@ export function LoginMethodPanel({
                           setPassword(event.target.value);
                           resetFeedback();
                         }}
-                        placeholder="请输入密码"
+                        placeholder={isD1Backend()&&passwordMode==='register'?'设置密码（至少15个字符）':'请输入密码'}
                         className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-slate-400"
                       />
                       <button
@@ -748,6 +800,8 @@ export function LoginMethodPanel({
           )}
         </div>
 
+        {isD1Backend()?<div id="clerk-captcha"/>:null}
+
         <div className="mt-5 min-h-12">
           {message ? (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
@@ -755,7 +809,7 @@ export function LoginMethodPanel({
             </div>
           ) : null}
           {error ? (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
+            <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
               {error}
             </div>
           ) : null}
@@ -766,6 +820,8 @@ export function LoginMethodPanel({
             </p>
           ) : null}
         </div>
+
+        {isD1Backend()&&canResume?<><button type="button" disabled={Boolean(pending)} className="mb-2 w-full rounded-xl border border-brand/30 p-3 text-sm font-semibold text-brand" onClick={()=>void runD1Action('password',()=>clerkAuthFlow.resume(account.trim()||resumeEmail))}>继续完成主站登录{resumeEmail?`（${resumeEmail}）`:''}</button><button type="button" disabled={Boolean(pending)} className="mb-4 w-full p-2 text-sm text-slate-600 underline underline-offset-4" onClick={()=>void runTask('password',async()=>{await clerkAuthFlow.switchAccount();setCanResume(false);setResumeEmail('');setAccount('');setPassword('');setD1Challenge(null);},{closeOnSuccess:false,successMessage:'已退出当前寻鹿网页登录会话，请输入要登录的邮箱。'})}>切换寻鹿账号</button></>:null}
 
         <div className="mt-3">
           {passwordMode === 'login' ? (

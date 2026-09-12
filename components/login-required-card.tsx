@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ArrowRight, BellRing, CheckSquare2, ClipboardList, LockKeyhole, Sparkles } from 'lucide-react';
 import { openAuthModal, type AuthIntent, writeAuthIntent } from '@/lib/auth-intent';
 import type { AuthRequirement } from '@/lib/user-session';
+import {AuthEntryLink} from './auth-entry-link';
 
 export function LoginRequiredCard({
   title = '别再用 Excel 追保研截止了',
@@ -58,13 +59,13 @@ export function LoginRequiredCard({
           </div>
 
           <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              onClick={handleOpenLogin}
+            <AuthEntryLink
+              onActivate={handleOpenLogin}
               className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
             >
               {actionLabel}
               <ArrowRight className="h-4 w-4" />
-            </button>
+            </AuthEntryLink>
             <Link
               href="/notices"
               className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-brand/25 hover:text-brand"

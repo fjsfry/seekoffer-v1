@@ -33,11 +33,14 @@
     "**/*.ts",
     "**/*.tsx",
     ".next-web/types/**/*.ts",
+    ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next/types/**/*.ts"
+    ".next-emergency/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "supabase"
+    "supabase",
+    "workers",
+    "artifacts"
   ]
 }

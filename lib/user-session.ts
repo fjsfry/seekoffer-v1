@@ -3,6 +3,11 @@
 import type { AuthChangeEvent } from '@supabase/supabase-js';
 import { getSupabaseBrowserClient } from './supabase-browser';
 import { SEEKOFFER_SITE_URL, SUPABASE_ENABLE_PHONE_AUTH, isSupabaseConfigured } from './supabase-env';
+import {isD1Backend} from './backend-mode';
+import {hydrateClerkD1Session,watchClerkIdentity,signOutClerkSession,D1SessionChangedError,prepareExplicitD1SignInRetry} from './clerk-d1-session';
+import {D1RequestError} from './d1-backend-client';
+let sessionHydrationError='';
+export function getSessionHydrationError(){return sessionHydrationError;}
 
 export type UserProfile = {
   nickname: string;
@@ -57,6 +62,7 @@ type SupabaseSignUpUserLike = SupabaseUserLike & {
 };
 
 const SESSION_STORAGE_KEY = 'seekoffer-user-session';
+const activeSessionStorageKey=()=>isD1Backend()?'seekoffer-d1-user-session':SESSION_STORAGE_KEY;
 const SESSION_EVENT_NAME = 'seekoffer-user-session-updated';
 
 const defaultProfile: UserProfile = {
@@ -326,7 +332,7 @@ export function getUserSession(): UserSession | null {
   }
 
   try {
-    const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    const raw = window.localStorage.getItem(activeSessionStorageKey());
     if (!raw) {
       return null;
     }
@@ -355,12 +361,18 @@ function writeUserSession(session: UserSession | null) {
   }
 
   if (!session) {
-    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    window.localStorage.removeItem(activeSessionStorageKey());
   } else {
-    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+    window.localStorage.setItem(activeSessionStorageKey(), JSON.stringify(session));
   }
 
   emitSessionUpdate();
+}
+
+export async function confirmD1UserSession():Promise<UserSession>{
+  sessionHydrationError='';
+  try{prepareExplicitD1SignInRetry();const session=await hydrateClerkD1Session();if(!session?.loggedIn||!session.userId)throw Error('认证会话未就绪，主站尚未登录。');writeUserSession(session);return session;}
+  catch(error){const detail=error instanceof Error?error.message:'暂时无法读取资料。';sessionHydrationError='主站账号同步未完成：'+detail+(error instanceof D1RequestError?`（${error.status}${error.code?' / '+error.code:''}）`:'');emitSessionUpdate();throw new Error(sessionHydrationError);}
 }
 
 async function getSupabaseUser() {
@@ -383,6 +395,11 @@ async function getSupabaseUser() {
 
 export async function hydrateSupabaseSession() {
   const current = getUserSession();
+  if(isD1Backend()){
+    sessionHydrationError='';
+    try{const session=await hydrateClerkD1Session();if(!session&&current?.authProvider==='anonymous')return current;writeUserSession(session);return session;}
+    catch(error){if(error instanceof D1SessionChangedError)return getUserSession();sessionHydrationError=error instanceof D1RequestError?error.message:'账号连接未完成，请检查网络后刷新一次；本地数据已保留。';return current;}
+  }
 
   if (!isSupabaseConfigured()) {
     return current;
@@ -694,12 +711,13 @@ export async function verifyEmailLoginCode(email: string, token: string) {
 
 export async function signInAsGuest() {
   const current = getUserSession();
-  const nextSession = buildAnonymousSession(current);
+  const nextSession = buildAnonymousSession(isD1Backend()&&current?.authProvider!=='anonymous'?null:current);
   writeUserSession(nextSession);
   return nextSession;
 }
 
 export async function signOutUser() {
+  if(isD1Backend()){await signOutClerkSession();writeUserSession(null);return;}
   try {
     if (isSupabaseConfigured()) {
       const supabase = getSupabaseBrowserClient();
@@ -746,6 +764,10 @@ export function watchUserSession(callback: () => void) {
 }
 
 export function watchSupabaseAuthState(callback: (event: AuthChangeEvent) => void) {
+  if(isD1Backend())return watchClerkIdentity(signedIn=>{
+    writeUserSession(null);
+    void hydrateSupabaseSession().finally(()=>callback(signedIn?'SIGNED_IN':'SIGNED_OUT'));
+  });
   if (typeof window === 'undefined' || !isSupabaseConfigured()) {
     return () => undefined;
   }

@@ -31,6 +31,7 @@ import {
   type AdminDashboardShellSnapshot
 } from '@/lib/admin-shell-events';
 import { adminClassNames } from './admin-ui';
+import {isD1Backend} from '@/lib/backend-mode';import {useUserSessionState} from '@/hooks/use-user-session';
 
 const adminNavItems = [
   { href: '/admin/dashboard', label: '数据概览', icon: LayoutDashboard },
@@ -39,6 +40,7 @@ const adminNavItems = [
   { href: '/admin/users', label: '用户管理', icon: UsersRound },
   { href: '/admin/feedback', label: '反馈举报', icon: Flag },
   { href: '/admin/logs', label: '操作日志', icon: ShieldCheck },
+  ...(process.env.NEXT_PUBLIC_ACCOUNT_DELETION_REQUESTS_ENABLED==='true'||process.env.NEXT_PUBLIC_ACCOUNT_DELETION_EXECUTION_ENABLED==='true'||process.env.NEXT_PUBLIC_REFUNDS_ENABLED==='true'?[{ href: '/admin/account-operations', label: '账号与订单处理', icon: ShieldCheck }]:[]),
   { href: '/admin/settings', label: '系统设置', icon: Settings }
 ];
 
@@ -57,9 +59,9 @@ type ShellOverviewMetrics = {
 
 type ShellAnalyticsPayload = {
   metrics: {
-    onlineVisitors: number;
-    totalVisitors: number;
-    todayPageViews: number;
+    onlineVisitors: number|null;
+    totalVisitors: number|null;
+    todayPageViews: number|null;
     activeWindowMinutes: number;
   };
 };
@@ -71,9 +73,9 @@ type ShellStatus = {
   pendingNotices: number;
   pendingOffers: number;
   pendingFeedback: number;
-  onlineVisitors: number;
-  totalVisitors: number;
-  todayPageViews: number;
+  onlineVisitors: number|null;
+  totalVisitors: number|null;
+  todayPageViews: number|null;
   lastCheckedAt: string;
 };
 
@@ -139,7 +141,9 @@ export function AdminShell({
   const pathname = usePathname();
   const router = useRouter();
   const [session, setSession] = useState<AdminSession | null>(null);
+  const {ready:accountReady,session:accountSession}=useUserSessionState();
   const [sessionReady, setSessionReady] = useState(false);
+  const [sessionOwner,setSessionOwner]=useState('');
   const [globalSearch, setGlobalSearch] = useState('');
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -148,6 +152,7 @@ export function AdminShell({
   const normalizedPathname = pathname.replace(/\/$/, '') || '/';
 
   useEffect(() => {
+    if(isD1Backend()&&!accountReady)return;
     let disposed = false;
 
     const syncSession = async () => {
@@ -155,6 +160,7 @@ export function AdminShell({
         const verifiedSession = await refreshAdminSession();
         if (!disposed) {
           setSession(verifiedSession);
+          setSessionOwner(accountSession?.userId||'');
         }
       } catch {
         if (!disposed) {
@@ -176,7 +182,7 @@ export function AdminShell({
       disposed = true;
       dispose();
     };
-  }, []);
+  }, [accountReady,accountSession?.userId]);
 
   useEffect(() => {
     if (!sessionReady || session) {
@@ -263,9 +269,9 @@ export function AdminShell({
             pendingNotices: overview.metrics.pendingNotices || 0,
             pendingOffers: overview.metrics.pendingOffers || 0,
             pendingFeedback: overview.metrics.pendingFeedback || 0,
-            onlineVisitors: analytics.metrics.onlineVisitors || 0,
-            totalVisitors: analytics.metrics.totalVisitors || 0,
-            todayPageViews: analytics.metrics.todayPageViews || 0,
+            onlineVisitors: analytics.metrics.onlineVisitors,
+            totalVisitors: analytics.metrics.totalVisitors,
+            todayPageViews: analytics.metrics.todayPageViews,
             lastCheckedAt: new Date().toISOString()
           });
         } catch (error) {
@@ -289,24 +295,11 @@ export function AdminShell({
       return request;
     };
 
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') {
-        void loadShellStatus();
-      }
-    };
-
-    refreshWhenVisible();
-    const interval = window.setInterval(refreshWhenVisible, 5 * 60_000);
-    document.addEventListener('visibilitychange', refreshWhenVisible);
-
-    return () => {
-      disposed = true;
-      window.clearInterval(interval);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
-    };
+    void loadShellStatus();
+    return () => { disposed = true; };
   }, [normalizedPathname, session]);
 
-  if (!sessionReady) {
+  if (!sessionReady || isD1Backend()&&(!accountReady||sessionOwner!==(accountSession?.userId||''))) {
     return (
       <AdminAuthGate title="正在加载" />
     );

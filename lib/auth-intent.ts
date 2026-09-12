@@ -25,6 +25,7 @@ export type AuthIntent =
 
 const AUTH_INTENT_EVENT = 'seekoffer-open-auth-modal';
 const AUTH_INTENT_STORAGE_KEY = 'seekoffer-auth-intent';
+let pendingAuthOpen:AuthIntent|null|undefined;
 
 function canUseBrowserStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -39,6 +40,7 @@ export function openAuthModal(intent?: AuthIntent | null) {
     return;
   }
 
+  pendingAuthOpen=intent??null;
   window.dispatchEvent(
     new CustomEvent(AUTH_INTENT_EVENT, {
       detail: intent ?? null
@@ -53,10 +55,12 @@ export function watchAuthModal(callback: (intent: AuthIntent | null) => void) {
 
   const handler = (event: Event) => {
     const customEvent = event as CustomEvent<AuthIntent | null>;
+    pendingAuthOpen=undefined;
     callback(customEvent.detail ?? null);
   };
 
   window.addEventListener(AUTH_INTENT_EVENT, handler as EventListener);
+  if(pendingAuthOpen!==undefined){const intent=pendingAuthOpen;pendingAuthOpen=undefined;callback(intent);}
   return () => {
     window.removeEventListener(AUTH_INTENT_EVENT, handler as EventListener);
   };

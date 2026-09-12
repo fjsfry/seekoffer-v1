@@ -1,6 +1,10 @@
+import {isD1Backend} from '../backend-mode';
+import {createD1DownloadTracker} from './d1-download-tracker';
+
 export const DESKTOP_DOWNLOAD_ATTEMPT_ENDPOINT = '/api/desktop-download/attempt/';
 
 const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded;charset=UTF-8';
+let d1Tracker: ReturnType<typeof createD1DownloadTracker> | undefined;
 
 export type DesktopDownloadAttemptQueueResult = 'beacon' | 'fetch' | 'skipped';
 
@@ -26,6 +30,14 @@ function getBrowserTransport(): DesktopDownloadAttemptTransport | null {
 export function queueDesktopDownloadAttempt(
   transport: DesktopDownloadAttemptTransport | null = getBrowserTransport()
 ): DesktopDownloadAttemptQueueResult {
+  if (isD1Backend()) {
+    if (process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_TRACKING_ENABLED !== 'true' || typeof window === 'undefined') return 'skipped';
+    if (!d1Tracker) d1Tracker = createD1DownloadTracker(window.fetch.bind(window), {
+      getItem: key => window.localStorage.getItem(key),
+      setItem: (key, value) => window.localStorage.setItem(key, value)
+    });
+    return d1Tracker() ? 'fetch' : 'skipped';
+  }
   if (!transport) return 'skipped';
 
   let attemptId: string;

@@ -73,8 +73,8 @@ export function getBeijingDateString(date = new Date()) {
   return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
-export function matchesNoticeProgress(filter: NoticeProgressFilter, project: PublicNoticeProject) {
-  const deadlineLevel = getDeadlineLevelFromDate(project.deadlineDate);
+export function matchesNoticeProgress(filter: NoticeProgressFilter, project: PublicNoticeProject, now = Date.now()) {
+  const deadlineLevel = getDeadlineLevelFromDate(project.deadlineDate, now);
   if (filter === '全部') return true;
   if (filter === '报名中') {
     return (
@@ -91,11 +91,11 @@ export function matchesNoticeProgress(filter: NoticeProgressFilter, project: Pub
   );
 }
 
-export function sortNotices<T extends SortableNotice>(rows: T[], sortBy: NoticeSortOption) {
+export function sortNotices<T extends SortableNotice>(rows: T[], sortBy: NoticeSortOption, now = Date.now()) {
   return [...rows].sort((left, right) => {
     if (sortBy === 'deadline') {
-      const leftExpired = getDeadlineLevelFromDate(left.deadlineDate) === 'expired' ? 1 : 0;
-      const rightExpired = getDeadlineLevelFromDate(right.deadlineDate) === 'expired' ? 1 : 0;
+      const leftExpired = getDeadlineLevelFromDate(left.deadlineDate, now) === 'expired' ? 1 : 0;
+      const rightExpired = getDeadlineLevelFromDate(right.deadlineDate, now) === 'expired' ? 1 : 0;
 
       if (leftExpired !== rightExpired) {
         return leftExpired - rightExpired;
@@ -179,21 +179,23 @@ export function filterAndSortNotices(
   const schoolKeyword = filters.schoolName.trim().toLowerCase();
   const majorText = filters.majorKeyword.trim().toLowerCase();
   const todayInBeijing = getBeijingDateString(now);
+  const needsSchoolText = Boolean(noticeKeyword || majorText || schoolKeyword && filters.schoolName !== '全部');
+  const needsTitleText = Boolean(noticeKeyword || majorText);
+  const canUseBroadKeyword = noticeKeyword.length >= 4 || /[a-z0-9]/i.test(noticeKeyword);
 
   const rows = notices.filter((item) => {
-    const displaySchool = getDisplaySchoolName(item.schoolName);
-    const displayDepartment = getDisplayNoticeDepartment(item);
-    const displayTitle = normalizeNoticeTitle(item.projectName, 160);
+    const displaySchool = needsSchoolText ? getDisplaySchoolName(item.schoolName) : '';
+    const displayDepartment = needsSchoolText ? getDisplayNoticeDepartment(item) : '';
+    const displayTitle = needsTitleText ? normalizeNoticeTitle(item.projectName, 160) : '';
     const primaryKeywordText = [displaySchool, displayDepartment, displayTitle]
       .join(' ')
       .toLowerCase();
-    const secondaryKeywordText = [
+    const secondaryKeywordText = noticeKeyword && canUseBroadKeyword ? [
       getDisplayDiscipline(item.discipline),
       getNoticeCardTags(item).join(' ')
     ]
       .join(' ')
-      .toLowerCase();
-    const canUseBroadKeyword = noticeKeyword.length >= 4 || /[a-z0-9]/i.test(noticeKeyword);
+      .toLowerCase() : '';
     const matchesType = matchesNoticeType(item, filters.projectType);
     const matchesKind = matchesNoticeKind(item, filters.noticeKind);
     const matchesRange = matchesSchoolRange(
@@ -225,8 +227,8 @@ export function filterAndSortNotices(
         .join(' ')
         .toLowerCase()
         .includes(majorText);
-    const matchesProgressState = matchesNoticeProgress(filters.progress, item);
-    const deadlineLevel = getDeadlineLevelFromDate(item.deadlineDate);
+    const matchesProgressState = matchesNoticeProgress(filters.progress, item, now.getTime());
+    const deadlineLevel = getDeadlineLevelFromDate(item.deadlineDate, now.getTime());
     const matchesDeadlineQuick =
       filters.deadlineQuick === '全部' ||
       (filters.deadlineQuick === 'today' && deadlineLevel === 'today') ||
@@ -263,5 +265,5 @@ export function filterAndSortNotices(
     );
   });
 
-  return sortNotices(rows, filters.sortBy);
+  return sortNotices(rows, filters.sortBy, now.getTime());
 }

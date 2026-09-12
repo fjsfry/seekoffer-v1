@@ -1,0 +1,6 @@
+// Server job only. The dedicated capability never enters browser code or logs.
+export function createD1PublicationStore(env,fetcher=fetch){
+ const secret=env.WECHAT_LEDGER_SECRET;if(typeof secret!=='string'||secret.length<32||secret.length>200)throw Error('WECHAT_LEDGER_SECRET_REQUIRED');
+ const call=async body=>{const r=await fetcher('https://migration.seekoffer.com.cn/v1/internal/wechat-publications',{method:'POST',headers:{'Content-Type':'application/json','X-Wechat-Ledger-Secret':secret},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(15000)});if(!r.ok){const error=Error('WECHAT_LEDGER_HTTP_'+r.status);error.status=r.status;throw error;}const raw=await r.text();if(Buffer.byteLength(raw)>524288)throw Error('WECHAT_LEDGER_RESPONSE_BOUND');return JSON.parse(raw);};
+ return{async get(date){return(await call({action:'get',date})).publication;},async claim(date,payload,existing){try{return await call({action:'claim',date,payload,expected:existing?{updated_at:existing.updated_at,status:existing.status,ledger_state:existing.ledger_state??null}:null});}catch(error){if(error.status===409)return{claimed:false};throw error;}},async complete(date,token,patch){return call({action:'complete',date,token,patch});}};
+}

@@ -1,0 +1,2805 @@
+{
+  "version": 1,
+  "sourceLayer": "LIVE_PUBLIC_SCHEMA_METADATA_NOT_BACKUP",
+  "tables": [
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "admin_operation_logs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "admin_email",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "module",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "target_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "before_data",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "after_data",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "ip_address",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "result",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "remark",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "admin_system_settings",
+      "columns": [
+        {
+          "name": "key",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "value",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "updated_by",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "key"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "admin_users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "ai_positioning_reports",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "profile_snapshot",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "input_snapshot",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "report",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "ai_waitlist_leads",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "wechat_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "primary_need",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "details",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "submitted_at_text",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "applications",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "project_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "is_favorited",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "my_status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "priority_level",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "materials_progress",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "cv_ready",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "transcript_ready",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "ranking_proof_ready",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "recommendation_ready",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "personal_statement_ready",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "contact_supervisor_done",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "submitted_at",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "interview_time",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "result_status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "my_notes",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "custom_reminder_enabled",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "billing_fill_sessions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "request_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "token_hash",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "field_count",
+          "type": "int2",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "tier",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "consumed_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "billing_orders",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "plan_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "out_trade_no",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "provider_trade_no",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "amount_cents",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "code_url",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "checkout_url",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "raw_request",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "raw_response",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "paid_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "idempotency_key",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "last_checked_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "failure_code",
+          "type": "text",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "billing_plans",
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "price_cents",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "duration_days",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "benefits",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "sort_order",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "is_recommended",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "crawler_runs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "notices_received",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "notices_upserted",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "success",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "summary",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "desktop_download_attempts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int8",
+          "nullable": false
+        },
+        {
+          "name": "attempt_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "release_version",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "platform",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "feedback_reports",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "module",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "target_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "handler",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "handler_note",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "handled_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "llm_call_logs",
+      "columns": [
+        {
+          "name": "request_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "feature",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "student_id_hash",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "class_code",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "model",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "latency_ms",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "retry_count",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "prompt_tokens",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "completion_tokens",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "total_tokens",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "cache_hit_tokens",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "success",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "error_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "fallback_used",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "shadow_recorded",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "shadow_payload",
+          "type": "jsonb",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "request_id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "notices",
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "school_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "department_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "project_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "project_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "discipline",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "publish_date",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "deadline_date",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "event_start_date",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "event_end_date",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "apply_link",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "source_link",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "requirements",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "materials_required",
+          "type": "_text",
+          "nullable": false
+        },
+        {
+          "name": "exam_interview_info",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "contact_info",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "remarks",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "tags",
+          "type": "_text",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "year",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "deadline_level",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "source_site",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "is_private",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "collected_at",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "last_checked_at",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "is_verified",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "change_log",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "history_records",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at_ts",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "admin_status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "admin_review_note",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "admin_reviewed_by",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "admin_reviewed_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "admin_deleted_at",
+          "type": "timestamptz",
+          "nullable": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "offer_comments",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "post_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "author_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "is_anonymous",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "review_status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "hidden_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "offer_post_follows",
+      "columns": [
+        {
+          "name": "post_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "post_id",
+        "user_id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "offer_posts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "author_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "school_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "major",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "project_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "result",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "undergraduate_background",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "is_anonymous",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "review_status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "review_note",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "reviewed_by",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "reviewed_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "hidden_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "reports_count",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "content_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "is_official",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "source_label",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "comments_count",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "follows_count",
+          "type": "int4",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "profiles",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "nickname",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "age",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "undergraduate_school",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "major",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "grade",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "target_major",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "target_region",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "auth_provider",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "site_visit_events",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int8",
+          "nullable": false
+        },
+        {
+          "name": "visitor_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "session_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "path",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "referrer",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "locale",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "timezone",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "site_visitors",
+      "columns": [
+        {
+          "name": "visitor_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "first_seen_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "last_seen_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "last_path",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "last_title",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "last_referrer",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "last_locale",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "last_timezone",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "last_user_agent",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "first_session_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "last_session_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "visit_count",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "page_view_count",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "visitor_id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "user_entitlements",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "plan_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "starts_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "source_order_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "user_id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "user_moderation",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "updated_by",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "user_id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "user_vaults",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "encrypted_payload",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "revision",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "schema_version",
+          "type": "int2",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "user_id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "wechat_daily_publications",
+      "columns": [
+        {
+          "name": "digest_date",
+          "type": "date",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "notice_count",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "included_notice_count",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "notice_ids",
+          "type": "_text",
+          "nullable": false
+        },
+        {
+          "name": "article_title",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "article_digest",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "content_source_url",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "content_html",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "wechat_media_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "wechat_thumb_media_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "error_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "error_message",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "digest_date"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "mnotoltpythkayguhnrk",
+      "schema": "public",
+      "table": "workbench_states",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "completed_todo_ids",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "custom_todos",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "mentor_contacts",
+          "type": "jsonb",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "user_id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "account_entitlement_devices",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "entitlement_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "install_hash",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "activation_token_hash",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "extension_version",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "browser_family",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "activated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "last_checked_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "revoked_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "account_entitlement_events",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int8",
+          "nullable": false
+        },
+        {
+          "name": "entitlement_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "grant_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "device_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "event_data",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "account_entitlement_grants",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "entitlement_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "plan_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "duration_days",
+          "type": "int2",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "previous_valid_until",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "granted_until",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "granted_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "refunded_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "account_entitlements",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "plan_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "valid_until",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "max_devices",
+          "type": "int2",
+          "nullable": false
+        },
+        {
+          "name": "version",
+          "type": "int8",
+          "nullable": false
+        },
+        {
+          "name": "source_order_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "commercial_orders",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "order_no",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "plan_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "amount_cents",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "payment_provider",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "payment_reference",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "contact_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "contact_value",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "license_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "consent_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "paid_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "fulfilled_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "refunded_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "access_token_hash",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "delivery_code_hash",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "delivery_code_hint",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "delivery_version",
+          "type": "int2",
+          "nullable": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "delivery_mode",
+          "type": "text",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "commercial_payment_events",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int8",
+          "nullable": false
+        },
+        {
+          "name": "payment_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "provider_status",
+          "type": "int2",
+          "nullable": true
+        },
+        {
+          "name": "payload_hash",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "event_data",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "commercial_payments",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "merchant_order_no",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "provider_order_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "pay_method",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "amount_cents",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "provider_status",
+          "type": "int2",
+          "nullable": true
+        },
+        {
+          "name": "pay_url",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "failure_code",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "paid_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "last_queried_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "commercial_refunds",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "payment_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "refund_no",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "provider_refund_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "amount_cents",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "provider_status",
+          "type": "int2",
+          "nullable": true
+        },
+        {
+          "name": "affects_order",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "affects_entitlement",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "error_message",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "requested_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "refunded_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "last_queried_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "license_activations",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "license_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "install_hash",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "activation_token_hash",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "extension_version",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "browser_family",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "activated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "last_checked_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "revoked_at",
+          "type": "timestamptz",
+          "nullable": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "license_codes",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "code_hash",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "code_hint",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "plan_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "duration_days",
+          "type": "int2",
+          "nullable": false
+        },
+        {
+          "name": "max_devices",
+          "type": "int2",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "batch_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "not_before",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "entitlement_expires_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "first_redeemed_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "redemption_count",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "license_events",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int8",
+          "nullable": false
+        },
+        {
+          "name": "license_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "install_hash",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "event_data",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "license_rate_limits",
+      "columns": [
+        {
+          "name": "key_hash",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "window_started_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "attempt_count",
+          "type": "int2",
+          "nullable": false
+        },
+        {
+          "name": "blocked_until",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "key_hash"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "product_links",
+      "columns": [
+        {
+          "name": "key",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "destination_url",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "key"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    },
+    {
+      "sourceProjectRef": "bqzchxacykhdmoczysfe",
+      "schema": "public",
+      "table": "user_vaults",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "encrypted_payload",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "revision",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "schema_version",
+          "type": "int2",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "user_id"
+      ],
+      "state": "LIVE_SCHEMA_INVENTORIED_DATA_NOT_EXPORTED",
+      "targetImplementation": "PENDING_EXPLICIT_BUSINESS_MAPPING"
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { publicServiceErrorResponse } from '@/lib/service-availability';
 import { getPublicNoticesByIds } from '@/lib/server/public-notice-catalog';
 
 export const runtime = 'nodejs';
@@ -22,6 +23,7 @@ function normalizeIds(value: unknown) {
 }
 
 export async function POST(request: Request) {
+  try {
   const declaredLength = Number(request.headers.get('content-length') || '0');
   if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BODY_BYTES) {
     return Response.json({ error: 'payload_too_large' }, { status: 413 });
@@ -53,7 +55,8 @@ export async function POST(request: Request) {
 
   return Response.json(result, {
     headers: {
-      'Cache-Control': 'private, max-age=60'
+      'Cache-Control': 'no-store'
     }
   });
+  } catch (error) { return publicServiceErrorResponse(error); }
 }

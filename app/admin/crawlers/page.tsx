@@ -73,6 +73,7 @@ export default function AdminOperationsPage() {
   const router = useRouter();
   const isLegacyCrawlerRoute = pathname.includes('/admin/crawlers');
   const [activeSection, setActiveSection] = useState<OperationsSection>('users');
+  const [loadedSection,setLoadedSection]=useState<OperationsSection|null>(null);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [feedback, setFeedback] = useState<AdminFeedbackRow[]>([]);
   const [logs, setLogs] = useState<AdminOperationLog[]>([]);
@@ -126,6 +127,8 @@ export default function AdminOperationsPage() {
     );
   }
 
+  if(loadedSection!==activeSection)return <AdminShell title={operationsSectionTitles[activeSection]} description="读取当前页面有权限的数据"><div role={message?'alert':'status'} className="rounded-xl border bg-white p-6">{message||'正在读取运营数据…'}{message&&<button className="ml-4 text-brand" onClick={()=>void loadOperationsData()}>重新加载</button>}</div></AdminShell>;
+
   async function loadOperationsData(
     overrides: Partial<{
       userPage: number;
@@ -150,52 +153,20 @@ export default function AdminOperationsPage() {
     const nextLogFilters = overrides.logFilters ?? logFilters;
 
     try {
-      const [userData, feedbackData, logData] = await Promise.all([
-        invokeAdminApi<{ users: UserApiRow[]; total: number; page: number; pageSize: number; metrics: UserMetricsPayload }>({
-          resource: 'users',
-          action: 'list',
-          page: nextUserPage,
-          pageSize: nextUserPageSize,
-          filters: serializeUserFilters(nextUserFilters)
-        }),
-        invokeAdminApi<{ feedback: FeedbackApiRow[]; total: number; page: number; pageSize: number; metrics: FeedbackMetricsPayload }>({
-          resource: 'feedback',
-          action: 'list',
-          page: nextFeedbackPage,
-          pageSize: nextFeedbackPageSize,
-          filters: serializeFeedbackFilters(nextFeedbackFilters)
-        }),
-        invokeAdminApi<{ logs: LogApiRow[]; total: number; page: number; pageSize: number; metrics: LogMetricsPayload }>({
-          resource: 'logs',
-          action: 'list',
-          page: nextLogPage,
-          pageSize: nextLogPageSize,
-          filters: serializeLogFilters(nextLogFilters)
-        })
-      ]);
-      setUsers(userData.users.map(mapUserApiRow));
-      setFeedback(feedbackData.feedback.map(mapFeedbackApiRow));
-      setLogs(logData.logs.map(mapLogApiRow));
-      setUserMetrics(buildUserMetrics(userData.metrics));
-      setFeedbackMetrics(buildFeedbackMetrics(feedbackData.metrics));
-      setLogMetrics(buildLogMetrics(logData.metrics));
-      setUserTotal(userData.total);
-      setFeedbackTotal(feedbackData.total);
-      setLogTotal(logData.total);
-      setUserPage(userData.page);
-      setUserPageSize(userData.pageSize);
-      setFeedbackPage(feedbackData.page || nextFeedbackPage);
-      setFeedbackPageSize(feedbackData.pageSize || nextFeedbackPageSize);
-      setLogPage(logData.page || nextLogPage);
-      setLogPageSize(logData.pageSize || nextLogPageSize);
-      setUserFilters(nextUserFilters);
-      setFeedbackFilters(nextFeedbackFilters);
-      setLogFilters(nextLogFilters);
+      const section=resolveSectionFromLocation(pathname,window.location.hash);
+      if(section==='users'){
+        const data=await invokeAdminApi<{users:UserApiRow[];total:number;page:number;pageSize:number;metrics:UserMetricsPayload}>({resource:'users',action:'list',page:nextUserPage,pageSize:nextUserPageSize,filters:serializeUserFilters(nextUserFilters)});
+        setUsers(data.users.map(mapUserApiRow));setUserMetrics(buildUserMetrics(data.metrics));setUserTotal(data.total);setUserPage(data.page);setUserPageSize(data.pageSize);setUserFilters(nextUserFilters);
+      }else if(section==='feedback'){
+        const data=await invokeAdminApi<{feedback:FeedbackApiRow[];total:number;page:number;pageSize:number;metrics:FeedbackMetricsPayload}>({resource:'feedback',action:'list',page:nextFeedbackPage,pageSize:nextFeedbackPageSize,filters:serializeFeedbackFilters(nextFeedbackFilters)});
+        setFeedback(data.feedback.map(mapFeedbackApiRow));setFeedbackMetrics(buildFeedbackMetrics(data.metrics));setFeedbackTotal(data.total);setFeedbackPage(data.page||nextFeedbackPage);setFeedbackPageSize(data.pageSize||nextFeedbackPageSize);setFeedbackFilters(nextFeedbackFilters);
+      }else if(section==='logs'){
+        const data=await invokeAdminApi<{logs:LogApiRow[];total:number;page:number;pageSize:number;metrics:LogMetricsPayload}>({resource:'logs',action:'list',page:nextLogPage,pageSize:nextLogPageSize,filters:serializeLogFilters(nextLogFilters)});
+        setLogs(data.logs.map(mapLogApiRow));setLogMetrics(buildLogMetrics(data.metrics));setLogTotal(data.total);setLogPage(data.page||nextLogPage);setLogPageSize(data.pageSize||nextLogPageSize);setLogFilters(nextLogFilters);
+      }
+      setLoadedSection(section);
       setMessage('');
     } catch (error) {
-      setUsers([]);
-      setFeedback([]);
-      setLogs([]);
       setMessage(`运营数据暂时无法更新：${getAdminErrorMessage(error)}`);
     }
   }

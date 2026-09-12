@@ -1,7 +1,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { DESKTOP_RELEASE } from '@/lib/desktop-download';
+import { PUBLISHED_DESKTOP_RELEASE as DESKTOP_RELEASE } from '@/lib/desktop-public-release';
 import { footerColumns } from '@/lib/site-content';
 
 const root = process.cwd();
@@ -22,11 +22,16 @@ const sitemapSource = readFileSync(resolve(root, 'app/sitemap.ts'), 'utf8');
 const vercelIgnoreSource = readFileSync(resolve(root, '.vercelignore'), 'utf8');
 
 describe('desktop-only addition to the production website baseline', () => {
-  it('uses verified public v0.2.22 metadata without exposing delivery origins', () => {
-    expect(DESKTOP_RELEASE.version).toBe('0.2.22');
-    expect(DESKTOP_RELEASE.installerSizeBytes).toBe(33_674_743);
-    expect(DESKTOP_RELEASE.installerSha256).toMatch(/^[A-F0-9]{64}$/);
-    expect('installerUrl' in DESKTOP_RELEASE).toBe(false);
+  it('matches the verified public installer and preserves the stable page address', () => {
+    expect(DESKTOP_RELEASE.version).toBe('0.2.26');
+    expect(DESKTOP_RELEASE.installerSizeBytes).toBe(25_633_770);
+    expect(DESKTOP_RELEASE.installerSha256).toBe('405683bace090365f8a84c8169b6b56b26967ca7b42c76f2a58ffdd2c7feeb27');
+    expect(DESKTOP_RELEASE.installerSha256).toMatch(/^[a-f0-9]{64}$/);
+    const installer = new URL(DESKTOP_RELEASE.installerUrl);
+    expect(installer.origin).toBe(DESKTOP_RELEASE.verificationUrl);
+    expect(installer.pathname).toBe(`/files/${DESKTOP_RELEASE.installerSha256.slice(0, 12)}/${DESKTOP_RELEASE.installerName}`);
+    expect(DESKTOP_RELEASE.installerName).toContain(`v${DESKTOP_RELEASE.version}`);
+    expect(DESKTOP_RELEASE.pageUrl).toBe('https://www.seekoffer.com.cn/download/');
     expect('manifestUrl' in DESKTOP_RELEASE).toBe(false);
     expect(desktopReleaseSource).not.toContain('process.env');
     expect(desktopReleaseSource).not.toContain('seekoffer-desktop-updates.vercel.app');
@@ -46,8 +51,8 @@ describe('desktop-only addition to the production website baseline', () => {
     expect(downloadPageSource).not.toContain('官方发布与安全说明');
     expect(downloadPageSource).not.toContain('data-download-surface="security"');
     expect(downloadActionSource).toContain("const canOfferWindowsDownload = platform !== 'other'");
-    expect(downloadActionSource).toContain("const PERMANENT_DOWNLOAD_PATH = '/download/windows/latest/'");
-    expect(downloadActionSource).toContain("const BACKUP_DOWNLOAD_PATH = '/download/windows/github/'");
+    expect(downloadActionSource).toContain('PUBLISHED_DESKTOP_RELEASE.installerUrl');
+    expect(downloadActionSource).toContain('PUBLISHED_DESKTOP_RELEASE.verificationUrl');
     expect(downloadActionSource).toContain('href={PERMANENT_DOWNLOAD_PATH}');
     expect(downloadActionSource).toContain('href={BACKUP_DOWNLOAD_PATH}');
     expect(downloadActionSource).toContain('target="_blank"');
@@ -56,7 +61,7 @@ describe('desktop-only addition to the production website baseline', () => {
     expect(downloadActionSource).toContain('queueDesktopDownloadAttempt()');
     expect(downloadActionSource).toContain('在新标签页打开');
     expect(downloadActionSource).toContain('已发起下载请求，请查看新标签页');
-    expect(downloadActionSource).toContain('https://www.seekoffer.com.cn/download/windows/latest');
+    expect(downloadActionSource).toContain('PUBLISHED_DESKTOP_RELEASE.pageUrl');
     expect(downloadActionSource).not.toContain('<form');
     expect(downloadActionSource).not.toContain('/api/desktop-download/windows/');
     expect(downloadActionSource).not.toContain('下载已开始');
@@ -70,7 +75,7 @@ describe('desktop-only addition to the production website baseline', () => {
     expect(downloadAttemptClientSource).toContain('keepalive: true');
     expect(downloadAttemptClientSource).not.toMatch(/await\s+transport\.fetcher/);
     expect(downloadPageSource).toContain(
-      "downloadUrl: absoluteUrl('/download/windows/latest')"
+      'downloadUrl: DESKTOP_RELEASE.installerUrl'
     );
     expect(downloadActionSource).toContain('继续使用网页版');
     expect(downloadActionSource).toContain('复制到 Windows 电脑打开');

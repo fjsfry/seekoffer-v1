@@ -19,6 +19,11 @@ import {
   type UserProjectStatus
 } from './mock-data';
 import { canCreateMoreApplications } from './billing-api';
+import {workspaceStorageKey} from './workspace-storage-scope';
+import {isD1Backend} from './backend-mode';
+import {updateD1Profile,d1ClientForUser,D1SessionChangedError} from './clerk-d1-session';
+import {D1RequestError} from './d1-backend-client';
+import {createApplicationWorkspace} from './d1-application-workspace';
 
 const APPLICATION_STORAGE_KEY = 'seekoffer-my-application-table';
 const MANUAL_PROJECT_STORAGE_KEY = 'seekoffer-manual-projects';
@@ -35,6 +40,7 @@ export type ApplicationRow = {
   project: PublicNoticeProject;
   noticeAvailable: boolean;
   noticeAvailability: 'available' | 'missing' | 'lookup-failed';
+  syncStatus?: 'synced' | 'pending' | 'offline';
 };
 
 export type ManualProjectInput = {
@@ -54,6 +60,24 @@ export const WORKSPACE_SYNC_NOTICE =
 
 let hydrateWorkspacePromise: Promise<void> | null = null;
 let hydratedWorkspaceUserId = '';
+const d1Workspaces=new Map<string,ReturnType<typeof createApplicationWorkspace>>();
+const d1NoticeFlights=new Map<string,Promise<{items:Record<string,unknown>[];unavailableIds:string[]}>>();
+async function d1AssociatedNotices(owner:string,ids:string[]){
+ const client=await d1ClientForUser(owner),unique=[...new Set(ids)].sort();
+ const key=owner+':'+client.sessionScope+':'+JSON.stringify(unique);
+ let flight=d1NoticeFlights.get(key);if(!flight){flight=client.applicationNotices(unique);d1NoticeFlights.set(key,flight);}
+ try{return await flight;}finally{if(d1NoticeFlights.get(key)===flight)d1NoticeFlights.delete(key);}
+}
+function d1WorkspaceContext(){
+ if(!isD1Backend())return null;
+ const session=getUserSession();if(!session?.loggedIn||session.authProvider==='anonymous'||!session.userId)return null;
+ const owner=session.userId;
+ const isCurrent=()=>{const s=getUserSession();return Boolean(s?.loggedIn&&s.authProvider!=='anonymous'&&s.userId===owner);};
+ let workspace=d1Workspaces.get(owner);
+ if(!workspace){workspace=createApplicationWorkspace(owner,window.localStorage,()=>d1ClientForUser(owner),isCurrent);d1Workspaces.set(owner,workspace);}
+ return {owner,workspace,isCurrent};
+}
+function d1Record(row:Record<string,unknown>,owner:string){return mapApplicationRowToRecord({...row,user_id:owner,project_id:row.project_id||'unavailable:'+row.id});}
 
 function canUseBrowserStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -85,7 +109,7 @@ function readStoragePayload<T>(storageKey: string): StoredPayload<T> | null {
   }
 
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    const raw = window.localStorage.getItem(workspaceStorageKey(storageKey));
     if (!raw) {
       return null;
     }
@@ -260,7 +284,7 @@ function persistStoredManualProjects(projects: PublicNoticeProject[], updatedAt 
   }
 
   window.localStorage.setItem(
-    MANUAL_PROJECT_STORAGE_KEY,
+    workspaceStorageKey(MANUAL_PROJECT_STORAGE_KEY),
     JSON.stringify({
       updatedAt,
       items: projects
@@ -299,7 +323,7 @@ function persistStoredRecords(records: UserProjectRecord[], updatedAt = nowIsoTe
   }
 
   window.localStorage.setItem(
-    APPLICATION_STORAGE_KEY,
+    workspaceStorageKey(APPLICATION_STORAGE_KEY),
     JSON.stringify({
       updatedAt,
       items: records
@@ -634,6 +658,11 @@ async function fetchRemoteProfile() {
 }
 
 async function hydrateWorkspaceFromSupabase() {
+  if(isD1Backend()){
+    const session=getUserSession();
+    if(session?.loggedIn&&session.authProvider!=='anonymous')throw new Error('申请工作区接口正在迁移，已保留本地数据并停止连接旧服务。');
+    return;
+  }
   const context = getSupabaseMemberContext();
   if (!context) {
     hydratedWorkspaceUserId = '';
@@ -767,11 +796,34 @@ function buildUnavailableNoticeProject(projectId: string): PublicNoticeProject {
 }
 
 export async function fetchUserProjects() {
+  const d1=d1WorkspaceContext();if(d1)return (await d1.workspace.read()).map(r=>d1Record(r,d1.owner));
   await hydrateWorkspaceFromSupabase();
   return readStoredRecords();
 }
 
 export async function fetchApplicationRows() {
+  const d1=d1WorkspaceContext();
+  if(d1){
+    let raw:Awaited<ReturnType<typeof d1.workspace.read>>,offline=false;
+    try{raw=await d1.workspace.read();}catch(error){
+      if(!d1.isCurrent()||error instanceof D1SessionChangedError||(error instanceof D1RequestError&&[401,403].includes(error.status)))throw error;
+      // A cached display still requires the currently verified Clerk-to-original-UUID binding.
+      await d1ClientForUser(d1.owner);if(!d1.isCurrent())throw error;
+      raw=d1.workspace.cached();if(!raw.length)throw error;offline=true;
+    }
+    if(!d1.isCurrent())throw new Error('账号已切换，请重新加载。');
+    const pending=d1.workspace.pending(),pendingIds=new Set([...pending.updates,...pending.deletes]);
+    const ids=raw.map(r=>r.project_id).filter((id):id is string=>Boolean(id));
+    let projects=new Map<string,PublicNoticeProject>(),lookupFailed=offline;
+    if(!offline)try{
+      const result=await d1AssociatedNotices(d1.owner,ids);
+      const allowed=new Set(ids);
+      if(result.items.some(p=>typeof p.id!=='string'||!allowed.has(p.id)))throw new Error('关联通知响应不匹配。');
+      projects=new Map(result.items.map(p=>[String(p.id),p as unknown as PublicNoticeProject]));
+    }catch(error){if(!d1.isCurrent())throw error;lookupFailed=true;}
+    if(!d1.isCurrent())throw new Error('账号已切换，请重新加载。');
+    return raw.map<ApplicationRow>(r=>{const item=d1Record(r,d1.owner),project=projects.get(item.projectId);return {item,project:project||buildUnavailableNoticeProject(item.projectId),noticeAvailable:Boolean(project),noticeAvailability:project?'available':lookupFailed?'lookup-failed':'missing',syncStatus:offline?'offline':pendingIds.has(r.id)?'pending':'synced'};}).sort((a,b)=>Number(b.noticeAvailable)-Number(a.noticeAvailable)||a.project.deadlineDate.localeCompare(b.project.deadlineDate));
+  }
   await hydrateWorkspaceFromSupabase();
   const records = readStoredRecords();
   const manualProjects = readStoredManualProjects();
@@ -818,6 +870,7 @@ export async function fetchApplicationRows() {
 }
 
 export async function addProjectToApplicationTable(projectId: string) {
+  const d1=d1WorkspaceContext();if(d1){try{return d1Record(await d1.workspace.add(projectId),d1.owner);}finally{if(d1.isCurrent())emitApplicationUpdate();}}
   await hydrateWorkspaceFromSupabase();
   const current = readStoredRecords();
   const existing = current.find((item) => item.projectId === projectId);
@@ -844,6 +897,11 @@ export async function addProjectToApplicationTable(projectId: string) {
 }
 
 export async function createManualApplicationEntry(input: ManualProjectInput) {
+  const d1=d1WorkspaceContext();if(d1){
+    try{const created=await d1.workspace.manual({...input});
+      return {item:d1Record(created.row,d1.owner),project:created.project as unknown as PublicNoticeProject};
+    }finally{if(d1.isCurrent())emitApplicationUpdate();}
+  }
   await hydrateWorkspaceFromSupabase();
   const manualProjects = readStoredManualProjects();
   const existingRecords = readStoredRecords();
@@ -888,6 +946,10 @@ export async function createManualApplicationEntry(input: ManualProjectInput) {
 }
 
 export async function saveUserProfileToWorkspace(profile: UserProfile) {
+  if(isD1Backend()){
+    const session=getUserSession();if(!session?.userId||session.authProvider==='anonymous')return false;
+    await updateD1Profile(session.userId,{nickname:profile.nickname,age:profile.age,undergraduate_school:profile.undergraduateSchool,major:profile.major,grade:profile.grade,target_major:profile.targetMajor,target_region:profile.targetRegion});return true;
+  }
   const context = getSupabaseMemberContext();
   if (!context) {
     return false;
@@ -898,6 +960,15 @@ export async function saveUserProfileToWorkspace(profile: UserProfile) {
 }
 
 export async function updateUserProject(userProjectId: string, patch: Partial<UserProjectRecord>) {
+  const d1=d1WorkspaceContext();if(d1){
+    const raw=d1.workspace.cached().find(r=>r.id===userProjectId);if(!raw)throw new Error('请先读取当前申请，修改未发送。');
+    const prior=d1Record(raw,d1.owner);
+    if((patch.userId&&patch.userId!==d1.owner)||(patch.projectId&&patch.projectId!==prior.projectId)||(patch.userProjectId&&patch.userProjectId!==userProjectId))throw new Error('不能修改申请的账号或通知关联。');
+    let merged=normalizeRecord({...prior,...patch});if(hasMaterialChecklistPatch(patch))merged={...merged,materialsProgress:calculateMaterialsProgress(merged)};
+    if(patch.myStatus==='已提交'&&!merged.submittedAt)merged={...merged,submittedAt:nowText()};
+    const payload:Record<string,unknown>={...mapRecordToApplicationUpsert(merged,d1.owner)};delete payload.user_id;delete payload.project_id;
+    try{return d1Record(await d1.workspace.update(userProjectId,payload),d1.owner);}finally{if(d1.isCurrent())emitApplicationUpdate();}
+  }
   await hydrateWorkspaceFromSupabase();
   const current = readStoredRecords();
   const next = current.map((item) => {
@@ -931,6 +1002,7 @@ export async function updateUserProject(userProjectId: string, patch: Partial<Us
 }
 
 export async function deleteUserProject(userProjectId: string) {
+  const d1=d1WorkspaceContext();if(d1){try{return await d1.workspace.remove(userProjectId);}finally{if(d1.isCurrent())emitApplicationUpdate();}}
   await hydrateWorkspaceFromSupabase();
 
   const currentRecords = readStoredRecords();

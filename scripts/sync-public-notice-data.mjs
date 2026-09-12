@@ -450,7 +450,7 @@ async function fetchSupabaseNoticeRows() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseAnonKey || typeof fetch !== 'function') {
-    return { ok: false, rows: [] };
+    throw new Error('NOTICE_SYNC_UNAVAILABLE: missing public configuration or upstream failure');
   }
 
   const rows = [];
@@ -486,9 +486,7 @@ async function fetchSupabaseNoticeRows() {
         'collected_at',
         'updated_at',
         'last_checked_at',
-        'is_verified',
-        'change_log',
-        'history_records'
+        'is_verified'
       ].join(',')
     );
     endpoint.searchParams.set('year', 'eq.2026');
@@ -500,6 +498,7 @@ async function fetchSupabaseNoticeRows() {
     endpoint.searchParams.set('offset', String(offset));
 
     const response = await fetch(endpoint, {
+      signal: AbortSignal.timeout(15_000),
       headers: {
         apikey: supabaseAnonKey,
         Authorization: `Bearer ${supabaseAnonKey}`
@@ -507,8 +506,8 @@ async function fetchSupabaseNoticeRows() {
     });
 
     if (!response.ok) {
-      console.warn(`Supabase notice sync skipped: ${response.status} ${await response.text()}`);
-      return { ok: false, rows: [] };
+      console.warn(`Supabase notice sync stopped: HTTP ${response.status}`);
+      throw new Error('NOTICE_SYNC_UPSTREAM_UNAVAILABLE');
     }
 
     const page = await response.json();
@@ -516,6 +515,7 @@ async function fetchSupabaseNoticeRows() {
       break;
     }
 
+    if (rows.length + page.length > 20_000) throw new Error('NOTICE_SYNC_LIMIT_EXCEEDED');
     rows.push(...page);
     if (page.length < pageSize) {
       break;
@@ -544,8 +544,7 @@ const merged = new Map();
 if (supabaseResult.ok) {
   supabaseRows.forEach((item) => merged.set(item.id, item));
 } else {
-  exportRows.forEach((item) => merged.set(item.id, item));
-  supplementRows.forEach((item) => merged.set(item.id, item));
+  throw new Error('NOTICE_SYNC_NOT_AUTHORITATIVE');
 }
 
 const result = Array.from(merged.values()).map((item) => ({

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { BarChart3, Bell, ClipboardCheck, LoaderCircle, LockKeyhole, ShieldCheck, UsersRound } from 'lucide-react';
 import { getAdminErrorMessage } from '@/lib/admin-api';
 import { refreshAdminSession, signInAdmin } from '@/lib/admin-session';
+import {isD1Backend} from '@/lib/backend-mode';import {clerkAuthFlow,clerkFlowError,type AuthChallenge} from '@/lib/clerk-auth-flow';import {useUserSessionState} from '@/hooks/use-user-session';
 
 function getSafeAdminNextPath() {
   if (typeof window === 'undefined') {
@@ -26,8 +27,10 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const [challenge,setChallenge]=useState<AuthChallenge|null>(null);const [code,setCode]=useState('');const {ready,session:userSession}=useUserSessionState();
 
   useEffect(() => {
+    if(isD1Backend()&&!ready)return;
     let disposed = false;
 
     refreshAdminSession().then((session) => {
@@ -39,7 +42,7 @@ export default function AdminLoginPage() {
     return () => {
       disposed = true;
     };
-  }, [router]);
+  }, [router,ready,userSession?.userId]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,10 +52,15 @@ export default function AdminLoginPage() {
     setError('');
 
     try {
+      if(isD1Backend()){
+        const result=challenge?await clerkAuthFlow.verify(challenge.email,code):await clerkAuthFlow.password(email.trim().toLowerCase(),password);
+        if(result.status==='challenge'){setChallenge(result.challenge);setPassword('');return;}
+        if(!await refreshAdminSession({force:true}))throw Error('当前账号没有后台权限。');router.push(getSafeAdminNextPath());return;
+      }
       await signInAdmin(email, password);
       router.push(getSafeAdminNextPath());
     } catch (loginError) {
-      setError(getAdminErrorMessage(loginError, '后台登录失败，请稍后重试。'));
+      setError(isD1Backend()?clerkFlowError(loginError):getAdminErrorMessage(loginError, '后台登录失败，请稍后重试。'));
     } finally {
       setPending(false);
     }
@@ -97,12 +105,13 @@ export default function AdminLoginPage() {
                 type="email"
                 autoComplete="username"
                 value={email}
+                disabled={Boolean(challenge)||pending}
                 onChange={(event) => setEmail(event.target.value)}
                 className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-emerald-50"
               />
             </label>
 
-            <label className="grid gap-2">
+            {challenge?<label className="grid gap-2"><span className="text-sm font-semibold text-slate-800">邮箱验证码</span><input aria-label="邮箱验证码" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" autoComplete="one-time-code" className="h-12 rounded-xl border border-slate-200 px-4"/></label>:<label className="grid gap-2">
               <span className="text-sm font-semibold text-slate-800">密码</span>
               <input
                 type="password"
@@ -111,10 +120,11 @@ export default function AdminLoginPage() {
                 onChange={(event) => setPassword(event.target.value)}
                 className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-emerald-50"
               />
-            </label>
+            </label>}
 
             <button
               type="submit"
+              disabled={pending||!ready}
               className="mt-2 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-teal-700 px-5 text-sm font-semibold text-white transition hover:bg-teal-800"
             >
               {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}

@@ -1,7 +1,9 @@
 import { PassThrough } from 'node:stream';
 import { createReadStream } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import * as PImage from 'pureimage';
+import {fetchD1DailyNotices} from './d1-public-source.mjs';
+import {createD1PublicationStore} from './d1-publication-store.mjs';
+let PImage;
 import {
   buildEditorialBrief,
   buildFallbackEditorial,
@@ -479,6 +481,7 @@ function ensureCoverFont() {
 }
 
 export async function renderCoverJpeg(digest) {
+  PImage ||= await import('pureimage');
   await ensureCoverFont();
   const canvas = await PImage.decodePNGFromStream(createReadStream(COVER_TEMPLATE_PATH));
   const context = canvas.getContext('2d');
@@ -605,7 +608,9 @@ export async function runDailyDigest({
   const hasEditorialOverride = event.editorial !== undefined || event.editorial_override !== undefined;
   const editorialOverride = event.editorial ?? event.editorial_override;
   const suppliedNotices = dryRun && Array.isArray(event.notices) ? event.notices : null;
-  const rawNotices = suppliedNotices || await fetchDailyNotices(fetchImpl, env, targetDate);
+  const d1 = env.SEEKOFFER_DIGEST_BACKEND === 'd1';
+  const store = d1 && !dryRun ? createD1PublicationStore(env, fetchImpl) : null;
+  const rawNotices = suppliedNotices || (d1 ? (await fetchD1DailyNotices(targetDate, fetchImpl)).notices : await fetchDailyNotices(fetchImpl, env, targetDate));
   const digestOptions = {
     siteUrl: env.SEEKOFFER_SITE_URL || env.NEXT_PUBLIC_SITE_URL,
     maxContentChars: env.WECHAT_DAILY_MAX_CONTENT_CHARS
@@ -614,8 +619,8 @@ export async function runDailyDigest({
 
   let existing = null;
   if (!dryRun) {
-    requireEnv(env, ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'WECHAT_MP_APP_ID', 'WECHAT_MP_APP_SECRET']);
-    existing = await getExistingPublication(fetchImpl, env, targetDate);
+    requireEnv(env, d1 ? ['WECHAT_MP_APP_ID', 'WECHAT_MP_APP_SECRET'] : ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'WECHAT_MP_APP_ID', 'WECHAT_MP_APP_SECRET']);
+    existing = store ? await store.get(targetDate) : await getExistingPublication(fetchImpl, env, targetDate);
 
     if (existing && !force) {
       return {
@@ -700,7 +705,12 @@ export async function runDailyDigest({
   };
 
   let claimed = false;
-  if (existing && force) {
+  let claimToken;
+  if (store) {
+    const result = await store.claim(targetDate, lockPayload, existing);
+    claimed = result.claimed;
+    claimToken = result.token;
+  } else if (existing && force) {
     await updatePublication(fetchImpl, env, targetDate, lockPayload);
     claimed = true;
   } else {
@@ -708,7 +718,7 @@ export async function runDailyDigest({
   }
 
   if (!claimed) {
-    const winner = await getExistingPublication(fetchImpl, env, targetDate);
+    const winner = store ? await store.get(targetDate) : await getExistingPublication(fetchImpl, env, targetDate);
     return {
       ok: winner?.status === 'drafted' || winner?.status === 'skipped',
       skipped: true,
@@ -720,25 +730,30 @@ export async function runDailyDigest({
   }
 
   if (!digest.noticeCount) {
-    await updatePublication(fetchImpl, env, targetDate, { status: 'skipped' });
+    if (store) await store.complete(targetDate, claimToken, {status:'skipped'});
+    else await updatePublication(fetchImpl, env, targetDate, { status: 'skipped' });
     return { ok: true, skipped: true, reason: 'no_notices', targetDate, noticeCount: 0 };
   }
 
+  let providerAttempted = false;
   try {
     const accessToken = await getWechatAccessToken(fetchImpl, env);
     const thumbMediaId = compactText(env.WECHAT_MP_THUMB_MEDIA_ID) || await uploadCover(fetchImpl, accessToken, digest);
     const existingMediaId = compactText(existing?.wechat_media_id);
+    providerAttempted = true;
     const mediaId = existing && force && existingMediaId
       ? await updateWechatDraft(fetchImpl, accessToken, env, digest, thumbMediaId, existingMediaId)
       : await addWechatDraft(fetchImpl, accessToken, env, digest, thumbMediaId);
 
-    await updatePublication(fetchImpl, env, targetDate, {
+    const completedPatch = {
       status: 'drafted',
       wechat_media_id: mediaId,
       wechat_thumb_media_id: thumbMediaId,
       error_code: '',
       error_message: ''
-    });
+    };
+    if (store) await store.complete(targetDate, claimToken, completedPatch);
+    else await updatePublication(fetchImpl, env, targetDate, completedPatch);
 
     return {
       ok: true,
@@ -755,11 +770,13 @@ export async function runDailyDigest({
   } catch (error) {
     const code = compactText(error?.code) || 'unexpected_error';
     const message = compactText(error?.message) || String(error);
-    await updatePublication(fetchImpl, env, targetDate, {
+    const failedPatch = {
       status: 'failed',
       error_code: code,
       error_message: message.slice(0, 2_000)
-    }).catch(() => undefined);
+    };
+    if (store) await store.complete(targetDate, claimToken, {...failedPatch,status:providerAttempted?'uncertain':'failed'}).catch(() => undefined);
+    else await updatePublication(fetchImpl, env, targetDate, failedPatch).catch(() => undefined);
     throw error;
   }
 }

@@ -19,7 +19,7 @@ import { toNoticeListItem, type NoticeListItem } from './notice-record';
 import { inferDisciplineCategory } from './notice-taxonomy';
 import type { PublicNoticeProject } from './mock-data';
 
-export type PublicNoticeDataSource = 'supabase' | 'bundled';
+export type PublicNoticeDataSource = 'supabase' | 'bundled' | 'recovery';
 
 export type PublicNoticeSearchResponse = {
   items: NoticeListItem[];
@@ -106,6 +106,54 @@ function getTodaySchoolUpdates(
   };
 }
 
+type StaticFacets = Pick<PublicNoticeSearchResponse['facets'], 'regions' | 'schools' | 'categories' | 'disciplines'>;
+const immutableFacets = new WeakMap<PublicNoticeProject[], Map<string, StaticFacets>>();
+function getStableFacets(catalog: PublicNoticeProject[], category: string, region: string): StaticFacets {
+  const key = JSON.stringify([category, region]);
+  let entries = immutableFacets.get(catalog);
+  const known = entries?.get(key);
+  if (known) return known;
+  const categories = Array.from(
+    new Set(catalog.map((item) => inferDisciplineCategory(item.discipline)))
+  );
+  const disciplineRows =
+    category === '全部'
+      ? catalog
+      : catalog.filter(
+          (item) => inferDisciplineCategory(item.discipline) === category
+        );
+  const disciplines = Array.from(
+    new Set(
+      disciplineRows
+        .map((item) => getDisplayDiscipline(item.discipline))
+        .filter(Boolean)
+    )
+  );
+  const schoolRows =
+    region === '全部'
+      ? catalog
+      : catalog.filter(
+          (item) =>
+            getNoticeRegion(item) === region ||
+            (item.tags || []).includes(region)
+        );
+  const schools = Array.from(
+    new Set(
+      schoolRows
+        .map((item) => getDisplaySchoolName(item.schoolName))
+        .filter((item) => item && item !== '待识别院校')
+    )
+  ).sort((left, right) => left.localeCompare(right, 'zh-CN'));
+  const value = {categories, disciplines, schools, regions: getNoticeRegionOptions(catalog)};
+  if (Object.isFrozen(catalog) && catalog.every(item => Object.isFrozen(item) && Object.isFrozen(item.tags))) {
+    if (!entries) { entries = new Map(); immutableFacets.set(catalog, entries); }
+    if (entries.size >= 128) entries.clear();
+    Object.values(value).forEach(list => Object.freeze(list));
+    entries.set(key, value);
+  }
+  return value;
+}
+
 export function buildPublicNoticeSearchResult(
   catalog: PublicNoticeProject[],
   filters: NoticeSearchFilters,
@@ -133,37 +181,7 @@ export function buildPublicNoticeSearchResult(
     'deadline'
   ).slice(0, 5);
   const latestProjects = sortNotices(activeCatalog, 'publish').slice(0, 5);
-  const categories = Array.from(
-    new Set(catalog.map((item) => inferDisciplineCategory(item.discipline)))
-  );
-  const disciplineRows =
-    filters.category === '全部'
-      ? catalog
-      : catalog.filter(
-          (item) => inferDisciplineCategory(item.discipline) === filters.category
-        );
-  const disciplines = Array.from(
-    new Set(
-      disciplineRows
-        .map((item) => getDisplayDiscipline(item.discipline))
-        .filter(Boolean)
-    )
-  );
-  const schoolRows =
-    filters.region === '全部'
-      ? catalog
-      : catalog.filter(
-          (item) =>
-            getNoticeRegion(item) === filters.region ||
-            (item.tags || []).includes(filters.region)
-        );
-  const schools = Array.from(
-    new Set(
-      schoolRows
-        .map((item) => getDisplaySchoolName(item.schoolName))
-        .filter((item) => item && item !== '待识别院校')
-    )
-  ).sort((left, right) => left.localeCompare(right, 'zh-CN'));
+  const {categories, disciplines, schools, regions} = getStableFacets(catalog, filters.category, filters.region);
   const collegeStats = getTopCollegeNoticeStats(catalog, Number.MAX_SAFE_INTEGER);
 
   return {
@@ -190,7 +208,7 @@ export function buildPublicNoticeSearchResult(
       topColleges: collegeStats.slice(0, 6)
     },
     facets: {
-      regions: getNoticeRegionOptions(catalog),
+      regions,
       schools,
       categories,
       disciplines,
