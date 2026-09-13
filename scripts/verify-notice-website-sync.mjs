@@ -7,6 +7,30 @@ const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 function requireValue(value, error) { if (!value) throw Error(error); }
 const transientStatuses = new Set([502, 503, 504]);
 const retryDelays = [2000, 5000];
+// The production public Worker sends Retry-After: 30. Its index refresh backoff
+// lasts 60 seconds, so two such waits must be allowed without increasing retries.
+const maxRetryAfterMs = 60000;
+const publicErrorCodes = new Set(['PUBLIC_READ_QUOTA_EXCEEDED', 'PUBLIC_READ_ONLY_GUARD',
+  'PUBLIC_QUERY_SCOPE_INVALID', 'PUBLIC_DATABASE_CONFIGURATION', 'PUBLIC_PROJECTION_INVALID',
+  'PUBLIC_DATABASE_RESPONSE_INVALID', 'PUBLIC_CACHE_UNAVAILABLE', 'PUBLIC_DATABASE_READ_FAILED',
+  'PUBLIC_READ_TYPE_ERROR', 'PUBLIC_READ_UNAVAILABLE', 'PUBLIC_REFRESH_BACKOFF',
+  'PUBLIC_INDEX_BOUND', 'PUBLIC_INDEX_SHARD_LIMIT', 'PUBLIC_INDEX_INVALID',
+  'PUBLIC_INDEX_CHANGE_LIMIT', 'PUBLIC_AGGREGATE_TOO_LARGE', 'PUBLIC_VERSION_CHANGED',
+  'PUBLIC_REFRESH_IN_PROGRESS', 'COUNT_REFRESH_IN_PROGRESS', 'NOTICE_PROJECTION_PENDING']);
+async function publicErrorCode(response) {
+  if (!response.body) return null;
+  const reader = response.body.getReader(), chunks = []; let size = 0;
+  try {
+    while (true) {
+      const part = await reader.read(); if (part.done) break;
+      size += part.value.length; if (size > 4096) return null;
+      chunks.push(part.value);
+    }
+    const value = JSON.parse(Buffer.concat(chunks)).error;
+    return publicErrorCodes.has(value) ? value : null;
+  } catch { return null; }
+  finally { try { await reader.cancel(); } catch {} reader.releaseLock(); }
+}
 function failureCode(error) {
   if (error?.name === 'TimeoutError') return 'WEBSITE_TIMEOUT';
   if (error instanceof TypeError && ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET'].includes(error.cause?.code)) return 'WEBSITE_NETWORK_ERROR';
@@ -38,8 +62,9 @@ export async function verifyNoticeWebsite({fetchImpl = fetch, sleep = ms => new 
         if (!response.ok) {
           const retryAfter = response.headers.get('retry-after');
           if (retryAfter) retryAfterMs = /^\d+$/.test(retryAfter) ? Number(retryAfter) * 1000 : Math.max(0, Date.parse(retryAfter) - Date.now()) || 0;
-          // Retain the known HTTP failure even if closing its body also fails.
-          try { await response.body?.cancel(); } catch {}
+          if (retryAfterMs) record.retryAfterMs = retryAfterMs;
+          // Only known public categories are recorded, never raw bodies/causes.
+          record.sourceCode = await publicErrorCode(response);
           throw Error('WEBSITE_HTTP_' + response.status);
         }
         const chunks = []; let size = 0;
@@ -54,7 +79,7 @@ export async function verifyNoticeWebsite({fetchImpl = fetch, sleep = ms => new 
         record.code = failureCode(error);
         const transient = (transientStatuses.has(record.status) && record.code === 'WEBSITE_HTTP_' + record.status) ||
           ((record.status === null || record.status === 200) && ['WEBSITE_TIMEOUT', 'WEBSITE_NETWORK_ERROR'].includes(record.code));
-        if (!transient || transientRetries >= retryDelays.length || retryAfterMs > 15000) throw error;
+        if (!transient || record.sourceCode === 'PUBLIC_READ_QUOTA_EXCEEDED' || transientRetries >= retryDelays.length || retryAfterMs > maxRetryAfterMs) throw error;
         record.retryDelayMs = Math.max(retryDelays[transientRetries++], retryAfterMs);
         record.elapsedMs = Date.now() - started;
         await sleep(record.retryDelayMs);

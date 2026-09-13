@@ -120,6 +120,23 @@ test('Retry-After is respected within the wait budget, longer backoff remains a 
   await assert.rejects(verifyNoticeWebsite(long),/HTTP_503/);assert.equal(long.calls.length,1);
 });
 
+test('production 30-second Retry-After permits recovery past the 60-second index backoff',async()=>{
+  const delays=[],f=fixture((r,u,calls)=>{
+    if(calls.length<=2){r.status=503;r.headers={'retry-after':'30'};r.data={error:calls.length===1?'PUBLIC_DATABASE_READ_FAILED':'PUBLIC_REFRESH_BACKOFF',cause:'private internal details'};}
+  });
+  const result=await verifyNoticeWebsite({...f,sleep:async ms=>delays.push(ms)});
+  assert.equal(result.state,'WEBSITE_SYNC_VERIFIED');assert.deepEqual(delays,[30000,30000]);
+  assert.equal(f.calls.length,8);assert.equal(result.transientRetries,2);
+  assert.equal(result.requests[0].retryAfterMs,30000);
+  assert.equal(result.requests[1].sourceCode,'PUBLIC_REFRESH_BACKOFF');
+  assert.ok(!JSON.stringify(result).includes('private internal details'));
+});
+
+test('known quota category stops even if an upstream incorrectly wraps it in 503',async()=>{
+  const f=fixture(r=>{r.status=503;r.data={error:'PUBLIC_READ_QUOTA_EXCEEDED'};r.headers={'retry-after':'30'};});
+  await assert.rejects(verifyNoticeWebsite(f),/HTTP_503/);assert.equal(f.calls.length,1);
+});
+
 test('a timeout while reading a body retries the same endpoint; exceeding a payload bound never does',async()=>{
   const f=fixture();let reads=0;
   const r=await verifyNoticeWebsite({...f,fetchImpl:async(...args)=>{
