@@ -87,19 +87,19 @@ export async function reviewedIndex(db:D1Database,expectedVersion?:string):Promi
  const pending=inflight.get(v);if(pending)return pending;
  const task=(async()=>{
   try{
-   const rows=new Map(base.map(p=>[p.summary.id,p]));let cursor='notice_override:',count=0;
-   for(let page=0;page<45;page++){
-    const key='https://seekoffer-reviewed-index.invalid/v2/'+encodeURIComponent(v)+'/'+page;
-    let stored=await caches.default.match(key);
-    type Change={key:string;visible:number;catalog_projection:string|null};let changes:Change[];
-    if(stored)changes=await stored.json() as Change[];
-    else{
-     const result=await db.prepare("SELECT v.key,json_extract(v.value,'$.visible') visible,CASE WHEN n.is_private=0 AND n.admin_status='published' AND n.admin_deleted_at IS NULL AND n.source_site<>'用户手动录入' AND n.id NOT LIKE 'custom-%' THEN n.catalog_projection ELSE NULL END catalog_projection FROM _runtime_state v LEFT JOIN main__notices n ON n.id=substr(v.key,17) WHERE v.key>? AND v.key<'notice_override;' ORDER BY v.key LIMIT 80").bind(cursor).all<Change>();changes=result.results;
-     const body=JSON.stringify(changes);if(new TextEncoder().encode(body).byteLength>512000)throw new ApiError(503,'PUBLIC_INDEX_SHARD_LIMIT');
-     await caches.default.put(key,new Response(body,{headers:{'Cache-Control':'public,max-age=21600'}}));
-    }
-    for(const row of changes){if(!row.key.startsWith('notice_override:')||row.key<=cursor||![0,1].includes(row.visible))throw new ApiError(503,'PUBLIC_INDEX_INVALID');cursor=row.key;count++;const id=row.key.slice(16);if(!row.visible||!row.catalog_projection)rows.delete(id);else{const p=JSON.parse(row.catalog_projection) as P;if(p.summary.id!==id||id.startsWith('custom-')||!Number.isFinite(p.sourceRank)||!Number.isFinite(p.schoolRank))throw new ApiError(503,'PUBLIC_INDEX_INVALID');rows.set(id,p);}}
-    if(changes.length<80){if(await version(db)!==v)throw new ApiError(409,'PUBLIC_VERSION_CHANGED');current=new ReviewedIndex([...rows.values()],v);return current;}
+   const rows=new Map(base.map(p=>[p.summary.id,p]));let cursor='notice_override:';
+   // Cache API calls share the Worker's subrequest budget. The former 80-row
+   // match/query/put loop exhausted that budget during every cold refresh.
+   // At most 40 read-only D1 pages plus version checks leave room for routing
+   // and response-cache calls within the Free plan's 50-subrequest ceiling.
+   const pageSize=500;
+   for(let page=0;page<40;page++){
+    type Change={key:string;visible:number;catalog_projection:string|null};
+    const result=await db.prepare("SELECT v.key,json_extract(v.value,'$.visible') visible,CASE WHEN n.is_private=0 AND n.admin_status='published' AND n.admin_deleted_at IS NULL AND n.source_site<>'用户手动录入' AND n.id NOT LIKE 'custom-%' THEN n.catalog_projection ELSE NULL END catalog_projection FROM _runtime_state v LEFT JOIN main__notices n ON n.id=substr(v.key,17) WHERE v.key>? AND v.key<'notice_override;' ORDER BY v.key LIMIT 500").bind(cursor).all<Change>();
+    const changes=result.results;
+    if(new TextEncoder().encode(JSON.stringify(changes)).byteLength>4000000)throw new ApiError(503,'PUBLIC_INDEX_SHARD_LIMIT');
+    for(const row of changes){if(!row.key.startsWith('notice_override:')||row.key<=cursor||![0,1].includes(row.visible))throw new ApiError(503,'PUBLIC_INDEX_INVALID');cursor=row.key;const id=row.key.slice(16);if(!row.visible||!row.catalog_projection)rows.delete(id);else{const p=JSON.parse(row.catalog_projection) as P;if(p.summary.id!==id||id.startsWith('custom-')||!Number.isFinite(p.sourceRank)||!Number.isFinite(p.schoolRank))throw new ApiError(503,'PUBLIC_INDEX_INVALID');rows.set(id,p);}}
+    if(changes.length<pageSize){if(await version(db)!==v)throw new ApiError(409,'PUBLIC_VERSION_CHANGED');current=new ReviewedIndex([...rows.values()],v);return current;}
    }
    throw new ApiError(503,'PUBLIC_INDEX_CHANGE_LIMIT');
   }catch(e){if(failed.size>32)failed.clear();failed.set(v,Date.now()+60000);throw e;}finally{inflight.delete(v);}
