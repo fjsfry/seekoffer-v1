@@ -47,8 +47,13 @@ Email notifications and the hourly schedule remain enabled.
   notices, newest publication 2026-09-19; list, metadata and detail all HTTP 200,
   warm cache HIT, no transient retry required.
 - End-to-end GitHub run: https://github.com/fjsfry/seekoffer-v1/actions/runs/35439968557
-  (consult its final status and receipt; the initial website count above precedes
-  this ingestion run and is not its final imported count).
+  **SUCCESS**, finished at 2026-09-19 11:28:59 UTC, duration 5m42s.
+  Processed 3,387 candidates in all 565 batches; 392 inserted/updated,
+  1,609 unchanged, 1,386 protected, zero remaining; complete=true.
+  Final public website count: 8,980, newest publication 2026-09-19,
+  version `3d1b1480-6b05-4a2b-996b-198ec61d534a`.
+  Cold list, metadata, detail and subsequent warm list checks all returned 200,
+  with zero transient retries. The final warm list used one D1 row read.
 
 ## Operational guardrails
 
