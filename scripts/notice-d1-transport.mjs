@@ -22,6 +22,28 @@ export function toD1Notice(notice) {
     row[key]='h'+row[key];corrected=true;
   }
   if(corrected){row.admin_status='pending';row.is_private=true;row.admin_review_note=[row.admin_review_note,'auto_quality:source_url_scheme_typo'].filter(Boolean).join(';');}
+  // Source pages sometimes contain relative links, prose, or several URLs in
+  // one field. Keep those records for review; never let one bad URL reject a
+  // complete ingestion batch or publish an invented replacement URL.
+  const invalidLinks = [];
+  for (const key of ['source_link', 'apply_link']) {
+    if (!row[key]) continue;
+    let valid = false;
+    try {
+      const url = new URL(row[key]);
+      valid = ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;
+    } catch { /* Retain the original value in the private review note below. */ }
+    if (!valid) {
+      invalidLinks.push(`${key}=${String(row[key]).slice(0, 1000)}`);
+      row[key] = '';
+    }
+  }
+  if (invalidLinks.length) {
+    row.admin_status = ['hidden', 'rejected'].includes(row.admin_status) ? row.admin_status : 'pending';
+    row.is_private = true;
+    row.admin_review_note = ['auto_quality:invalid_source_url', row.admin_review_note].filter(Boolean).join(';').slice(0, 2000);
+    row.remarks = ['原始链接待核对：' + invalidLinks.join('；'), row.remarks].filter(Boolean).join('\n').slice(0, 10000);
+  }
   return row;
 }
 export function orderD1Notices(notices) {

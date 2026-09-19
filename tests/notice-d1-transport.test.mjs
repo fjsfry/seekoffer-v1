@@ -20,3 +20,27 @@ test('source URL scheme typo enters review rather than being published',()=>{
  assert.equal(row.source_link,'https://example.edu.cn/notice');assert.equal(row.admin_status,'pending');assert.equal(row.is_private,true);
  assert.match(row.admin_review_note,/source_url_scheme_typo/);
 });
+
+test('malformed source links are retained privately without blocking other notices', () => {
+ for (const link of ['/notice/1', '详见官网', 'javascript:alert(1)', 'https://user:pass@example.edu.cn/']) {
+  const rows = orderD1Notices([
+   {id:'xingke-bad', source_link:link, apply_link:'https://example.edu.cn/apply', admin_status:'published'},
+   {id:'xingke-good', source_link:'https://example.edu.cn/notice', admin_status:'published'}
+  ]);
+  const bad = rows.find(row => row.id === 'xingke-bad');
+  assert.equal(bad.source_link, '');
+  assert.equal(bad.apply_link, 'https://example.edu.cn/apply');
+  assert.equal(bad.admin_status, 'pending');
+  assert.equal(bad.is_private, true);
+  assert.ok(bad.remarks.includes(link));
+  assert.equal(rows.find(row => row.id === 'xingke-good').admin_status, 'published');
+ }
+});
+
+test('invalid application links do not erase valid sources or weaken hidden moderation', () => {
+ const row = toD1Notice({id:'xingke-review', source_link:'https://example.edu.cn/', apply_link:'待公布', admin_status:'hidden'});
+ assert.equal(row.source_link, 'https://example.edu.cn/');
+ assert.equal(row.apply_link, '');
+ assert.equal(row.admin_status, 'hidden');
+ assert.equal(row.is_private, true);
+});
