@@ -21,11 +21,14 @@ try{
  for(let i=0;i<205;i+=20)await db.batch(Array.from({length:Math.min(20,205-i)},(_,n)=>db.prepare('INSERT INTO _runtime_state(key,value) VALUES(?,?)').bind('notice_override:zz-synthetic-'+String(i+n).padStart(3,'0'),JSON.stringify({id:'zz-synthetic-'+String(i+n).padStart(3,'0'),visible:false}))));
  const publicPage=await mf.dispatchFetch('http://127.0.0.1/v1/public/notice-overrides'),pageOne=await publicPage.json(),publicVersion=pageOne.version;
  assert.ok(pageOne.nextCursor);
- const warm=await mf.dispatchFetch('http://127.0.0.1/v1/public/notice-overrides');const warmRows=Number(warm.headers.get('x-d1-rows-read'));assert.ok(warmRows<=4);await warm.arrayBuffer();
+ const warm=await mf.dispatchFetch('http://127.0.0.1/v1/public/notice-overrides');const warmRows=Number(warm.headers.get('x-d1-rows-read'));assert.ok(warmRows<=8);await warm.arrayBuffer();
  await call([notice(32)]);
- const previousSnapshot=await mf.dispatchFetch('http://127.0.0.1/v1/public/notice-overrides?version='+publicVersion);assert.equal(previousSnapshot.status,200);assert.equal((await previousSnapshot.json()).items.some(n=>n.id===notice(32).id),false);
- const pageTwo=await mf.dispatchFetch('http://127.0.0.1/v1/public/notice-overrides?'+new URLSearchParams({version:publicVersion,after:pageOne.nextCursor}));assert.equal(pageTwo.status,200);const second=await pageTwo.json();assert.equal(second.version,publicVersion);assert.equal(second.items.length,100);assert.ok(second.nextCursor);
- const pageThree=await mf.dispatchFetch('http://127.0.0.1/v1/public/notice-overrides?'+new URLSearchParams({version:publicVersion,after:second.nextCursor}));assert.equal(pageThree.status,200);assert.equal((await pageThree.json()).items.length,11);
+ // Lazy keyset pages reject a changed version instead of mixing snapshots or
+ // eagerly caching the entire catalog. The caller restarts once from page one.
+ const previousSnapshot=await mf.dispatchFetch('http://127.0.0.1/v1/public/notice-overrides?version='+publicVersion);assert.equal(previousSnapshot.status,409);assert.equal((await previousSnapshot.json()).error,'NOTICE_VERSION_CHANGED');
+ const restarted=await mf.dispatchFetch('http://127.0.0.1/v1/public/notice-overrides');assert.equal(restarted.status,200);const restartedPage=await restarted.json();assert.notEqual(restartedPage.version,publicVersion);assert.ok(restartedPage.items.some(n=>n.id===notice(32).id));
+ const pageTwo=await mf.dispatchFetch('http://127.0.0.1/v1/public/notice-overrides?'+new URLSearchParams({version:restartedPage.version,after:restartedPage.nextCursor}));assert.equal(pageTwo.status,200);const second=await pageTwo.json();assert.equal(second.version,restartedPage.version);assert.equal(second.items.length,100);assert.ok(second.nextCursor);
+ const pageThree=await mf.dispatchFetch('http://127.0.0.1/v1/public/notice-overrides?'+new URLSearchParams({version:restartedPage.version,after:second.nextCursor}));assert.equal(pageThree.status,200);assert.equal((await pageThree.json()).items.length,12);
  await db.batch([db.prepare("UPDATE _runtime_state SET value='synthetic-next-version' WHERE key='notice_version'"),db.prepare("INSERT INTO _runtime_state(key,value) VALUES('notice_visibility_version','moderated-next-version')"),db.prepare('UPDATE _runtime_state SET value=? WHERE key=?').bind(JSON.stringify({id:notice(0).id,visible:false}),'notice_override:'+notice(0).id)]);
  assert.equal((await mf.dispatchFetch('http://127.0.0.1/v1/public/notice-overrides?version='+publicVersion)).status,409);
  const updated=await (await mf.dispatchFetch('http://127.0.0.1/v1/public/notice-overrides')).json();assert.equal(updated.items.find(n=>n.id===notice(0).id).visible,false);

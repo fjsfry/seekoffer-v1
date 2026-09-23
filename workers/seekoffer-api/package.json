@@ -6,6 +6,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:snapshot": "node --test tests/snapshot-runtime.test.mjs",
+    "test:notice-overrides": "node --experimental-strip-types --test tests/notice-overrides.test.ts && node --test tests/notice-overrides-workerd.test.mjs",
     "test:auth-runtime": "node ../../scripts/migration/test-auth-bootstrap-workerd.mjs",
     "test:payments": "node --test tests/payment-transactions.test.mjs",
     "dev:local": "wrangler dev --local",
