@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {verifyNoticeWebsite} from '../scripts/verify-notice-website-sync.mjs';
+import {verifyNoticeWebsite, websiteFailureReport} from '../scripts/verify-notice-website-sync.mjs';
 import {noticeSyncReceipt} from '../scripts/notice-sync-report.mjs';
 
 const version='11111111-2222-4333-8444-555555555555', next='11111111-2222-4333-8444-666666666666';
@@ -14,7 +14,7 @@ function fixture(change=()=>{}) {
       u.pathname.includes('notice-detail')?{id:rows[0].id}:
       {metadataVersion:version,items:rows,pagination:{total:20}};
     const r={data,status:200,reads:1,writes:0};change(r,u,calls);
-    return new Response(JSON.stringify(r.data),{status:r.status,headers:{'content-type':'application/json','x-d1-rows-read':String(r.reads),'x-d1-rows-written':String(r.writes),'x-public-count-cache':'HIT'}});
+    return new Response(JSON.stringify(r.data),{status:r.status,headers:{'content-type':'application/json','x-d1-rows-read':String(r.reads),'x-d1-rows-written':String(r.writes),'x-public-count-cache':'HIT',...r.headers}});
   };
   return {fetchImpl,calls,sleep:async()=>{}};
 }
@@ -53,4 +53,98 @@ test('receipt excludes source details, credentials and user data, and retains pa
   const r=noticeSyncReceipt({destination:'d1.main__notices',complete:false,stoppedReason:'INGEST_DAILY_BUDGET',noticesUpserted:299,remainingCandidates:1886,secret:'private',sourceErrors:[{error:'private'}],notices:[{email:'private'}]});
   assert.equal(r.complete,false);assert.equal(r.remainingCandidates,1886);assert.equal(r.noticesUpserted,299);assert.ok(!JSON.stringify(r).includes('private'));
   assert.throws(()=>noticeSyncReceipt({rowsWritten:-1}),/INVALID_SYNC_RECEIPT/);
+});
+
+test('one transient list failure retries only that read, preserving full version and detail validation',async()=>{
+  const delays=[];
+  const f=fixture((r,u,calls)=>{if(calls.length===2){r.status=503;r.data={error:'temporarily unavailable'};}});
+  const result=await verifyNoticeWebsite({...f,sleep:async ms=>delays.push(ms)});
+  assert.equal(result.state,'WEBSITE_SYNC_VERIFIED');assert.equal(result.transientRetries,1);
+  assert.equal(f.calls.length,7);assert.deepEqual(delays,[2000]);
+  assert.equal(f.calls[1].url,f.calls[2].url);
+  assert.equal(f.calls.filter(c=>c.path.endsWith('notice-overrides')).length,2);
+  assert.equal(result.requests[1].status,503);assert.equal(result.requests[1].code,'WEBSITE_HTTP_503');
+});
+
+test('persistent 502/503/504 fail after at most two retries with the failing endpoint retained',async()=>{
+  for(const status of [502,503,504]){
+    const f=fixture(r=>{r.status=status;r.data={message:'private upstream details must not be logged'};});
+    let failure;try{await verifyNoticeWebsite(f);}catch(error){failure=websiteFailureReport(error);}
+    assert.equal(f.calls.length,3);assert.equal(failure.code,'WEBSITE_HTTP_'+status);
+    assert.equal(failure.failedPath,'/v1/public/notice-overrides');assert.equal(failure.transientRetries,2);
+    assert.equal(failure.requests.length,3);assert.ok(!JSON.stringify(failure).includes('private upstream'));
+  }
+});
+
+test('all endpoints and a version restart share one transient retry budget',async()=>{
+  const f=fixture((r,u,calls)=>{
+    if([1,4,5].includes(calls.length))r.status=503;
+    if(calls.length===3)r.data={...r.data,metadataVersion:next};
+  });
+  await assert.rejects(verifyNoticeWebsite(f),error=>{
+    assert.equal(error.message,'WEBSITE_HTTP_503');assert.equal(error.verification.transientRetries,2);return true;
+  });
+  assert.equal(f.calls.length,5);
+});
+
+test('401/402/403/404/429 never retry or get downgraded to successful verification',async()=>{
+  for(const status of [401,402,403,404,429]){
+    const f=fixture(r=>{r.status=status;});
+    await assert.rejects(verifyNoticeWebsite(f),new RegExp('HTTP_'+status));assert.equal(f.calls.length,1);
+  }
+});
+
+test('transient network failures retry without logging raw exception details',async()=>{
+  for(const makeError of [()=>new DOMException('private request details','TimeoutError'),()=>new TypeError('private request details',{cause:{code:'ECONNRESET'}})]){
+    const f=fixture();let calls=0;
+    const result=await verifyNoticeWebsite({...f,fetchImpl:async(...args)=>{if(++calls===1)throw makeError();return f.fetchImpl(...args);}});
+    assert.equal(result.transientRetries,1);assert.equal(result.requests[0].status,null);
+    assert.ok(!JSON.stringify(result).includes('private request details'));
+  }
+});
+
+test('unknown fetch errors and invalid JSON fail without retrying or leaking response details',async()=>{
+  for(const fetchImpl of [async()=>{throw new TypeError('private implementation detail');},async()=>new Response('private malformed response')]){
+    let calls=0,failure;
+    try{await verifyNoticeWebsite({fetchImpl:async(...args)=>{calls++;return fetchImpl(...args);},sleep:async()=>{}});}catch(error){failure=websiteFailureReport(error);}
+    assert.equal(calls,1);assert.equal(failure.code,'READ_VERIFICATION_FAILED');
+    assert.ok(!JSON.stringify(failure).includes('private'));
+  }
+});
+
+test('Retry-After is respected within the wait budget, longer backoff remains a failure',async()=>{
+  const delays=[],f=fixture((r,u,calls)=>{if(calls.length===1){r.status=503;r.headers={'retry-after':'4'};}});
+  assert.equal((await verifyNoticeWebsite({...f,sleep:async ms=>delays.push(ms)})).state,'WEBSITE_SYNC_VERIFIED');
+  assert.deepEqual(delays,[4000]);
+  const long=fixture(r=>{r.status=503;r.headers={'retry-after':'120'};});
+  await assert.rejects(verifyNoticeWebsite(long),/HTTP_503/);assert.equal(long.calls.length,1);
+});
+
+test('production 30-second Retry-After permits recovery past the 60-second index backoff',async()=>{
+  const delays=[],f=fixture((r,u,calls)=>{
+    if(calls.length<=2){r.status=503;r.headers={'retry-after':'30'};r.data={error:calls.length===1?'PUBLIC_DATABASE_READ_FAILED':'PUBLIC_REFRESH_BACKOFF',cause:'private internal details'};}
+  });
+  const result=await verifyNoticeWebsite({...f,sleep:async ms=>delays.push(ms)});
+  assert.equal(result.state,'WEBSITE_SYNC_VERIFIED');assert.deepEqual(delays,[30000,30000]);
+  assert.equal(f.calls.length,8);assert.equal(result.transientRetries,2);
+  assert.equal(result.requests[0].retryAfterMs,30000);
+  assert.equal(result.requests[1].sourceCode,'PUBLIC_REFRESH_BACKOFF');
+  assert.ok(!JSON.stringify(result).includes('private internal details'));
+});
+
+test('known quota category stops even if an upstream incorrectly wraps it in 503',async()=>{
+  const f=fixture(r=>{r.status=503;r.data={error:'PUBLIC_READ_QUOTA_EXCEEDED'};r.headers={'retry-after':'30'};});
+  await assert.rejects(verifyNoticeWebsite(f),/HTTP_503/);assert.equal(f.calls.length,1);
+});
+
+test('a timeout while reading a body retries the same endpoint; exceeding a payload bound never does',async()=>{
+  const f=fixture();let reads=0;
+  const r=await verifyNoticeWebsite({...f,fetchImpl:async(...args)=>{
+    if(++reads===1)return new Response(new ReadableStream({start(controller){controller.error(new DOMException('body timeout','TimeoutError'));}}));
+    return f.fetchImpl(...args);
+  }});
+  assert.equal(r.transientRetries,1);assert.equal(reads,7);
+  let oversized=0;
+  await assert.rejects(verifyNoticeWebsite({fetchImpl:async()=>{oversized++;return new Response('x'.repeat(512001));},sleep:async()=>{}}),/WEBSITE_PAYLOAD_BOUND/);
+  assert.equal(oversized,1);
 });
