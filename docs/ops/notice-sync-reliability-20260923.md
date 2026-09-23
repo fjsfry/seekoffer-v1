@@ -64,3 +64,20 @@ website check fails. Do not disable the hourly schedule, suppress failures, or
 raise retry loops to mask deterministic errors. Investigate the recorded stage
 and error code; retain quota stop behavior. The next scheduled run reacquires
 and idempotently reconciles the lookback window.
+
+## Observed successful run
+
+Run `35828484714` (commit `f03e7c20f977e83deca1d9d76b26f749d041e34b`) completed all
+stages successfully on September 23 at 06:54:44 UTC. The sanitized receipt records
+`SYNC_AND_WEBSITE_VERIFIED`: preflight and ingestion both succeeded, ingestion was
+complete with 2,126 candidates in 355 batches, 3 notices changed, 1,397 were
+unchanged, 726 were protected, zero remained, and D1 reported 4,278 reads and 33
+writes. The newest source date was 2026-09-22.
+
+The website check also succeeded with version
+`3a9cec27-dfe0-4c00-83fd-c319d4f07bc0`, 9,976 public notices, newest publication
+2026-09-22, detail verification enabled, zero transient retries, and all reported
+write counters zero.
+Its four bounded requests read 8,225 rows in total (8,223 cold list, one metadata,
+one warm list; the detail endpoint reported no row counters). The receipt is retained
+as artifact `notice-sync-35828484714-1` and contains no account data.
