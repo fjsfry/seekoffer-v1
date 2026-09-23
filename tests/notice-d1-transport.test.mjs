@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {toD1Notice,orderD1Notices,ingestionShouldRetry} from '../scripts/notice-d1-transport.mjs';
+import {toD1Notice,orderD1Notices,ingestionShouldRetry,validateD1IngestReceipt} from '../scripts/notice-d1-transport.mjs';
 test('explicit source metadata boundary preserves IDs and moderation without resetting reminders',()=>{
  const row=toD1Notice({id:'xingke-abc',source_record_id:'abc',last_checked_source:'official',quality_tier:'clean',quality_reasons:[],reminder_7d_sent:false,admin_status:'hidden',is_private:true,requirements:'原始正文'});
  assert.deepEqual(row,{id:'xingke-abc',admin_status:'hidden',is_private:true,requirements:'原始正文'});
@@ -10,6 +10,20 @@ test('quota and conflict responses stop; temporary failures retry only under bou
  for(const status of [401,402,403,404,409])assert.equal(ingestionShouldRetry(status),false);
  assert.equal(ingestionShouldRetry(429,'INGEST_DAILY_BUDGET'),false);
  assert.equal(ingestionShouldRetry(503),true);
+});
+
+test('successful ingestion accounts for changed, unchanged and protected records',()=>{
+ const receipt=validateD1IngestReceipt({ok:true,noticesReceived:6,noticesUpserted:1,unchanged:2,protected:3,private:'excluded'},6);
+ assert.deepEqual(receipt,{noticesReceived:6,noticesUpserted:1,unchanged:2,protected:3});
+ assert.equal(validateD1IngestReceipt({ok:true,noticesReceived:6,noticesUpserted:0,unchanged:0,protected:6},6).noticesUpserted,0);
+});
+
+test('2xx malformed, partial or dry-run receipts cannot silently complete an import',()=>{
+ const valid={ok:true,noticesReceived:6,noticesUpserted:1,unchanged:2,protected:3};
+ for(const payload of [null,{},[],{...valid,ok:false},{...valid,dryRun:true},{...valid,noticesReceived:5},
+   {...valid,noticesUpserted:0},{...valid,protected:-1},{...valid,unchanged:'2'}]) {
+   assert.throws(()=>validateD1IngestReceipt(payload,6),error=>error.message==='INVALID_INGEST_RECEIPT'&&error.retryable===false);
+ }
 });
 test('prioritize newest records with a stable order without truncating older candidates',()=>{
  const rows=Array.from({length:3000},(_,i)=>({id:'xingke-'+i,publish_date:i===2500?'2026-09-10':'2026-09-08'}));

@@ -53,3 +53,16 @@ export function ingestionShouldRetry(status, code='') {
   if ([402,409].includes(status) || ['INGEST_DAILY_BUDGET','INGEST_CONFLICT_OR_DAILY_BUDGET'].includes(code)) return false;
   return [408,425,429].includes(status) || status >= 500 && status <= 599;
 }
+
+// A 2xx response is not proof that a batch was processed. All notices must be
+// accounted for, including unchanged and manually protected records.
+export function validateD1IngestReceipt(payload, expectedCount) {
+  const invalid=()=>{throw Object.assign(Error('INVALID_INGEST_RECEIPT'),{
+    retryable:false,ingestCode:'INVALID_INGEST_RECEIPT'
+  });};
+  if(!payload||typeof payload!=='object'||Array.isArray(payload)||payload.ok!==true||payload.dryRun===true)invalid();
+  const keys=['noticesReceived','noticesUpserted','unchanged','protected'];
+  if(keys.some(key=>!Number.isSafeInteger(payload[key])||payload[key]<0))invalid();
+  if(payload.noticesReceived!==expectedCount||payload.noticesUpserted+payload.unchanged+payload.protected!==expectedCount)invalid();
+  return Object.fromEntries(keys.map(key=>[key,payload[key]]));
+}
