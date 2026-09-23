@@ -2,7 +2,7 @@ import http from 'node:http';
 import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
-import {orderD1Notices, ingestionShouldRetry} from './notice-d1-transport.mjs';
+import {orderD1Notices, ingestionShouldRetry, validateD1IngestReceipt} from './notice-d1-transport.mjs';
 import {saveNoticeSyncReceipt} from './notice-sync-report.mjs';
 import {
   areLikelyDuplicateNotices,
@@ -2036,7 +2036,10 @@ async function postIngestBatch(notices, summary, batchIndex, batchCount) {
         status: response.status,
         body: rawText
       });
-      if (response.ok) return {...payload,rowsRead:Number(response.headers.get('x-d1-rows-read')||0),rowsWritten:Number(response.headers.get('x-d1-rows-written')||0)};
+      if (response.ok) {
+        const receipt = USE_D1_INGEST ? validateD1IngestReceipt(payload, notices.length) : payload;
+        return {...receipt,rowsRead:Number(response.headers.get('x-d1-rows-read')||0),rowsWritten:Number(response.headers.get('x-d1-rows-written')||0)};
+      }
 
       const error = new Error(
         `Supabase ingest batch ${batchIndex}/${batchCount} failed with status ${response.status}: ${USE_D1_INGEST ? String(payload?.error || 'INGEST_FAILED').replace(/[^A-Z_]/g, '') : JSON.stringify(payload)}`
@@ -2309,6 +2312,9 @@ function assessSyncHealth(sourceStats, qualityStats) {
 }
 
 async function runSync() {
+  if (!DRY_RUN && (!SUPABASE_INGEST_URL || !SUPABASE_INGEST_SECRET)) {
+    throw new Error('INGEST_CONFIGURATION_MISSING');
+  }
   const startedAt = nowText();
   console.log(
     JSON.stringify(

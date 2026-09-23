@@ -2,9 +2,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
-const site = 'https://www.seekoffer.com.cn', api = 'https://migration.seekoffer.com.cn';
+const site = 'https://www.seekoffer.com.cn';
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 function requireValue(value, error) { if (!value) throw Error(error); }
+function validatePage(page) {
+  requireValue(page && Array.isArray(page.items) && page.items.length <= 16 &&
+    Number.isSafeInteger(page.pagination?.total) && page.pagination.total >= 0, 'INVALID_WEBSITE_PAGE');
+  requireValue(uuid.test(page.metadataVersion), 'INVALID_SOURCE_VERSION');
+  requireValue(page.items.length === Math.min(16, page.pagination.total), 'WEBSITE_PAGE_INCOMPLETE');
+  requireValue(new Set(page.items.map(item => item?.id)).size === page.items.length, 'WEBSITE_DUPLICATE_ID');
+  requireValue(page.items.every((n, i) => n && typeof n.id === 'string' && n.id.length > 0 && !n.id.startsWith('custom-') &&
+    typeof n.publishDate === 'string' && /^20\d{2}-\d{2}-\d{2}$/.test(n.publishDate) &&
+    !Object.keys(n).some(k => /^(admin|created_by|createdBy|requirements|historyRecords|history_records|change_log|password|email|secret)/i.test(k)) &&
+    (i === 0 || page.items[i - 1].publishDate >= n.publishDate)), 'PUBLIC_SORT_OR_FIELD_BOUNDARY');
+}
 const transientStatuses = new Set([502, 503, 504]);
 const retryDelays = [2000, 5000];
 // The production public Worker sends Retry-After: 30. Its index refresh backoff
@@ -91,16 +102,13 @@ export async function verifyNoticeWebsite({fetchImpl = fetch, sleep = ms => new 
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const before = (await read(api + '/v1/public/notice-overrides')).data;
-        requireValue(uuid.test(before.version), 'INVALID_SOURCE_VERSION');
         const first = await read(site + '/api/public/notices/?page=1&pageSize=16&sort=publish', 100 * 1024);
         const page = first.data;
-        requireValue(Array.isArray(page.items) && page.items.length <= 16 && Number.isSafeInteger(page.pagination?.total), 'INVALID_WEBSITE_PAGE');
-        if (page.metadataVersion !== before.version) throw Error('PUBLIC_VERSION_CHANGED');
-        requireValue(page.items.length === Math.min(16, page.pagination.total), 'WEBSITE_PAGE_INCOMPLETE');
-        requireValue(page.items.every((n, i) => typeof n.id === 'string' && !n.id.startsWith('custom-') &&
-          !Object.keys(n).some(k => /^(admin|created_by|createdBy|requirements|historyRecords|history_records|change_log|password|email|secret)/i.test(k)) &&
-          (i === 0 || page.items[i - 1].publishDate >= n.publishDate)), 'PUBLIC_SORT_OR_FIELD_BOUNDARY');
+        // This production route checks the live D1 version before serving a
+        // page, including cache hits. Metadata rechecks it against the requested
+        // version. Verify that serving path without downloading recovery shards.
+        validatePage(page);
+        const before = {version: page.metadataVersion};
         const metadata = (await read(site + '/api/public/notices/metadata/?section=summary&version=' + encodeURIComponent(before.version))).data;
         requireValue(metadata.version === before.version && metadata.stats?.total2026 === page.pagination.total, 'WEBSITE_METADATA_MISMATCH');
         let detailChecked = false;
@@ -109,12 +117,13 @@ export async function verifyNoticeWebsite({fetchImpl = fetch, sleep = ms => new 
           requireValue(detail.id === page.items[0].id, 'WEBSITE_DETAIL_MISMATCH');
           detailChecked = true;
         }
-        const after = (await read(api + '/v1/public/notice-overrides')).data;
-        if (after.version !== before.version) throw Error('PUBLIC_VERSION_CHANGED');
         const warm = await read(site + '/api/public/notices/?page=1&pageSize=16&sort=publish', 100 * 1024);
+        validatePage(warm.data);
         if (warm.data.metadataVersion !== before.version) throw Error('PUBLIC_VERSION_CHANGED');
         requireValue(warm.data.pagination.total === page.pagination.total, 'WEBSITE_COUNT_CHANGED_WITHOUT_VERSION');
-        requireValue(warm.record.rowsRead !== null && warm.record.rowsRead <= 4, 'WEBSITE_WARM_READ_BOUND');
+        requireValue(warm.data.items.every((item, index) => item.id === page.items[index]?.id &&
+          item.publishDate === page.items[index]?.publishDate), 'WEBSITE_ITEMS_CHANGED_WITHOUT_VERSION');
+        requireValue(Number.isSafeInteger(warm.record.rowsRead) && warm.record.rowsRead >= 0 && warm.record.rowsRead <= 4, 'WEBSITE_WARM_READ_BOUND');
         return {at: new Date().toISOString(), state: 'WEBSITE_SYNC_VERIFIED', version: before.version,
           total: page.pagination.total, latestDate: page.items[0]?.publishDate || null,
           listBytes: first.record.bytes, detailChecked, warmCache: warm.record.cache, requests, transientRetries,

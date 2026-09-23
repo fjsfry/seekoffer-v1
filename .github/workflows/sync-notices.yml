@@ -12,9 +12,11 @@ on:
       - 'scripts/notice-sync-core.mjs'
       - 'scripts/notice-d1-transport.mjs'
       - 'scripts/notice-sync-report.mjs'
+      - 'scripts/summarize-notice-sync-run.mjs'
       - 'scripts/verify-notice-website-sync.mjs'
       - 'tests/notice-d1-transport.test.mjs'
       - 'tests/notice-website-sync.test.mjs'
+      - 'tests/notice-sync-run-report.test.mjs'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -35,7 +37,6 @@ jobs:
     timeout-minutes: 30
     env:
       SEEKOFFER_INGEST_BACKEND: d1
-      SEEKOFFER_INGEST_SECRET: ${{ secrets.SEEKOFFER_INGEST_SECRET }}
       SUPABASE_INGEST_SOURCE: github-actions-sync
       SYNC_MODE: incremental
       TARGET_YEAR: '2026'
@@ -65,19 +66,40 @@ jobs:
         with:
           node-version: '24'
       - name: Check D1 transport boundaries
-        run: node --test tests/notice-d1-transport.test.mjs tests/notice-website-sync.test.mjs
+        id: preflight
+        run: node --test tests/notice-d1-transport.test.mjs tests/notice-website-sync.test.mjs tests/notice-sync-run-report.test.mjs
       - name: Sync notices through authenticated D1 ingestion
         id: ingest
         env:
+          SEEKOFFER_INGEST_SECRET: ${{ secrets.SEEKOFFER_INGEST_SECRET }}
           NOTICE_SYNC_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-sync.json
         run: node scripts/sync-baoyan-notices-to-supabase.mjs
       - name: Verify live website version, ordering and detail
+        id: website
         if: ${{ !cancelled() && steps.ingest.outcome != 'skipped' && env.DRY_RUN != 'true' }}
         # Fixed public endpoints only. No ingest secret is needed by this step.
         env:
           SEEKOFFER_INGEST_SECRET: ''
           NOTICE_WEBSITE_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-website.json
         run: node scripts/verify-notice-website-sync.mjs
+      - name: Record ingestion and website outcomes
+        if: ${{ always() }}
+        env:
+          NOTICE_PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
+          NOTICE_INGEST_OUTCOME: ${{ steps.ingest.outcome }}
+          NOTICE_WEBSITE_OUTCOME: ${{ steps.website.outcome }}
+          NOTICE_SYNC_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-sync.json
+          NOTICE_WEBSITE_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-website.json
+          NOTICE_RUN_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-run.json
+        run: node scripts/summarize-notice-sync-run.mjs
+      - name: Retain sanitized diagnostic receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: notice-sync-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seekoffer-notice-run.json
+          if-no-files-found: warn
+          retention-days: 14
       # The authenticated Worker atomically updates notices + public overrides.
       # No Supabase calls, database tokens, Vercel hooks, frontend build or deploy.
       # No application-level daily count cap. Official quota errors stop safely

@@ -22,6 +22,28 @@ export function toD1Notice(notice) {
     row[key]='h'+row[key];corrected=true;
   }
   if(corrected){row.admin_status='pending';row.is_private=true;row.admin_review_note=[row.admin_review_note,'auto_quality:source_url_scheme_typo'].filter(Boolean).join(';');}
+  // Source pages sometimes contain relative links, prose, or several URLs in
+  // one field. Keep those records for review; never let one bad URL reject a
+  // complete ingestion batch or publish an invented replacement URL.
+  const invalidLinks = [];
+  for (const key of ['source_link', 'apply_link']) {
+    if (!row[key]) continue;
+    let valid = false;
+    try {
+      const url = new URL(row[key]);
+      valid = ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;
+    } catch { /* Retain the original value in the private review note below. */ }
+    if (!valid) {
+      invalidLinks.push(`${key}=${String(row[key]).slice(0, 1000)}`);
+      row[key] = '';
+    }
+  }
+  if (invalidLinks.length) {
+    row.admin_status = ['hidden', 'rejected'].includes(row.admin_status) ? row.admin_status : 'pending';
+    row.is_private = true;
+    row.admin_review_note = ['auto_quality:invalid_source_url', row.admin_review_note].filter(Boolean).join(';').slice(0, 2000);
+    row.remarks = ['原始链接待核对：' + invalidLinks.join('；'), row.remarks].filter(Boolean).join('\n').slice(0, 10000);
+  }
   return row;
 }
 export function orderD1Notices(notices) {
@@ -30,4 +52,17 @@ export function orderD1Notices(notices) {
 export function ingestionShouldRetry(status, code='') {
   if ([402,409].includes(status) || ['INGEST_DAILY_BUDGET','INGEST_CONFLICT_OR_DAILY_BUDGET'].includes(code)) return false;
   return [408,425,429].includes(status) || status >= 500 && status <= 599;
+}
+
+// A 2xx response is not proof that a batch was processed. All notices must be
+// accounted for, including unchanged and manually protected records.
+export function validateD1IngestReceipt(payload, expectedCount) {
+  const invalid=()=>{throw Object.assign(Error('INVALID_INGEST_RECEIPT'),{
+    retryable:false,ingestCode:'INVALID_INGEST_RECEIPT'
+  });};
+  if(!payload||typeof payload!=='object'||Array.isArray(payload)||payload.ok!==true||payload.dryRun===true)invalid();
+  const keys=['noticesReceived','noticesUpserted','unchanged','protected'];
+  if(keys.some(key=>!Number.isSafeInteger(payload[key])||payload[key]<0))invalid();
+  if(payload.noticesReceived!==expectedCount||payload.noticesUpserted+payload.unchanged+payload.protected!==expectedCount)invalid();
+  return Object.fromEntries(keys.map(key=>[key,payload[key]]));
 }
