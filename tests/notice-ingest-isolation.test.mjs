@@ -101,6 +101,11 @@ test('only known deterministic record codes are eligible for isolation', () => {
   }
 });
 
+test('source text normalization removes D1-forbidden control characters', () => {
+  assert.equal(ingest.normalizeSpace('天津大学\u0007材料学院\u001f'), '天津大学材料学院');
+  assert.equal(ingest.normalizeSpace('正常\n文本\t保留'), '正常 文本 保留');
+});
+
 test('receipt keeps bounded sanitized repair metadata while preserving the full count', () => {
   const receipt = noticeSyncReceipt({destination: 'd1.main__notices', complete: true,
     mergedProjects: 3, noticesReceived: 3, noticesUpserted: 2, unchanged: 0, protected: 0,

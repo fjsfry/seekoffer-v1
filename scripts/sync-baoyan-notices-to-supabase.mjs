@@ -193,12 +193,19 @@ function isSourceRateLimitError(error) {
   return /^Source rate limited/.test(toErrorMessage(error));
 }
 
-function normalizeSpace(value) {
+export function normalizeSpace(value) {
   if (value === null || value === undefined) {
     return '';
   }
 
-  return String(value).replace(/\s+/g, ' ').trim();
+  // Some public feeds contain ASCII control characters inside titles or
+  // descriptions. Strip the characters rejected by the D1 Worker while
+  // preserving ordinary spaces and line content. This keeps one malformed
+  // source field from creating a quarantine-only full run.
+  return String(value)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function isWeakSchoolName(value) {

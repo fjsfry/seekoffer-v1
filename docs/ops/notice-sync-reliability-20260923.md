@@ -145,3 +145,24 @@ deployment must preserve the Cloudflare route and pass the live preflight before
 the ingestion secret is made available. A missing route, stale version, private
 field, non-zero website write counter, incomplete ingestion receipt, or source
 security violation is an explicit failed run and retains its sanitized receipt.
+
+## Source quality boundary — 2026-10-03
+
+The first full-reconciliation rehearsal (`37059297359`) found a BEL control
+character in the public Xingke title `xingke-27583`. The D1 Worker correctly
+rejected it with `INVALID_INGEST_TEXT`; the client isolated that single record,
+continued all 7,123 candidates, and reported the repair queue instead of
+silently dropping the rest. The parser now removes only the Worker-forbidden
+ASCII control range before building a notice, while the recursive isolation
+path remains as a defense in depth. A quarantine count greater than zero keeps
+the overall run in `ATTENTION_REQUIRED` even when all valid candidates finish.
+
+Full-mode workflow inputs use an explicit zero sentinel because GitHub Actions
+treats an empty expression as false; the sync parser interprets zero as no page
+or detail limit. This prevents a manual full run from silently falling back to
+the two-page incremental window.
+
+The public `seekoffer-v1.vercel.app` alias was removed from Vercel after the
+route audit. It now returns `DEPLOYMENT_NOT_FOUND`; the canonical `www` host
+continues to be served only by the Cloudflare Worker and remains independently
+verified.

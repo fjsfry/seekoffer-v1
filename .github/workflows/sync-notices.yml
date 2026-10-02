@@ -52,8 +52,10 @@ jobs:
       SYNC_MODE: ${{ (((github.event_name == 'schedule') && (github.event.schedule == '35 2 * * *')) || ((github.event_name == 'workflow_dispatch') && (inputs.sync_mode == 'full'))) && 'full' || 'incremental' }}
       TARGET_YEAR: '2026'
       PRIMARY_ORDER_BY: publishTime
-      PRIMARY_MAX_PAGES: ${{ (((github.event_name == 'schedule') && (github.event.schedule == '35 2 * * *')) || ((github.event_name == 'workflow_dispatch') && (inputs.sync_mode == 'full'))) && '' || '2' }}
-      PRIMARY_MAX_DETAILS: ${{ (((github.event_name == 'schedule') && (github.event.schedule == '35 2 * * *')) || ((github.event_name == 'workflow_dispatch') && (inputs.sync_mode == 'full'))) && '' || '40' }}
+      # GitHub expressions treat an empty string as false. Use the explicit
+      # zero sentinel; the sync script parses it as "no limit" for full mode.
+      PRIMARY_MAX_PAGES: ${{ (((github.event_name == 'schedule') && (github.event.schedule == '35 2 * * *')) || ((github.event_name == 'workflow_dispatch') && (inputs.sync_mode == 'full'))) && '0' || '2' }}
+      PRIMARY_MAX_DETAILS: ${{ (((github.event_name == 'schedule') && (github.event.schedule == '35 2 * * *')) || ((github.event_name == 'workflow_dispatch') && (inputs.sync_mode == 'full'))) && '0' || '40' }}
       PRIMARY_DETAIL_CONCURRENCY: '2'
       PRIMARY_DETAIL_DELAY_MS: '150'
       ENABLE_XINGKE_SOURCE: 'true'
