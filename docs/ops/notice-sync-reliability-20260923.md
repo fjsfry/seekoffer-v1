@@ -107,3 +107,41 @@ version `d25626f2-5c76-487c-8775-c66f192d870e`, valid detail and zero retries.
 The warm request read one row. Public verification reported zero writes and
 did not access accounts. Artifact `notice-sync-35835292363-1` retains the
 sanitized end-to-end receipt for 14 days.
+
+## Production route drift incident — 2026-10-02
+
+Three scheduled runs (`37047552901`, `37008311960`, and `36970289572`) wrote
+successfully to D1 but failed the public website check with Vercel `NOT_FOUND`.
+The production custom domain had been moved to a Vercel static-export deployment
+(`c49bf7e`) that did not contain the public API routes. This was a deployment
+topology failure, not an acquisition or D1 failure. The canonical domain was
+restored to the Cloudflare Worker route `www.seekoffer.com.cn/*` (route id
+`493ef3d142dc494889bafdfb6a6bc069`) serving the reviewed D1 projection. The
+Vercel default alias remains a static presentation endpoint; the canonical
+domain is verified through Cloudflare and never relies on Vercel API routes.
+
+The restored production contract was checked anonymously: list, versioned
+metadata, detail, and warm-cache reads all returned 200; stale versions return
+409; the current public projection contained 10,330 notices through
+2026-10-01; all public response fields passed the privacy boundary; and every
+check reported zero writes. Batch detail is a POST-only contract and is covered
+by the production Worker, while unsupported GET requests are not treated as a
+website failure.
+
+Commit `81dc0dd` added hourly incremental reconciliation, a daily full
+reconciliation, a write-free live website preflight before ingestion, source
+redirect SSRF checks, fail-closed primary-source and full-pagination checks,
+and bounded stage receipts. Commit `aebd901` corrected the preflight receipt
+path so a successful preflight cannot be reported as a missing receipt.
+Run `37055743770` (commit `aebd901`) completed all stages with
+`SYNC_AND_WEBSITE_VERIFIED`: preflight, ingestion, website verification,
+summary, and artifact retention all succeeded. The retained receipt records 81
+merged projects, zero remaining candidates, 10,330 public notices, latest date
+2026-10-01, detail verification, warm-cache verification, and no website
+writes.
+
+The route and Worker version are release dependencies. Any future frontend
+deployment must preserve the Cloudflare route and pass the live preflight before
+the ingestion secret is made available. A missing route, stale version, private
+field, non-zero website write counter, incomplete ingestion receipt, or source
+security violation is an explicit failed run and retains its sanitized receipt.
