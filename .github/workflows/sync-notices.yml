@@ -21,6 +21,7 @@ on:
       - 'tests/notice-website-sync.test.mjs'
       - 'tests/notice-sync-run-report.test.mjs'
       - 'tests/notice-source-security.test.mjs'
+      - 'tests/notice-website-receipt-path.test.mjs'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -76,7 +77,7 @@ jobs:
           node-version: '24'
       - name: Check D1 transport boundaries
         id: preflight
-        run: node --test tests/notice-d1-transport.test.mjs tests/notice-website-sync.test.mjs tests/notice-sync-run-report.test.mjs tests/notice-source-security.test.mjs
+        run: node --test tests/notice-d1-transport.test.mjs tests/notice-website-sync.test.mjs tests/notice-sync-run-report.test.mjs tests/notice-source-security.test.mjs tests/notice-website-receipt-path.test.mjs
       - name: Preflight live D1 website contract
         id: website_preflight
         if: ${{ env.DRY_RUN != 'true' }}

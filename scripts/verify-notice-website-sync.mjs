@@ -152,7 +152,13 @@ async function main() {
   const preflight = process.argv.includes('--preflight') || process.env.NOTICE_WEBSITE_PREFLIGHT === 'true';
   try { report = await verifyNoticeWebsite({preflight}); }
   catch (error) { report = websiteFailureReport(error); process.exitCode = 1; }
-  if (process.env.NOTICE_WEBSITE_RECEIPT_PATH) fs.writeFileSync(process.env.NOTICE_WEBSITE_RECEIPT_PATH, JSON.stringify(report, null, 2));
+  // Keep the pre-ingestion contract receipt separate from the post-ingestion
+  // website receipt. Mixing the paths makes a successful preflight look like
+  // a missing receipt in the final run report.
+  const receiptPath = websiteReceiptPath({preflight,
+    preflightPath: process.env.NOTICE_WEBSITE_PREFLIGHT_RECEIPT_PATH,
+    websitePath: process.env.NOTICE_WEBSITE_RECEIPT_PATH});
+  if (receiptPath) fs.writeFileSync(receiptPath, JSON.stringify(report, null, 2));
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
     `### D1 → production website\n\nStatus: **${report.state}**\n\n` + (report.code ?
       `Error: ${report.code}; endpoint: ${report.failedPath}; transient retries: ${report.transientRetries}.\n\n` +
@@ -161,4 +167,9 @@ async function main() {
       `16-row payload: ${report.listBytes} bytes; detail checked: ${report.detailChecked}; warm cache: ${report.warmCache}; reported reads: ${report.rowsRead}.\n\nNo login, private account access, build, deployment or database writes are performed by this check.\n`));
   console.log(JSON.stringify(report));
 }
+
+export function websiteReceiptPath({preflight = false, preflightPath, websitePath} = {}) {
+  return preflight ? (preflightPath || websitePath) : websitePath;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) await main();
