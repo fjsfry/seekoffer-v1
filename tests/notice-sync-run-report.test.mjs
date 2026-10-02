@@ -47,6 +47,14 @@ test('only successful outcomes with complete valid receipts are considered verif
   assert.match(formatNoticeRunSummary(missing), /no zero-work success is inferred/);
 });
 
+test('deterministically quarantined records keep writes safe but require attention', () => {
+  const report = run({ingestion: ingestion({quarantinedCount: 1, quarantined: [{id: 'baoyantongzhi-bad', code: 'INVALID_INGEST_TEXT'}]})});
+  assert.equal(report.ingestion.complete, true);
+  assert.equal(report.ingestion.quarantinedCount, 1);
+  assert.equal(report.ok, false);
+  assert.match(formatNoticeRunSummary(report), /Quarantined 1 deterministic invalid record/);
+});
+
 test('dry runs explicitly skip website verification and cannot claim database writes', () => {
   const base = {dryRun: true, websiteOutcome: 'skipped', website: {state: 'MISSING'},
     ingestion: ingestion({destination: 'dry-run', noticesUpserted: 0, rowsWritten: 0})};

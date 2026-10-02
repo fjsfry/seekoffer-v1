@@ -12,7 +12,7 @@ const outcome = value => outcomes.has(value) ? value : 'skipped';
 const isoDate = value => typeof value === 'string' && /^20\d{2}-\d{2}-\d{2}T[\d:.]+Z$/.test(value) && Number.isFinite(Date.parse(value)) ? value : null;
 const uuid = value => typeof value === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value) ? value : null;
 const ingestCounts = ['mergedProjects', 'noticesReceived', 'noticesUpserted', 'unchanged', 'protected',
-  'remainingCandidates', 'rowsRead', 'rowsWritten', 'completedBatches'];
+  'remainingCandidates', 'rowsRead', 'rowsWritten', 'completedBatches', 'quarantinedCount'];
 
 export function readRunReceipt(file) {
   if (!file || !fs.existsSync(file)) return {state: 'MISSING'};
@@ -63,7 +63,7 @@ export function noticeRunReport({preflightOutcome, ingestOutcome, websiteOutcome
   const ingest = {outcome: outcome(ingestOutcome), ...ingestionReceipt(ingestion)};
   const site = {outcome: outcome(websiteOutcome), ...websiteReceipt(website)};
   const imported = ingest.outcome === 'success' && ingest.receiptState === 'PRESENT' && ingest.complete === true &&
-    ingest.remainingCandidates === 0 && !ingest.stoppedReason && (!dryRun || ingest.rowsWritten === 0) &&
+    ingest.remainingCandidates === 0 && ingest.quarantinedCount === 0 && !ingest.stoppedReason && (!dryRun || ingest.rowsWritten === 0) &&
     ingest.destination === (dryRun ? 'dry-run' : 'd1.main__notices');
   const verified = site.outcome === 'success' && site.receiptState === 'PRESENT' && site.state === 'WEBSITE_SYNC_VERIFIED';
   const livePreflight = dryRun || (sitePreflight.outcome === 'success' && sitePreflight.receiptState === 'PRESENT' && sitePreflight.state === 'WEBSITE_PREFLIGHT_VERIFIED');
@@ -78,6 +78,7 @@ export function noticeRunReport({preflightOutcome, ingestOutcome, websiteOutcome
 function ingestionLabel(stage) {
   if (stage.outcome === 'skipped') return 'Not run';
   if (stage.receiptState !== 'PRESENT') return `${stage.outcome}; receipt ${stage.receiptState.toLowerCase()}`;
+  if (stage.quarantinedCount > 0) return `${stage.complete ? 'Complete' : 'Incomplete'}; quarantined ${stage.quarantinedCount}; step ${stage.outcome}`;
   return `${stage.complete ? 'Complete' : 'Incomplete'}; step ${stage.outcome}`;
 }
 function websiteLabel(stage, dryRun) {
@@ -95,6 +96,11 @@ export function formatNoticeRunSummary(report) {
   if (ingest.receiptState === 'PRESENT') lines.push(
     `Processed ${ingest.noticesReceived}; changed ${ingest.noticesUpserted}; unchanged ${ingest.unchanged}; protected ${ingest.protected}; remaining ${ingest.remainingCandidates}.`, '',
     `Ingestion reads ${ingest.rowsRead}, writes ${ingest.rowsWritten}; completed batches ${ingest.completedBatches}.`, '');
+  if (ingest.receiptState === 'PRESENT' && ingest.quarantinedCount > 0) {
+    const ids = (ingest.quarantined || []).map(item => `${item.id} (${item.code})`).slice(0, 20);
+    lines.push(`Quarantined ${ingest.quarantinedCount} deterministic invalid record(s); remaining valid candidates continued.`,
+      ids.length ? `Repair queue (first ${ids.length}): ${ids.join(', ')}${ingest.quarantinedCount > ids.length ? ', …' : ''}.` : '', '');
+  }
   if (ingest.stoppedReason) lines.push(`Ingestion stop: ${ingest.stoppedReason}.`, '');
   if (site.code) lines.push(`Website error: ${site.code}; endpoint: ${site.failedPath || 'unreported'}.`, '');
   if (ingest.complete && site.outcome === 'failure') lines.push('D1 ingestion completed. Website verification failed separately; completed writes are retained. A website check must not be repaired by replaying ingestion.', '');
