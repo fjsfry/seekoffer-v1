@@ -1,4 +1,7 @@
 {
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next-web",
   "rewrites": [
     {
       "source": "/googlef6d37ad2e103e5b2.html",
