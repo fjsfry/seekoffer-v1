@@ -166,3 +166,11 @@ The public `seekoffer-v1.vercel.app` alias was removed from Vercel after the
 route audit. It now returns `DEPLOYMENT_NOT_FOUND`; the canonical `www` host
 continues to be served only by the Cloudflare Worker and remains independently
 verified.
+
+Final full validation run `37061514571` (commit `eb49974`) completed in 13
+minutes with `SYNC_AND_WEBSITE_VERIFIED`: unrestricted primary pagination was
+enabled and completed, 7,043 merged candidates were accounted for, 1,174 D1 batches completed, zero
+records were quarantined, and zero candidates remained. The public check then
+verified 10,330 notices through 2026-10-01, a valid detail, warm cache behavior,
+and zero website writes. The retained artifact is
+`notice-sync-37061514571-1`.
