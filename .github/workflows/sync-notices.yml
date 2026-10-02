@@ -4,6 +4,9 @@ on:
   schedule:
     # GitHub schedules use UTC and can be delayed by runner availability.
     - cron: '20 * * * *'
+    # A bounded full reconciliation catches pagination gaps and source outages
+    # that an hourly ten-day incremental window cannot detect.
+    - cron: '35 2 * * *'
   push:
     branches: [main]
     paths:
@@ -17,12 +20,18 @@ on:
       - 'tests/notice-d1-transport.test.mjs'
       - 'tests/notice-website-sync.test.mjs'
       - 'tests/notice-sync-run-report.test.mjs'
+      - 'tests/notice-source-security.test.mjs'
   workflow_dispatch:
     inputs:
       dry_run:
         description: 'Acquire and validate public notices without D1 writes'
         type: boolean
         default: false
+      sync_mode:
+        description: 'Incremental hourly sync or full reconciliation'
+        type: choice
+        options: [incremental, full]
+        default: incremental
 
 concurrency:
   group: seekoffer-notice-ingestion
@@ -34,15 +43,15 @@ jobs:
   sync:
     name: Acquire, validate and update D1 notices
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       SEEKOFFER_INGEST_BACKEND: d1
       SUPABASE_INGEST_SOURCE: github-actions-sync
-      SYNC_MODE: incremental
+      SYNC_MODE: ${{ (github.event_name == 'schedule' && github.event.schedule == '35 2 * * *') && 'full' || inputs.sync_mode || 'incremental' }}
       TARGET_YEAR: '2026'
       PRIMARY_ORDER_BY: publishTime
-      PRIMARY_MAX_PAGES: '2'
-      PRIMARY_MAX_DETAILS: '40'
+      PRIMARY_MAX_PAGES: ${{ (github.event_name == 'schedule' && github.event.schedule == '35 2 * * *') && '' || '2' }}
+      PRIMARY_MAX_DETAILS: ${{ (github.event_name == 'schedule' && github.event.schedule == '35 2 * * *') && '' || '40' }}
       PRIMARY_DETAIL_CONCURRENCY: '2'
       PRIMARY_DETAIL_DELAY_MS: '150'
       ENABLE_XINGKE_SOURCE: 'true'
@@ -67,7 +76,15 @@ jobs:
           node-version: '24'
       - name: Check D1 transport boundaries
         id: preflight
-        run: node --test tests/notice-d1-transport.test.mjs tests/notice-website-sync.test.mjs tests/notice-sync-run-report.test.mjs
+        run: node --test tests/notice-d1-transport.test.mjs tests/notice-website-sync.test.mjs tests/notice-sync-run-report.test.mjs tests/notice-source-security.test.mjs
+      - name: Preflight live D1 website contract
+        id: website_preflight
+        if: ${{ env.DRY_RUN != 'true' }}
+        env:
+          SEEKOFFER_INGEST_SECRET: ''
+          NOTICE_WEBSITE_PREFLIGHT: 'true'
+          NOTICE_WEBSITE_PREFLIGHT_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-preflight.json
+        run: node scripts/verify-notice-website-sync.mjs --preflight
       - name: Sync notices through authenticated D1 ingestion
         id: ingest
         env:
@@ -86,9 +103,11 @@ jobs:
         if: ${{ always() }}
         env:
           NOTICE_PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
+          NOTICE_WEBSITE_PREFLIGHT_OUTCOME: ${{ steps.website_preflight.outcome }}
           NOTICE_INGEST_OUTCOME: ${{ steps.ingest.outcome }}
           NOTICE_WEBSITE_OUTCOME: ${{ steps.website.outcome }}
           NOTICE_SYNC_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-sync.json
+          NOTICE_WEBSITE_PREFLIGHT_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-preflight.json
           NOTICE_WEBSITE_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-website.json
           NOTICE_RUN_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-run.json
         run: node scripts/summarize-notice-sync-run.mjs

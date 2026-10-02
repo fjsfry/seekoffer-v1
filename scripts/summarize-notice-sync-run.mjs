@@ -37,8 +37,8 @@ function ingestionReceipt(input) {
 function websiteReceipt(input) {
   if (input.state !== 'PRESENT') return {receiptState: input.state};
   const raw = input.value;
-  if (!['WEBSITE_SYNC_VERIFIED', 'WEBSITE_SYNC_FAILED'].includes(raw.state)) return {receiptState: 'INVALID'};
-  if (raw.state === 'WEBSITE_SYNC_VERIFIED' && (!uuid(raw.version) || count(raw.total) === null)) return {receiptState: 'INVALID'};
+  if (!['WEBSITE_PREFLIGHT_VERIFIED', 'WEBSITE_SYNC_VERIFIED', 'WEBSITE_SYNC_FAILED'].includes(raw.state)) return {receiptState: 'INVALID'};
+  if (['WEBSITE_PREFLIGHT_VERIFIED', 'WEBSITE_SYNC_VERIFIED'].includes(raw.state) && (!uuid(raw.version) || count(raw.total) === null)) return {receiptState: 'INVALID'};
   const requests = Array.isArray(raw.requests) ? raw.requests.slice(0, 32).map(request => ({
     path: paths.has(request?.path) ? request.path : null,
     attempt: count(request?.attempt), status: count(request?.status),
@@ -56,19 +56,23 @@ function websiteReceipt(input) {
 // Stage outcomes are independent: a failed website check cannot turn completed
 // D1 writes into an ingestion failure, and cannot make the overall run green.
 export function noticeRunReport({preflightOutcome, ingestOutcome, websiteOutcome, dryRun = false,
-  ingestion = {state: 'MISSING'}, website = {state: 'MISSING'}} = {}) {
+  websitePreflightOutcome, ingestion = {state: 'MISSING'}, websitePreflight = {state: 'MISSING'},
+  website = {state: 'MISSING'}} = {}) {
   const preflight = outcome(preflightOutcome);
+  const sitePreflight = {outcome: outcome(websitePreflightOutcome), ...websiteReceipt(websitePreflight)};
   const ingest = {outcome: outcome(ingestOutcome), ...ingestionReceipt(ingestion)};
   const site = {outcome: outcome(websiteOutcome), ...websiteReceipt(website)};
   const imported = ingest.outcome === 'success' && ingest.receiptState === 'PRESENT' && ingest.complete === true &&
     ingest.remainingCandidates === 0 && !ingest.stoppedReason && (!dryRun || ingest.rowsWritten === 0) &&
     ingest.destination === (dryRun ? 'dry-run' : 'd1.main__notices');
   const verified = site.outcome === 'success' && site.receiptState === 'PRESENT' && site.state === 'WEBSITE_SYNC_VERIFIED';
-  const ok = preflight === 'success' && imported && (dryRun ? site.outcome === 'skipped' : verified);
+  const livePreflight = dryRun || (sitePreflight.outcome === 'success' && sitePreflight.receiptState === 'PRESENT' && sitePreflight.state === 'WEBSITE_PREFLIGHT_VERIFIED');
+  const ok = preflight === 'success' && livePreflight && imported && (dryRun ? site.outcome === 'skipped' : verified);
   return {schemaVersion: 1, at: new Date().toISOString(), ok,
     state: ok ? (dryRun ? 'DRY_RUN_COMPLETE' : 'SYNC_AND_WEBSITE_VERIFIED') :
-      [preflight, ingest.outcome, site.outcome].includes('cancelled') ? 'CANCELLED' : 'ATTENTION_REQUIRED',
-    dryRun, preflight: {outcome: preflight}, ingestion: ingest, website: site, accountDataRead: false};
+      [preflight, sitePreflight.outcome, ingest.outcome, site.outcome].includes('cancelled') ? 'CANCELLED' : 'ATTENTION_REQUIRED',
+    dryRun, preflight: {outcome: preflight}, websitePreflight: sitePreflight,
+    ingestion: ingest, website: site, accountDataRead: false};
 }
 
 function ingestionLabel(stage) {
@@ -85,6 +89,7 @@ export function formatNoticeRunSummary(report) {
   const ingest = report.ingestion, site = report.website;
   const lines = ['### Notice sync result', '', `Overall: **${report.state}**`, '',
     '| Stage | Result |', '| --- | --- |', `| Preflight | ${report.preflight.outcome} |`,
+    `| Live website preflight | ${report.websitePreflight.outcome} |`,
     `| Acquisition / D1 ingestion | ${ingestionLabel(ingest)} |`,
     `| Public website verification | ${websiteLabel(site, report.dryRun)} |`, ''];
   if (ingest.receiptState === 'PRESENT') lines.push(
@@ -100,8 +105,11 @@ export function formatNoticeRunSummary(report) {
 
 export function saveNoticeRunReport(env = process.env) {
   const report = noticeRunReport({preflightOutcome: env.NOTICE_PREFLIGHT_OUTCOME, ingestOutcome: env.NOTICE_INGEST_OUTCOME,
+    websitePreflightOutcome: env.NOTICE_WEBSITE_PREFLIGHT_OUTCOME,
     websiteOutcome: env.NOTICE_WEBSITE_OUTCOME, dryRun: env.DRY_RUN === 'true',
-    ingestion: readRunReceipt(env.NOTICE_SYNC_RECEIPT_PATH), website: readRunReceipt(env.NOTICE_WEBSITE_RECEIPT_PATH)});
+    ingestion: readRunReceipt(env.NOTICE_SYNC_RECEIPT_PATH),
+    websitePreflight: readRunReceipt(env.NOTICE_WEBSITE_PREFLIGHT_RECEIPT_PATH),
+    website: readRunReceipt(env.NOTICE_WEBSITE_RECEIPT_PATH)});
   if (env.NOTICE_RUN_RECEIPT_PATH) fs.writeFileSync(env.NOTICE_RUN_RECEIPT_PATH, JSON.stringify(report, null, 2), {mode: 0o600});
   if (env.GITHUB_STEP_SUMMARY) fs.appendFileSync(env.GITHUB_STEP_SUMMARY, formatNoticeRunSummary(report));
   return report;

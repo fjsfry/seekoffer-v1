@@ -2,6 +2,7 @@ import http from 'node:http';
 import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import {orderD1Notices, ingestionShouldRetry, validateD1IngestReceipt} from './notice-d1-transport.mjs';
 import {saveNoticeSyncReceipt} from './notice-sync-report.mjs';
 import {
@@ -1284,6 +1285,9 @@ function decodeResponseBuffer(buffer, contentType = '') {
 }
 
 function requestTextWithNode(url, headers = {}, redirectCount = 0) {
+  if (!isSafePublicUrl(url.toString())) {
+    return Promise.reject(new Error('UNSAFE_REQUEST_URL'));
+  }
   return new Promise((resolve, reject) => {
     const client = url.protocol === 'http:' ? http : https;
     const request = client.request(
@@ -1302,7 +1306,12 @@ function requestTextWithNode(url, headers = {}, redirectCount = 0) {
             reject(new Error(`Too many redirects: ${url.toString()}`));
             return;
           }
-          resolve(requestTextWithNode(new URL(location, url), headers, redirectCount + 1));
+          const nextUrl = new URL(location, url);
+          if (!isSafePublicUrl(nextUrl.toString())) {
+            reject(new Error('UNSAFE_REDIRECT_TARGET'));
+            return;
+          }
+          resolve(requestTextWithNode(nextUrl, headers, redirectCount + 1));
           return;
         }
 
@@ -1867,7 +1876,7 @@ function buildBaoyanNewsProjects(records) {
   return records.map((record) => buildBaoyanNewsProject(record, TARGET_YEAR));
 }
 
-function isSafePublicUrl(value) {
+export function isSafePublicUrl(value) {
   const text = normalizeSpace(value);
   if (!text) return false;
   try {
@@ -2295,13 +2304,9 @@ function assessSyncHealth(sourceStats, qualityStats) {
   }
 
   const primaryFetchMeta = sourceStats.primaryFetchMeta;
-  if (
-    primaryFetchMeta &&
-    !primaryFetchMeta.intentionallyLimited &&
-    primaryFetchMeta.expectedTotal > primaryFetchMeta.returnedRows &&
-    primaryFetchMeta.emptyPage
-  ) {
-    warnings.push('primary_incomplete_pagination');
+  if (primaryFetchMeta && !primaryFetchMeta.intentionallyLimited && primaryFetchMeta.expectedTotal > primaryFetchMeta.returnedRows) {
+    if (SYNC_MODE === 'full') errors.push('primary_incomplete_pagination');
+    else warnings.push('primary_incomplete_pagination');
   }
 
   return {
@@ -2475,6 +2480,11 @@ async function runSync() {
   const health = assessSyncHealth(sourceStats, qualityStats);
   if (sourceErrors.length) {
     health.warnings.push(...sourceErrors.map((item) => `${item.source}_source_unavailable`));
+    // The primary source is canonical. Continuing with only optional mirrors
+    // would make a green run look complete while silently dropping new notices.
+    if (sourceErrors.some((item) => item.source === 'primary')) {
+      health.errors.push('primary_source_unavailable');
+    }
   }
   if (secondaryRepairFailures.length) {
     health.warnings.push('secondary_detail_repair_failed');
@@ -2586,16 +2596,18 @@ async function runSync() {
   return result;
 }
 
-runSync().catch((error) => {
-  console.error(
-    JSON.stringify(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : String(error)
-      },
-      null,
-      2
-    )
-  );
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  runSync().catch((error) => {
+    console.error(
+      JSON.stringify(
+        {
+          ok: false,
+          error: error instanceof Error ? error.message : String(error)
+        },
+        null,
+        2
+      )
+    );
+    process.exit(1);
+  });
+}

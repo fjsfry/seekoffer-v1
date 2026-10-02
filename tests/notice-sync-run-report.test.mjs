@@ -13,8 +13,9 @@ const ingestion = (patch = {}) => ({state: 'PRESENT', value: noticeSyncReceipt({
   complete: true, noticesReceived: 2126, noticesUpserted: 6, unchanged: 1394, protected: 726,
   rowsRead: 4303, rowsWritten: 67, completedBatches: 355, ...patch})});
 const website = (patch = {}) => ({state: 'PRESENT', value: {state: 'WEBSITE_SYNC_VERIFIED', version, total: 9976, ...patch}});
-const run = (patch = {}) => noticeRunReport({preflightOutcome: 'success', ingestOutcome: 'success', websiteOutcome: 'success',
-  ingestion: ingestion(), website: website(), ...patch});
+const websitePreflight = (patch = {}) => ({state: 'PRESENT', value: {state: 'WEBSITE_PREFLIGHT_VERIFIED', version, total: 9976, ...patch}});
+const run = (patch = {}) => noticeRunReport({preflightOutcome: 'success', websitePreflightOutcome: 'success', ingestOutcome: 'success', websiteOutcome: 'success',
+  ingestion: ingestion(), websitePreflight: websitePreflight(), website: website(), ...patch});
 
 test('completed ingestion and a failed website remain distinct and never produce a green run', () => {
   const report = run({websiteOutcome: 'failure', website: website({state: 'WEBSITE_SYNC_FAILED', code: 'WEBSITE_HTTP_503',
@@ -34,7 +35,7 @@ test('partial ingestion cannot be covered by a healthy website', () => {
 
 test('only successful outcomes with complete valid receipts are considered verified', () => {
   assert.equal(run().state, 'SYNC_AND_WEBSITE_VERIFIED');
-  for (const change of [{ingestOutcome: 'failure'}, {websiteOutcome: 'failure'}, {preflightOutcome: 'failure'},
+  for (const change of [{ingestOutcome: 'failure'}, {websiteOutcome: 'failure'}, {websitePreflightOutcome: 'failure'}, {preflightOutcome: 'failure'},
     {ingestion: {state: 'MISSING'}}, {website: {state: 'INVALID'}}, {websiteOutcome: 'skipped'},
     {ingestion: {state: 'PRESENT', value: {schemaVersion: 1, destination: 'd1.main__notices', complete: true}}},
     {website: website({version: 'invalid'})}, {ingestion: ingestion({remainingCandidates: 3})}]) {
@@ -82,8 +83,9 @@ test('CLI always writes a bounded diagnostic artifact, and a failed stage remain
     assert.deepEqual(readRunReceipt(path.join(dir, 'missing.json')), {state: 'MISSING'});
     const input = path.join(dir, 'ingest.json'), websitePath = path.join(dir, 'website.json');
     fs.writeFileSync(input, JSON.stringify(ingestion().value)); fs.writeFileSync(websitePath, JSON.stringify(website().value));
-    const good = saveNoticeRunReport({NOTICE_PREFLIGHT_OUTCOME: 'success', NOTICE_INGEST_OUTCOME: 'success', NOTICE_WEBSITE_OUTCOME: 'success',
-      NOTICE_SYNC_RECEIPT_PATH: input, NOTICE_WEBSITE_RECEIPT_PATH: websitePath, NOTICE_RUN_RECEIPT_PATH: output});
+    const preflightPath = path.join(dir, 'preflight.json'); fs.writeFileSync(preflightPath, JSON.stringify(websitePreflight().value));
+    const good = saveNoticeRunReport({NOTICE_PREFLIGHT_OUTCOME: 'success', NOTICE_WEBSITE_PREFLIGHT_OUTCOME: 'success', NOTICE_INGEST_OUTCOME: 'success', NOTICE_WEBSITE_OUTCOME: 'success',
+      NOTICE_SYNC_RECEIPT_PATH: input, NOTICE_WEBSITE_PREFLIGHT_RECEIPT_PATH: preflightPath, NOTICE_WEBSITE_RECEIPT_PATH: websitePath, NOTICE_RUN_RECEIPT_PATH: output});
     assert.equal(good.ok, true); assert.equal(JSON.parse(fs.readFileSync(output)).ok, true);
   } finally { fs.rmSync(dir, {recursive: true, force: true}); }
 });

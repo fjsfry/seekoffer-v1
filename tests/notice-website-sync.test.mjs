@@ -30,6 +30,12 @@ test('repeated version changes cannot be accepted even when every response is 20
   const f=fixture((r,u,calls)=>{if(u.pathname==='/api/public/notices/'&&[4,8].includes(calls.length))r.data={...r.data,metadataVersion:next};});
   await assert.rejects(verifyNoticeWebsite(f),/PUBLIC_VERSION_CHANGED/);assert.equal(f.calls.length,8);
 });
+test('preflight validates the live D1 list before ingestion without touching metadata or detail',async()=>{
+  const f=fixture(),r=await verifyNoticeWebsite({...f,preflight:true});
+  assert.equal(r.state,'WEBSITE_PREFLIGHT_VERIFIED');
+  assert.equal(r.version,version);assert.equal(r.total,20);assert.equal(r.detailChecked,false);
+  assert.equal(f.calls.length,1);assert.equal(f.calls[0].path,'/api/public/notices/');
+});
 test('one concurrent version change retries once then verifies a consistent version',async()=>{
   const f=fixture((r,u,calls)=>{if(u.pathname==='/api/public/notices/'&&calls.length===4)r.data={...r.data,metadataVersion:next};});
   assert.equal((await verifyNoticeWebsite(f)).state,'WEBSITE_SYNC_VERIFIED');assert.equal(f.calls.length,8);

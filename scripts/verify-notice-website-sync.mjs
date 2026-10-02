@@ -55,7 +55,7 @@ export function websiteFailureReport(error) {
 // Anonymous, read-only verification with fixed hosts, bounded payloads and no
 // random cache-busting. Two transient retries are shared by the entire check,
 // including its one version restart. Never repeat ingestion or retry 402/429.
-export async function verifyNoticeWebsite({fetchImpl = fetch, sleep = ms => new Promise(r => setTimeout(r, ms))} = {}) {
+export async function verifyNoticeWebsite({fetchImpl = fetch, sleep = ms => new Promise(r => setTimeout(r, ms)), preflight = false} = {}) {
   const requests = [];
   let transientRetries = 0;
   async function read(url, limit = 512000) {
@@ -109,6 +109,12 @@ export async function verifyNoticeWebsite({fetchImpl = fetch, sleep = ms => new 
         // version. Verify that serving path without downloading recovery shards.
         validatePage(page);
         const before = {version: page.metadataVersion};
+        if (preflight) {
+          return {at: new Date().toISOString(), state: 'WEBSITE_PREFLIGHT_VERIFIED', version: before.version,
+            total: page.pagination.total, latestDate: page.items[0]?.publishDate || null,
+            listBytes: first.record.bytes, detailChecked: false, warmCache: first.record.cache,
+            requests, transientRetries, rowsRead: requests.reduce((n, r) => n + (r.rowsRead || 0), 0), accountDataRead: false};
+        }
         const metadata = (await read(site + '/api/public/notices/metadata/?section=summary&version=' + encodeURIComponent(before.version))).data;
         requireValue(metadata.version === before.version && metadata.stats?.total2026 === page.pagination.total, 'WEBSITE_METADATA_MISMATCH');
         let detailChecked = false;
@@ -143,7 +149,8 @@ export async function verifyNoticeWebsite({fetchImpl = fetch, sleep = ms => new 
 
 async function main() {
   let report;
-  try { report = await verifyNoticeWebsite(); }
+  const preflight = process.argv.includes('--preflight') || process.env.NOTICE_WEBSITE_PREFLIGHT === 'true';
+  try { report = await verifyNoticeWebsite({preflight}); }
   catch (error) { report = websiteFailureReport(error); process.exitCode = 1; }
   if (process.env.NOTICE_WEBSITE_RECEIPT_PATH) fs.writeFileSync(process.env.NOTICE_WEBSITE_RECEIPT_PATH, JSON.stringify(report, null, 2));
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
