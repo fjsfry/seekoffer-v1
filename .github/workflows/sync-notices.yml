@@ -65,8 +65,8 @@ jobs:
       REQUEST_TIMEOUT_MS: '15000'
       MAX_RATE_LIMIT_RETRY_AFTER_SECONDS: '30'
       DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
-      NOTICE_SYNC_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-sync.json
-      NOTICE_WEBSITE_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-website.json
+      NOTICE_SYNC_RECEIPT_PATH: ${{ github.workspace }}/.seekoffer-notice-sync.json
+      NOTICE_WEBSITE_RECEIPT_PATH: ${{ github.workspace }}/.seekoffer-notice-website.json
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -95,8 +95,8 @@ jobs:
         with:
           name: notice-sync-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/seekoffer-notice-sync.json
-            ${{ runner.temp }}/seekoffer-notice-website.json
+            ${{ github.workspace }}/.seekoffer-notice-sync.json
+            ${{ github.workspace }}/.seekoffer-notice-website.json
           if-no-files-found: ignore
           retention-days: 14
 
