@@ -129,6 +129,7 @@ jobs:
             ${{ github.workspace }}/.seekoffer-notice-website.json
             ${{ github.workspace }}/.seekoffer-d1-preflight.json
           if-no-files-found: ignore
+          include-hidden-files: true
           retention-days: 14
 
       # The Worker atomically updates D1 notices and their public projection.
