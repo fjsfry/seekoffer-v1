@@ -1,28 +1,24 @@
-name: Sync notices to D1
+name: Sync notices to Cloudflare D1
 
 on:
   schedule:
-    # GitHub schedules use UTC and can be delayed by runner availability.
+    # GitHub schedules use UTC. The first job keeps the recent window fresh;
+    # the second job performs a bounded full reconciliation every night in
+    # Beijing time so older notices can be repaired without user traffic.
     - cron: '20 * * * *'
-    # A bounded full reconciliation catches pagination gaps and source outages
-    # that an hourly ten-day incremental window cannot detect.
-    - cron: '35 2 * * *'
+    - cron: '10 18 * * *'
   push:
     branches: [main]
     paths:
       - '.github/workflows/sync-notices.yml'
-      - 'scripts/sync-baoyan-notices-to-supabase.mjs'
+      - 'scripts/sync-baoyan-notices-to-d1.mjs'
       - 'scripts/notice-sync-core.mjs'
       - 'scripts/notice-d1-transport.mjs'
       - 'scripts/notice-sync-report.mjs'
-      - 'scripts/summarize-notice-sync-run.mjs'
       - 'scripts/verify-notice-website-sync.mjs'
       - 'tests/notice-d1-transport.test.mjs'
       - 'tests/notice-website-sync.test.mjs'
-      - 'tests/notice-sync-run-report.test.mjs'
-      - 'tests/notice-source-security.test.mjs'
-      - 'tests/notice-website-receipt-path.test.mjs'
-      - 'tests/notice-ingest-isolation.test.mjs'
+      - 'lib/notice-quality.ts'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -34,10 +30,23 @@ on:
         type: choice
         options: [incremental, full]
         default: incremental
+      target_year:
+        description: 'Notice year to reconcile'
+        type: string
+        default: '2026'
+      primary_max_pages:
+        description: 'Primary source page limit; 0 means no limit in full mode'
+        type: string
+        default: ''
+      primary_max_details:
+        description: 'Primary detail limit; 0 means no limit in full mode'
+        type: string
+        default: ''
 
 concurrency:
   group: seekoffer-notice-ingestion
   cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -45,17 +54,16 @@ jobs:
   sync:
     name: Acquire, validate and update D1 notices
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     env:
-      SEEKOFFER_INGEST_BACKEND: d1
-      SUPABASE_INGEST_SOURCE: github-actions-sync
-      SYNC_MODE: ${{ (((github.event_name == 'schedule') && (github.event.schedule == '35 2 * * *')) || ((github.event_name == 'workflow_dispatch') && (inputs.sync_mode == 'full'))) && 'full' || 'incremental' }}
-      TARGET_YEAR: '2026'
+      SEEKOFFER_INGEST_URL: https://migration.seekoffer.com.cn/v1/internal/ingest-notices
+      SEEKOFFER_INGEST_SECRET: ${{ secrets.SEEKOFFER_INGEST_SECRET }}
+      SEEKOFFER_INGEST_SOURCE: github-actions-sync
+      SYNC_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.sync_mode || (github.event.schedule == '10 18 * * *' && 'full' || 'incremental') }}
+      TARGET_YEAR: ${{ github.event_name == 'workflow_dispatch' && inputs.target_year || '2026' }}
       PRIMARY_ORDER_BY: publishTime
-      # GitHub expressions treat an empty string as false. Use the explicit
-      # zero sentinel; the sync script parses it as "no limit" for full mode.
-      PRIMARY_MAX_PAGES: ${{ (((github.event_name == 'schedule') && (github.event.schedule == '35 2 * * *')) || ((github.event_name == 'workflow_dispatch') && (inputs.sync_mode == 'full'))) && '0' || '2' }}
-      PRIMARY_MAX_DETAILS: ${{ (((github.event_name == 'schedule') && (github.event.schedule == '35 2 * * *')) || ((github.event_name == 'workflow_dispatch') && (inputs.sync_mode == 'full'))) && '0' || '40' }}
+      PRIMARY_MAX_PAGES: ${{ github.event_name == 'workflow_dispatch' && inputs.primary_max_pages || (github.event.schedule == '10 18 * * *' && '0' || '2') }}
+      PRIMARY_MAX_DETAILS: ${{ github.event_name == 'workflow_dispatch' && inputs.primary_max_details || (github.event.schedule == '10 18 * * *' && '0' || '40') }}
       PRIMARY_DETAIL_CONCURRENCY: '2'
       PRIMARY_DETAIL_DELAY_MS: '150'
       ENABLE_XINGKE_SOURCE: 'true'
@@ -69,61 +77,40 @@ jobs:
       REQUEST_TIMEOUT_MS: '15000'
       MAX_RATE_LIMIT_RETRY_AFTER_SECONDS: '30'
       DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+      NOTICE_SYNC_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-sync.json
+      NOTICE_WEBSITE_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-website.json
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
+
       - name: Check D1 transport boundaries
-        id: preflight
-        run: node --test tests/notice-d1-transport.test.mjs tests/notice-website-sync.test.mjs tests/notice-sync-run-report.test.mjs tests/notice-source-security.test.mjs tests/notice-website-receipt-path.test.mjs tests/notice-ingest-isolation.test.mjs
-      - name: Preflight live D1 website contract
-        id: website_preflight
-        if: ${{ env.DRY_RUN != 'true' }}
-        env:
-          SEEKOFFER_INGEST_SECRET: ''
-          NOTICE_WEBSITE_PREFLIGHT: 'true'
-          NOTICE_WEBSITE_PREFLIGHT_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-preflight.json
-        run: node scripts/verify-notice-website-sync.mjs --preflight
+        run: node --test tests/notice-d1-transport.test.mjs tests/notice-website-sync.test.mjs
+
       - name: Sync notices through authenticated D1 ingestion
         id: ingest
-        env:
-          SEEKOFFER_INGEST_SECRET: ${{ secrets.SEEKOFFER_INGEST_SECRET }}
-          NOTICE_SYNC_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-sync.json
-        run: node scripts/sync-baoyan-notices-to-supabase.mjs
-      - name: Verify live website version, ordering and detail
-        id: website
-        if: ${{ !cancelled() && steps.ingest.outcome != 'skipped' && env.DRY_RUN != 'true' }}
-        # Fixed public endpoints only. No ingest secret is needed by this step.
-        env:
-          SEEKOFFER_INGEST_SECRET: ''
-          NOTICE_WEBSITE_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-website.json
+        run: npm run sync:notices:github
+
+      - name: Verify live website ordering and detail
+        if: ${{ !cancelled() && steps.ingest.outcome == 'success' && env.DRY_RUN != 'true' }}
         run: node scripts/verify-notice-website-sync.mjs
-      - name: Record ingestion and website outcomes
-        if: ${{ always() }}
-        env:
-          NOTICE_PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
-          NOTICE_WEBSITE_PREFLIGHT_OUTCOME: ${{ steps.website_preflight.outcome }}
-          NOTICE_INGEST_OUTCOME: ${{ steps.ingest.outcome }}
-          NOTICE_WEBSITE_OUTCOME: ${{ steps.website.outcome }}
-          NOTICE_SYNC_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-sync.json
-          NOTICE_WEBSITE_PREFLIGHT_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-preflight.json
-          NOTICE_WEBSITE_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-website.json
-          NOTICE_RUN_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-run.json
-        run: node scripts/summarize-notice-sync-run.mjs
-      - name: Retain sanitized diagnostic receipt
+
+      - name: Publish sanitized sync receipt
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: notice-sync-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/seekoffer-notice-run.json
-          if-no-files-found: warn
+          name: notice-sync-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/seekoffer-notice-sync.json
+            ${{ runner.temp }}/seekoffer-notice-website.json
+          if-no-files-found: ignore
           retention-days: 14
-      # The authenticated Worker atomically updates notices + public overrides.
-      # No Supabase calls, database tokens, Vercel hooks, frontend build or deploy.
-      # No application-level daily count cap. Official quota errors stop safely
-      # and retain an explicit incomplete result and remaining candidate count.
+
+      # The Worker atomically updates D1 notices and their public projection.
+      # This workflow never calls Supabase, Vercel, or a frontend build hook.

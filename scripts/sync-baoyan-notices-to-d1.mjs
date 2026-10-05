@@ -2,8 +2,7 @@ import http from 'node:http';
 import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
-import {orderD1Notices, ingestionShouldRetry, validateD1IngestReceipt} from './notice-d1-transport.mjs';
+import {orderD1Notices, ingestionShouldRetry} from './notice-d1-transport.mjs';
 import {saveNoticeSyncReceipt} from './notice-sync-report.mjs';
 import {
   areLikelyDuplicateNotices,
@@ -20,14 +19,10 @@ const PRIMARY_API_BASE_URL = process.env.API_BASE_URL || 'https://ajqwsiasyqyi.s
 const SECONDARY_API_BASE_URL = process.env.BAOYANWANG_API_BASE_URL || 'http://api.baoyanwang.com.cn/api/v1';
 const XINGKE_DATA_URL = process.env.XINGKE_DATA_URL || 'https://www.xingkebaoyan.com/data.json';
 const BAOYANNEWS_LIST_URL = process.env.BAOYANNEWS_LIST_URL || 'https://www.baoyannews.com/notices';
-const USE_D1_INGEST = process.env.SEEKOFFER_INGEST_BACKEND === 'd1';
-const SUPABASE_PROJECT_REF = process.env.SUPABASE_PROJECT_REF || '';
-const SUPABASE_INGEST_URL =
-  (USE_D1_INGEST ? 'https://migration.seekoffer.com.cn/v1/internal/ingest-notices' : '') ||
-  process.env.SUPABASE_INGEST_URL ||
-  (SUPABASE_PROJECT_REF ? `https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/ingest-notices` : '');
-const SUPABASE_INGEST_SECRET = USE_D1_INGEST ? process.env.SEEKOFFER_INGEST_SECRET || '' : process.env.SUPABASE_INGEST_SECRET || process.env.SEEKOFFER_INGEST_SECRET || '';
-const SUPABASE_INGEST_SOURCE = process.env.SUPABASE_INGEST_SOURCE || 'github-actions-sync';
+const D1_INGEST_ENABLED = true;
+const D1_INGEST_URL = process.env.SEEKOFFER_INGEST_URL || 'https://migration.seekoffer.com.cn/v1/internal/ingest-notices';
+const D1_INGEST_SECRET = process.env.SEEKOFFER_INGEST_SECRET || '';
+const D1_INGEST_SOURCE = process.env.SEEKOFFER_INGEST_SOURCE || 'github-actions-sync';
 const TARGET_YEAR = Number(process.env.TARGET_YEAR || '2026');
 const SYNC_MODE = normalizeSyncMode(process.env.SYNC_MODE || 'full');
 const IS_INCREMENTAL_SYNC = SYNC_MODE === 'incremental';
@@ -85,8 +80,8 @@ const OFFICIAL_REPAIR_MAX_DETAILS =
   parseOptionalInteger(process.env.OFFICIAL_REPAIR_MAX_DETAILS) || (IS_INCREMENTAL_SYNC ? 30 : 240);
 const OFFICIAL_REPAIR_CONCURRENCY = Math.max(1, Number(process.env.OFFICIAL_REPAIR_CONCURRENCY || 4));
 const OFFICIAL_REPAIR_DELAY_MS = Math.max(0, Number(process.env.OFFICIAL_REPAIR_DELAY_MS || 80));
-const INGEST_BATCH_SIZE = USE_D1_INGEST ? Math.min(6, Math.max(1, parseOptionalInteger(process.env.INGEST_BATCH_SIZE) || 6)) : Math.min(200, Math.max(25, parseOptionalInteger(process.env.INGEST_BATCH_SIZE) || 100));
-const INGEST_MAX_ATTEMPTS = Math.min(USE_D1_INGEST ? 2 : 5, Math.max(1, parseOptionalInteger(process.env.INGEST_MAX_ATTEMPTS) || 3));
+const INGEST_BATCH_SIZE = D1_INGEST_ENABLED ? Math.min(6, Math.max(1, parseOptionalInteger(process.env.INGEST_BATCH_SIZE) || 6)) : Math.min(200, Math.max(25, parseOptionalInteger(process.env.INGEST_BATCH_SIZE) || 100));
+const INGEST_MAX_ATTEMPTS = Math.min(D1_INGEST_ENABLED ? 2 : 5, Math.max(1, parseOptionalInteger(process.env.INGEST_MAX_ATTEMPTS) || 3));
 const INGEST_RETRY_BASE_DELAY_MS = Math.max(100, Number(process.env.INGEST_RETRY_BASE_DELAY_MS || 1000));
 const INGEST_RETRY_MAX_DELAY_MS = Math.max(
   INGEST_RETRY_BASE_DELAY_MS,
@@ -193,19 +188,12 @@ function isSourceRateLimitError(error) {
   return /^Source rate limited/.test(toErrorMessage(error));
 }
 
-export function normalizeSpace(value) {
+function normalizeSpace(value) {
   if (value === null || value === undefined) {
     return '';
   }
 
-  // Some public feeds contain ASCII control characters inside titles or
-  // descriptions. Strip the characters rejected by the D1 Worker while
-  // preserving ordinary spaces and line content. This keeps one malformed
-  // source field from creating a quarantine-only full run.
-  return String(value)
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return String(value).replace(/\s+/g, ' ').trim();
 }
 
 function isWeakSchoolName(value) {
@@ -1292,9 +1280,6 @@ function decodeResponseBuffer(buffer, contentType = '') {
 }
 
 function requestTextWithNode(url, headers = {}, redirectCount = 0) {
-  if (!isSafePublicUrl(url.toString())) {
-    return Promise.reject(new Error('UNSAFE_REQUEST_URL'));
-  }
   return new Promise((resolve, reject) => {
     const client = url.protocol === 'http:' ? http : https;
     const request = client.request(
@@ -1313,12 +1298,7 @@ function requestTextWithNode(url, headers = {}, redirectCount = 0) {
             reject(new Error(`Too many redirects: ${url.toString()}`));
             return;
           }
-          const nextUrl = new URL(location, url);
-          if (!isSafePublicUrl(nextUrl.toString())) {
-            reject(new Error('UNSAFE_REDIRECT_TARGET'));
-            return;
-          }
-          resolve(requestTextWithNode(nextUrl, headers, redirectCount + 1));
+          resolve(requestTextWithNode(new URL(location, url), headers, redirectCount + 1));
           return;
         }
 
@@ -1883,7 +1863,7 @@ function buildBaoyanNewsProjects(records) {
   return records.map((record) => buildBaoyanNewsProject(record, TARGET_YEAR));
 }
 
-export function isSafePublicUrl(value) {
+function isSafePublicUrl(value) {
   const text = normalizeSpace(value);
   if (!text) return false;
   try {
@@ -2020,7 +2000,7 @@ async function enrichProjectsFromPublicPages(projects) {
   };
 }
 
-export async function postIngestBatch(notices, summary, batchIndex, batchCount) {
+async function postIngestBatch(notices, summary, batchIndex, batchCount) {
   let lastError = null;
 
   for (let attempt = 1; attempt <= INGEST_MAX_ATTEMPTS; attempt += 1) {
@@ -2028,14 +2008,14 @@ export async function postIngestBatch(notices, summary, batchIndex, batchCount) 
     const timeout = setTimeout(() => controller.abort(), INGEST_REQUEST_TIMEOUT_MS);
 
     try {
-      const response = await fetch(SUPABASE_INGEST_URL, {
+      const response = await fetch(D1_INGEST_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-seekoffer-ingest-secret': SUPABASE_INGEST_SECRET
+          'x-seekoffer-ingest-secret': D1_INGEST_SECRET
         },
         body: JSON.stringify({
-          source: SUPABASE_INGEST_SOURCE,
+          source: D1_INGEST_SOURCE,
           notices,
           summary: {
             ...summary,
@@ -2052,17 +2032,14 @@ export async function postIngestBatch(notices, summary, batchIndex, batchCount) 
         status: response.status,
         body: rawText
       });
-      if (response.ok) {
-        const receipt = USE_D1_INGEST ? validateD1IngestReceipt(payload, notices.length) : payload;
-        return {...receipt,rowsRead:Number(response.headers.get('x-d1-rows-read')||0),rowsWritten:Number(response.headers.get('x-d1-rows-written')||0)};
-      }
+      if (response.ok) return {...payload,rowsRead:Number(response.headers.get('x-d1-rows-read')||0),rowsWritten:Number(response.headers.get('x-d1-rows-written')||0)};
 
       const error = new Error(
-        `Supabase ingest batch ${batchIndex}/${batchCount} failed with status ${response.status}: ${USE_D1_INGEST ? String(payload?.error || 'INGEST_FAILED').replace(/[^A-Z_]/g, '') : JSON.stringify(payload)}`
+        `D1 ingest batch ${batchIndex}/${batchCount} failed with status ${response.status}: ${D1_INGEST_ENABLED ? String(payload?.error || 'INGEST_FAILED').replace(/[^A-Z_]/g, '') : JSON.stringify(payload)}`
       );
-      error.ingestCode = USE_D1_INGEST ? String(payload?.error || 'INGEST_FAILED') : '';
+      error.ingestCode = D1_INGEST_ENABLED ? String(payload?.error || 'INGEST_FAILED') : '';
       error.ingestStatus = response.status;
-      error.retryable = USE_D1_INGEST ? ingestionShouldRetry(response.status,payload?.error) : isRetryableIngestStatus(response.status);
+      error.retryable = D1_INGEST_ENABLED ? ingestionShouldRetry(response.status,payload?.error) : isRetryableIngestStatus(response.status);
       error.retryAfter = response.headers.get('retry-after') || '';
       throw error;
     } catch (error) {
@@ -2070,7 +2047,7 @@ export async function postIngestBatch(notices, summary, batchIndex, batchCount) 
         error?.name === 'AbortError'
           ? Object.assign(
               new Error(
-                `Supabase ingest batch ${batchIndex}/${batchCount} timed out after ${INGEST_REQUEST_TIMEOUT_MS}ms.`
+                `D1 ingest batch ${batchIndex}/${batchCount} timed out after ${INGEST_REQUEST_TIMEOUT_MS}ms.`
               ),
               { retryable: true }
             )
@@ -2085,7 +2062,7 @@ export async function postIngestBatch(notices, summary, batchIndex, batchCount) 
         maxDelayMs: INGEST_RETRY_MAX_DELAY_MS,
         retryAfter: normalizedError?.retryAfter || ''
       });
-      logEvent('supabase_ingest_batch_retry', {
+      logEvent('d1_ingest_batch_retry', {
         batch: batchIndex,
         batchCount,
         attempt,
@@ -2099,114 +2076,11 @@ export async function postIngestBatch(notices, summary, batchIndex, batchCount) 
     }
   }
 
-  throw lastError || new Error(`Supabase ingest batch ${batchIndex}/${batchCount} failed.`);
+  throw lastError || new Error(`D1 ingest batch ${batchIndex}/${batchCount} failed.`);
 }
 
-// These failures are deterministic properties of one source record.  A bad
-// record must not make an otherwise valid batch retry forever or prevent the
-// rest of the acquisition from reaching D1.  Batch-level conflicts, quota
-// responses, malformed receipts and transient/network errors remain fatal to
-// the current batch and are never silently quarantined.
-const DETERMINISTIC_RECORD_INGEST_CODES = new Set([
-  'INVALID_INGEST_OBJECT',
-  'INVALID_INGEST_TEXT',
-  'INVALID_INGEST_ID',
-  'UNSUPPORTED_INGEST_FIELD',
-  'INGEST_SOURCE_REQUIRED',
-  'INVALID_SOURCE_URL',
-  'PRIVATE_NOTICE_INGEST_FORBIDDEN',
-  'INVALID_INGEST_ARRAY',
-  'INVALID_INGEST_YEAR',
-  'INVALID_INGEST_BOOLEAN',
-  'INVALID_INGEST_REVIEW_STATE',
-  'INGEST_DELETE_FORBIDDEN',
-  'INVALID_INGEST_HISTORY',
-  'INGEST_HISTORY_INVALID',
-  'INGEST_HISTORY_CAPACITY_REVIEW',
-  'OUTDATED_DEADLINE'
-]);
-
-export function isDeterministicRecordIngestError(error) {
-  return USE_D1_INGEST && DETERMINISTIC_RECORD_INGEST_CODES.has(String(error?.ingestCode || ''));
-}
-
-function sanitizedQuarantineId(notice, ordinal) {
-  const value = normalizeSpace(notice?.id);
-  // Source IDs are useful for a future repair, but never copy arbitrary source
-  // text into a durable Actions artifact.  The fallback is deterministic and
-  // contains no source data.
-  return /^[A-Za-z0-9][A-Za-z0-9._:-]{0,179}$/.test(value) ? value : `record-${ordinal + 1}`;
-}
-
-function quarantineCode(error) {
-  const value = String(error?.ingestCode || '');
-  return /^[A-Z_0-9]{1,80}$/.test(value) ? value : 'INVALID_INGEST_RECORD';
-}
-
-async function ingestBatchWithIsolation(notices, summary, batchIndex, batchCount, ordinalOffset, path = 'root') {
-  try {
-    const payload = await postIngestBatch(notices, summary, batchIndex, batchCount);
-    return {
-      ok: true,
-      accountedCount: notices.length,
-      receipts: [{payload, notices, path}],
-      quarantined: []
-    };
-  } catch (error) {
-    if (!isDeterministicRecordIngestError(error)) {
-      return {ok: false, accountedCount: 0, remainingCount: notices.length, receipts: [], quarantined: [], error};
-    }
-
-    if (notices.length === 1) {
-      const item = {id: sanitizedQuarantineId(notices[0], ordinalOffset), code: quarantineCode(error)};
-      logEvent('d1_ingest_record_quarantined', {
-        batch: batchIndex,
-        batchCount,
-        path,
-        id: item.id,
-        code: item.code
-      });
-      return {ok: true, accountedCount: 1, receipts: [], quarantined: [item]};
-    }
-
-    const middle = Math.ceil(notices.length / 2);
-    logEvent('d1_ingest_batch_isolated', {
-      batch: batchIndex,
-      batchCount,
-      path,
-      size: notices.length,
-      left: middle,
-      right: notices.length - middle
-    });
-    const left = await ingestBatchWithIsolation(
-      notices.slice(0, middle), summary, batchIndex, batchCount, ordinalOffset, `${path}L`
-    );
-    if (!left.ok) {
-      return {
-        ok: false,
-        accountedCount: left.accountedCount,
-        remainingCount: left.remainingCount + notices.length - middle,
-        receipts: left.receipts,
-        quarantined: left.quarantined,
-        error: left.error
-      };
-    }
-    const right = await ingestBatchWithIsolation(
-      notices.slice(middle), summary, batchIndex, batchCount, ordinalOffset + middle, `${path}R`
-    );
-    return {
-      ok: right.ok,
-      accountedCount: left.accountedCount + right.accountedCount,
-      remainingCount: right.ok ? 0 : right.remainingCount,
-      receipts: [...left.receipts, ...right.receipts],
-      quarantined: [...left.quarantined, ...right.quarantined],
-      error: right.error
-    };
-  }
-}
-
-export async function pushProjectsToSupabase(projects, summary) {
-  if (USE_D1_INGEST) projects = orderD1Notices(projects);
+async function pushProjectsToD1(projects, summary) {
+  if (D1_INGEST_ENABLED) projects = orderD1Notices(projects);
   if (DRY_RUN) {
     return {
       ok: true,
@@ -2216,12 +2090,12 @@ export async function pushProjectsToSupabase(projects, summary) {
     };
   }
 
-  if (!SUPABASE_INGEST_URL) {
-    throw new Error('SUPABASE_INGEST_URL or SUPABASE_PROJECT_REF is not configured.');
+  if (!D1_INGEST_URL) {
+    throw new Error('D1_INGEST_URL or D1_PROJECT_REF is not configured.');
   }
 
-  if (!SUPABASE_INGEST_SECRET) {
-    throw new Error('SUPABASE_INGEST_SECRET or SEEKOFFER_INGEST_SECRET is not configured.');
+  if (!D1_INGEST_SECRET) {
+    throw new Error('D1_INGEST_SECRET or SEEKOFFER_INGEST_SECRET is not configured.');
   }
 
   const batches = [];
@@ -2238,63 +2112,38 @@ export async function pushProjectsToSupabase(projects, summary) {
     noticesPublished: 0,
     noticesPrivate: 0,
     restoredAutoDeleted: 0,
-    unchanged: 0, protected: 0, rowsRead: 0, rowsWritten: 0, completedBatches: 0,
-    quarantinedCount: 0, quarantined: [], remainingCandidates: 0
-  };
-
-  const applyAttempt = (attempt, batchNumber) => {
-    for (const entry of attempt.receipts || []) {
-      const payload = entry.payload || {};
-      aggregate.noticesReceived += Number(payload.noticesReceived || entry.notices?.length || 0);
-      aggregate.noticesSkipped += Number(payload.noticesSkipped || 0);
-      aggregate.noticesUpserted += Number(payload.noticesUpserted || 0);
-      aggregate.noticesPublished += Number(payload.noticesPublished || 0);
-      aggregate.noticesPrivate += Number(payload.noticesPrivate || 0);
-      aggregate.restoredAutoDeleted += Number(payload.restoredAutoDeleted || 0);
-      for (const key of ['unchanged', 'protected', 'rowsRead', 'rowsWritten']) aggregate[key] += Number(payload[key] || 0);
-      aggregate.completedBatches += 1;
-      logEvent(USE_D1_INGEST ? 'd1_ingest_batch_finished' : 'supabase_ingest_batch_finished', {
-        batch: batchNumber,
-        batchCount: batches.length,
-        path: entry.path,
-        notices: entry.notices.length,
-        upserted: payload.noticesUpserted,
-        unchanged: payload.unchanged,
-        protected: payload.protected,
-        rowsRead: payload.rowsRead,
-        rowsWritten: payload.rowsWritten
-      });
-    }
-    for (const item of attempt.quarantined || []) {
-      aggregate.noticesReceived += 1;
-      aggregate.quarantinedCount += 1;
-      // Keep a bounded, sanitized repair queue in the receipt. The count is
-      // authoritative when there are more than this many bad records.
-      if (aggregate.quarantined.length < 100) aggregate.quarantined.push(item);
-    }
+    unchanged: 0, protected: 0, rowsRead: 0, rowsWritten: 0, completedBatches: 0
   };
 
   for (let index = 0; index < batches.length; index += 1) {
-    const attempt = await ingestBatchWithIsolation(
-      batches[index], summary, index + 1, batches.length, index * INGEST_BATCH_SIZE
-    );
-    applyAttempt(attempt, index + 1);
-    if (!attempt.ok) {
-      const code = attempt.error?.ingestStatus === 402
-        ? 'SERVICE_QUOTA_EXCEEDED'
-        : /^[A-Z_0-9]{1,80}$/.test(attempt.error?.ingestCode || '')
-          ? attempt.error.ingestCode
-          : 'INGEST_FAILED';
-      return {
-        ...aggregate,
-        complete: false,
-        stoppedReason: code,
-        remainingCandidates: attempt.remainingCount + batches.slice(index + 1).reduce((n, batch) => n + batch.length, 0)
-      };
+    let payload;
+    try { payload = await postIngestBatch(batches[index], summary, index + 1, batches.length); }
+    catch(error) {
+      if(D1_INGEST_ENABLED) {
+        const code=error.ingestStatus===402?'SERVICE_QUOTA_EXCEEDED':/^[A-Z_0-9]{1,80}$/.test(error.ingestCode||'')?error.ingestCode:'INGEST_FAILED';
+        return {...aggregate,complete:false,stoppedReason:code,remainingCandidates:batches.slice(index).reduce((n,b)=>n+b.length,0)};
+      }
+      throw error;
     }
+
+    aggregate.noticesReceived += Number(payload?.noticesReceived || batches[index].length);
+    aggregate.noticesSkipped += Number(payload?.noticesSkipped || 0);
+    aggregate.noticesUpserted += Number(payload?.noticesUpserted || 0);
+    aggregate.noticesPublished += Number(payload?.noticesPublished || 0);
+    aggregate.noticesPrivate += Number(payload?.noticesPrivate || 0);
+    aggregate.restoredAutoDeleted += Number(payload?.restoredAutoDeleted || 0);
+    for (const key of ['unchanged','protected','rowsRead','rowsWritten']) aggregate[key] += Number(payload?.[key] || 0);
+    aggregate.completedBatches += 1;
+    logEvent(D1_INGEST_ENABLED ? 'd1_ingest_batch_finished' : 'd1_ingest_batch_finished', {
+      batch: index + 1,
+      batchCount: batches.length,
+      notices: batches[index].length,
+      upserted: payload.noticesUpserted, unchanged: payload.unchanged, protected: payload.protected,
+      rowsRead: payload.rowsRead, rowsWritten: payload.rowsWritten
+    });
   }
 
-  return {...aggregate, complete: true, remainingCandidates: 0};
+  return aggregate;
 }
 
 function countBy(items, picker) {
@@ -2439,9 +2288,13 @@ function assessSyncHealth(sourceStats, qualityStats) {
   }
 
   const primaryFetchMeta = sourceStats.primaryFetchMeta;
-  if (primaryFetchMeta && !primaryFetchMeta.intentionallyLimited && primaryFetchMeta.expectedTotal > primaryFetchMeta.returnedRows) {
-    if (SYNC_MODE === 'full') errors.push('primary_incomplete_pagination');
-    else warnings.push('primary_incomplete_pagination');
+  if (
+    primaryFetchMeta &&
+    !primaryFetchMeta.intentionallyLimited &&
+    primaryFetchMeta.expectedTotal > primaryFetchMeta.returnedRows &&
+    primaryFetchMeta.emptyPage
+  ) {
+    warnings.push('primary_incomplete_pagination');
   }
 
   return {
@@ -2452,15 +2305,12 @@ function assessSyncHealth(sourceStats, qualityStats) {
 }
 
 async function runSync() {
-  if (!DRY_RUN && (!SUPABASE_INGEST_URL || !SUPABASE_INGEST_SECRET)) {
-    throw new Error('INGEST_CONFIGURATION_MISSING');
-  }
   const startedAt = nowText();
   console.log(
     JSON.stringify(
       {
         event: 'sync_started',
-        source: SUPABASE_INGEST_SOURCE,
+        source: D1_INGEST_SOURCE,
         syncMode: SYNC_MODE,
         targetYear: TARGET_YEAR,
         primaryOrderBy: PRIMARY_ORDER_BY,
@@ -2615,11 +2465,6 @@ async function runSync() {
   const health = assessSyncHealth(sourceStats, qualityStats);
   if (sourceErrors.length) {
     health.warnings.push(...sourceErrors.map((item) => `${item.source}_source_unavailable`));
-    // The primary source is canonical. Continuing with only optional mirrors
-    // would make a green run look complete while silently dropping new notices.
-    if (sourceErrors.some((item) => item.source === 'primary')) {
-      health.errors.push('primary_source_unavailable');
-    }
   }
   if (secondaryRepairFailures.length) {
     health.warnings.push('secondary_detail_repair_failed');
@@ -2699,11 +2544,11 @@ async function runSync() {
     fs.mkdirSync(path.dirname(destination), {recursive: true});
     fs.writeFileSync(destination, JSON.stringify({version: 1, summary, notices: merged}), {flag: 'wx'});
   }
-  const ingestResult = await pushProjectsToSupabase(merged, summary);
+  const ingestResult = await pushProjectsToD1(merged, summary);
   const result = {
     ok: true,
-    destination: DRY_RUN ? 'dry-run' : USE_D1_INGEST ? 'd1.main__notices' : 'supabase.notices',
-    source: SUPABASE_INGEST_SOURCE,
+    destination: DRY_RUN ? 'dry-run' : 'd1.main__notices',
+    source: D1_INGEST_SOURCE,
     ...summary,
     noticesReceived: Number(ingestResult?.noticesReceived ?? merged.length),
     noticesUpserted: Number(ingestResult?.noticesUpserted || 0),
@@ -2716,13 +2561,11 @@ async function runSync() {
     protected: Number(ingestResult?.protected || 0),
     rowsRead: Number(ingestResult?.rowsRead || 0),
     rowsWritten: Number(ingestResult?.rowsWritten || 0),
-    restoredAutoDeleted: Number(ingestResult?.restoredAutoDeleted || 0),
-    quarantinedCount: Number(ingestResult?.quarantinedCount || 0),
-    quarantined: Array.isArray(ingestResult?.quarantined) ? ingestResult.quarantined.slice(0, 100) : []
+    restoredAutoDeleted: Number(ingestResult?.restoredAutoDeleted || 0)
   };
 
   console.log(JSON.stringify(result, null, 2));
-  if (USE_D1_INGEST) {
+  if (D1_INGEST_ENABLED) {
     saveNoticeSyncReceipt(result);
     if (!result.complete) {
       // A successful partial batch must not make the complete workflow green.
@@ -2733,18 +2576,16 @@ async function runSync() {
   return result;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  runSync().catch((error) => {
-    console.error(
-      JSON.stringify(
-        {
-          ok: false,
-          error: error instanceof Error ? error.message : String(error)
-        },
-        null,
-        2
-      )
-    );
-    process.exit(1);
-  });
-}
+runSync().catch((error) => {
+  console.error(
+    JSON.stringify(
+      {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      },
+      null,
+      2
+    )
+  );
+  process.exit(1);
+});

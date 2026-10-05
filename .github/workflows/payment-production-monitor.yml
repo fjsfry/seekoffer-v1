@@ -1,0 +1,36 @@
+name: Payment production preflight
+
+on:
+  schedule:
+    # Keep this separate from notice ingestion so one slow source crawl does
+    # not hide payment availability signals.
+    - cron: '40 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: seekoffer-payment-preflight
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: Verify payment boundaries without charging
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      API_BASE_URL: https://migration.seekoffer.com.cn
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Run no-charge production preflight
+        run: node scripts/payment-production-preflight.mjs
