@@ -30,18 +30,6 @@ on:
         type: choice
         options: [incremental, full]
         default: incremental
-      target_year:
-        description: 'Notice year to reconcile'
-        type: string
-        default: '2026'
-      primary_max_pages:
-        description: 'Primary source page limit; 0 means no limit in full mode'
-        type: string
-        default: ''
-      primary_max_details:
-        description: 'Primary detail limit; 0 means no limit in full mode'
-        type: string
-        default: ''
 
 concurrency:
   group: seekoffer-notice-ingestion
@@ -59,11 +47,11 @@ jobs:
       SEEKOFFER_INGEST_URL: https://migration.seekoffer.com.cn/v1/internal/ingest-notices
       SEEKOFFER_INGEST_SECRET: ${{ secrets.SEEKOFFER_INGEST_SECRET }}
       SEEKOFFER_INGEST_SOURCE: github-actions-sync
-      SYNC_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.sync_mode || (github.event.schedule == '10 18 * * *' && 'full' || 'incremental') }}
-      TARGET_YEAR: ${{ github.event_name == 'workflow_dispatch' && inputs.target_year || '2026' }}
+      SYNC_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.sync_mode || 'incremental' }}
+      TARGET_YEAR: '2026'
       PRIMARY_ORDER_BY: publishTime
-      PRIMARY_MAX_PAGES: ${{ github.event_name == 'workflow_dispatch' && inputs.primary_max_pages || (github.event.schedule == '10 18 * * *' && '0' || '2') }}
-      PRIMARY_MAX_DETAILS: ${{ github.event_name == 'workflow_dispatch' && inputs.primary_max_details || (github.event.schedule == '10 18 * * *' && '0' || '40') }}
+      PRIMARY_MAX_PAGES: ${{ github.event.schedule == '10 18 * * *' && '0' || '2' }}
+      PRIMARY_MAX_DETAILS: ${{ github.event.schedule == '10 18 * * *' && '0' || '40' }}
       PRIMARY_DETAIL_CONCURRENCY: '2'
       PRIMARY_DETAIL_DELAY_MS: '150'
       ENABLE_XINGKE_SOURCE: 'true'
