@@ -4,6 +4,7 @@ import {readClerkUser,type BootstrapConfig} from './identity-bootstrap.ts';
 import {getDeadlineTimestamp} from '../../../lib/deadline-display';
 import {overrideStatements} from './notice-overrides.ts';
 import {prepareNoticeOrder} from './notice-order';
+import {readPaymentMonitor} from './payments/payment-monitor.ts';
 export type Admin={email:string;name:string;role:string;status:string;ownerId?:string};
 const permissions:Record<string,string[]>={super_admin:['overview','content','users','settings','logs'],ops_manager:['overview','content','users','logs'],content_reviewer:['overview','content'],readonly_admin:['overview','logs']};
 function permit(admin:Admin,permission:string){if(!permissions[admin.role]?.includes(permission))throw new ApiError(403,'ADMIN_PERMISSION_DENIED');}
@@ -94,6 +95,7 @@ export async function adminAction(db:D1Database,admin:Admin,body:Record<string,u
  if(resource==='me')return{admin};
  const permission=resource==='settings'?'settings':['users','feedback','ai_waitlist'].includes(resource)?'users':resource==='logs'?'logs':['notices','offers','comments'].includes(resource)?'content':'overview';permit(admin,permission);
  if(resource==='analytics')return readAnalytics(db,config);
+ if(resource==='payment_monitor'&&action==='snapshot')return readPaymentMonitor(db,config);
  if(resource==='users'&&action==='list')return listUsers(db,body,config,fetcher);
  if(resource==='overview')return overview(db);
  if(resource==='shell'&&action==='snapshot')return{overview:{metrics:{pendingNotices:await scalar(db,"SELECT count(*) AS n FROM main__notices WHERE admin_status='pending' AND admin_deleted_at IS NULL"),pendingOffers:await scalar(db,"SELECT count(*) AS n FROM main__offer_posts WHERE review_status='pending' AND deleted_at IS NULL"),pendingFeedback:permissions[admin.role].includes('users')?await scalar(db,"SELECT count(*) AS n FROM main__feedback_reports WHERE status='pending'"):0}},analytics:await readAnalytics(db,config)};

@@ -14,7 +14,7 @@
       "zone_id": "82eca6dd8e89e5a1c0c87e514536383a"
     }
   ],
-  "observability": { "enabled": false },
+  "observability": { "enabled": true },
   "d1_databases": [
     {
       "binding": "CORE",
