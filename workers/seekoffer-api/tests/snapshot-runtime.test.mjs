@@ -115,11 +115,20 @@ test('real candidate schema: SQL filters match the existing fixed-sample impleme
  for(const v of variants){const filter={...fields,...v};const params=new URLSearchParams();for(const [key,value]of Object.entries(filter))if(value)params.set(mapping[key],value);const q=noticeSql(params,now.getTime());const actual=db.prepare('SELECT n.id FROM main__notices n WHERE '+q.where+' ORDER BY '+q.order).all(...q.values).map(r=>r.id);const expected=filterAndSortNotices(projects,filter,now).map(r=>r.id);assert.deepEqual(actual,expected,JSON.stringify(v));}db.close();
 });
 test('16-item list uses a persistent count cache, returns no internal fields, hides revoked rows',async()=>{
- const {db,request,queries}=setup();const first=await request('/v1/notices?page=2');assert.equal(first.status,200);const text=await first.text();assert.ok(Buffer.byteLength(text)<100000);const body=JSON.parse(text);assert.equal(body.items.length,16);assert.ok(!text.includes('PRIVATE_ADMIN_NOTE'));assert.ok(!text.includes('created_by'));
- const scans=queries.filter(q=>q.startsWith('SELECT count(*) AS total FROM main__notices')).length;
- const warm=await request('/v1/notices?page=2');assert.equal(warm.headers.get('X-Count-Cache'),'HIT');assert.equal(queries.filter(q=>q.startsWith('SELECT count(*) AS total FROM main__notices')).length,scans);
- const id=body.items[0].id;db.prepare("UPDATE main__notices SET admin_status='hidden' WHERE id=?").run(id);assert.equal((await request('/v1/notices/'+id)).status,404);
- const batch=await (await request('/v1/notices/by-ids','POST',{ids:[id]})).json();assert.equal(batch.items.length,0);db.close();
+  const {db,request,queries}=setup();const first=await request('/v1/notices?page=2');assert.equal(first.status,200);const text=await first.text();assert.ok(Buffer.byteLength(text)<100000);const body=JSON.parse(text);assert.equal(body.items.length,16);assert.ok(!text.includes('PRIVATE_ADMIN_NOTE'));assert.ok(!text.includes('created_by'));
+  const scans=queries.filter(q=>q.startsWith('SELECT count(*) AS total FROM main__notices')).length;
+  const warm=await request('/v1/notices?page=2');assert.equal(warm.headers.get('X-Count-Cache'),'HIT');assert.equal(queries.filter(q=>q.startsWith('SELECT count(*) AS total FROM main__notices')).length,scans);
+  const id=body.items[0].id;db.prepare("UPDATE main__notices SET admin_status='hidden' WHERE id=?").run(id);assert.equal((await request('/v1/notices/'+id)).status,404);
+  const batch=await (await request('/v1/notices/by-ids','POST',{ids:[id]})).json();assert.equal(batch.items.length,0);db.close();
+});
+test('public metadata uses one bounded shared snapshot across filters and ingest versions',async()=>{
+  const {db,request,queries}=setup();
+  const fullScans=()=>queries.filter(q=>q.startsWith("SELECT catalog_projection FROM main__notices n WHERE n.is_private=0")&&!q.includes(' ORDER BY ')).length;
+  assert.equal((await request('/v1/notices?page=1')).status,200);assert.equal(fullScans(),1);
+  assert.equal((await request('/v1/notices?page=1&category=工学')).status,200);assert.equal(fullScans(),1);
+  db.prepare("UPDATE _runtime_state SET value=? WHERE key='notice_version'").run('fixture-v2');
+  assert.equal((await request('/v1/notices?page=1&region=北京')).status,200);assert.equal(fullScans(),1);
+  db.close();
 });
 test('both detail routes query only their ID, not the complete notice catalog',async()=>{
  const {db,request,queries}=setup();assert.equal((await request('/v1/notices/notice-001')).status,200);assert.equal((await request('/v1/notices/detail?id=notice-001')).status,200);assert.ok(queries.every(q=>q.includes('WHERE n.id=?')));db.close();
