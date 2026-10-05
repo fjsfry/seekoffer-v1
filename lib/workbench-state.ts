@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from './supabase-browser';
+import { cloudflareRequest } from './cloudflare-api';
 
 export const WORKBENCH_TODO_CATEGORIES = ['申请', '学习', '作业', '工作', '生活', '其他'] as const;
 export const WORKBENCH_TODO_PRIORITIES = ['重要且紧急', '重要不紧急', '不重要紧急', '不重要不紧急'] as const;
@@ -277,41 +277,37 @@ export function mergeWorkbenchState(localState: WorkbenchState, remoteState: Par
 }
 
 export async function hydrateWorkbenchState(userId: string, localState: WorkbenchState) {
-  const supabase = getSupabaseBrowserClient();
-  const { data, error } = await supabase
-    .from('workbench_states')
-    .select('completed_todo_ids, custom_todos, mentor_contacts')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
+  void userId;
+  const data = await cloudflareRequest<{
+    completed_todo_ids?: unknown;
+    custom_todos?: unknown;
+    mentor_contacts?: unknown;
+    sync_revision?: number;
+  } | null>('/v1/me/workbench', {}, true);
 
   const mergedState = mergeWorkbenchState(localState, {
-    completedTodoIds: data?.completed_todo_ids,
-    customTodos: data?.custom_todos,
-    contacts: data?.mentor_contacts
+    completedTodoIds: data?.completed_todo_ids as string[] | undefined,
+    customTodos: data?.custom_todos as WorkbenchCustomTodo[] | undefined,
+    contacts: data?.mentor_contacts as WorkbenchMentorContact[] | undefined
   });
 
-  await saveWorkbenchState(userId, mergedState);
+  await saveWorkbenchState(userId, mergedState, Number(data?.sync_revision || 0));
   return mergedState;
 }
 
-export async function saveWorkbenchState(userId: string, state: WorkbenchState) {
-  const supabase = getSupabaseBrowserClient();
-  const payload = {
-    user_id: userId,
-    completed_todo_ids: normalizeCompletedTodoIds(state.completedTodoIds),
-    custom_todos: normalizeCustomTodos(state.customTodos),
-    mentor_contacts: normalizeContacts(state.contacts)
-  };
-
-  const { error } = await supabase.from('workbench_states').upsert(payload, {
-    onConflict: 'user_id'
-  });
-
-  if (error) {
-    throw error;
-  }
+export async function saveWorkbenchState(userId: string, state: WorkbenchState, expectedRevision = 0) {
+  void userId;
+  await cloudflareRequest(
+    '/v1/me/workbench',
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        expectedRevision,
+        completed_todo_ids: normalizeCompletedTodoIds(state.completedTodoIds),
+        custom_todos: normalizeCustomTodos(state.customTodos),
+        mentor_contacts: normalizeContacts(state.contacts)
+      })
+    },
+    true
+  );
 }

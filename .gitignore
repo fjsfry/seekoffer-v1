@@ -33,6 +33,10 @@ pnpm-debug.log*
 .env.local
 .env*.local
 
+# local Cloudflare commerce state
+workers/seekoffer-api/.wrangler-commerce-local/
+workers/seekoffer-api/.wrangler/
+
 # misc
 tsconfig.tsbuildinfo
 .DS_Store
@@ -44,3 +48,4 @@ public/site-marks/_preview/
 .wechat-codex/
 
 .env*
+.vercel

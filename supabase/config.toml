@@ -1,5 +1,0 @@
-[functions.ingest-notices]
-verify_jwt = false
-
-[functions.analytics-api]
-verify_jwt = false

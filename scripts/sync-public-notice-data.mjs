@@ -408,90 +408,6 @@ function loadExportRows() {
   return readJson(calendarNoticesPath).filter((item) => item && (item.sourceKey || item.project || item.detailUrl));
 }
 
-function mapSupabaseNoticeRow(row) {
-  const deadlineLevel = inferDeadlineLevel(row.deadline_date, row.status);
-  const status = inferStatus(deadlineLevel, row.status);
-
-  return normalizeProject({
-    id: row.id,
-    schoolName: row.school_name,
-    departmentName: row.department_name,
-    projectName: row.project_name,
-    projectType: row.project_type,
-    discipline: row.discipline,
-    publishDate: row.publish_date,
-    deadlineDate: row.deadline_date,
-    eventStartDate: row.event_start_date,
-    eventEndDate: row.event_end_date,
-    applyLink: row.apply_link,
-    sourceLink: row.source_link,
-    requirements: row.requirements,
-    materialsRequired: row.materials_required,
-    examInterviewInfo: row.exam_interview_info,
-    contactInfo: row.contact_info,
-    remarks: row.remarks,
-    tags: row.tags,
-    status,
-    year: row.year,
-    deadlineLevel,
-    sourceSite: row.source_site,
-    collectedAt: row.collected_at,
-    updatedAt: row.updated_at,
-    lastCheckedAt: row.last_checked_at,
-    isVerified: row.is_verified,
-    changeLog: row.change_log,
-    historyRecords: row.history_records
-  });
-}
-
-async function fetchSupabaseNoticeRows() {
-  loadLocalEnv();
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseAnonKey || typeof fetch !== 'function') {
-    return [];
-  }
-
-  const rows = [];
-  const pageSize = 1000;
-
-  for (let offset = 0; ; offset += pageSize) {
-    const endpoint = new URL('/rest/v1/notices', supabaseUrl);
-    endpoint.searchParams.set('select', '*');
-    endpoint.searchParams.set('year', 'eq.2026');
-    endpoint.searchParams.set('is_private', 'eq.false');
-    endpoint.searchParams.set('admin_status', 'eq.published');
-    endpoint.searchParams.set('admin_deleted_at', 'is.null');
-    endpoint.searchParams.set('limit', String(pageSize));
-    endpoint.searchParams.set('offset', String(offset));
-
-    const response = await fetch(endpoint, {
-      headers: {
-        apikey: supabaseAnonKey,
-        Authorization: `Bearer ${supabaseAnonKey}`
-      }
-    });
-
-    if (!response.ok) {
-      console.warn(`Supabase notice sync skipped: ${response.status} ${await response.text()}`);
-      return [];
-    }
-
-    const page = await response.json();
-    if (!Array.isArray(page) || page.length === 0) {
-      break;
-    }
-
-    rows.push(...page);
-    if (page.length < pageSize) {
-      break;
-    }
-  }
-
-  return rows.map(mapSupabaseNoticeRow).filter((item) => item.year === 2026 && shouldKeepPublicNotice(item));
-}
-
 const exportRows = loadExportRows()
   .map(normalizeProject)
   .filter((item) => item.year === 2026 && shouldKeepPublicNotice(item));
@@ -499,12 +415,9 @@ const supplementRows = readJson(dataPath)
   .filter((item) => String(item.id || '').startsWith('baoyantongzhi-'))
   .map(normalizeProject)
   .filter((item) => item.year === 2026 && shouldKeepPublicNotice(item));
-const supabaseRows = await fetchSupabaseNoticeRows();
-
 const merged = new Map();
 exportRows.forEach((item) => merged.set(item.id, item));
 supplementRows.forEach((item) => merged.set(item.id, item));
-supabaseRows.forEach((item) => merged.set(item.id, item));
 
 const result = Array.from(merged.values()).map((item) => ({
   ...item,
@@ -525,7 +438,6 @@ console.log(
     {
       exportRows: exportRows.length,
       supplements: supplementRows.length,
-      supabaseRows: supabaseRows.length,
       output: result.length,
       dataPath
     },

@@ -2,14 +2,14 @@
 
 ## 当前环境
 
-- 环境名称：`cloudbase`
-- 环境 ID：`cloudbase-4gonuep215f23af4`
+- 环境名称：`gongzhonghao`
+- 环境 ID：`gongzhonghao-d5gc5vsrid0deaab8`
 - 区域：`ap-shanghai`
 - 前端目录：`E:\earn money\小程序\推免星\seekoffer-web`
 
 ## 当前线上地址
 
-- 静态托管地址：[https://cloudbase-4gonuep215f23af4-1416959201.tcloudbaseapp.com](https://cloudbase-4gonuep215f23af4-1416959201.tcloudbaseapp.com)
+- 静态托管地址：[https://gongzhonghao-d5gc5vsrid0deaab8-1420298392.tcloudbaseapp.com](https://gongzhonghao-d5gc5vsrid0deaab8-1420298392.tcloudbaseapp.com)
 
 ## 本地代码已完成的配置
 

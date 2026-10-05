@@ -2,16 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Clock3, RefreshCw } from 'lucide-react';
+import { ArrowUpRight, Clock3, LoaderCircle, RefreshCw } from 'lucide-react';
 import { ApplicationActionButton } from '@/components/application-action-button';
-import { DesktopStateSurface } from '@/components/desktop-state-surface';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge, StatusBadge } from '@/components/status-badge';
-import { fetchDeadlineNotices } from '@/lib/cloudbase-data';
+import { fetchPublicDeadlineNotices } from '@/lib/public-notice-api';
 import { getDeadlineLevelFromDate } from '@/lib/deadline-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
-import { allSchoolOptions, projectTypeOptions, type PublicNoticeProject } from '@/lib/mock-data';
+import { allSchoolOptions, projectTypeOptions } from '@/lib/mock-data';
+import type { NoticeListItem } from '@/lib/notice-record';
 
 type DeadlineGroupKey = 'today' | 'within3days' | 'within7days';
 
@@ -43,26 +43,31 @@ const groupMeta: Record<
 };
 
 export default function DeadlinesPage() {
-  const [projects, setProjects] = useState<PublicNoticeProject[]>([]);
-  const [school, setSchool] = useState<(typeof allSchoolOptions)[number]>('全部学校');
-  const [projectType, setProjectType] = useState<(typeof projectTypeOptions)[number]>('全部类型');
+  const [projects, setProjects] = useState<NoticeListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [usingBundledData, setUsingBundledData] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [school, setSchool] = useState<(typeof allSchoolOptions)[number]>('全部学校');
+  const [projectType, setProjectType] = useState<(typeof projectTypeOptions)[number]>('全部类型');
 
   useEffect(() => {
     let active = true;
-
+    const controller = new AbortController();
     setIsLoading(true);
     setLoadError('');
-    fetchDeadlineNotices()
-      .then((rows) => {
-        if (!active) return;
-        setProjects(rows);
+
+    fetchPublicDeadlineNotices(controller.signal)
+      .then((result) => {
+        if (active) {
+          setProjects(result.items);
+          setUsingBundledData(result.source === 'bundled');
+        }
       })
-      .catch(() => {
-        if (!active) return;
-        setLoadError('截止项目暂时无法加载，请检查网络后重试。');
+      .catch((error: unknown) => {
+        if (active && !(error instanceof DOMException && error.name === 'AbortError')) {
+          setLoadError('截止提醒暂时无法更新。已保留上一次成功结果，请稍后重试。');
+        }
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -70,8 +75,9 @@ export default function DeadlinesPage() {
 
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [refreshNonce]);
+  }, [reloadToken]);
 
   const filteredProjects = useMemo(() => {
     return projects
@@ -92,85 +98,91 @@ export default function DeadlinesPage() {
 
   return (
     <SiteShell>
-      <div className="desktop-deadlines-page">
-        <PageSectionTitle
-          eyebrow="Upcoming Deadlines"
-          title="即将截止"
-          subtitle="按剩余时间分组，优先核对报名入口、材料状态和最终提交时间。"
-          level="h1"
-        />
+      <PageSectionTitle
+        eyebrow="Upcoming Deadlines"
+        title="即将截止专区"
+        subtitle="智能风险预警中心。按紧急程度排序，助你从容应对每一个 Deadline。"
+      />
 
-        <section className="desktop-deadlines-toolbar mb-8 grid gap-4 xl:grid-cols-[0.9fr_0.9fr_1.2fr]" aria-label="截止项目筛选">
-          <select
-            aria-label="按学校筛选"
-            value={school}
-            onChange={(event) => setSchool(event.target.value as typeof school)}
-            className="rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm outline-none"
+      <section className="mb-8 grid gap-4 xl:grid-cols-[0.9fr_0.9fr_1.2fr]">
+        <select
+          value={school}
+          onChange={(event) => setSchool(event.target.value as typeof school)}
+          className="rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm outline-none"
+        >
+          {allSchoolOptions.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={projectType}
+          onChange={(event) => setProjectType(event.target.value as typeof projectType)}
+          className="rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm outline-none"
+        >
+          {projectTypeOptions.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+
+        <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
+          {isLoading && !projects.length
+            ? '正在核对最新截止时间，请稍等。'
+            : `共筛到 ${filteredProjects.length} 个高风险项目，建议优先处理 24 小时内与 3 天内截止通知。`}
+        </div>
+      </section>
+
+      {loadError ? (
+        <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+          <span>{loadError}</span>
+          <button
+            type="button"
+            onClick={() => setReloadToken((value) => value + 1)}
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 font-semibold shadow-sm disabled:opacity-60"
           >
-            {allSchoolOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-
-          <select
-            aria-label="按项目类型筛选"
-            value={projectType}
-            onChange={(event) => setProjectType(event.target.value as typeof projectType)}
-            className="rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm outline-none"
-          >
-            {projectTypeOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-
-          <div className="desktop-deadlines-toolbar-summary rounded-2xl bg-white px-4 py-3 text-sm text-slate-500 shadow-sm" role="status">
-            共 {filteredProjects.length} 个即将截止项目，已按剩余时间从近到远分组。
-          </div>
+            {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            重新加载
+          </button>
         </section>
+      ) : usingBundledData ? (
+        <section className="mb-6 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600">
+          云端数据暂时不可用，当前展示最近一次随版本发布的备用数据。
+        </section>
+      ) : null}
 
-        {isLoading ? (
-          <DesktopStateSurface
-            variant="section"
-            loading
-            ariaBusy
-            icon={<RefreshCw />}
-            title="正在加载截止项目"
-            detail="正在核对最新截止时间与项目状态。"
-          />
-        ) : loadError ? (
-          <DesktopStateSurface
-            variant="section"
-            tone="error"
-            icon={<RefreshCw />}
-            title="截止项目加载失败"
-            detail={loadError}
-            action={<button type="button" onClick={() => setRefreshNonce((value) => value + 1)}>重新加载</button>}
-          />
-        ) : (
-          <section className="desktop-deadline-groups grid gap-6">
-            {(Object.keys(grouped) as DeadlineGroupKey[]).map((groupKey) => {
+      {isLoading && !projects.length ? (
+        <section className="grid gap-4" aria-label="正在加载截止提醒">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="h-44 animate-pulse rounded-[30px] bg-slate-100" />
+          ))}
+        </section>
+      ) : null}
+
+      {projects.length || (!isLoading && !loadError) ? <section className="grid gap-6">
+        {(Object.keys(grouped) as DeadlineGroupKey[]).map((groupKey) => {
           const meta = groupMeta[groupKey];
           const rows = grouped[groupKey];
 
           return (
-            <div key={groupKey} className={`desktop-deadline-group desktop-deadline-group--${groupKey} rounded-[30px] border p-5 shadow-sm ${meta.border}`}>
-              <div className="desktop-deadline-group-header mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div key={groupKey} className={`rounded-[30px] border p-5 shadow-sm ${meta.border}`}>
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
                 <div>
-                  <div className={`desktop-deadline-group-title text-2xl font-semibold ${meta.tone}`}>{meta.title}</div>
+                  <div className={`text-2xl font-semibold ${meta.tone}`}>{meta.title}</div>
                   <div className="mt-2 text-sm text-slate-600">{meta.subtitle}</div>
                 </div>
-                <div className={`desktop-deadline-group-count text-3xl font-semibold ${meta.tone}`} aria-label={`${rows.length} 个项目`}>{rows.length}</div>
+                <div className={`text-3xl font-semibold ${meta.tone}`}>{rows.length}</div>
               </div>
 
-              <div className="desktop-deadline-list grid gap-4">
+              <div className="grid gap-4">
                 {rows.length ? (
                   rows.map((project) => (
-                    <article key={project.id} className="desktop-deadline-row-card rounded-[28px] border border-white/70 bg-white p-5 shadow-sm">
-                      <div className="desktop-deadline-row-badges flex flex-wrap items-center gap-2">
+                    <div key={project.id} className="rounded-[28px] border border-white/70 bg-white p-5 shadow-sm">
+                      <div className="flex flex-wrap items-center gap-2">
                         <DeadlineBadge level={getDeadlineLevelFromDate(project.deadlineDate)} />
                         <StatusBadge status={project.status} />
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
@@ -178,8 +190,8 @@ export default function DeadlinesPage() {
                         </span>
                       </div>
 
-                      <div className="desktop-deadline-row-main mt-4 grid gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
-                        <div className="desktop-deadline-row-identity">
+                      <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
+                        <div>
                           <div className="text-lg font-semibold text-ink">{project.schoolName}</div>
                           <div className="mt-1 text-sm text-slate-500">{project.departmentName}</div>
                           <div className="mt-3 text-sm leading-7 text-slate-700">{project.projectName}</div>
@@ -196,7 +208,7 @@ export default function DeadlinesPage() {
                           </div>
                         </div>
 
-                        <div className="desktop-deadline-row-actions grid gap-3">
+                        <div className="grid gap-3">
                           <Link
                             href={buildNoticeDetailHref(project.id)}
                             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white"
@@ -207,23 +219,18 @@ export default function DeadlinesPage() {
                           <ApplicationActionButton projectId={project.id} variant="secondary" />
                         </div>
                       </div>
-                    </article>
+                    </div>
                   ))
                 ) : (
-                  <DesktopStateSurface
-                    variant="inline"
-                    icon={<Clock3 />}
-                    title={meta.empty}
-                    detail="有新的截止项目时会自动出现在这里。"
-                  />
+                  <div className="rounded-[26px] border border-dashed border-black/10 bg-white/70 px-5 py-10 text-sm text-slate-500">
+                    {meta.empty}
+                  </div>
                 )}
               </div>
             </div>
           );
         })}
-          </section>
-        )}
-      </div>
+      </section> : null}
     </SiteShell>
   );
 }

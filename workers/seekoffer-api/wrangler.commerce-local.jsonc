@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "seekoffer-commerce-local",
+  "main": "src/acceptance-worker.ts",
+  "compatibility_date": "2026-09-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "d1_databases": [
+    {
+      "binding": "CORE",
+      "database_name": "seekoffer-commerce-local",
+      "migrations_dir": "../../migrations/d1/snapshot"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ASSET_BUCKET",
+      "bucket_name": "seekoffer-assets-local"
+    }
+  ],
+  "vars": {
+    "MODE": "local",
+    "BUSINESS_WRITES_ENABLED": "true",
+    "PAYMENT_PROCESSING_ENABLED": "false",
+    "PAYMENT_CHECKOUT_ENABLED": "false",
+    "COMMERCE_LOCAL_PAYMENT_ENABLED": "true",
+    "COMMERCE_ORDER_IDEMPOTENCY_KEY": "local-only-commerce-key-change-me-20261003",
+    "ALLOWED_ORIGINS": "http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3002,http://localhost:3002",
+    "COMMERCE_RETURN_ORIGIN": "http://127.0.0.1:3002"
+  }
+}

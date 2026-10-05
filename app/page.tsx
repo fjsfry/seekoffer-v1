@@ -25,8 +25,7 @@ import {
 import { DeadlineBadge } from '@/components/status-badge';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
-import { fetchPublicNotices } from '@/lib/cloudbase-data';
-import { getDeadlineDistanceLabel, getDeadlineLevelFromDate, getDeadlineTimestamp } from '@/lib/deadline-display';
+import { getDeadlineDistanceLabel, getDeadlineLevelFromDate } from '@/lib/deadline-display';
 import {
   formatNoticeDateOnly,
   getDisplayNoticeDepartment,
@@ -36,37 +35,57 @@ import {
 } from '@/lib/notice-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
 import { collegeDirectory } from '@/lib/college-directory';
-import { filterMainNoticeProjects } from '@/lib/notice-quality';
-import { baseNoticeProjects } from '@/lib/notice-source';
-import { getTopCollegeNoticeStats } from '@/lib/notice-analytics';
+import { fetchPublicNoticeSearch } from '@/lib/public-notice-api';
+import type { PublicNoticeSearchResponse } from '@/lib/public-notice-search';
+import type { NoticeSearchFilters } from '@/lib/notice-query';
+import type { NoticeListItem } from '@/lib/notice-record';
 import { officialResourceSections } from '@/lib/portal-data';
-import { PUBLISHED_DESKTOP_RELEASE } from '@/lib/desktop-public-release';
+import { DESKTOP_RELEASE } from '@/lib/desktop-download';
 import { fetchPublicOffers } from '@/lib/offers';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
-import type { PublicNoticeProject } from '@/lib/mock-data';
-
-const urgentRank = { today: 0, within3days: 1, within7days: 2, future: 3, expired: 4 } as const;
+const homeNoticeFilters: NoticeSearchFilters = {
+  keyword: '',
+  schoolName: '',
+  region: '全部',
+  majorKeyword: '',
+  category: '全部',
+  discipline: '全部',
+  schoolRange: '全部',
+  progress: '全部',
+  deadlineQuick: '全部',
+  fresh: '全部',
+  publishDate: '',
+  projectType: '全部',
+  noticeKind: '全部',
+  year: '2026',
+  sortBy: 'publish'
+};
 
 export default function HomePage() {
-  const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
-    filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
-  );
+  const [noticeOverview, setNoticeOverview] = useState<PublicNoticeSearchResponse | null>(null);
   const [noticesLoading, setNoticesLoading] = useState(true);
+  const [noticeLoadError, setNoticeLoadError] = useState(false);
   const [offerCount, setOfferCount] = useState(0);
   const [offersLoading, setOffersLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
 
-    fetchPublicNotices()
-      .then((rows) => {
+    const controller = new AbortController();
+
+    fetchPublicNoticeSearch(homeNoticeFilters, 1, {
+      pageSize: 1,
+      signal: controller.signal
+    })
+      .then((result) => {
         if (active) {
-          setProjects(rows.filter((item) => String(item.year) === '2026'));
+          setNoticeOverview(result);
+          setNoticeLoadError(false);
         }
       })
-      .catch(() => {
-        if (active) {
-          setProjects(filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026'));
+      .catch((error: unknown) => {
+        if (active && !(error instanceof DOMException && error.name === 'AbortError')) {
+          setNoticeLoadError(true);
         }
       })
       .finally(() => {
@@ -77,6 +96,7 @@ export default function HomePage() {
 
     return () => {
       active = false;
+      controller.abort();
     };
   }, []);
 
@@ -105,37 +125,27 @@ export default function HomePage() {
     };
   }, []);
 
-  const liveProjects = useMemo(
-    () => projects.filter((item) => getDeadlineLevelFromDate(item.deadlineDate) !== 'expired'),
-    [projects]
-  );
-
   const latestProjects = useMemo(
-    () => [...liveProjects].sort((left, right) => right.publishDate.localeCompare(left.publishDate)).slice(0, 5),
-    [liveProjects]
+    () => noticeOverview?.sideData.latestProjects || [],
+    [noticeOverview]
   );
-
   const deadlineProjects = useMemo(
-    () =>
-      [...liveProjects]
-        .sort(
-          (left, right) =>
-            urgentRank[getDeadlineLevelFromDate(left.deadlineDate)] - urgentRank[getDeadlineLevelFromDate(right.deadlineDate)] ||
-            getDeadlineTimestamp(left.deadlineDate) - getDeadlineTimestamp(right.deadlineDate)
-        )
-        .slice(0, 5),
-    [liveProjects]
+    () => noticeOverview?.sideData.urgentProjects || [],
+    [noticeOverview]
   );
 
   const priorityActions = useMemo(() => deadlineProjects.slice(0, 3), [deadlineProjects]);
   const totalResourceLinks = officialResourceSections.flatMap((item) => item.links).length;
-  const hotCollegeStats = useMemo(() => getTopCollegeNoticeStats(projects, 6), [projects]);
+  const hotCollegeStats = useMemo(
+    () => noticeOverview?.sideData.topColleges || [],
+    [noticeOverview]
+  );
 
   const heroMetrics = [
     {
       label: '2026 通知',
-      value: `${projects.length}+`,
-      hint: noticesLoading ? '正在同步最新通知' : '持续更新中',
+      value: noticesLoading ? '—' : noticeOverview ? `${noticeOverview.stats.total2026}+` : '暂不可用',
+      hint: noticesLoading ? '正在加载最新通知' : noticeLoadError ? '网络恢复后自动更新' : '持续更新中',
       icon: BellRing,
       href: '/notices'
     },
@@ -168,7 +178,7 @@ export default function HomePage() {
     { title: '申请决策', description: '多维筛选院校，科学定位更高效', icon: Target },
     { title: '截止提醒', description: '关键节点提前预警，重要截止不再错过', icon: CalendarDays },
     { title: '背景提升', description: '竞赛库和资源中心，沉淀可写进材料的经历', icon: Trophy },
-    { title: '申请跟进', description: '一站式管理进度，让申请事务不再杂乱', icon: Monitor }
+    { title: '工作台跟进', description: '一站式管理进度，让申请事务不再杂乱', icon: Monitor }
   ];
 
   const stepCards = [
@@ -180,7 +190,7 @@ export default function HomePage() {
     },
     {
       index: '2',
-      title: '建申请表 / 加入申请',
+      title: '建申请表 / 加入工作台',
       description: '整理材料，统一管理所有申请',
       icon: FileText
     },
@@ -205,7 +215,7 @@ export default function HomePage() {
               <span className="block sm:whitespace-nowrap">整理成清晰路径</span>
             </h1>
             <p className="mt-6 max-w-[610px] text-[15px] leading-7 text-slate-600 sm:mt-8 sm:text-base sm:leading-8 lg:text-lg lg:leading-9">
-              寻鹿 Seekoffer 同步整理夏令营、预推免与正式推免通知，把院校筛选、截止提醒、申请材料和进度跟进集中到全部申请。
+              寻鹿 Seekoffer 同步整理夏令营、预推免与正式推免通知，把院校筛选、截止提醒、申请材料和进度跟进放进同一个工作台。
             </p>
 
             <div className="mt-8 grid grid-cols-2 gap-3 sm:mt-10 sm:flex sm:flex-wrap sm:gap-5">
@@ -220,15 +230,15 @@ export default function HomePage() {
                 href="/me"
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[16px] border border-brand/25 bg-white/92 px-4 py-3 text-sm font-semibold text-brand shadow-sm transition hover:-translate-y-0.5 hover:border-brand sm:rounded-[18px] sm:px-7 sm:py-4"
               >
-                打开全部申请
+                打开工作台
               </Link>
             </div>
             <Link
               href="/download"
-              className="mx-auto mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-brand transition hover:bg-white/75 hover:text-brand-deep focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/10 min-[1400px]:mx-0"
+              className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-brand transition hover:bg-white/75 hover:text-brand-deep focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/10"
             >
               <Download className="h-4 w-4" />
-              Windows 桌面端 v{PUBLISHED_DESKTOP_RELEASE.version}
+              Windows 桌面端 v{DESKTOP_RELEASE.version}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -362,7 +372,7 @@ export default function HomePage() {
         <div className="product-card grid min-h-[285px] overflow-hidden rounded-[30px] bg-white/90 backdrop-blur lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           <div className="p-7 lg:p-8">
             <h2 className="text-[1.35rem] font-semibold leading-snug tracking-tight text-ink xl:text-2xl">
-              今天先处理什么，全部申请会直接告诉你
+              今天先处理什么，工作台会直接告诉你
             </h2>
             <p className="mt-4 text-sm leading-8 text-slate-600">
               待办、进度、材料完成度、截止提醒，一目了然，帮你聚焦最重要的下一步。
@@ -371,7 +381,7 @@ export default function HomePage() {
               href="/me"
               className="mt-7 inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-float transition hover:bg-brand-deep"
             >
-              进入全部申请
+              进入工作台
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -457,7 +467,7 @@ function HomeHeroPreview() {
         <div className="mb-4 flex items-center justify-between px-1">
           <div className="flex items-center gap-3">
             <SeekofferMiniMark className="h-9 w-9" />
-            <div className="text-sm font-semibold text-ink">全部申请</div>
+            <div className="text-sm font-semibold text-ink">我的申请工作台</div>
             <span className="rounded-full bg-brand/[0.07] px-2 py-1 text-[10px] font-semibold text-brand">
               产品界面示意
             </span>
@@ -558,7 +568,7 @@ function HomeHeroPreview() {
   );
 }
 
-function MiniWorkbenchPanel({ projects }: { projects: PublicNoticeProject[] }) {
+function MiniWorkbenchPanel({ projects }: { projects: NoticeListItem[] }) {
   return (
     <div className="relative min-h-[260px] overflow-hidden bg-gradient-to-br from-emerald-50/80 to-white p-5 sm:p-6">
       <div className="absolute right-[-2rem] top-[-2rem] h-32 w-32 rounded-full bg-brand/10 blur-2xl" />
@@ -618,7 +628,7 @@ function NoticeIllustration() {
   );
 }
 
-function LatestNoticeList({ projects }: { projects: PublicNoticeProject[] }) {
+function LatestNoticeList({ projects }: { projects: NoticeListItem[] }) {
   return (
     <section className="product-card rounded-[24px] p-7">
       <div className="flex items-center justify-between gap-4">
@@ -667,7 +677,7 @@ function LatestNoticeList({ projects }: { projects: PublicNoticeProject[] }) {
   );
 }
 
-function DeadlineReminderList({ projects }: { projects: PublicNoticeProject[] }) {
+function DeadlineReminderList({ projects }: { projects: NoticeListItem[] }) {
   return (
     <aside className="product-card rounded-[24px] p-7">
       <div className="flex items-center justify-between gap-4">

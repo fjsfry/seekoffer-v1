@@ -3,10 +3,10 @@
 import { createContext, startTransition, useContext, useEffect, useState } from 'react';
 import {
   getUserSession,
-  hydrateSupabaseSession,
+  hydrateCloudflareSession,
   isLoggedInSession,
   isMemberSession,
-  watchSupabaseAuthState,
+  watchCloudflareAuthState,
   watchUserSession,
   type UserSession
 } from '@/lib/user-session';
@@ -33,7 +33,7 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
         setSession(getUserSession());
       });
 
-      const hydrated = await hydrateSupabaseSession();
+      const hydrated = await hydrateCloudflareSession();
       if (!active) {
         return;
       }
@@ -56,7 +56,7 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
       });
     });
 
-    const disposeSupabase = watchSupabaseAuthState(() => {
+    const disposeCloudflareAuth = watchCloudflareAuthState(() => {
       if (!active) {
         return;
       }
@@ -70,12 +70,12 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
     return () => {
       active = false;
       dispose();
-      disposeSupabase();
+      disposeCloudflareAuth();
     };
   }, []);
 
   async function refresh() {
-    const hydrated = await hydrateSupabaseSession();
+    const hydrated = await hydrateCloudflareSession();
     const nextSession = hydrated ?? getUserSession();
 
     startTransition(() => {

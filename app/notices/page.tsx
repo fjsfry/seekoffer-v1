@@ -11,56 +11,63 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  GraduationCap,
+  Lightbulb,
   MapPin,
   RefreshCw,
   Search,
-  SlidersHorizontal
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles
 } from 'lucide-react';
 import { ApplicationActionButton } from '@/components/application-action-button';
-import { DesktopStateSurface } from '@/components/desktop-state-surface';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge } from '@/components/status-badge';
-import { fetchPublicNotices } from '@/lib/cloudbase-data';
 import {
   getDaysUntilDeadline,
   getDeadlineDistanceLabel,
-  getDeadlineLevelFromDate,
-  getDeadlineTimestamp
+  getDeadlineLevelFromDate
 } from '@/lib/deadline-display';
 import {
   formatNoticeDateOnly,
-  getDisplayDiscipline,
   getDisplayNoticeDepartment,
-  getDisplayProjectType,
   getDisplaySchoolName,
-  getDisplayTags,
   normalizeNoticeTitle
 } from '@/lib/notice-display';
 import { buildNoticeDetailHref } from '@/lib/notice-links';
 import {
-  getNoticeRegion,
-  getNoticeRegionOptions,
-  matchesNoticeKind,
-  matchesNoticeType,
   noticeKindFilters,
-  noticeTypeFilters
+  noticeTypeFilters,
+  type NoticeKindFilter
 } from '@/lib/notice-analytics';
-import { filterMainNoticeProjects } from '@/lib/notice-quality';
-import { baseNoticeProjects, inferDisciplineCategory, inferSchoolRange, matchesSchoolRange } from '@/lib/notice-source';
+import {
+  getNoticeCardTags,
+  getNoticeCityTag,
+  type NoticeDeadlineFilter,
+  type NoticeFreshFilter,
+  type NoticeProgressFilter,
+  type NoticeRangeFilter,
+  type NoticeSearchFilters,
+  type NoticeSortOption
+} from '@/lib/notice-query';
+import {
+  clearPublicNoticeSearchCache,
+  fetchPublicNoticeSearch
+} from '@/lib/public-notice-api';
+import type { PublicNoticeSearchResponse } from '@/lib/public-notice-search';
+import type { NoticeListItem } from '@/lib/notice-record';
 import { resolveNoticeLogoSource } from '@/lib/school-mark-source';
-import type { PublicNoticeProject } from '@/lib/mock-data';
 
-type SortOption = 'deadline' | 'publish' | 'updated' | 'school';
-type ProgressFilter = '全部' | '报名中' | '未开始' | '已结束';
-type RangeFilter = '全部' | '985' | '211' | '双一流' | '其他';
-type DeadlineQuickFilter = '全部' | 'today' | 'within3days' | 'within7days';
-type FreshFilter = '全部' | 'today';
+type SortOption = NoticeSortOption;
+type ProgressFilter = NoticeProgressFilter;
+type RangeFilter = NoticeRangeFilter;
+type DeadlineQuickFilter = NoticeDeadlineFilter;
+type FreshFilter = NoticeFreshFilter;
 type SearchParamReader = Pick<URLSearchParams, 'get' | 'toString'>;
 
 const PAGE_SIZE = 16;
 const NOTICE_LIST_POSITION_STORAGE_KEY = 'seekoffer.noticeListPosition.v1';
-const isDesktopSurface = process.env.NEXT_PUBLIC_SEEKOFFER_SURFACE === 'desktop';
 const projectTypeOptions = noticeTypeFilters;
 const noticeKindOptions = noticeKindFilters;
 const sortOptions: SortOption[] = ['deadline', 'publish', 'updated', 'school'];
@@ -68,7 +75,6 @@ const progressOptions: ProgressFilter[] = ['全部', '报名中', '未开始', '
 const rangeOptions: RangeFilter[] = ['全部', '985', '211', '双一流', '其他'];
 const deadlineQuickOptions: DeadlineQuickFilter[] = ['全部', 'today', 'within3days', 'within7days'];
 const freshOptions: FreshFilter[] = ['全部', 'today'];
-const NOTICE_LOADING_ROWS = [0, 1, 2, 3] as const;
 const defaultNoticeListState: NoticeListUrlState = {
   keyword: '',
   schoolName: '',
@@ -88,36 +94,6 @@ const defaultNoticeListState: NoticeListUrlState = {
   advancedOpen: false,
   page: 1
 };
-const CITY_TAGS = new Set([
-  '北京',
-  '上海',
-  '广州',
-  '深圳',
-  '南京',
-  '杭州',
-  '天津',
-  '武汉',
-  '成都',
-  '西安',
-  '合肥',
-  '苏州',
-  '重庆',
-  '长沙',
-  '厦门',
-  '青岛',
-  '哈尔滨',
-  '香港',
-  '澳门'
-]);
-
-function matchesProgress(filter: ProgressFilter, project: PublicNoticeProject) {
-  const deadlineLevel = getDeadlineLevelFromDate(project.deadlineDate);
-  if (filter === '全部') return true;
-  if (filter === '报名中') return deadlineLevel !== 'expired' && (project.status === '报名中' || project.status === '即将截止');
-  if (filter === '未开始') return project.status === '未开始';
-  return deadlineLevel === 'expired' || project.status === '已截止' || project.status === '已结束' || project.status === '活动中';
-}
-
 function getVisiblePages(currentPage: number, totalPages: number) {
   const start = Math.max(1, currentPage - 1);
   const end = Math.min(totalPages, currentPage + 1);
@@ -133,47 +109,8 @@ function getVisiblePages(currentPage: number, totalPages: number) {
   return Array.from(new Set(pages));
 }
 
-function getNoticeCardTags(project: PublicNoticeProject) {
-  const seen = new Set<string>();
-  const tags = [getDisplayProjectType(project.projectType), inferSchoolRange(project), ...getDisplayTags(project.tags)]
-    .map((item) => item.trim())
-    .filter((item) => {
-      if (!item || item === '其他' || item === '待分类' || item === '方向待分类') {
-        return false;
-      }
-
-      return item.length <= 8 && !/[，,、；;]/.test(item);
-    })
-    .filter((item) => {
-      if (seen.has(item)) {
-        return false;
-      }
-
-      seen.add(item);
-      return true;
-    });
-
-  return tags.slice(0, 3);
-}
-
-function parseDeadline(project: PublicNoticeProject) {
-  return getDeadlineTimestamp(project.deadlineDate);
-}
-
-function getDaysLeft(project: PublicNoticeProject) {
+function getDaysLeft(project: NoticeListItem) {
   return getDaysUntilDeadline(project.deadlineDate);
-}
-
-function getBeijingDateString(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).formatToParts(date);
-  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || '';
-
-  return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
 function getBeijingTimeString(date = new Date()) {
@@ -188,54 +125,19 @@ function getBeijingTimeString(date = new Date()) {
   return `${value('hour')}:${value('minute')}`;
 }
 
-function sortProjects(rows: PublicNoticeProject[], sortBy: SortOption) {
-  return rows.sort((left, right) => {
-    if (sortBy === 'deadline') {
-      const leftExpired = getDeadlineLevelFromDate(left.deadlineDate) === 'expired' ? 1 : 0;
-      const rightExpired = getDeadlineLevelFromDate(right.deadlineDate) === 'expired' ? 1 : 0;
+const quickFilters = [
+  { label: '今日新增', kind: 'fresh', value: 'today' },
+  { label: '报名中', kind: 'progress', value: '报名中' },
+  { label: '3天内截止', kind: 'deadline', value: 'within3days' },
+  { label: '7天内截止', kind: 'deadline', value: 'within7days' },
+  { label: '985', kind: 'range', value: '985' },
+  { label: '211', kind: 'range', value: '211' },
+  { label: '双一流', kind: 'range', value: '双一流' },
+  { label: '宣讲会', kind: 'noticeKind', value: '宣讲会' },
+  { label: '入营名单', kind: 'noticeKind', value: '入营名单' }
+] as const;
 
-      if (leftExpired !== rightExpired) {
-        return leftExpired - rightExpired;
-      }
-
-      return parseDeadline(left) - parseDeadline(right);
-    }
-
-    if (sortBy === 'school') {
-      return left.schoolName.localeCompare(right.schoolName, 'zh-CN');
-    }
-
-    if (sortBy === 'updated') {
-      const leftValue = left.updatedAt || left.collectedAt || left.publishDate;
-      const rightValue = right.updatedAt || right.collectedAt || right.publishDate;
-      return rightValue.localeCompare(leftValue);
-    }
-
-    return right.publishDate.localeCompare(left.publishDate);
-  });
-}
-
-function getCityTag(project: PublicNoticeProject) {
-  return (project.tags || []).map((tag) => tag.trim()).find((tag) => CITY_TAGS.has(tag));
-}
-
-type NoticeListFilterValues = {
-  keyword: string;
-  schoolName: string;
-  region: string;
-  majorKeyword: string;
-  category: string;
-  discipline: string;
-  schoolRange: RangeFilter;
-  progress: ProgressFilter;
-  deadlineQuick: DeadlineQuickFilter;
-  fresh: FreshFilter;
-  publishDate: string;
-  projectType: string;
-  noticeKind: string;
-  year: string;
-  sortBy: SortOption;
-};
+type NoticeListFilterValues = NoticeSearchFilters;
 
 type NoticeListUrlState = NoticeListFilterValues & {
   advancedOpen: boolean;
@@ -368,17 +270,6 @@ function getUrlWithoutHash(href: string) {
   return href.split('#')[0];
 }
 
-function replaceNoticeHistory(href: string) {
-  window.history.replaceState(window.history.state, '', href);
-}
-
-function getNoticeScrollOwner() {
-  return (
-    document.querySelector<HTMLElement>('.desktop-route-content') ||
-    (document.scrollingElement as HTMLElement | null)
-  );
-}
-
 function writeNoticeListPosition(snapshot: NoticeListPositionDraft) {
   if (typeof window === 'undefined') {
     return;
@@ -453,19 +344,11 @@ export default function NoticesPage() {
 function NoticesPageFallback() {
   return (
     <SiteShell>
-      <div className="desktop-notice-library">
-        <section className={isDesktopSurface
-          ? 'desktop-core-page-header desktop-page-header desktop-page-header--directory desktop-notice-hero page-hero'
-          : 'desktop-notice-hero page-hero px-6 py-7 lg:px-8'}>
-          <div className={isDesktopSurface ? 'desktop-page-header-copy' : undefined}>
-            {isDesktopSurface ? <div className="desktop-page-header-title-row">
-              <h1 className={isDesktopSurface ? 'desktop-page-header-title' : 'text-4xl font-semibold tracking-tight text-ink md:text-5xl'}>通知库</h1>
-            </div> : <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">通知库</h1>}
-            <p className={isDesktopSurface ? 'desktop-page-header-subtitle' : 'mt-4 text-base leading-8 text-slate-600'}>正在恢复你的浏览位置，请稍等。</p>
-          </div>
-        </section>
-        <NoticeLoadingState />
-      </div>
+      <section className="page-hero px-6 py-7 lg:px-8">
+        <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">通知库</h1>
+        <p className="mt-4 text-base leading-8 text-slate-600">正在恢复你的浏览位置，请稍等。</p>
+      </section>
+      <NoticeListSkeleton />
     </SiteShell>
   );
 }
@@ -474,19 +357,19 @@ function NoticesPageContent() {
   const searchParams = useSearchParams();
   const initialUrlState = useMemo(() => parseNoticeListUrlState(searchParams), [searchParams]);
   const initialNoticeState = initialUrlState || defaultNoticeListState;
-  const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
-    filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026')
-  );
+  const [searchResponse, setSearchResponse] = useState<PublicNoticeSearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const [loadedQueryKey, setLoadedQueryKey] = useState('');
   const [lastLoadedAt, setLastLoadedAt] = useState('');
   const [loadError, setLoadError] = useState('');
-  const hasOnlineSnapshotRef = useRef(false);
   const [keyword, setKeyword] = useState(initialNoticeState.keyword);
+  const [debouncedKeyword, setDebouncedKeyword] = useState(initialNoticeState.keyword);
   const [schoolName, setSchoolName] = useState(initialNoticeState.schoolName);
   const [region, setRegion] = useState(initialNoticeState.region);
   const [majorKeyword, setMajorKeyword] = useState(initialNoticeState.majorKeyword);
+  const [debouncedMajorKeyword, setDebouncedMajorKeyword] = useState(initialNoticeState.majorKeyword);
   const [category, setCategory] = useState(initialNoticeState.category);
   const [discipline, setDiscipline] = useState(initialNoticeState.discipline);
   const [schoolRange, setSchoolRange] = useState<RangeFilter>(initialNoticeState.schoolRange);
@@ -503,6 +386,7 @@ function NoticesPageContent() {
     page: initialNoticeState.page,
     filterKey: buildNoticeFilterKey(initialNoticeState)
   }));
+  const requestSequenceRef = useRef(0);
   const filterValues = useMemo<NoticeListFilterValues>(
     () => ({
       keyword,
@@ -540,203 +424,133 @@ function NoticesPageContent() {
     ]
   );
   const filterKey = buildNoticeFilterKey(filterValues);
-  const activeFilterCount = useMemo(
-    () =>
-      [
-        keyword.trim(),
-        schoolName.trim(),
-        region !== defaultNoticeListState.region,
-        majorKeyword.trim(),
-        category !== defaultNoticeListState.category,
-        discipline !== defaultNoticeListState.discipline,
-        schoolRange !== defaultNoticeListState.schoolRange,
-        progress !== defaultNoticeListState.progress,
-        deadlineQuick !== defaultNoticeListState.deadlineQuick,
-        fresh !== defaultNoticeListState.fresh,
-        publishDate,
-        projectType !== defaultNoticeListState.projectType,
-        noticeKind !== defaultNoticeListState.noticeKind,
-        year !== defaultNoticeListState.year,
-        sortBy !== defaultNoticeListState.sortBy
-      ].filter(Boolean).length,
-    [
-      category,
-      deadlineQuick,
-      discipline,
-      fresh,
-      keyword,
-      majorKeyword,
-      noticeKind,
-      progress,
-      projectType,
-      publishDate,
-      region,
-      schoolName,
-      schoolRange,
-      sortBy,
-      year
-    ]
-  );
 
   useEffect(() => {
-    let active = true;
+    const timeout = window.setTimeout(() => setDebouncedKeyword(keyword), 350);
+    return () => window.clearTimeout(timeout);
+  }, [keyword]);
 
-    async function loadPublicNotices() {
-      setIsLoading(true);
-      setLoadError('');
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedMajorKeyword(majorKeyword), 350);
+    return () => window.clearTimeout(timeout);
+  }, [majorKeyword]);
 
-      try {
-        const rows = await fetchPublicNotices({ refresh: reloadToken > 0 });
-        if (active) {
-          setProjects(rows.filter((item) => String(item.year) === '2026'));
-          hasOnlineSnapshotRef.current = true;
-          setLastLoadedAt(getBeijingTimeString());
+  const apiFilterValues = useMemo<NoticeSearchFilters>(
+    () => ({
+      keyword: debouncedKeyword,
+      schoolName,
+      region,
+      majorKeyword: debouncedMajorKeyword,
+      category,
+      discipline,
+      schoolRange,
+      progress,
+      deadlineQuick,
+      fresh,
+      publishDate,
+      projectType,
+      noticeKind,
+      year,
+      sortBy
+    }),
+    [
+      debouncedKeyword,
+      schoolName,
+      region,
+      debouncedMajorKeyword,
+      category,
+      discipline,
+      schoolRange,
+      progress,
+      deadlineQuick,
+      fresh,
+      publishDate,
+      projectType,
+      noticeKind,
+      year,
+      sortBy
+    ]
+  );
+  const apiFilterKey = buildNoticeFilterKey(apiFilterValues);
+  const requestedPage = pageState.filterKey === apiFilterKey ? pageState.page : 1;
+  const apiQueryKey = `${apiFilterKey}|page:${requestedPage}`;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const requestId = requestSequenceRef.current + 1;
+    requestSequenceRef.current = requestId;
+    setIsLoading(true);
+    setLoadError('');
+
+    fetchPublicNoticeSearch(apiFilterValues, requestedPage, {
+      pageSize: PAGE_SIZE,
+      signal: controller.signal
+    })
+      .then((response) => {
+        if (controller.signal.aborted || requestSequenceRef.current !== requestId) {
+          return;
         }
-      } catch {
-        if (active) {
-          if (hasOnlineSnapshotRef.current) {
-            setLoadError('本次刷新失败，继续展示上次同步成功的通知。');
-          } else {
-            setProjects(filterMainNoticeProjects(baseNoticeProjects).filter((item) => String(item.year) === '2026'));
-            setLoadError('通知同步暂时不可用，已展示本地兜底数据。');
-          }
+
+        setSearchResponse(response);
+        setLoadedQueryKey(apiQueryKey);
+        setLastLoadedAt(getBeijingTimeString());
+        setLoadError(
+          response.source === 'bundled'
+            ? '云端通知暂时不可用，当前展示最近一次发布的本地兜底数据。'
+            : ''
+        );
+
+        if (response.pagination.page !== requestedPage) {
+          setPageState((current) =>
+            current.filterKey === apiFilterKey
+              ? { filterKey: apiFilterKey, page: response.pagination.page }
+              : current
+          );
         }
-      } finally {
-        if (active) {
+      })
+      .catch((error: unknown) => {
+        if (
+          controller.signal.aborted ||
+          requestSequenceRef.current !== requestId ||
+          (error instanceof DOMException && error.name === 'AbortError')
+        ) {
+          return;
+        }
+
+        setLoadError('通知加载失败，请检查网络后重试。');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted && requestSequenceRef.current === requestId) {
           setIsLoading(false);
           setIsRefreshing(false);
         }
-      }
-    }
+      });
 
-    void loadPublicNotices();
+    return () => controller.abort();
+  }, [apiFilterKey, apiFilterValues, apiQueryKey, reloadToken, requestedPage]);
 
-    return () => {
-      active = false;
-    };
-  }, [reloadToken]);
-
-  const categoryOptions = useMemo(
-    () => ['全部', ...Array.from(new Set(projects.map((item) => inferDisciplineCategory(item.discipline))))],
-    [projects]
-  );
-
-  const disciplineOptions = useMemo(() => {
-    const rows =
-      category === '全部'
-        ? projects
-        : projects.filter((item) => inferDisciplineCategory(item.discipline) === category);
-
-    return ['全部', ...Array.from(new Set(rows.map((item) => getDisplayDiscipline(item.discipline)).filter(Boolean)))];
-  }, [projects, category]);
-
-  const regionOptions = useMemo(() => ['全部', ...getNoticeRegionOptions(projects)], [projects]);
-
-  const schoolOptions = useMemo(() => {
-    const rows = region === '全部' ? projects : projects.filter((item) => getNoticeRegion(item) === region);
-    const schools = Array.from(new Set(rows.map((item) => getDisplaySchoolName(item.schoolName)).filter((item) => item && item !== '待识别院校')));
-
-    return ['全部', ...schools.sort((left, right) => left.localeCompare(right, 'zh-CN'))];
-  }, [projects, region]);
-
-  const todayInBeijing = getBeijingDateString();
-
-  const filteredProjects = useMemo(() => {
-    const noticeKeyword = keyword.trim().toLowerCase();
-    const schoolKeyword = schoolName.trim().toLowerCase();
-    const majorText = majorKeyword.trim().toLowerCase();
-
-    const rows = projects.filter((item) => {
-      const displaySchool = getDisplaySchoolName(item.schoolName);
-      const displayDepartment = getDisplayNoticeDepartment(item);
-      const displayTitle = normalizeNoticeTitle(item.projectName, 160);
-      const primaryKeywordText = [displaySchool, displayDepartment, displayTitle].join(' ').toLowerCase();
-      const secondaryKeywordText = [
-        getDisplayDiscipline(item.discipline),
-        getNoticeCardTags(item).join(' ')
-      ]
-        .join(' ')
-        .toLowerCase();
-      const canUseBroadKeyword = noticeKeyword.length >= 4 || /[a-z0-9]/i.test(noticeKeyword);
-      const matchesType = matchesNoticeType(item, projectType);
-      const matchesKind = matchesNoticeKind(item, noticeKind);
-      const matchesRange = matchesSchoolRange(item, schoolRange);
-      const matchesRegion = region === '全部' ? true : getNoticeRegion(item) === region || (item.tags || []).includes(region);
-      const matchesSchool =
-        schoolName === '全部' ||
-        !schoolKeyword ||
-        [displaySchool, displayDepartment].join(' ').toLowerCase().includes(schoolKeyword);
-      const matchesCategory = category === '全部' ? true : inferDisciplineCategory(item.discipline) === category;
-      const matchesDiscipline = discipline === '全部' ? true : getDisplayDiscipline(item.discipline) === discipline;
-      const matchesMajor =
-        !majorText ||
-        [getDisplayDiscipline(item.discipline), displayDepartment, displayTitle, getNoticeCardTags(item).join(' ')]
-          .join(' ')
-          .toLowerCase()
-          .includes(majorText);
-      const matchesProgressState = matchesProgress(progress, item);
-      const matchesDeadlineQuick =
-        deadlineQuick === '全部'
-          ? true
-          : deadlineQuick === 'today'
-            ? getDeadlineLevelFromDate(item.deadlineDate) === 'today'
-            : deadlineQuick === 'within3days'
-              ? ['today', 'within3days'].includes(getDeadlineLevelFromDate(item.deadlineDate))
-              : ['today', 'within3days', 'within7days'].includes(getDeadlineLevelFromDate(item.deadlineDate));
-      const matchesFresh = fresh === '全部' ? true : item.publishDate === todayInBeijing;
-      const matchesPublishDate = publishDate ? item.publishDate === publishDate : true;
-      const matchesYear = year === '全部' ? true : String(item.year) === year;
-      const matchesKeyword =
-        !noticeKeyword ||
-        primaryKeywordText.includes(noticeKeyword) ||
-        (canUseBroadKeyword && secondaryKeywordText.includes(noticeKeyword));
-
-      return (
-        matchesType &&
-        matchesKind &&
-        matchesRange &&
-        matchesRegion &&
-        matchesSchool &&
-        matchesCategory &&
-        matchesDiscipline &&
-        matchesMajor &&
-        matchesProgressState &&
-        matchesDeadlineQuick &&
-        matchesFresh &&
-        matchesPublishDate &&
-        matchesYear &&
-        matchesKeyword
-      );
-    });
-
-    return sortProjects(rows, sortBy);
-  }, [
-    projects,
-    keyword,
-    schoolName,
-    region,
-    majorKeyword,
-    category,
-    discipline,
-    schoolRange,
-    progress,
-    deadlineQuick,
-    fresh,
-    publishDate,
-    projectType,
-    noticeKind,
-    year,
-    sortBy,
-    todayInBeijing
-  ]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
-  const requestedPage = pageState.filterKey === filterKey ? pageState.page : 1;
-  const currentPage = Math.min(requestedPage, totalPages);
-  const pagedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const responseMatchesQuery = loadedQueryKey === apiQueryKey;
+  const visibleResponse = responseMatchesQuery ? searchResponse : null;
+  const currentPage = responseMatchesQuery
+    ? visibleResponse?.pagination.page || requestedPage
+    : pageState.filterKey === filterKey
+      ? pageState.page
+      : 1;
+  const totalResults = visibleResponse?.pagination.total || 0;
+  const totalPages = visibleResponse?.pagination.totalPages || 1;
+  const pagedProjects = visibleResponse?.items || [];
   const visiblePages = getVisiblePages(currentPage, totalPages);
-  const isNoticeLoading = isLoading && projects.length === 0;
-  const latestPublishDate = projects.reduce((latest, item) => (item.publishDate > latest ? item.publishDate : latest), '');
+  const isNoticeLoading = isLoading && !visibleResponse;
+  const categoryOptions = ['全部', ...(visibleResponse?.facets.categories || [])];
+  const disciplineOptions = ['全部', ...(visibleResponse?.facets.disciplines || [])];
+  const regionOptions = ['全部', ...(visibleResponse?.facets.regions || [])];
+  const schoolOptions = ['全部', ...(visibleResponse?.facets.schools || [])];
+  const urgentProjects = visibleResponse?.sideData.urgentProjects || [];
+  const todayUpdates = visibleResponse?.sideData.todaySchoolUpdates || {
+    date: '',
+    hasTodayRows: false,
+    rows: [] as Array<[string, number]>
+  };
 
   useEffect(() => {
     const preservedHash = window.location.hash.startsWith('#notice-') ? window.location.hash : '';
@@ -744,63 +558,40 @@ function NoticesPageContent() {
     const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
     if (currentHref !== nextHref) {
-      replaceNoticeHistory(nextHref);
+      window.history.replaceState(null, '', nextHref);
     }
   }, [filterValues, currentPage, advancedOpen]);
 
   useEffect(() => {
-    if (isNoticeLoading || !pagedProjects.length || typeof window === 'undefined') {
+    if (isLoading || !responseMatchesQuery || !pagedProjects.length || typeof window === 'undefined') {
       return;
     }
 
     const snapshot = readNoticeListPosition();
     const currentPathWithSearch = `${window.location.pathname}${window.location.search}`;
-    const expectedLocationHref = `${currentPathWithSearch}${window.location.hash}`;
-    const restoreHref = buildNoticeListHref(filterValues, currentPage, advancedOpen);
-    let cancelled = false;
-    let firstRestoreFrame: number | null = null;
-    let secondRestoreFrame: number | null = null;
-    const isCurrentNoticeRestore = () =>
-      !cancelled &&
-      `${window.location.pathname}${window.location.search}${window.location.hash}` ===
-        expectedLocationHref;
-    const cancelNoticeRestore = () => {
-      cancelled = true;
-      if (firstRestoreFrame !== null) {
-        window.cancelAnimationFrame(firstRestoreFrame);
-      }
-      if (secondRestoreFrame !== null) {
-        window.cancelAnimationFrame(secondRestoreFrame);
-      }
-    };
-
     if (
       snapshot &&
       getUrlWithoutHash(snapshot.href) === currentPathWithSearch &&
       snapshot.filterKey === filterKey &&
       snapshot.page === currentPage
     ) {
-      firstRestoreFrame = window.requestAnimationFrame(() => {
-        if (!isCurrentNoticeRestore()) return;
-
+      window.requestAnimationFrame(() => {
         if (snapshot.noticeId) {
           document.getElementById(getNoticeDomId(snapshot.noticeId))?.scrollIntoView({
             block: 'center'
           });
         }
 
-        secondRestoreFrame = window.requestAnimationFrame(() => {
-          if (!isCurrentNoticeRestore()) return;
-
-          getNoticeScrollOwner()?.scrollTo({
+        window.requestAnimationFrame(() => {
+          window.scrollTo({
             top: Math.max(0, snapshot.scrollY),
             behavior: 'auto'
           });
-          replaceNoticeHistory(restoreHref);
+          window.history.replaceState(null, '', buildNoticeListHref(filterValues, currentPage, advancedOpen));
           clearNoticeListPosition();
         });
       });
-      return cancelNoticeRestore;
+      return;
     }
 
     if (snapshot && getUrlWithoutHash(snapshot.href) !== currentPathWithSearch) {
@@ -812,45 +603,35 @@ function NoticesPageContent() {
       return;
     }
 
-    firstRestoreFrame = window.requestAnimationFrame(() => {
-      if (!isCurrentNoticeRestore()) return;
-
+    window.requestAnimationFrame(() => {
       document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView({
         block: 'center'
       });
-      replaceNoticeHistory(restoreHref);
+      window.history.replaceState(null, '', buildNoticeListHref(filterValues, currentPage, advancedOpen));
     });
-    return cancelNoticeRestore;
-  }, [isNoticeLoading, currentPage, filterKey, pagedProjects.length, filterValues, advancedOpen]);
+  }, [isLoading, responseMatchesQuery, currentPage, filterKey, pagedProjects.length, filterValues, advancedOpen]);
 
-  const urgentProjects = useMemo(
-    () =>
-      sortProjects(
-        projects.filter((item) => ['today', 'within3days', 'within7days'].includes(getDeadlineLevelFromDate(item.deadlineDate))),
-        'deadline'
-      ).slice(0, 5),
-    [projects]
-  );
-
-  const todayUpdates = useMemo(() => {
-    const counts = new Map<string, number>();
-    const todayRows = projects.filter((item) => item.publishDate === todayInBeijing);
-    const fallbackRows = latestPublishDate ? projects.filter((item) => item.publishDate === latestPublishDate) : [];
-    const rows = todayRows.length ? todayRows : fallbackRows;
-
-    rows.forEach((item) => {
-      const school = getDisplaySchoolName(item.schoolName);
-      counts.set(school, (counts.get(school) || 0) + 1);
-    });
-
-    return {
-      date: todayRows.length ? todayInBeijing : latestPublishDate,
-      hasTodayRows: todayRows.length > 0,
-      rows: Array.from(counts.entries())
-        .sort((left, right) => right[1] - left[1])
-        .slice(0, 5)
-    };
-  }, [projects, todayInBeijing, latestPublishDate]);
+  const pageStats = [
+    {
+      label: '2026通知',
+      value: isNoticeLoading ? '加载中' : visibleResponse ? `${visibleResponse.stats.total2026}+` : '—',
+      icon: BellRing
+    },
+    {
+      label: '今日更新',
+      value: isNoticeLoading ? '加载中' : visibleResponse ? `${visibleResponse.stats.todayUpdates}` : '—',
+      icon: BookOpenText
+    },
+    {
+      label: '3天内截止',
+      value: isNoticeLoading
+        ? '加载中'
+        : visibleResponse
+          ? `${visibleResponse.stats.deadlineWithin3Days}`
+          : '—',
+      icon: Clock3
+    }
+  ];
 
   function updatePage(nextPage: number | ((currentPage: number) => number)) {
     setPageState((current) => {
@@ -874,9 +655,9 @@ function NoticesPageContent() {
       filterKey,
       noticeId,
       page: currentPage,
-      scrollY: getNoticeScrollOwner()?.scrollTop || 0
+      scrollY: window.scrollY
     });
-    replaceNoticeHistory(returnHref);
+    window.history.replaceState(null, '', returnHref);
   }
 
   function resetFilters() {
@@ -908,53 +689,114 @@ function NoticesPageContent() {
     }
 
     setIsRefreshing(true);
+    clearPublicNoticeSearchCache();
     setReloadToken((value) => value + 1);
   }
 
-  const noticeResultsToolbar = (
-    <div className="desktop-notice-toolbar flex flex-wrap items-center justify-between gap-4 rounded-[22px] border border-slate-200 bg-white px-5 py-4 shadow-sm">
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <span className="font-semibold text-ink">
-          {isNoticeLoading ? '正在加载通知...' : `共 ${filteredProjects.length.toLocaleString('zh-CN')} 条结果`}
-        </span>
-        {!isDesktopSurface && lastLoadedAt ? <span className="text-slate-400">已同步 {lastLoadedAt}</span> : null}
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={refreshLatestNotices}
-          disabled={isLoading || isRefreshing}
-          className="desktop-notice-toolbar-action inline-flex items-center gap-2 text-sm font-semibold text-brand transition hover:text-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          {isRefreshing ? '刷新中' : '刷新最新'}
-        </button>
-        <button onClick={resetFilters} className="desktop-notice-toolbar-action inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-brand">
-          <RefreshCw className="h-4 w-4" />
-          重置筛选
-        </button>
-      </div>
-    </div>
-  );
+  function applyQuickFilter(filter: (typeof quickFilters)[number]) {
+    if (filter.kind === 'fresh') {
+      if (fresh === filter.value) {
+        setFresh('全部');
+        setSortBy((current) => (current === 'updated' ? defaultNoticeListState.sortBy : current));
+        return;
+      }
+
+      setFresh(filter.value as FreshFilter);
+      setSortBy('updated');
+      return;
+    }
+
+    if (filter.kind === 'progress') {
+      setProgress((current) => (current === filter.value ? '全部' : (filter.value as ProgressFilter)));
+      return;
+    }
+
+    if (filter.kind === 'deadline') {
+      const nextDeadline = filter.value as DeadlineQuickFilter;
+      if (deadlineQuick === nextDeadline) {
+        setDeadlineQuick('全部');
+        setProgress((current) => (current === '报名中' ? '全部' : current));
+        setSortBy((current) => (current === 'deadline' ? defaultNoticeListState.sortBy : current));
+        return;
+      }
+
+      setProgress('报名中');
+      setDeadlineQuick(nextDeadline);
+      setSortBy('deadline');
+      return;
+    }
+
+    if (filter.kind === 'range') {
+      setSchoolRange((current) => (current === filter.value ? '全部' : (filter.value as RangeFilter)));
+      return;
+    }
+
+    if (filter.kind === 'noticeKind') {
+      setNoticeKind((current) => (current === filter.value ? '全部' : (filter.value as NoticeKindFilter)));
+    }
+  }
+
+  function isQuickFilterActive(filter: (typeof quickFilters)[number]) {
+    if (filter.kind === 'fresh') return fresh === filter.value;
+    if (filter.kind === 'progress') return progress === filter.value;
+    if (filter.kind === 'deadline') return deadlineQuick === filter.value;
+    if (filter.kind === 'range') return schoolRange === filter.value;
+    return noticeKind === filter.value;
+  }
 
   return (
     <SiteShell>
-      <div className="desktop-core-page desktop-core-page--scroll desktop-notice-library">
-      <section className={`desktop-core-page-header desktop-notice-hero page-hero${
-        isDesktopSurface ? ' desktop-page-header desktop-page-header--directory' : ''
-      }`}>
-        <div className={isDesktopSurface ? 'desktop-page-header-copy' : undefined}>
-          {isDesktopSurface ? <div className="desktop-page-header-title-row">
-            <h1 className="desktop-page-header-title">通知库</h1>
-          </div> : <h1>通知库</h1>}
-          <p className={isDesktopSurface ? 'desktop-page-header-subtitle' : undefined}>持续同步公开保研通知，优先展示可报名项目与关键截止时间。</p>
+      <section className="page-hero grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:px-8">
+        <div>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-5xl">通知库</h1>
+          <p className="mt-4 text-base leading-8 text-slate-600">
+            持续同步公开保研通知，优先展示可报名项目与关键截止时间。
+          </p>
+        </div>
+
+        <div className="mx-auto grid w-full max-w-[520px] grid-cols-1 gap-3 sm:grid-cols-3 lg:mx-0 lg:justify-self-center">
+          {pageStats.map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <div key={item.label} className="soft-stat-pill rounded-[28px] px-4 py-4">
+                <div className="flex items-center justify-center gap-3 text-center">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand/8 text-brand">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="whitespace-nowrap text-xs text-slate-500">{item.label}</div>
+                    <div className="whitespace-nowrap text-xl font-semibold text-ink">{item.value}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
-      <section className="desktop-notice-filters product-card rounded-[30px] p-5 lg:p-6">
-        <div className="desktop-notice-search-row grid gap-3 xl:grid-cols-[minmax(280px,1fr)_150px_170px_180px_148px]">
-          <label className="desktop-notice-search-field flex h-12 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4">
-            <span className="sr-only">搜索通知</span>
+      <section className="product-card rounded-[30px] p-5 lg:p-6">
+        <div className="flex flex-wrap gap-4 border-b border-slate-100 pb-5">
+          {projectTypeOptions.map((item) => (
+            <button
+              key={item}
+              onClick={() => setProjectType((current) => (item === '全部' || current === item ? '全部' : item))}
+              className={`relative px-4 py-2 text-sm font-semibold transition ${
+                projectType === item ? 'text-brand' : 'text-slate-500 hover:text-brand'
+              }`}
+            >
+              {item}
+              <span
+                className={`absolute inset-x-3 -bottom-5 h-0.5 rounded-full bg-brand transition ${
+                  projectType === item ? 'opacity-100' : 'opacity-0'
+                }`}
+              />
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_160px]">
+          <label className="flex h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 shadow-sm">
             <Search className="h-5 w-5 text-slate-400" />
             <input
               value={keyword}
@@ -963,46 +805,42 @@ function NoticesPageContent() {
               className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
             />
           </label>
-          <CompactFilterSelect label="申请状态" value={progress} onChange={(value) => setProgress(value as ProgressFilter)}>
-            {(['全部', '报名中', '未开始', '已结束'] as ProgressFilter[]).map((item) => (
-              <option key={item} value={item}>{item === '全部' ? '全部状态' : item}</option>
-            ))}
-          </CompactFilterSelect>
-          <CompactFilterSelect label="截止范围" value={deadlineQuick} onChange={(value) => setDeadlineQuick(value as DeadlineQuickFilter)}>
-            <option value="全部">全部截止时间</option>
-            <option value="today">今天截止</option>
-            <option value="within3days">3天内截止</option>
-            <option value="within7days">7天内截止</option>
-          </CompactFilterSelect>
-          <CompactFilterSelect label="排序方式" value={sortBy} onChange={(value) => setSortBy(value as SortOption)}>
-            <option value="publish">最新发布优先</option>
-            <option value="updated">最近更新优先</option>
-            <option value="deadline">最近截止优先</option>
-            <option value="school">按学校名称</option>
-          </CompactFilterSelect>
           <button
             type="button"
             onClick={() => setAdvancedOpen((current) => !current)}
-            aria-expanded={advancedOpen}
-            className="desktop-notice-filter-toggle inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:border-brand hover:text-brand"
+            className="inline-flex h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-brand px-5 text-sm font-semibold text-white shadow-float transition hover:-translate-y-0.5 hover:bg-brand-deep"
           >
             <SlidersHorizontal className="h-4 w-4" />
-            {advancedOpen ? '收起筛选' : '更多筛选'}
-            {activeFilterCount > 0 ? <span className="desktop-notice-filter-count">{activeFilterCount}</span> : null}
+            {advancedOpen ? '收起筛选' : '高级筛选'}
           </button>
         </div>
 
-        {!isDesktopSurface && activeFilterCount > 0 ? (
-          <div className="desktop-notice-active-filters mt-3 flex items-center gap-3 text-sm text-slate-500" role="status">
-            <span>已应用 {activeFilterCount} 项筛选</span>
-            <button type="button" onClick={resetFilters} className="font-semibold text-brand hover:text-brand-deep">
-              清除全部
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs font-semibold text-slate-400">快捷筛选</span>
+          {quickFilters.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => applyQuickFilter(item)}
+              aria-pressed={isQuickFilterActive(item)}
+              className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${
+                isQuickFilterActive(item) ? 'bg-brand text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-brand/8 hover:text-brand'
+              }`}
+            >
+              {item.label}
             </button>
-          </div>
-        ) : null}
+          ))}
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="ml-auto rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-brand hover:text-brand"
+          >
+            重置
+          </button>
+        </div>
 
         {advancedOpen ? (
-          <div className="desktop-notice-advanced-filters mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-3 xl:grid-cols-4">
+          <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-3 xl:grid-cols-4">
             <FilterSelect label="年份" value={year} onChange={setYear}>
               <option value="2026">2026</option>
               <option value="全部">全部</option>
@@ -1068,9 +906,22 @@ function NoticesPageContent() {
                 </option>
               ))}
             </FilterSelect>
+            <FilterSelect label="状态" value={progress} onChange={(value) => setProgress(value as ProgressFilter)}>
+              {(['全部', '报名中', '未开始', '已结束'] as ProgressFilter[]).map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </FilterSelect>
             <FilterSelect label="新增" value={fresh} onChange={(value) => setFresh(value as FreshFilter)}>
               <option value="全部">不限</option>
               <option value="today">今日新增</option>
+            </FilterSelect>
+            <FilterSelect label="截止范围" value={deadlineQuick} onChange={(value) => setDeadlineQuick(value as DeadlineQuickFilter)}>
+              <option value="全部">不限</option>
+              <option value="today">今天截止</option>
+              <option value="within3days">3天内截止</option>
+              <option value="within7days">7天内截止</option>
             </FilterSelect>
             <FilterInput label="专业关键词" value={majorKeyword} onChange={setMajorKeyword} placeholder="例如 人工智能" />
             <FilterSelect label="细分专业" value={discipline} onChange={setDiscipline}>
@@ -1080,30 +931,72 @@ function NoticesPageContent() {
                 </option>
               ))}
             </FilterSelect>
+            <FilterSelect label="排序" value={sortBy} onChange={(value) => setSortBy(value as SortOption)}>
+              <option value="publish">按发布时间排序</option>
+              <option value="updated">按最新更新排序</option>
+              <option value="deadline">按截止时间排序</option>
+              <option value="school">按学校名称排序</option>
+            </FilterSelect>
           </div>
         ) : null}
         {loadError ? (
-          <div className="desktop-notice-filter-error mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700" role="alert">
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
             {loadError}
           </div>
         ) : null}
       </section>
 
-      <section
-        className="desktop-notice-results grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_330px]"
-        aria-busy={isNoticeLoading}
-      >
-        {isDesktopSurface ? noticeResultsToolbar : null}
-        <div className="desktop-notice-main-column grid content-start gap-4">
-          {!isDesktopSurface ? noticeResultsToolbar : null}
+      <section className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_330px]">
+        <div className="grid content-start gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-[22px] border border-slate-200 bg-white px-5 py-4 shadow-sm">
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              <span className="font-semibold text-ink">
+                {isNoticeLoading ? '正在加载通知...' : `共 ${totalResults.toLocaleString('zh-CN')} 条结果`}
+              </span>
+              <span className="text-slate-400">|</span>
+              <button
+                onClick={() => setSortBy('publish')}
+                className={sortBy === 'publish' ? 'font-semibold text-brand' : 'text-slate-500 hover:text-brand'}
+              >
+                按发布时间排序
+              </button>
+              <button
+                onClick={() => setSortBy('updated')}
+                className={sortBy === 'updated' ? 'font-semibold text-brand' : 'text-slate-500 hover:text-brand'}
+              >
+                按最新更新排序
+              </button>
+              <button
+                onClick={() => setSortBy('deadline')}
+                className={sortBy === 'deadline' ? 'font-semibold text-brand' : 'text-slate-500 hover:text-brand'}
+              >
+                按截止时间排序
+              </button>
+              {lastLoadedAt ? <span className="text-slate-400">已加载 {lastLoadedAt}</span> : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={refreshLatestNotices}
+                disabled={isLoading || isRefreshing}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-brand transition hover:text-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? '刷新中' : '刷新最新'}
+              </button>
+              <button onClick={resetFilters} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-brand">
+                <RefreshCw className="h-4 w-4" />
+                重置筛选
+              </button>
+            </div>
+          </div>
 
-          <div className="desktop-notice-list">
-            {isNoticeLoading ? (
-              <NoticeLoadingState />
-            ) : (
-              pagedProjects.map((project, index) => {
+          {isNoticeLoading ? (
+            <NoticeListSkeleton />
+          ) : (
+            pagedProjects.map((project, index) => {
               const daysLeft = getDaysLeft(project);
-              const city = getCityTag(project);
+              const city = getNoticeCityTag(project);
               const deadlineLevel = getDeadlineLevelFromDate(project.deadlineDate);
               const highlighted = currentPage === 1 && index === 0 && deadlineLevel !== 'expired';
               const returnHref = buildNoticeListHref(filterValues, currentPage, advancedOpen, project.id);
@@ -1113,13 +1006,17 @@ function NoticesPageContent() {
                 <article
                   id={getNoticeDomId(project.id)}
                   key={project.id}
-                  className={`desktop-notice-card relative min-h-[210px] overflow-hidden rounded-[26px] border bg-white p-5 transition sm:min-h-[210px] ${
-                    isDesktopSurface ? 'desktop-notice-card--reference ' : ''
-                  }${
-                    highlighted ? 'desktop-notice-card--highlighted' : ''
+                  className={`relative min-h-[210px] overflow-hidden rounded-[26px] border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft sm:min-h-[210px] ${
+                    highlighted ? 'border-emerald-300 bg-emerald-50/35' : 'border-slate-200'
                   }`}
                 >
-                  <div className="desktop-notice-card-layout grid h-full gap-5 sm:grid-cols-[70px_minmax(0,1fr)_176px]">
+                  {highlighted ? (
+                    <div className="absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-br-2xl bg-emerald-500 text-sm font-bold text-white shadow-sm">
+                      急
+                    </div>
+                  ) : null}
+
+                  <div className="grid h-full gap-5 sm:grid-cols-[70px_minmax(0,1fr)_176px]">
                     <ExternalSiteMark
                       source={resolveNoticeLogoSource(project)}
                       label={getDisplaySchoolName(project.schoolName)}
@@ -1127,42 +1024,35 @@ function NoticesPageContent() {
                       rounded="full"
                     />
 
-                    <div className="desktop-notice-card-copy flex h-full min-w-0 flex-col overflow-hidden">
-                      <div className="desktop-notice-card-heading flex min-w-0 flex-wrap items-center gap-2">
+                    <div className="flex h-full min-w-0 flex-col overflow-hidden">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <h2 className="shrink-0 text-lg font-semibold text-ink">{getDisplaySchoolName(project.schoolName)}</h2>
-                        <span className="desktop-notice-card-status shrink-0">
+                        <span className="shrink-0">
                           <DeadlineBadge level={deadlineLevel} />
                         </span>
                       </div>
                       <Link
                         href={detailHref}
                         onClick={(event) => rememberNoticeListPosition(event, project.id, returnHref)}
-                        className="desktop-notice-card-title mt-2 line-clamp-2 min-h-[3.35rem] text-lg font-semibold leading-7 text-slate-800 hover:text-brand"
+                        className="mt-2 line-clamp-2 min-h-[3.35rem] text-lg font-semibold leading-7 text-slate-800 hover:text-brand"
                         title={normalizeNoticeTitle(project.projectName, 160)}
                       >
                         {normalizeNoticeTitle(project.projectName, 86)}
                       </Link>
-                      <div className="desktop-notice-card-meta mt-3 flex h-5 items-center gap-3 overflow-hidden text-xs text-slate-500">
-                        <span className="desktop-notice-card-department inline-flex min-w-0 items-center gap-1.5 truncate">
-                          {isDesktopSurface ? (
-                            <CalendarDays className="h-4 w-4 shrink-0" />
-                          ) : (
-                            <BookOpenText className="h-4 w-4 shrink-0" />
-                          )}
-                          {getDisplayNoticeDepartment(project)}
-                        </span>
-                        <span className="desktop-notice-card-published inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
-                          <Clock3 className="h-4 w-4" />
+                      <div className="mt-3 flex h-5 items-center gap-3 overflow-hidden text-xs text-slate-500">
+                        <span className="min-w-0 truncate">{getDisplayNoticeDepartment(project)}</span>
+                        <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
+                          <CalendarDays className="h-3.5 w-3.5" />
                           发布于 {formatNoticeDateOnly(project.publishDate)}
                         </span>
                         {city ? (
-                          <span className="desktop-notice-card-city inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
+                          <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
                             <MapPin className="h-3.5 w-3.5" />
                             {city}
                           </span>
                         ) : null}
                       </div>
-                      <div className="desktop-notice-card-tags mt-3 flex h-7 flex-nowrap gap-2 overflow-hidden">
+                      <div className="mt-3 flex h-7 flex-nowrap gap-2 overflow-hidden">
                         {getNoticeCardTags(project).map((item) => (
                           <span
                             key={item}
@@ -1172,21 +1062,17 @@ function NoticesPageContent() {
                           </span>
                         ))}
                       </div>
-                      <div className="desktop-notice-card-source mt-auto pt-3 text-xs font-semibold text-brand">提交前请核对院校原文</div>
+                      <div className="mt-auto pt-3 text-xs font-semibold text-brand">寻鹿整理 · 关键信息已提取</div>
                     </div>
 
-                    <div className="desktop-notice-card-actions grid gap-3 sm:h-full sm:justify-items-end">
-                      <div className="desktop-notice-card-deadline text-right text-sm">
+                    <div className="grid gap-3 sm:h-full sm:justify-items-end">
+                      <div className="text-right text-sm">
                         <div className="font-semibold text-brand">截止 {formatNoticeDateOnly(project.deadlineDate)}</div>
                         <div className="mt-1 text-slate-500">
                           {daysLeft === null ? '时间待补充' : getDeadlineDistanceLabel(project.deadlineDate)}
                         </div>
                       </div>
-                      <div
-                        className={`desktop-notice-card-buttons grid w-full gap-2 sm:w-[150px]${
-                          deadlineLevel === 'expired' ? ' desktop-notice-card-buttons--expired' : ''
-                        }`}
-                      >
+                      <div className="grid w-full gap-2 sm:w-[150px]">
                         <Link
                           href={detailHref}
                           onClick={(event) => rememberNoticeListPosition(event, project.id, returnHref)}
@@ -1195,40 +1081,24 @@ function NoticesPageContent() {
                           查看详情
                           <ArrowRight className="h-4 w-4" />
                         </Link>
-                        {deadlineLevel === 'expired' ? null : (
-                          <ApplicationActionButton projectId={project.id} variant="secondary" label="加入申请" />
-                        )}
+                        <ApplicationActionButton projectId={project.id} variant="secondary" label="加入申请表" />
                       </div>
                     </div>
                   </div>
                 </article>
               );
-              })
-            )}
+            })
+          )}
 
-            {!isNoticeLoading && !pagedProjects.length ? (
-              <DesktopStateSurface
-                variant="section"
-                icon={<BookOpenText />}
-                title="没有找到匹配通知"
-                detail="可以减少筛选条件、换一个关键词，或清除当前筛选重新查看。"
-                action={(
-                  <button type="button" className="desktop-setting-secondary-button" onClick={resetFilters}>
-                    清除筛选
-                  </button>
-                )}
-              />
-            ) : null}
-          </div>
+          {!isNoticeLoading && !pagedProjects.length ? (
+            <div className="rounded-[24px] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm text-slate-500">
+              当前筛选条件下没有匹配通知，建议减少筛选条件或换一个关键词。
+            </div>
+          ) : null}
 
-          {!isNoticeLoading && filteredProjects.length && totalPages > 1 ? (
-            <nav
-              aria-label="通知分页"
-              className="flex flex-wrap items-center justify-center gap-3 rounded-[22px] bg-white px-5 py-5 shadow-sm"
-            >
+          {!isNoticeLoading && totalResults > 0 && totalPages > 1 ? (
+            <div className="flex flex-wrap items-center justify-center gap-3 rounded-[22px] bg-white px-5 py-5 shadow-sm">
               <button
-                type="button"
-                aria-label="上一页"
                 onClick={() => updatePage((current) => Math.max(1, current - 1))}
                 disabled={currentPage === 1}
                 className="inline-flex h-11 items-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-45"
@@ -1239,9 +1109,6 @@ function NoticesPageContent() {
               {visiblePages.map((pageNumber, index) => (
                 <button
                   key={`${pageNumber}-${index}`}
-                  type="button"
-                  aria-label={`第 ${pageNumber} 页`}
-                  aria-current={currentPage === pageNumber ? 'page' : undefined}
                   onClick={() => updatePage(pageNumber)}
                   className={`h-11 min-w-11 rounded-xl px-4 text-sm font-semibold ${
                     currentPage === pageNumber ? 'bg-brand text-white' : 'bg-slate-100 text-slate-700'
@@ -1252,23 +1119,21 @@ function NoticesPageContent() {
               ))}
 
               <button
-                type="button"
-                aria-label="下一页"
                 onClick={() => updatePage((current) => Math.min(totalPages, current + 1))}
                 disabled={currentPage === totalPages}
                 className="inline-flex h-11 items-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-45"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
-            </nav>
+            </div>
           ) : null}
         </div>
 
-        <aside className="desktop-notice-sidebar grid content-start gap-5">
+        <aside className="grid content-start gap-5">
           <SideCard title="截止提醒" icon={BellRing}>
-            <div className="desktop-notice-deadline-list grid gap-4">
+            <div className="grid gap-4">
               {isNoticeLoading ? (
-                <SideLoadingState icon={Clock3} label="正在整理截止提醒" />
+                <SideLoadingRows />
               ) : urgentProjects.length ? (
                 urgentProjects.map((project) => {
                   const daysLeft = getDaysLeft(project);
@@ -1279,22 +1144,16 @@ function NoticesPageContent() {
                       key={project.id}
                       href={buildNoticeDetailHref(project.id, returnHref)}
                       onClick={(event) => rememberNoticeListPosition(event, project.id, returnHref)}
-                      className="desktop-notice-deadline-item grid gap-1 rounded-xl p-2 hover:bg-slate-50"
+                      className="grid gap-1 rounded-xl p-2 hover:bg-slate-50"
                     >
-                      <div className="desktop-notice-deadline-row flex items-center justify-between gap-3 text-sm">
-                        <span className="desktop-notice-deadline-school font-semibold text-slate-700">
-                          {getDisplaySchoolName(project.schoolName)}
-                        </span>
-                        <span className="desktop-notice-deadline-distance font-semibold text-rose-500">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="font-semibold text-slate-700">{getDisplaySchoolName(project.schoolName)}</span>
+                        <span className="font-semibold text-rose-500">
                           {daysLeft === null ? '-' : getDeadlineDistanceLabel(project.deadlineDate)}
                         </span>
                       </div>
-                      <div className="desktop-notice-deadline-summary line-clamp-1 text-xs text-slate-500">
-                        {normalizeNoticeTitle(project.projectName, 34)}
-                      </div>
-                      <div className="desktop-notice-deadline-date text-xs text-slate-400">
-                        {formatNoticeDateOnly(project.deadlineDate)} 截止
-                      </div>
+                      <div className="line-clamp-1 text-xs text-slate-500">{normalizeNoticeTitle(project.projectName, 34)}</div>
+                      <div className="text-xs text-slate-400">{formatNoticeDateOnly(project.deadlineDate)} 截止</div>
                     </Link>
                   );
                 })
@@ -1305,31 +1164,61 @@ function NoticesPageContent() {
           </SideCard>
 
           <SideCard title="今日更新" icon={RefreshCw}>
-            <div className="desktop-notice-today-list grid gap-3">
+            <div className="grid gap-3">
               {!todayUpdates.hasTodayRows && todayUpdates.date ? (
-                <div className="desktop-notice-today-fallback rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500">
+                <div className="rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500">
                   暂无今日新增，以下显示最近同步日 {todayUpdates.date} 的更新。
                 </div>
               ) : null}
               {isNoticeLoading ? (
-                <SideLoadingState icon={BookOpenText} label="正在汇总今日更新" />
+                <SideLoadingRows />
               ) : todayUpdates.rows.length ? (
                 todayUpdates.rows.map(([school, count]) => (
-                  <div key={school} className="desktop-notice-today-row flex items-center justify-between gap-3 text-sm">
-                    <span className="desktop-notice-today-school text-slate-700">{school}</span>
-                    <span className="desktop-notice-today-count font-semibold text-slate-500">{count} 条</span>
+                  <div key={school} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-slate-700">{school}</span>
+                    <span className="font-semibold text-slate-500">{count} 条</span>
                   </div>
                 ))
               ) : (
-                <p className="desktop-notice-side-empty">暂无更新记录。</p>
+                <div className="rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-400">暂无更新记录。</div>
               )}
             </div>
           </SideCard>
 
+          <SideCard title="整理说明" icon={Lightbulb}>
+            <p className="text-sm leading-7 text-slate-600">
+              寻鹿会持续整理保研通知，提取学校、学院、项目阶段、截止时间和报名入口，帮助你更快判断下一步。
+            </p>
+            <Link href="/disclaimer" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand">
+              了解更多
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </SideCard>
+
+          <SideCard title="使用提醒" icon={ShieldCheck}>
+            <div className="grid gap-3 text-sm leading-7 text-slate-600">
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                <span className="font-semibold text-ink">先看重点：</span>
+                优先关注院校、学院、通知标题、发布时间和截止时间。
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                <span className="font-semibold text-ink">再做确认：</span>
+                正式提交前，请再次核对学校页面与报名系统里的具体要求。
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                <span className="font-semibold text-ink">发现问题：</span>
+                可以加入 QQ 群 1092490793 告诉我们。
+              </div>
+            </div>
+          </SideCard>
         </aside>
       </section>
 
-      </div>
+      <section className="grid gap-4 lg:grid-cols-3">
+        <PromoCard title="院校库" description="院校信息、专业设置及推免政策查询" href="/colleges" icon={GraduationCap} />
+        <PromoCard title="资源库" description="汇集面试经验与文书模板，助力申请" href="/resources" icon={BookOpenText} />
+        <PromoCard title="竞赛库" description="按 A/B/热门赛事整理背景提升机会" href="/competitions" icon={Sparkles} />
+      </section>
     </SiteShell>
   );
 }
@@ -1354,31 +1243,6 @@ function FilterInput({
         placeholder={placeholder}
         className="soft-input h-12 w-full rounded-xl px-4 text-sm text-slate-700 outline-none placeholder:text-slate-400"
       />
-    </label>
-  );
-}
-
-function CompactFilterSelect({
-  label,
-  value,
-  onChange,
-  children
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  children: ReactNode;
-}) {
-  return (
-    <label className="desktop-notice-compact-filter">
-      <span className="sr-only">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition-colors hover:border-slate-300 focus:border-brand"
-      >
-        {children}
-      </select>
     </label>
   );
 }
@@ -1418,80 +1282,91 @@ function SideCard({
   children: ReactNode;
 }) {
   return (
-    <div className="desktop-notice-sidecard product-card rounded-[22px] p-6">
-      <div className="desktop-notice-sidecard-header mb-5 flex items-center justify-between gap-3">
+    <div className="product-card rounded-[22px] p-6">
+      <div className="mb-5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="desktop-notice-sidecard-icon inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand/8 text-brand">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand/8 text-brand">
             <Icon className="h-5 w-5" />
           </span>
-          <h2 className="desktop-notice-sidecard-title text-lg font-semibold text-ink">{title}</h2>
+          <h2 className="text-lg font-semibold text-ink">{title}</h2>
         </div>
+        <Link href="/notices" className="text-xs font-semibold text-slate-400 hover:text-brand">
+          更多
+        </Link>
       </div>
       {children}
     </div>
   );
 }
 
-function NoticeLoadingState() {
+function NoticeListSkeleton() {
   return (
-    <div
-      className="desktop-notice-loading"
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-    >
-      <div className="desktop-notice-loading-heading">
-        <span className="desktop-notice-loading-icon">
-          <RefreshCw className="motion-safe:animate-spin" aria-hidden="true" />
-        </span>
-        <span>
-          <strong>正在同步通知</strong>
-          <small>
-            {isDesktopSurface
-              ? '正在获取最新院校通知，当前筛选会保留。'
-              : '正在同步最新院校通知、报名截止与更新信息。完成后会保留当前筛选条件'}
-          </small>
-        </span>
-      </div>
-      <div className="desktop-notice-loading-rows" aria-hidden="true">
-        {NOTICE_LOADING_ROWS.map((index) => (
-          <span className="desktop-notice-loading-row" key={index}>
-            <i />
-            <span>
-              <b />
-              <em />
-              <small />
-            </span>
-            <span>
-              <b />
-              <small />
-            </span>
-          </span>
-        ))}
-      </div>
+    <div className="grid gap-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="min-h-[210px] overflow-hidden rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="grid h-full gap-5 sm:grid-cols-[70px_minmax(0,1fr)_176px]">
+            <div className="h-14 w-14 animate-pulse rounded-full bg-slate-100" />
+            <div className="min-w-0">
+              <div className="h-5 w-44 animate-pulse rounded-full bg-slate-100" />
+              <div className="mt-4 h-6 w-full animate-pulse rounded-full bg-slate-100" />
+              <div className="mt-3 h-6 w-3/4 animate-pulse rounded-full bg-slate-100" />
+              <div className="mt-5 flex gap-2">
+                <span className="h-7 w-16 animate-pulse rounded-full bg-slate-100" />
+                <span className="h-7 w-20 animate-pulse rounded-full bg-slate-100" />
+                <span className="h-7 w-14 animate-pulse rounded-full bg-slate-100" />
+              </div>
+            </div>
+            <div className="grid content-between gap-3 sm:justify-items-end">
+              <div className="h-5 w-28 animate-pulse rounded-full bg-slate-100" />
+              <div className="grid w-full gap-2 sm:w-[150px]">
+                <span className="h-11 animate-pulse rounded-xl bg-slate-100" />
+                <span className="h-11 animate-pulse rounded-xl bg-slate-100" />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-function SideLoadingState({
-  icon: Icon,
-  label
+function SideLoadingRows() {
+  return (
+    <div className="grid gap-3">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="rounded-xl p-2">
+          <div className="h-4 w-4/5 animate-pulse rounded-full bg-slate-100" />
+          <div className="mt-2 h-3 w-2/3 animate-pulse rounded-full bg-slate-100" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PromoCard({
+  title,
+  description,
+  href,
+  icon: Icon
 }: {
-  icon: ComponentType<{ className?: string; strokeWidth?: number; 'aria-hidden'?: boolean | 'true' | 'false' }>;
-  label: string;
+  title: string;
+  description: string;
+  href: string;
+  icon: ComponentType<{ className?: string }>;
 }) {
   return (
-    <div
-      className="desktop-notice-side-loading flex min-h-24 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-4"
-      aria-hidden="true"
-    >
-      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand shadow-sm">
-        <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-      </span>
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-slate-700">{label}</p>
-        <p className="mt-1 text-xs leading-5 text-slate-400">加载完成后显示</p>
+    <Link href={href} className="product-card group relative overflow-hidden rounded-[22px] p-6">
+      <div className="relative z-10">
+        <div className="text-xl font-semibold text-ink">{title}</div>
+        <p className="mt-3 text-sm leading-7 text-slate-500">{description}</p>
+        <span className="mt-6 inline-flex items-center gap-2 rounded-xl border border-brand/25 bg-white px-4 py-2.5 text-sm font-semibold text-brand">
+          进入{title}
+          <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+        </span>
       </div>
-    </div>
+      <div className="absolute right-5 top-1/2 flex h-24 w-24 -translate-y-1/2 items-center justify-center rounded-[26px] bg-brand/8 text-brand">
+        <Icon className="h-12 w-12" />
+      </div>
+    </Link>
   );
 }

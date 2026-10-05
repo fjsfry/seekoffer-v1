@@ -4,8 +4,7 @@ const mocked = vi.hoisted(() => ({
   quota: (() => Promise.resolve({ allowed: true, freeLimit: 5 })) as (
     currentCount: number
   ) => Promise<{ allowed: boolean; freeLimit: number }>,
-  session: null as Record<string, unknown> | null,
-  upsertTables: [] as string[]
+  session: null as Record<string, unknown> | null
 }));
 
 vi.mock('@/lib/billing-api', () => ({
@@ -15,17 +14,6 @@ vi.mock('@/lib/billing-api', () => ({
 vi.mock('@/lib/user-session', () => ({
   getUserSession: () => mocked.session,
   updateUserProfile: vi.fn()
-}));
-
-vi.mock('@/lib/supabase-browser', () => ({
-  getSupabaseBrowserClient: () => ({
-    from: (table: string) => ({
-      upsert: async () => {
-        mocked.upsertTables.push(table);
-        return { error: null };
-      }
-    })
-  })
 }));
 
 import { createManualApplicationEntry } from '@/lib/cloudbase-data';
@@ -93,7 +81,6 @@ beforeEach(() => {
   vi.useFakeTimers();
   mocked.quota = () => Promise.resolve({ allowed: true, freeLimit: 5 });
   mocked.session = memberSession(`member-${Math.random()}`);
-  mocked.upsertTables.length = 0;
 });
 
 afterEach(() => {
@@ -122,7 +109,6 @@ describe('manual application local-first persistence', () => {
       synced: false,
       syncPending: true
     });
-    expect(mocked.upsertTables).toEqual([]);
     expect(dispatched).toEqual(['seekoffer-applications-updated']);
 
     const keys = Array.from(storage.snapshot().keys());
@@ -151,7 +137,6 @@ describe('manual application local-first persistence', () => {
 
     await expect(pending).rejects.toThrow('登录账号已发生变化');
     expect(storage.snapshot().size).toBe(0);
-    expect(mocked.upsertTables).toEqual([]);
   });
 
   it('restores both exact local payloads when the second storage write fails', async () => {
@@ -181,6 +166,5 @@ describe('manual application local-first persistence', () => {
 
     expect(storage.snapshot()).toEqual(before);
     expect(dispatchEvent).not.toHaveBeenCalled();
-    expect(mocked.upsertTables).toEqual([]);
   });
 });

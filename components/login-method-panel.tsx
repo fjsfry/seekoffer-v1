@@ -19,9 +19,9 @@ import {
 } from 'lucide-react';
 import {
   SEEKOFFER_SITE_URL,
-  SUPABASE_ENABLE_ANONYMOUS,
-  SUPABASE_ENABLE_PHONE_AUTH
-} from '@/lib/supabase-env';
+  AUTH_ENABLE_GUEST,
+  AUTH_ENABLE_PHONE
+} from '@/lib/auth-config';
 import {
   isEmailIdentifier,
   resendSignupConfirmationCode,
@@ -41,7 +41,7 @@ type AuthErrorField = 'account' | 'password' | 'passwordConfirm' | 'code' | 'for
 function friendlyAuthErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message.trim() : '';
   const containsChinese = /[\u3400-\u9fff]/.test(message);
-  const containsTechnicalDetail = /(supabase|fetch|jwt|sql|status\s*code|networkerror|failed to fetch)/i.test(message);
+  const containsTechnicalDetail = /(fetch|jwt|sql|status\s*code|networkerror|failed to fetch)/i.test(message);
 
   if (message && containsChinese && !containsTechnicalDetail) {
     return message;
@@ -115,7 +115,7 @@ function IconInput({
 
 export function LoginMethodPanel({
   mode = 'modal',
-  allowGuest = SUPABASE_ENABLE_ANONYMOUS,
+  allowGuest = AUTH_ENABLE_GUEST,
   onClose,
   onSuccess
 }: {
@@ -154,8 +154,8 @@ export function LoginMethodPanel({
   const [error, setError] = useState('');
   const [errorField, setErrorField] = useState<AuthErrorField>('form');
 
-  const accountLabel = SUPABASE_ENABLE_PHONE_AUTH ? '邮箱或手机号' : '邮箱';
-  const accountPlaceholder = SUPABASE_ENABLE_PHONE_AUTH ? '请输入邮箱或手机号' : '请输入邮箱地址';
+  const accountLabel = AUTH_ENABLE_PHONE ? '邮箱或手机号' : '邮箱';
+  const accountPlaceholder = AUTH_ENABLE_PHONE ? '请输入邮箱或手机号' : '请输入邮箱地址';
   const isEmailAccount = isEmailIdentifier(account);
   const passwordPending = pending === 'password' || pending === 'register' || pending === 'verify-signup';
   const passwordActionLabel =
@@ -176,14 +176,14 @@ export function LoginMethodPanel({
 
   const helperText = useMemo(() => {
     if (!account.trim()) {
-      return SUPABASE_ENABLE_PHONE_AUTH ? '输入邮箱或手机号继续' : '请输入邮箱继续';
+      return AUTH_ENABLE_PHONE ? '输入邮箱或手机号继续' : '请输入邮箱继续';
     }
 
     if (isEmailAccount) {
       return '邮箱格式正确';
     }
 
-    if (!SUPABASE_ENABLE_PHONE_AUTH && looksLikePhoneIdentifier(account)) {
+    if (!AUTH_ENABLE_PHONE && looksLikePhoneIdentifier(account)) {
       return '当前暂未开放手机号登录，请使用邮箱';
     }
 
@@ -234,8 +234,8 @@ export function LoginMethodPanel({
       return '';
     }
 
-    if ((options.emailOnly || !SUPABASE_ENABLE_PHONE_AUTH) && !isEmailIdentifier(value)) {
-      if (looksLikePhoneIdentifier(value) && !SUPABASE_ENABLE_PHONE_AUTH) {
+    if ((options.emailOnly || !AUTH_ENABLE_PHONE) && !isEmailIdentifier(value)) {
+      if (looksLikePhoneIdentifier(value) && !AUTH_ENABLE_PHONE) {
         showError('当前暂未开放手机号登录，请使用邮箱完成登录或注册。', 'account');
         return '';
       }
@@ -953,8 +953,8 @@ export function LoginMethodPanel({
             <span className="text-base font-medium text-slate-800">{accountLabel}</span>
             <IconInput icon={<Mail className="h-5 w-5" />}>
               <input
-                type={SUPABASE_ENABLE_PHONE_AUTH ? 'text' : 'email'}
-                inputMode={SUPABASE_ENABLE_PHONE_AUTH ? 'text' : 'email'}
+                type={AUTH_ENABLE_PHONE ? 'text' : 'email'}
+                inputMode={AUTH_ENABLE_PHONE ? 'text' : 'email'}
                 autoComplete="email"
                 value={account}
                 onChange={(event) => {

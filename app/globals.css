@@ -135,6 +135,289 @@ select {
   box-shadow: 0 16px 38px rgba(18, 32, 38, 0.045);
 }
 
+/* Keep the web Pro route usable outside the desktop app shell. */
+html:not(.seekoffer-desktop-surface) .desktop-pro-page {
+  display: flex;
+  width: min(100%, 1180px);
+  min-width: 0;
+  margin: 0 auto;
+  flex-direction: column;
+  gap: 1rem;
+  color: var(--page-ink);
+  font-size: 0.875rem;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-account-pane {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav {
+  min-height: 3.25rem;
+  padding: 0 0.75rem;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border: 1px solid rgba(18, 32, 38, 0.07);
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 32px rgba(18, 32, 38, 0.045);
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav::-webkit-scrollbar {
+  display: none;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav > a {
+  position: relative;
+  min-width: 9rem;
+  flex: 1 1 0;
+  min-height: 3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #64748b;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  transition: color 160ms ease;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav > a svg {
+  color: #94a3b8;
+  transition: color 160ms ease;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav > a::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: transparent;
+  content: '';
+  transition: background 160ms ease;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav > a:hover,
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav > a:focus-visible {
+  color: #174f4b;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav > a:hover svg,
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav > a:focus-visible svg,
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav > a.desktop-pro-section-nav-link--active,
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav > a.desktop-pro-section-nav-link--active svg {
+  color: #174f4b;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav > a.desktop-pro-section-nav-link--active::after {
+  background: #174f4b;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav > a:hover::after,
+html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav > a:focus-visible::after {
+  background: #174f4b;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-hero {
+  padding: 1.5rem;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-hero-grid {
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: 1.5rem;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-hero h1 {
+  margin-top: 0.625rem;
+  font-size: 2rem;
+  line-height: 1.35;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-hero h1 + p {
+  margin-top: 0.625rem;
+  line-height: 1.75;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-hero-actions {
+  margin-top: 1.125rem;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-entitlement {
+  padding: 1.125rem;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-benefits {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid rgba(18, 32, 38, 0.07);
+  border-radius: 1.5rem;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-benefit-row {
+  min-width: 0;
+  padding: 1.35rem 1.25rem;
+  border: 0;
+  border-right: 1px solid rgba(18, 32, 38, 0.07);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-benefit-row:last-child {
+  border-right: 0;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-benefit-row p {
+  line-height: 1.6;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-benefit-row h2 {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-benefit-row > span {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 1rem;
+  background: rgba(225, 247, 239, 0.95);
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-extension {
+  align-items: center;
+  gap: 2rem;
+  padding: 1.5rem;
+  background:
+    radial-gradient(circle at 88% 25%, rgba(99, 210, 193, 0.2), transparent 15rem),
+    linear-gradient(135deg, rgba(236, 250, 244, 0.96), rgba(255, 255, 255, 0.98));
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-extension-copy {
+  min-width: 0;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-extension-side {
+  min-width: 0;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-extension-visual {
+  position: relative;
+  min-height: 16rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 1.5rem;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 18px 42px rgba(20, 91, 87, 0.1);
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-extension-visual img {
+  object-position: center;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-extension-visual-badge {
+  z-index: 1;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-extension-download {
+  padding: 1rem;
+  border-color: rgba(255, 255, 255, 0.92);
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-extension-download label {
+  line-height: 1.55;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-plans {
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-plans-main {
+  padding: 1.5rem;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-plan-list {
+  align-items: stretch;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-plan-row {
+  min-width: 0;
+  outline: none;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-plan-row:focus-visible {
+  box-shadow: 0 0 0 3px rgba(20, 91, 87, 0.2);
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-plan-cta {
+  min-height: 2.5rem;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-comparison {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-comparison th,
+html:not(.seekoffer-desktop-surface) .desktop-pro-comparison td {
+  white-space: normal;
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-support-contact {
+  width: min(100%, 24rem);
+}
+
+html:not(.seekoffer-desktop-surface) .desktop-pro-plans-main,
+html:not(.seekoffer-desktop-surface) .desktop-pro-checkout,
+html:not(.seekoffer-desktop-surface) .desktop-pro-orders,
+html:not(.seekoffer-desktop-surface) .desktop-pro-support > * {
+  box-shadow: 0 18px 48px rgba(18, 32, 38, 0.045);
+}
+
+@media (max-width: 60rem) {
+  html:not(.seekoffer-desktop-surface) .desktop-pro-hero-grid,
+  html:not(.seekoffer-desktop-surface) .desktop-pro-extension,
+  html:not(.seekoffer-desktop-surface) .desktop-pro-plans,
+  html:not(.seekoffer-desktop-surface) .desktop-pro-support {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html:not(.seekoffer-desktop-surface) .desktop-pro-benefit-row {
+    border-right: 0;
+  }
+
+  html:not(.seekoffer-desktop-surface) .desktop-pro-benefit-row:nth-child(n + 3) {
+    border-top: 1px solid rgba(18, 32, 38, 0.07);
+  }
+
+  html:not(.seekoffer-desktop-surface) .desktop-pro-section-nav > a {
+    flex: 0 0 9rem;
+  }
+}
+
+@media (max-width: 40rem) {
+  html:not(.seekoffer-desktop-surface) .desktop-pro-page {
+    width: 100%;
+  }
+
+  html:not(.seekoffer-desktop-surface) .desktop-pro-hero,
+  html:not(.seekoffer-desktop-surface) .desktop-pro-extension,
+  html:not(.seekoffer-desktop-surface) .desktop-pro-plans-main,
+  html:not(.seekoffer-desktop-surface) .desktop-pro-checkout,
+  html:not(.seekoffer-desktop-surface) .desktop-pro-orders,
+  html:not(.seekoffer-desktop-surface) .desktop-pro-support > * {
+    border-radius: 1.5rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

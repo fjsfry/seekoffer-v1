@@ -1,8 +1,18 @@
 'use client';
 
-import type { AuthChangeEvent } from '@supabase/supabase-js';
-import { getSupabaseBrowserClient } from './supabase-browser';
-import { SEEKOFFER_SITE_URL, SUPABASE_ENABLE_PHONE_AUTH, isSupabaseConfigured } from './supabase-env';
+import {
+  bootstrapCloudflareIdentity,
+  cloudflareRequest,
+  cloudflareApiErrorMessage,
+  CloudflareApiError,
+  isCloudflareQuotaError
+} from './cloudflare-api';
+import {
+  clerkErrorMessage,
+  getClerk,
+  type ClerkInstance,
+  type ClerkUser
+} from './clerk-browser';
 
 export type UserProfile = {
   nickname: string;
@@ -45,19 +55,10 @@ export type PasswordSignUpResult =
       message: string;
     };
 
-type SupabaseUserLike = {
-  id: string;
-  email?: string | null;
-  phone?: string | null;
-  user_metadata?: Record<string, unknown> | null;
-};
-
-type SupabaseSignUpUserLike = SupabaseUserLike & {
-  identities?: unknown[] | null;
-};
-
 const SESSION_STORAGE_KEY = 'seekoffer-user-session';
 const SESSION_EVENT_NAME = 'seekoffer-user-session-updated';
+const SESSION_HYDRATED_AT_KEY = 'seekoffer-user-session-hydrated-at';
+const SESSION_HYDRATION_TTL_MS = 5 * 60_000;
 
 const defaultProfile: UserProfile = {
   nickname: '',
@@ -69,8 +70,41 @@ const defaultProfile: UserProfile = {
   targetRegion: ''
 };
 
+type ClerkProfileRow = {
+  id?: string;
+  nickname?: string | null;
+  age?: string | number | null;
+  undergraduate_school?: string | null;
+  major?: string | null;
+  grade?: string | null;
+  target_major?: string | null;
+  target_region?: string | null;
+  sync_revision?: number | null;
+};
+
+let pendingSignUp: { email: string; password: string } | null = null;
+let hydrateInFlight: Promise<UserSession | null> | null = null;
+let quotaBlockedUntil = 0;
+let lastQuotaLogAt = 0;
+
 function canUseBrowserStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
+function wasSessionHydratedRecently() {
+  if (!canUseBrowserStorage()) return false;
+  const timestamp = Number(window.localStorage.getItem(SESSION_HYDRATED_AT_KEY));
+  return Number.isFinite(timestamp) && timestamp > 0 && Date.now() - timestamp < SESSION_HYDRATION_TTL_MS;
+}
+
+function markSessionHydrated() {
+  if (!canUseBrowserStorage()) return;
+  window.localStorage.setItem(SESSION_HYDRATED_AT_KEY, String(Date.now()));
+}
+
+function clearSessionHydrationMarker() {
+  if (!canUseBrowserStorage()) return;
+  window.localStorage.removeItem(SESSION_HYDRATED_AT_KEY);
 }
 
 function emitSessionUpdate() {
@@ -80,18 +114,11 @@ function emitSessionUpdate() {
 }
 
 function normalizeProfile(profile?: Partial<UserProfile>) {
-  return {
-    ...defaultProfile,
-    ...(profile || {})
-  };
+  return { ...defaultProfile, ...(profile || {}) };
 }
 
 function normalizeProvider(provider?: unknown): AuthProviderType | null {
-  if (provider === 'password' || provider === 'otp' || provider === 'anonymous') {
-    return provider;
-  }
-
-  return null;
+  return provider === 'password' || provider === 'otp' || provider === 'anonymous' ? provider : null;
 }
 
 export function normalizeEmailIdentifier(value: string) {
@@ -108,39 +135,22 @@ function normalizePhoneIdentifier(value: string) {
 
 function isPhoneIdentifier(value: string) {
   const trimmed = value.trim();
-  if (!trimmed || isEmailIdentifier(trimmed)) {
-    return false;
-  }
-
-  if (!/^[+\d\s\-()]+$/.test(trimmed)) {
-    return false;
-  }
-
-  const normalized = normalizePhoneIdentifier(value);
-  return /^\+?\d{6,15}$/.test(normalized);
+  if (!trimmed || isEmailIdentifier(trimmed) || !/^[+\d\s\-()]+$/.test(trimmed)) return false;
+  return /^\+?\d{6,15}$/.test(normalizePhoneIdentifier(value));
 }
 
 function normalizeIdentifier(value: string) {
   const trimmed = value.trim();
-  if (isEmailIdentifier(trimmed)) {
-    return normalizeEmailIdentifier(trimmed);
-  }
-
+  if (isEmailIdentifier(trimmed)) return normalizeEmailIdentifier(trimmed);
   return isPhoneIdentifier(trimmed) ? normalizePhoneIdentifier(trimmed) : trimmed.toLowerCase();
 }
 
 function readRecordText(record: Record<string, unknown>, ...keys: string[]) {
   for (const key of keys) {
     const value = record[key];
-    if (typeof value === 'string' && value.trim()) {
-      return value;
-    }
-
-    if (typeof value === 'number') {
-      return String(value);
-    }
+    if (typeof value === 'string' && value.trim()) return value;
+    if (typeof value === 'number') return String(value);
   }
-
   return '';
 }
 
@@ -149,10 +159,7 @@ function toObjectRecord(value: unknown) {
 }
 
 function extractProfileMetadata(metadata?: Record<string, unknown> | null) {
-  if (!metadata) {
-    return {};
-  }
-
+  if (!metadata) return {};
   return {
     nickname: readRecordText(metadata, 'nickname', 'nickName', 'name', 'display_name'),
     age: readRecordText(metadata, 'age'),
@@ -164,16 +171,30 @@ function extractProfileMetadata(metadata?: Record<string, unknown> | null) {
   } satisfies Partial<UserProfile>;
 }
 
+function extractProfileRow(row: ClerkProfileRow | null | undefined) {
+  if (!row) return {};
+  return {
+    nickname: String(row.nickname || ''),
+    age: String(row.age || ''),
+    undergraduateSchool: String(row.undergraduate_school || ''),
+    major: String(row.major || ''),
+    grade: String(row.grade || '大四'),
+    targetMajor: String(row.target_major || ''),
+    targetRegion: String(row.target_region || '')
+  } satisfies Partial<UserProfile>;
+}
+
+function primaryEmail(user: ClerkUser | null | undefined) {
+  if (!user) return '';
+  return (
+    user.emailAddresses?.find((item) => item.id === user.primaryEmailAddressId)?.emailAddress ||
+    user.emailAddresses?.find((item) => item.emailAddress)?.emailAddress ||
+    ''
+  );
+}
+
 export function getAuthProviderLabel(provider: AuthProviderType) {
-  if (provider === 'otp') {
-    return '邮箱验证码';
-  }
-
-  if (provider === 'anonymous') {
-    return '本地试用';
-  }
-
-  return '密码登录';
+  return provider === 'otp' ? '邮箱验证码' : provider === 'anonymous' ? '本地试用' : '密码登录';
 }
 
 export function isLoggedInSession(session: UserSession | null | undefined) {
@@ -181,23 +202,14 @@ export function isLoggedInSession(session: UserSession | null | undefined) {
 }
 
 export function isMemberSession(session: UserSession | null | undefined) {
-  return Boolean(
-    session?.loggedIn &&
-      session.authProvider !== 'anonymous' &&
-      typeof session.userId === 'string' &&
-      session.userId.trim()
-  );
+  return Boolean(session?.loggedIn && session.authProvider !== 'anonymous' && session.userId?.trim());
 }
 
 export function satisfiesAuthRequirement(
   session: UserSession | null | undefined,
   requirement: AuthRequirement = 'session'
 ) {
-  if (requirement === 'member') {
-    return isMemberSession(session);
-  }
-
-  return isLoggedInSession(session);
+  return requirement === 'member' ? isMemberSession(session) : isLoggedInSession(session);
 }
 
 function normalizeErrorText(raw: string) {
@@ -205,82 +217,30 @@ function normalizeErrorText(raw: string) {
 }
 
 function extractErrorText(error: unknown) {
-  if (!error) {
-    return '';
-  }
-
-  if (typeof error === 'string') {
-    return normalizeErrorText(error);
-  }
-
-  if (error instanceof Error) {
-    return normalizeErrorText(error.message || error.toString());
-  }
-
-  if (typeof error === 'object') {
-    const record = toObjectRecord(error);
-    if (record) {
-      const nested = readRecordText(record, 'error_description', 'message', 'msg', 'error');
-      if (nested) {
-        return normalizeErrorText(nested);
-      }
-    }
-  }
-
-  return '';
+  if (!error) return '';
+  if (typeof error === 'string') return normalizeErrorText(error);
+  if (error instanceof Error) return normalizeErrorText(error.message || error.toString());
+  const record = toObjectRecord(error);
+  if (!record) return '';
+  const errors = Array.isArray(record.errors) ? record.errors : [];
+  const first = toObjectRecord(errors[0]);
+  return normalizeErrorText(
+    readRecordText(first || record, 'longMessage', 'message', 'error_description', 'msg', 'error')
+  );
 }
 
 function formatAuthError(error: unknown, fallback: string) {
-  const message = extractErrorText(error).toLowerCase();
-  if (!message) {
-    return fallback;
+  if (error instanceof CloudflareApiError) return cloudflareApiErrorMessage(error, fallback);
+  const raw = extractErrorText(error);
+  const message = raw.toLowerCase();
+  if (/invalid.*(credential|password)|incorrect|identifier/.test(message)) {
+    return '邮箱或密码不正确，请检查后重试。';
   }
-
-  if (/supabase|environment variables|missing/.test(message)) {
-    return '登录服务配置暂未完成，请稍后再试或联系 Seekoffer。';
-  }
-
-  if (/invalid login credentials|invalid_credentials/.test(message)) {
-    return '账号或密码不正确，请检查后重试。';
-  }
-
-  if (/email not confirmed|email_not_confirmed/.test(message)) {
-    return '邮箱还未完成验证，请先打开验证邮件。';
-  }
-
-  if (/error sending confirmation email|error sending magic link|error sending otp|smtp|send.*email|email.*send/.test(message)) {
-    return '邮件发送失败，请稍后再试或联系 Seekoffer。';
-  }
-
-  if (/email rate limit exceeded|rate limit/.test(message)) {
-    return '邮件发送太频繁了，请稍等一会儿再重新发送。';
-  }
-
-  if (/user not found|signup.*disabled|signups not allowed|no user/.test(message)) {
-    return '这个邮箱还没有注册，请切到“密码”并选择“注册”创建账号。';
-  }
-
-  if (/password should be at least/.test(message)) {
-    return '密码长度不够，请至少使用 6 位。';
-  }
-
-  if (
-    /phone provider is not configured|unsupported phone provider|phone logins are disabled|phone signups are disabled/.test(
-      message
-    )
-  ) {
-    return '当前还没有配置短信服务，手机号登录暂时不可用。';
-  }
-
-  if (/user already registered|already been registered/.test(message)) {
-    return '该账号已经注册，可以直接登录。';
-  }
-
-  if (/otp|token/.test(message)) {
-    return '验证码无效或已过期，请重新发送。';
-  }
-
-  return extractErrorText(error) || fallback;
+  if (/already.*(registered|exists)|taken/.test(message)) return '该邮箱已经注册，请直接登录。';
+  if (/verification|verify|code|token/.test(message)) return '验证码无效或已过期，请重新发送。';
+  if (/rate.?limit|too many/.test(message)) return '操作太频繁了，请稍等一会儿再试。';
+  if (/network|fetch|timeout|unavailable|service/.test(message)) return '登录服务暂时不可用，请稍后再试。';
+  return clerkErrorMessage(error, raw || fallback);
 }
 
 function buildAnonymousSession(existing?: UserSession | null) {
@@ -294,58 +254,37 @@ function buildAnonymousSession(existing?: UserSession | null) {
   };
 }
 
-function ensurePasswordIdentifierSupported(identifier: string) {
-  if (isPhoneIdentifier(identifier) && !SUPABASE_ENABLE_PHONE_AUTH) {
-    throw new Error('当前暂未开放手机号登录，请先使用邮箱注册，或改用邮箱验证码登录。');
-  }
-}
-
-function buildMemberSession(user: SupabaseUserLike, provider: AuthProviderType, existing?: UserSession | null) {
-  const metadataProfile = extractProfileMetadata(user.user_metadata);
-
+function buildMemberSession(
+  user: ClerkUser,
+  provider: Exclude<AuthProviderType, 'anonymous'>,
+  profileRow?: ClerkProfileRow | null,
+  existing?: UserSession | null
+) {
+  const nextProfile = normalizeProfile({
+    ...(existing?.profile || {}),
+    ...extractProfileMetadata(user.publicMetadata),
+    ...extractProfileRow(profileRow)
+  });
   return {
     loggedIn: true,
     authProvider: provider,
-    profile: normalizeProfile({
-      ...(existing?.profile || {}),
-      ...metadataProfile
-    }),
-    userId: user.id,
-    email: user.email || existing?.email || '',
-    phone: user.phone || existing?.phone || ''
+    profile: nextProfile,
+    // The Worker APIs are keyed by the D1 business user id, returned by
+    // /v1/me/profile after Clerk identity bootstrap.
+    userId: String(profileRow?.id || '').trim() || null,
+    email: primaryEmail(user),
+    phone: user.phoneNumbers?.[0]?.phoneNumber || ''
   } satisfies UserSession;
 }
 
-function isExistingEmailSignUpResponse(user: SupabaseUserLike | null | undefined) {
-  if (!user) {
-    return false;
-  }
-
-  const identities = (user as SupabaseSignUpUserLike).identities;
-  return Array.isArray(identities) && identities.length === 0;
-}
-
 export function getUserSession(): UserSession | null {
-  if (!canUseBrowserStorage()) {
-    return null;
-  }
-
+  if (!canUseBrowserStorage()) return null;
   try {
     const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
-
+    if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<UserSession>;
-    if (!parsed || !parsed.loggedIn) {
-      return null;
-    }
-
     const authProvider = normalizeProvider(parsed.authProvider);
-    if (!authProvider) {
-      return null;
-    }
-
+    if (!parsed.loggedIn || !authProvider) return null;
     return {
       loggedIn: true,
       authProvider,
@@ -360,189 +299,137 @@ export function getUserSession(): UserSession | null {
 }
 
 function writeUserSession(session: UserSession | null) {
-  if (!canUseBrowserStorage()) {
-    return;
-  }
-
-  if (!session) {
-    window.localStorage.removeItem(SESSION_STORAGE_KEY);
-  } else {
-    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-  }
-
+  if (!canUseBrowserStorage()) return;
+  if (session) window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  else window.localStorage.removeItem(SESSION_STORAGE_KEY);
   emitSessionUpdate();
 }
 
-async function getSupabaseUser() {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-
-  const supabase = getSupabaseBrowserClient();
-  const {
-    data: { user },
-    error
-  } = await supabase.auth.getUser();
-
-  if (error) {
-    throw error;
-  }
-
-  return user;
+async function readCloudflareProfile() {
+  return cloudflareRequest<ClerkProfileRow | null>('/v1/me/profile', {}, true);
 }
 
-export async function hydrateSupabaseSession() {
-  const current = getUserSession();
-
-  if (!isSupabaseConfigured()) {
-    if (current?.authProvider === 'anonymous') {
-      return current;
-    }
-    if (current) {
-      writeUserSession(null);
-    }
-    return null;
-  }
-
+async function persistClerkSession(
+  clerk: ClerkInstance,
+  provider: Exclude<AuthProviderType, 'anonymous'>
+) {
+  const user = clerk.user || clerk.session?.user;
+  if (!user) throw new Error('当前登录状态无效，请重新登录。');
+  let profile: ClerkProfileRow | null;
   try {
-    const supabase = getSupabaseBrowserClient();
-    const {
-      data: { session }
-    } = await supabase.auth.getSession();
+    // Profile is a read path. Bootstrapping on every page load used to turn a
+    // harmless session hydration into a D1 write and made quota incidents much
+    // worse. Only provision an identity when the API explicitly asks for it.
+    profile = await readCloudflareProfile();
+  } catch (error) {
+    if (!(error instanceof CloudflareApiError) || error.status !== 403 ||
+      !['IDENTITY_MAPPING_REQUIRED', 'EMAIL_VERIFICATION_REQUIRED'].includes(error.code || '')) {
+      throw error;
+    }
+    await bootstrapCloudflareIdentity();
+    profile = await readCloudflareProfile();
+  }
+  const next = buildMemberSession(user, provider, profile, getUserSession());
+  if (!next.userId) throw new Error('账号资料还在初始化，请稍后刷新页面。');
+  writeUserSession(next);
+  markSessionHydrated();
+  return next;
+}
 
-    if (!session) {
-      if (current?.authProvider === 'anonymous') {
+export async function hydrateCloudflareSession() {
+  if (hydrateInFlight) return hydrateInFlight;
+
+  const current = getUserSession();
+  if (Date.now() < quotaBlockedUntil) return current;
+  hydrateInFlight = (async () => {
+    try {
+      const clerk = await getClerk();
+      if (!clerk.session || !clerk.user) {
+        if (current?.authProvider === 'anonymous') return current;
+        writeUserSession(null);
+        return null;
+      }
+      if (current?.userId && current.authProvider !== 'anonymous' && wasSessionHydratedRecently()) {
         return current;
       }
-
-      writeUserSession(null);
-      return null;
+      const provider = current?.authProvider === 'otp' ? 'otp' : 'password';
+      return await persistClerkSession(clerk, provider);
+    } catch (error) {
+      // Quota and network failures must not erase a valid local session. The
+      // next explicit login or refresh can retry once the service recovers.
+      if (isCloudflareQuotaError(error)) {
+        quotaBlockedUntil = Date.now() + 5 * 60_000;
+        if (Date.now() - lastQuotaLogAt > 60_000) {
+          lastQuotaLogAt = Date.now();
+          console.warn('[Seekoffer][auth] D1 quota reached; hydration is paused temporarily.');
+        }
+      } else {
+        console.error('[Seekoffer][auth] hydrateCloudflareSession failed', error);
+      }
+      return current;
+    } finally {
+      hydrateInFlight = null;
     }
-
-    const user = session.user || (await getSupabaseUser());
-    if (!user) {
-      writeUserSession(null);
-      return null;
-    }
-
-    const provider = current?.authProvider === 'otp' ? 'otp' : 'password';
-    const nextSession = buildMemberSession(user, provider, current);
-    writeUserSession(nextSession);
-    return nextSession;
-  } catch (error) {
-    console.error('[Seekoffer][auth] hydrateSupabaseSession failed', error);
-    return current;
-  }
+  })();
+  return hydrateInFlight;
 }
 
-async function persistMemberSession(provider: AuthProviderType) {
-  const current = getUserSession();
-  const user = await getSupabaseUser();
-  if (!user) {
-    throw new Error('当前登录状态无效，请重新登录。');
-  }
-
-  const nextSession = buildMemberSession(user, provider, current);
-  writeUserSession(nextSession);
-  return nextSession;
+function ensureEmailIdentifier(value: string) {
+  const identifier = normalizeIdentifier(value);
+  if (!isEmailIdentifier(identifier)) throw new Error('请输入正确的邮箱地址。');
+  return identifier;
 }
 
-function persistMemberSessionFromUser(user: SupabaseUserLike, provider: AuthProviderType) {
-  const current = getUserSession();
-  const nextSession = buildMemberSession(user, provider, current);
-  writeUserSession(nextSession);
-  return nextSession;
+async function activateCreatedSession(clerk: ClerkInstance, sessionId?: string | null) {
+  if (!sessionId) throw new Error('认证服务没有返回有效会话，请重试。');
+  await clerk.setActive({ session: sessionId });
 }
 
 export async function signInWithPasswordAccount(payload: CredentialsPayload) {
-  if (!isSupabaseConfigured()) {
-    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
-  }
-
-  const identifier = normalizeIdentifier(payload.identifier);
-  ensurePasswordIdentifierSupported(identifier);
-  const supabase = getSupabaseBrowserClient();
-
+  const identifier = ensureEmailIdentifier(payload.identifier);
   try {
-    const credentials = isPhoneIdentifier(identifier)
-      ? { phone: normalizePhoneIdentifier(identifier), password: payload.password }
-      : { email: identifier, password: payload.password };
-
-    const { data, error } = await supabase.auth.signInWithPassword(credentials);
-    if (error) {
-      throw error;
+    const clerk = await getClerk();
+    const activeEmail = primaryEmail(clerk.user);
+    if (clerk.session && clerk.user) {
+      if (activeEmail && activeEmail.toLowerCase() === identifier.toLowerCase()) {
+        // Clerk rejects a second sign-in attempt while the same session is
+        // active. Reuse it and only reconcile the D1 profile.
+        return await persistClerkSession(clerk, 'password');
+      }
+      // The login form is explicitly asking for another account. Clear the
+      // stale session before creating the requested one.
+      await clerk.signOut();
     }
-
-    if (data.user) {
-      return persistMemberSessionFromUser(data.user, 'password');
-    }
-
-    return persistMemberSession('password');
+    const result = await clerk.client.signIn.create({ identifier, password: payload.password });
+    if (result.status !== 'complete') throw new Error('邮箱或密码不正确，请检查后重试。');
+    await activateCreatedSession(clerk, result.createdSessionId);
+    return await persistClerkSession(clerk, 'password');
   } catch (error) {
     console.error('[Seekoffer][auth] signInWithPasswordAccount failed', error);
+    if (isCloudflareQuotaError(error)) {
+      throw new Error('今日数据服务额度已用尽，登录资料已保留，请稍后重试。');
+    }
     throw new Error(formatAuthError(error, '密码登录暂时不可用，请稍后重试。'));
   }
 }
 
 export async function signUpWithPasswordAccount(payload: CredentialsPayload): Promise<PasswordSignUpResult> {
-  if (!isSupabaseConfigured()) {
-    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
-  }
-
-  const identifier = normalizeIdentifier(payload.identifier);
-  ensurePasswordIdentifierSupported(identifier);
-  const nicknameSeed = isEmailIdentifier(identifier)
-    ? identifier.split('@')[0]
-    : normalizePhoneIdentifier(identifier).slice(-4);
-
-  const supabase = getSupabaseBrowserClient();
-
+  const identifier = ensureEmailIdentifier(payload.identifier);
   try {
-    const credentials = isPhoneIdentifier(identifier)
-      ? {
-          phone: normalizePhoneIdentifier(identifier),
-          password: payload.password,
-          options: {
-            data: {
-              nickname: nicknameSeed
-            }
-          }
-        }
-      : {
-          email: identifier,
-          password: payload.password,
-          options: {
-            emailRedirectTo: SEEKOFFER_SITE_URL,
-            data: {
-              nickname: nicknameSeed
-            }
-          }
-        };
-
-    const { data, error } = await supabase.auth.signUp(credentials);
-    if (error) {
-      throw error;
+    const clerk = await getClerk();
+    const result = await clerk.client.signUp.create({
+      emailAddress: identifier,
+      password: payload.password
+    });
+    if (result.status === 'complete') {
+      await activateCreatedSession(clerk, result.createdSessionId);
+      return { status: 'signed_in', session: await persistClerkSession(clerk, 'password') };
     }
-
-    if (!isPhoneIdentifier(identifier) && isExistingEmailSignUpResponse(data.user)) {
-      throw new Error('该邮箱已经注册，请直接登录，或切换到“验证码”通过邮箱验证码登录。');
-    }
-
-    if (data.session) {
-      const session = data.user
-        ? persistMemberSessionFromUser(data.user, 'password')
-        : await persistMemberSession('password');
-      return {
-        status: 'signed_in',
-        session
-      };
-    }
-
+    pendingSignUp = { email: identifier, password: payload.password };
+    await clerk.client.signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
     return {
       status: 'pending_confirmation',
-      message: isPhoneIdentifier(identifier)
-        ? '注册成功，请使用短信验证码完成后续验证。'
-        : '注册验证码已发送，请输入邮件里的 6 位数字完成注册。'
+      message: '注册验证码已发送，请输入邮件里的 6 位数字完成注册。'
     };
   } catch (error) {
     console.error('[Seekoffer][auth] signUpWithPasswordAccount failed', error);
@@ -551,122 +438,51 @@ export async function signUpWithPasswordAccount(payload: CredentialsPayload): Pr
 }
 
 export async function resendSignupConfirmationCode(email: string) {
-  if (!isSupabaseConfigured()) {
-    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
-  }
-
-  const normalizedEmail = normalizeEmailIdentifier(email);
-  if (!isEmailIdentifier(normalizedEmail)) {
-    throw new Error('请输入正确的邮箱地址。');
-  }
-
-  const supabase = getSupabaseBrowserClient();
-
+  const normalizedEmail = ensureEmailIdentifier(email);
   try {
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email: normalizedEmail,
-      options: {
-        emailRedirectTo: SEEKOFFER_SITE_URL
-      }
-    });
-
-    if (error) {
-      throw error;
+    const clerk = await getClerk();
+    if (!pendingSignUp || pendingSignUp.email !== normalizedEmail) {
+      throw new Error('注册流程已过期，请重新填写注册信息。');
     }
+    await clerk.client.signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
   } catch (error) {
     console.error('[Seekoffer][auth] resendSignupConfirmationCode failed', error);
     throw new Error(formatAuthError(error, '注册验证码发送失败，请稍后重试。'));
   }
 }
 
-export async function sendPasswordResetEmail(email: string) {
-  if (!isSupabaseConfigured()) {
-    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
-  }
-
-  const normalizedEmail = normalizeEmailIdentifier(email);
-  if (!isEmailIdentifier(normalizedEmail)) {
-    throw new Error('请输入正确的邮箱地址。');
-  }
-
-  const supabase = getSupabaseBrowserClient();
-
-  try {
-    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: SEEKOFFER_SITE_URL
-    });
-
-    if (error) {
-      throw error;
-    }
-  } catch (error) {
-    console.error('[Seekoffer][auth] sendPasswordResetEmail failed', error);
-    throw new Error(formatAuthError(error, '密码重置邮件发送失败，请稍后重试。'));
-  }
-}
-
 export async function verifySignupConfirmationCode(email: string, token: string) {
-  if (!isSupabaseConfigured()) {
-    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
-  }
-
-  const normalizedEmail = normalizeEmailIdentifier(email);
-  const normalizedToken = token.trim();
-  if (!isEmailIdentifier(normalizedEmail)) {
-    throw new Error('请输入正确的邮箱地址。');
-  }
-
-  if (!normalizedToken) {
-    throw new Error('请先输入注册邮件中的 6 位验证码。');
-  }
-
-  const supabase = getSupabaseBrowserClient();
-
+  const normalizedEmail = ensureEmailIdentifier(email);
+  if (!token.trim()) throw new Error('请先输入注册邮件中的 6 位验证码。');
   try {
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: normalizedEmail,
-      token: normalizedToken,
-      type: 'signup'
-    });
-
-    if (error) {
-      throw error;
+    const clerk = await getClerk();
+    if (!pendingSignUp || pendingSignUp.email !== normalizedEmail) {
+      throw new Error('注册流程已过期，请重新填写注册信息。');
     }
-
-    return data.user ? persistMemberSessionFromUser(data.user, 'password') : persistMemberSession('password');
+    const result = await clerk.client.signUp.attemptEmailAddressVerification({ code: token.trim() });
+    if (result.status !== 'complete') throw new Error('验证码无效或已过期，请重新发送。');
+    await activateCreatedSession(clerk, result.createdSessionId);
+    pendingSignUp = null;
+    return await persistClerkSession(clerk, 'password');
   } catch (error) {
     console.error('[Seekoffer][auth] verifySignupConfirmationCode failed', error);
     throw new Error(formatAuthError(error, '注册验证码校验失败，请重新发送后再试。'));
   }
 }
 
+export async function sendPasswordResetEmail(email: string) {
+  // Keep the existing dialog simple: Clerk's email-code first factor gives the
+  // user an immediate way back into the account without a second reset page.
+  await sendEmailLoginCode(email, { shouldCreateUser: false });
+}
+
 export async function sendEmailLoginCode(email: string, options: EmailLoginCodeOptions = {}) {
-  if (!isSupabaseConfigured()) {
-    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
-  }
-
-  const normalizedEmail = normalizeEmailIdentifier(email);
-  if (!isEmailIdentifier(normalizedEmail)) {
-    throw new Error('请输入正确的邮箱地址。');
-  }
-
-  const supabase = getSupabaseBrowserClient();
-
+  const normalizedEmail = ensureEmailIdentifier(email);
+  void options;
   try {
-    const { error } = await supabase.auth.signInWithOtp({
-      email: normalizedEmail,
-      options: {
-        emailRedirectTo: SEEKOFFER_SITE_URL,
-        // Keep the code-login path from creating new users, which would send
-        // Supabase's signup-confirmation email instead of the login OTP.
-        shouldCreateUser: options.shouldCreateUser ?? false
-      }
-    });
-
-    if (error) {
-      throw error;
-    }
+    const clerk = await getClerk();
+    const result = await clerk.client.signIn.create({ identifier: normalizedEmail });
+    await result.prepareFirstFactor({ strategy: 'email_code' });
   } catch (error) {
     console.error('[Seekoffer][auth] sendEmailLoginCode failed', error);
     throw new Error(formatAuthError(error, '验证码发送失败，请稍后重试。'));
@@ -674,34 +490,17 @@ export async function sendEmailLoginCode(email: string, options: EmailLoginCodeO
 }
 
 export async function verifyEmailLoginCode(email: string, token: string) {
-  if (!isSupabaseConfigured()) {
-    throw new Error('登录服务配置暂未完成，请稍后再试或联系 Seekoffer。');
-  }
-
-  const normalizedEmail = normalizeEmailIdentifier(email);
-  const normalizedToken = token.trim();
-  if (!isEmailIdentifier(normalizedEmail)) {
-    throw new Error('请输入正确的邮箱地址。');
-  }
-
-  if (!normalizedToken) {
-    throw new Error('请先输入邮箱验证码。');
-  }
-
-  const supabase = getSupabaseBrowserClient();
-
+  ensureEmailIdentifier(email);
+  if (!token.trim()) throw new Error('请先输入邮箱验证码。');
   try {
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: normalizedEmail,
-      token: normalizedToken,
-      type: 'email'
+    const clerk = await getClerk();
+    const result = await clerk.client.signIn.attemptFirstFactor({
+      strategy: 'email_code',
+      code: token.trim()
     });
-
-    if (error) {
-      throw error;
-    }
-
-    return data.user ? persistMemberSessionFromUser(data.user, 'otp') : persistMemberSession('otp');
+    if (result.status !== 'complete') throw new Error('验证码无效或已过期，请重新发送。');
+    await activateCreatedSession(clerk, result.createdSessionId);
+    return await persistClerkSession(clerk, 'otp');
   } catch (error) {
     console.error('[Seekoffer][auth] verifyEmailLoginCode failed', error);
     throw new Error(formatAuthError(error, '验证码校验失败，请重新发送后再试。'));
@@ -709,73 +508,68 @@ export async function verifyEmailLoginCode(email: string, token: string) {
 }
 
 export async function signInAsGuest() {
-  const current = getUserSession();
-  const nextSession = buildAnonymousSession(current);
+  const nextSession = buildAnonymousSession(getUserSession());
   writeUserSession(nextSession);
   return nextSession;
 }
 
 export async function signOutUser() {
   try {
-    if (isSupabaseConfigured()) {
-      const supabase = getSupabaseBrowserClient();
-      await supabase.auth.signOut();
-    }
+    const clerk = await getClerk();
+    await clerk.signOut();
   } catch {
-    // Ignore and continue clearing the local session.
+    // A local session must still be cleared if the Clerk network is unavailable.
   }
-
+  pendingSignUp = null;
+  clearSessionHydrationMarker();
   writeUserSession(null);
 }
 
 export function updateUserProfile(patch: Partial<UserProfile>) {
   const current = getUserSession();
-  if (!current) {
-    return null;
-  }
-
-  const next: UserSession = {
+  if (!current) return null;
+  const next = {
     ...current,
-    profile: normalizeProfile({
-      ...current.profile,
-      ...patch
-    })
-  };
-
+    profile: normalizeProfile({ ...current.profile, ...patch })
+  } satisfies UserSession;
   writeUserSession(next);
   return next;
 }
 
 export function watchUserSession(callback: () => void) {
-  if (typeof window === 'undefined') {
-    return () => undefined;
-  }
-
+  if (typeof window === 'undefined') return () => undefined;
   const handler = () => callback();
   window.addEventListener(SESSION_EVENT_NAME, handler);
   window.addEventListener('storage', handler);
-
   return () => {
     window.removeEventListener(SESSION_EVENT_NAME, handler);
     window.removeEventListener('storage', handler);
   };
 }
 
-export function watchSupabaseAuthState(callback: (event: AuthChangeEvent) => void) {
-  if (typeof window === 'undefined' || !isSupabaseConfigured()) {
-    return () => undefined;
-  }
-
-  const supabase = getSupabaseBrowserClient();
-  const {
-    data: { subscription }
-  } = supabase.auth.onAuthStateChange((event) => {
-    window.setTimeout(() => {
-      void hydrateSupabaseSession().finally(() => callback(event));
-    }, 0);
-  });
-
+export function watchCloudflareAuthState(callback: (event?: string) => void) {
+  if (typeof window === 'undefined') return () => undefined;
+  let dispose: (() => void) | undefined;
+  let cancelled = false;
+  let lastIdentity = '';
+  let timer: number | undefined;
+  void getClerk()
+    .then((clerk) => {
+      if (cancelled || !clerk.addListener) return;
+      dispose = clerk.addListener(() => {
+        const identity = `${clerk.session?.id || ''}:${clerk.user?.id || ''}`;
+        if (identity === lastIdentity) return;
+        lastIdentity = identity;
+        if (timer) window.clearTimeout(timer);
+        timer = window.setTimeout(() => {
+          void hydrateCloudflareSession().finally(() => callback('session_changed'));
+        }, 250);
+      });
+    })
+    .catch(() => undefined);
   return () => {
-    subscription.unsubscribe();
+    cancelled = true;
+    if (timer) window.clearTimeout(timer);
+    dispose?.();
   };
 }

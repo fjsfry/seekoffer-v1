@@ -1641,7 +1641,12 @@ export function DesktopHome({
       return;
     }
 
-    const createdRow: ApplicationRow = { item: result.item, project: result.project };
+    const createdRow: ApplicationRow = {
+      item: result.item,
+      project: result.project,
+      noticeAvailable: true,
+      noticeAvailability: 'available'
+    };
     const creationNow = Date.now();
     const revealExpiredCreatedProject =
       hideExpired && isDesktopApplicationExpired(result.project.deadlineDate, creationNow);

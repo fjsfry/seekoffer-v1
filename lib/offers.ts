@@ -1,7 +1,6 @@
 'use client';
 
-import { getSupabaseBrowserClient } from './supabase-browser';
-import { isSupabaseConfigured } from './supabase-env';
+import { cloudflareRequest } from './cloudflare-api';
 
 export const offerResultTypes = ['录取', '放弃', '候补', '补录传闻', '官方确认'] as const;
 export const offerProjectTypes = ['夏令营', '预推免', '九推', '直博', '硕士', '博士', '其他'] as const;
@@ -95,27 +94,6 @@ type OfferCommentRow = {
   created_at: string | null;
 };
 
-const publicPostColumns = [
-  'id',
-  'content_type',
-  'title',
-  'category',
-  'author_name',
-  'school_name',
-  'major',
-  'project_type',
-  'result',
-  'undergraduate_background',
-  'content',
-  'is_anonymous',
-  'is_official',
-  'source_label',
-  'comments_count',
-  'follows_count',
-  'reports_count',
-  'created_at'
-].join(',');
-
 function cleanText(value: string, maxLength: number) {
   return value.replace(/\s+/g, ' ').trim().slice(0, maxLength);
 }
@@ -167,9 +145,7 @@ function mapCommentRow(row: OfferCommentRow): OfferComment {
 }
 
 function ensureConfigured(message: string) {
-  if (!isSupabaseConfigured()) {
-    throw new Error(message);
-  }
+  void message;
 }
 
 export function formatOfferTime(value: string) {
@@ -200,18 +176,22 @@ export function getOfferAvatar(label: string) {
 
 export async function fetchPublicCommunityPosts() {
   ensureConfigured('Offer 圈暂时无法加载，请稍后重试。');
-  const supabase = getSupabaseBrowserClient();
-  const { data, error } = await supabase
-    .from('offer_posts')
-    .select(publicPostColumns)
-    .eq('review_status', 'approved')
-    .is('hidden_at', null)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .limit(200);
-
-  if (error) throw new Error('Offer 圈暂时无法加载，请稍后重试。');
-  return ((data || []) as unknown as OfferPostRow[]).map(mapOfferRow);
+  const rows: OfferPostRow[] = [];
+  let page = 1;
+  let nextPage: number | null = 1;
+  while (nextPage && rows.length < 200) {
+    const result = await cloudflareRequest<{ items?: OfferPostRow[]; pagination?: { totalPages?: number } }>(
+      `/v1/community/posts?page=${page}&pageSize=40`,
+      {},
+      false
+    );
+    const items = Array.isArray(result.items) ? result.items : [];
+    rows.push(...items);
+    const totalPages = Number(result.pagination?.totalPages || page);
+    nextPage = items.length && page < totalPages ? page + 1 : null;
+    page += 1;
+  }
+  return rows.slice(0, 200).map(mapOfferRow);
 }
 
 export async function fetchPublicOffers() {
@@ -221,43 +201,42 @@ export async function fetchPublicOffers() {
 
 export async function fetchOfferComments(postId: string) {
   ensureConfigured('回复暂时无法加载，请稍后重试。');
-  const supabase = getSupabaseBrowserClient();
-  const { data, error } = await supabase
-    .from('offer_comments')
-    .select('id,post_id,author_name,content,is_anonymous,created_at')
-    .eq('post_id', postId)
-    .eq('review_status', 'approved')
-    .is('hidden_at', null)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: true })
-    .limit(200);
-
-  if (error) throw new Error('回复暂时无法加载，请稍后重试。');
-  return ((data || []) as OfferCommentRow[]).map(mapCommentRow);
+  const result = await cloudflareRequest<{ items?: OfferCommentRow[] }>(
+    `/v1/community/comments?postId=${encodeURIComponent(postId)}&page=1`,
+    {},
+    false
+  );
+  return (Array.isArray(result.items) ? result.items : []).map(mapCommentRow);
 }
 
 export async function fetchFollowedOfferPostIds(userId: string) {
-  if (!userId || !isSupabaseConfigured()) return [] as string[];
-  const supabase = getSupabaseBrowserClient();
-  const { data, error } = await supabase.from('offer_post_follows').select('post_id').eq('user_id', userId);
-  if (error) return [] as string[];
-  return (data || []).map((row) => String(row.post_id || '')).filter(Boolean);
+  if (!userId) return [] as string[];
+  const ids: string[] = [];
+  let page = 1;
+  let nextPage: number | null = 1;
+  while (nextPage) {
+    const result = await cloudflareRequest<{ ids?: string[]; nextPage?: number | null }>(
+      `/v1/me/community/follows?page=${page}`,
+      {},
+      true
+    );
+    ids.push(...(Array.isArray(result.ids) ? result.ids : []));
+    nextPage = result.nextPage || null;
+    page = nextPage || 0;
+  }
+  return ids.filter(Boolean);
 }
 
 export async function toggleOfferPostFollow(postId: string, userId: string, followed: boolean) {
   ensureConfigured('关注状态暂时无法保存，请稍后重试。');
   if (!userId) throw new Error('请登录后关注讨论。');
 
-  const supabase = getSupabaseBrowserClient();
-  if (followed) {
-    const { error } = await supabase.from('offer_post_follows').delete().eq('post_id', postId).eq('user_id', userId);
-    if (error) throw new Error('取消关注失败，请稍后重试。');
-    return false;
-  }
-
-  const { error } = await supabase.from('offer_post_follows').insert({ post_id: postId, user_id: userId });
-  if (error) throw new Error('关注失败，请稍后重试。');
-  return true;
+  const result = await cloudflareRequest<{ followed?: boolean }>(
+    '/v1/me/community/follows',
+    { method: 'POST', body: JSON.stringify({ postId, follow: !followed }) },
+    true
+  );
+  return result.followed === true;
 }
 
 export function validateOfferSubmitInput(input: OfferSubmitInput) {
@@ -282,23 +261,27 @@ export function validateOfferSubmitInput(input: OfferSubmitInput) {
 export async function submitOfferPost(input: OfferSubmitInput) {
   ensureConfigured('发布入口正在维护中，请稍后再试。');
   const validated = validateOfferSubmitInput(input);
-  const supabase = getSupabaseBrowserClient();
-  const { error } = await supabase.from('offer_posts').insert({
-    user_id: validated.userId,
-    author_name: validated.authorName,
-    school_name: validated.schoolName,
-    major: validated.major,
-    project_type: validated.projectType,
-    result: validated.result,
-    undergraduate_background: validated.undergraduateBackground,
-    content: validated.content,
-    is_anonymous: validated.isAnonymous,
-    content_type: 'offer',
-    title: '',
-    category: ''
-  });
-
-  if (error) throw new Error('发布失败，请稍后重试。');
+  await cloudflareRequest(
+    '/v1/me/community/posts',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        requestId: crypto.randomUUID(),
+        contentType: 'offer',
+        authorName: validated.authorName,
+        schoolName: validated.schoolName,
+        major: validated.major,
+        projectType: validated.projectType,
+        result: validated.result,
+        undergraduateBackground: validated.undergraduateBackground,
+        content: validated.content,
+        isAnonymous: validated.isAnonymous,
+        title: '',
+        category: ''
+      })
+    },
+    true
+  );
 }
 
 export async function submitOfferDiscussion(input: OfferDiscussionSubmitInput) {
@@ -317,23 +300,27 @@ export async function submitOfferDiscussion(input: OfferDiscussionSubmitInput) {
   if (!offerDiscussionCategories.includes(input.category)) throw new Error('请选择讨论分类。');
   if (content.length < 12) throw new Error('请补充问题背景，至少 12 个字。');
 
-  const supabase = getSupabaseBrowserClient();
-  const { error } = await supabase.from('offer_posts').insert({
-    user_id: input.userId,
-    author_name: authorName,
-    school_name: schoolName,
-    major,
-    project_type: '',
-    result: '',
-    undergraduate_background: '',
-    content,
-    is_anonymous: input.isAnonymous,
-    content_type: 'discussion',
-    title,
-    category: input.category
-  });
-
-  if (error) throw new Error('讨论提交失败，请稍后重试。');
+  await cloudflareRequest(
+    '/v1/me/community/posts',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        requestId: crypto.randomUUID(),
+        contentType: 'discussion',
+        authorName,
+        schoolName,
+        major,
+        projectType: '',
+        result: '',
+        undergraduateBackground: '',
+        content,
+        isAnonymous: input.isAnonymous,
+        title,
+        category: input.category
+      })
+    },
+    true
+  );
 }
 
 export async function submitOfferComment(input: {
@@ -350,16 +337,20 @@ export async function submitOfferComment(input: {
   if (!authorName) throw new Error('请填写发布人称呼。');
   if (content.length < 2) throw new Error('请填写回复内容。');
 
-  const supabase = getSupabaseBrowserClient();
-  const { error } = await supabase.from('offer_comments').insert({
-    post_id: input.postId,
-    user_id: input.userId,
-    author_name: authorName,
-    content,
-    is_anonymous: input.isAnonymous
-  });
-
-  if (error) throw new Error('回复失败，请稍后重试。');
+  await cloudflareRequest(
+    '/v1/me/community/comments',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        requestId: crypto.randomUUID(),
+        postId: input.postId,
+        authorName,
+        content,
+        isAnonymous: input.isAnonymous
+      })
+    },
+    true
+  );
 }
 
 export async function reportOfferPost(offerId: string, content: string, userId?: string | null) {
@@ -367,14 +358,12 @@ export async function reportOfferPost(offerId: string, content: string, userId?:
   const cleanContent = cleanMultiline(content, 800);
   if (cleanContent.length < 8) throw new Error('请至少用 8 个字说明举报原因。');
 
-  const supabase = getSupabaseBrowserClient();
-  const { error } = await supabase.from('feedback_reports').insert({
-    user_id: userId || null,
-    type: 'report',
-    module: 'offer',
-    target_id: offerId,
-    content: cleanContent
-  });
-
-  if (error) throw new Error('举报提交失败，请稍后重试。');
+  await cloudflareRequest(
+    '/v1/community/report',
+    {
+      method: 'POST',
+      body: JSON.stringify({ requestId: crypto.randomUUID(), postId: offerId, content: cleanContent })
+    },
+    Boolean(userId)
+  );
 }

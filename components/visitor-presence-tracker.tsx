@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
-import { SUPABASE_URL } from '@/lib/supabase-env';
+import { cloudflareApiOrigin } from '@/lib/cloudflare-api';
 
 const visitorStorageKey = 'seekoffer-visitor-id';
 const sessionStorageKey = 'seekoffer-session-id';
@@ -55,9 +55,7 @@ function buildPayload(eventType: 'pageview' | 'heartbeat', pathname: string) {
 }
 
 function sendPresence(eventType: 'pageview' | 'heartbeat', pathname: string) {
-  if (!SUPABASE_URL) return;
-
-  const url = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/analytics-api`;
+  const url = `${cloudflareApiOrigin()}/v1/analytics`;
   const body = JSON.stringify(buildPayload(eventType, pathname));
 
   if (navigator.sendBeacon && eventType === 'heartbeat') {

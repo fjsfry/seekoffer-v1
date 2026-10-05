@@ -1,7 +1,12 @@
 'use client';
 
-import { getSupabaseBrowserClient } from './supabase-browser';
-import { SUPABASE_URL, isSupabaseConfigured } from './supabase-env';
+import {
+  cloudflareApiErrorMessage,
+  cloudflareApiOrigin,
+  cloudflareRequest,
+  CloudflareApiError,
+  isCloudflareQuotaError
+} from './cloudflare-api';
 
 export type AdminApiPayload = {
   resource: string;
@@ -24,8 +29,6 @@ export type AdminApiResponse<T> = T & {
   message?: string;
 };
 
-const ADMIN_API_TIMEOUT_MS = 12_000;
-
 export function getAdminErrorMessage(error: unknown, fallback = '操作暂时无法完成，请稍后重试。') {
   if (!(error instanceof Error)) {
     return fallback;
@@ -39,7 +42,7 @@ function toSafeAdminMessage(message?: string) {
     return '操作暂时无法完成，请稍后重试。';
   }
 
-  if (/supabase|edge function|api|env|environment|jwt|token|function|\u63a5\u53e3|\u540e\u7aef|\u73af\u5883\u53d8\u91cf|\u767b\u5f55\u901a\u9053/i.test(message)) {
+  if (/edge function|api|env|environment|jwt|token|function|\u63a5\u53e3|\u540e\u7aef|\u73af\u5883\u53d8\u91cf|\u767b\u5f55\u901a\u9053/i.test(message)) {
     return '系统服务暂时不可用，请稍后重试。';
   }
 
@@ -47,7 +50,7 @@ function toSafeAdminMessage(message?: string) {
 }
 
 export function isAdminApiConfigured() {
-  return isSupabaseConfigured() && Boolean(SUPABASE_URL);
+  return Boolean(cloudflareApiOrigin());
 }
 
 export async function invokeAdminApi<T>(payload: AdminApiPayload): Promise<AdminApiResponse<T>> {
@@ -55,43 +58,19 @@ export async function invokeAdminApi<T>(payload: AdminApiPayload): Promise<Admin
     throw new Error('当前无法完成登录，请稍后再试或联系管理员。');
   }
 
-  const supabase = getSupabaseBrowserClient();
-  const {
-    data: { session },
-    error: sessionError
-  } = await supabase.auth.getSession();
-
-  if (sessionError || !session?.access_token) {
-    throw new Error('登录状态已失效，请重新登录。');
-  }
-
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), ADMIN_API_TIMEOUT_MS);
-
-  let response: Response;
   try {
-    response = await fetch(`${SUPABASE_URL}/functions/v1/admin-api`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    });
+    return await cloudflareRequest<AdminApiResponse<T>>(
+      '/v1/admin',
+      { method: 'POST', body: JSON.stringify(payload) },
+      true
+    );
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('操作响应超时，请稍后重试。');
+    if (isCloudflareQuotaError(error)) {
+      throw new Error(cloudflareApiErrorMessage(error));
     }
-    throw new Error('网络连接不稳定，请稍后重试。');
-  } finally {
-    window.clearTimeout(timeout);
+    if (error instanceof CloudflareApiError && error.status === 401) {
+      throw new Error('登录状态已失效，请重新登录。');
+    }
+    throw new Error(toSafeAdminMessage(error instanceof Error ? error.message : ''));
   }
-
-  const body = (await response.json().catch(() => ({}))) as AdminApiResponse<T>;
-  if (!response.ok) {
-    throw new Error(toSafeAdminMessage(body.message || body.error));
-  }
-
-  return body;
 }

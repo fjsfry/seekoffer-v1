@@ -2,7 +2,7 @@
 
 import type { AdminRole } from './admin-data';
 import { invokeAdminApi, isAdminApiConfigured } from './admin-api';
-import { getSupabaseBrowserClient } from './supabase-browser';
+import { signInWithPasswordAccount, signOutUser } from './user-session';
 
 export type AdminSession = {
   email: string;
@@ -101,19 +101,11 @@ export async function signInAdmin(email: string, password: string) {
     throw new Error('当前无法完成登录，请稍后再试或联系管理员。');
   }
 
-  const supabase = getSupabaseBrowserClient();
-  const { error: signInError } = await supabase.auth.signInWithPassword({
-    email: normalizedEmail,
-    password
-  });
-
-  if (signInError) {
-    throw new Error('管理员账号或密码不正确。');
-  }
+  await signInWithPasswordAccount({ identifier: normalizedEmail, password });
 
   const session = await refreshAdminSession({ force: true });
   if (!session) {
-    await supabase.auth.signOut().catch(() => undefined);
+    await signOutUser().catch(() => undefined);
     throw new Error('当前账号没有后台访问权限。');
   }
 
@@ -168,9 +160,7 @@ export async function refreshAdminSession(options: { force?: boolean } = {}) {
 }
 
 export function signOutAdmin() {
-  if (isAdminApiConfigured()) {
-    getSupabaseBrowserClient().auth.signOut().catch(() => undefined);
-  }
+  void signOutUser().catch(() => undefined);
 
   writeAdminSession(null);
 }

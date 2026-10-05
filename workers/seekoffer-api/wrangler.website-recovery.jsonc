@@ -1,0 +1,52 @@
+{
+  "name": "seekoffer-api-isolated-preview",
+  "main": "src/acceptance-worker.ts",
+  "compatibility_date": "2026-09-08",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "account_id": "9268f8c5fedc0f340356dcf729402a32",
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "migration.seekoffer.com.cn",
+      "custom_domain": true,
+      "zone_id": "82eca6dd8e89e5a1c0c87e514536383a"
+    }
+  ],
+  "triggers": {
+    "crons": []
+  },
+  "observability": {
+    "enabled": false
+  },
+  "d1_databases": [
+    {
+      "binding": "CORE",
+      "database_name": "seekoffer-core",
+      "database_id": "531486a7-f140-488e-8759-f77d885124f3"
+    }
+  ],
+  "vars": {
+    "MODE": "production",
+    "BUSINESS_WRITES_ENABLED": "true",
+    "OPERATIONS_WRITES_ENABLED": "true",
+    "NEW_ACCOUNTS_ENABLED": "true",
+    "NEW_ACCOUNTS_FROM": "2026-09-09T05:33:00Z",
+    "PAYMENT_PROCESSING_ENABLED": "false",
+    "ACCOUNT_ENTITLEMENT_ENABLED": "false",
+    "ALLOWED_ORIGINS": "https://www.seekoffer.com.cn,https://seekoffer.com.cn,https://migration.seekoffer.com.cn,chrome-extension://lmppfkhnomljidhplhhnboolhbleodeg,http://tauri.localhost,tauri://localhost,https://preview.seekoffer.com.cn",
+    "CLERK_ISSUER": "https://clerk.seekoffer.com.cn",
+    "CLERK_AUDIENCE": "seekoffer",
+    "AUTHORIZED_PARTIES": "https://www.seekoffer.com.cn,https://seekoffer.com.cn,https://migration.seekoffer.com.cn,chrome-extension://lmppfkhnomljidhplhhnboolhbleodeg,https://preview.seekoffer.com.cn",
+    "PUBLIC_READ_ENABLED": "false",
+    "INGEST_ENABLED": "true",
+    "NATIVE_OAUTH_CLIENT_ID": "bXDBbWjJFxXqoeG3",
+    "EXTENSION_OAUTH_CLIENT_ID": "uOgpBiVrePh1RgDk",
+    "LICENSE_ENABLED": "true",
+    "LICENSE_ATTEMPTS_PER_DAY": "100",
+    "ANALYTICS_ENABLED": "true",
+    "ANALYTICS_EVENTS_PER_DAY": "300"
+  }
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { getSupabaseBrowserClient } from './supabase-browser';
+import { cloudflareRequest } from './cloudflare-api';
 import { getDeadlineLevelFromDate, getPublicStatusForDeadlineLevel } from './deadline-display';
 import { getUserSession, type UserProfile, type UserSession, updateUserProfile } from './user-session';
 import {
@@ -14,6 +14,7 @@ import {
 } from './mock-data';
 import { filterMainNoticeProjects } from './notice-quality';
 import { baseNoticeProjects } from './notice-source';
+import { mapNoticeRowToProject as mapD1NoticeRowToProject } from './notice-record';
 import { canCreateMoreApplications } from './billing-api';
 import { createKeyedSyncRetryCoordinator } from './keyed-sync-retry';
 
@@ -22,8 +23,11 @@ const MANUAL_PROJECT_STORAGE_KEY = 'seekoffer-manual-projects';
 const APPLICATION_EVENT_NAME = 'seekoffer-applications-updated';
 const WORKSPACE_STORAGE_VERSION = 2;
 const NOTICE_TARGET_YEAR = 2026;
-const PUBLIC_NOTICE_QUERY_LIMIT = 5000;
-const PUBLIC_NOTICE_QUERY_PAGE_SIZE = 1000;
+// Workbench surfaces only need a compact latest/deadline snapshot. The public
+// directory itself uses server-side pagination through lib/public-notice-api.
+// Keeping this small prevents desktop startup from hydrating the full D1
+// catalogue into every browser session.
+const PUBLIC_NOTICE_COMPACT_PAGE_SIZE = 32;
 
 export type WorkspaceStorageOwner =
   | {
@@ -52,10 +56,13 @@ type ParsedStoredPayload<T> = {
 };
 
 type WorkspaceSessionIdentity = Pick<UserSession, 'loggedIn' | 'authProvider' | 'userId'>;
+type RemoteProfile = UserProfile & { id: string; sync_revision: number };
 
 export type ApplicationRow = {
   item: UserProjectRecord;
   project: PublicNoticeProject;
+  noticeAvailable: boolean;
+  noticeAvailability: 'available' | 'missing' | 'lookup-failed';
 };
 
 export type ManualProjectInput = {
@@ -670,7 +677,7 @@ function logWorkspaceSyncWarning(action: string, error: unknown) {
   console.warn(`[Seekoffer][workspace] ${action} failed`, error);
 }
 
-function getSupabaseMemberContext() {
+function getCloudflareMemberContext() {
   const session = getUserSession();
   if (!session || session.authProvider === 'anonymous' || !session.userId) {
     return null;
@@ -683,7 +690,7 @@ function getSupabaseMemberContext() {
 }
 
 function isActiveWorkspaceMember(userId: string) {
-  return getSupabaseMemberContext()?.userId === userId;
+  return getCloudflareMemberContext()?.userId === userId;
 }
 
 function releaseStaleWorkspaceHydration(userId: string) {
@@ -691,43 +698,6 @@ function releaseStaleWorkspaceHydration(userId: string) {
     hydratedWorkspaceUserId = '';
     hydrateWorkspacePromise = null;
   }
-}
-
-function mapNoticeRowToProject(row: Record<string, unknown>) {
-  if (!row) {
-    return null;
-  }
-
-  return normalizeManualProject({
-    id: String(row.id || '').trim(),
-    schoolName: String(row.school_name || row.schoolName || '').trim(),
-    departmentName: String(row.department_name || row.departmentName || '').trim(),
-    projectName: String(row.project_name || row.projectName || '').trim(),
-    projectType: String(row.project_type || row.projectType || '夏令营') as ProjectType,
-    discipline: String(row.discipline || '').trim(),
-    publishDate: String(row.publish_date || row.publishDate || '').trim(),
-    deadlineDate: String(row.deadline_date || row.deadlineDate || '').trim(),
-    eventStartDate: String(row.event_start_date || row.eventStartDate || '').trim(),
-    eventEndDate: String(row.event_end_date || row.eventEndDate || '').trim(),
-    applyLink: String(row.apply_link || row.applyLink || '').trim(),
-    sourceLink: String(row.source_link || row.sourceLink || '').trim(),
-    requirements: String(row.requirements || '').trim(),
-    materialsRequired: normalizeStringArray(row.materials_required || row.materialsRequired),
-    examInterviewInfo: String(row.exam_interview_info || row.examInterviewInfo || '').trim(),
-    contactInfo: String(row.contact_info || row.contactInfo || '').trim(),
-    remarks: String(row.remarks || '').trim(),
-    tags: normalizeStringArray(row.tags),
-    status: String(row.status || '') as PublicNoticeProject['status'],
-    year: Number(row.year || NOTICE_TARGET_YEAR),
-    deadlineLevel: String(row.deadline_level || row.deadlineLevel || 'future') as DeadlineLevel,
-    sourceSite: String(row.source_site || row.sourceSite || '').trim(),
-    collectedAt: String(row.collected_at || row.collectedAt || '').trim(),
-    updatedAt: String(row.updated_at || row.updatedAt || '').trim(),
-    lastCheckedAt: String(row.last_checked_at || row.lastCheckedAt || '').trim(),
-    isVerified: Boolean(row.is_verified ?? row.isVerified),
-    changeLog: (Array.isArray(row.change_log) ? row.change_log : row.changeLog || []) as PublicNoticeProject['changeLog'],
-    historyRecords: (Array.isArray(row.history_records) ? row.history_records : row.historyRecords || []) as PublicNoticeProject['historyRecords']
-  });
 }
 
 function mapApplicationRowToRecord(row: Record<string, unknown>) {
@@ -753,45 +723,86 @@ function mapApplicationRowToRecord(row: Record<string, unknown>) {
   });
 }
 
-function mapProjectToNoticeUpsert(project: PublicNoticeProject, userId: string, isPrivate: boolean) {
-  return {
-    id: project.id,
-    school_name: project.schoolName,
-    department_name: project.departmentName,
-    project_name: project.projectName,
-    project_type: project.projectType,
-    discipline: project.discipline,
-    publish_date: project.publishDate,
-    deadline_date: project.deadlineDate,
-    event_start_date: project.eventStartDate,
-    event_end_date: project.eventEndDate,
-    apply_link: project.applyLink,
-    source_link: project.sourceLink,
-    requirements: project.requirements,
-    materials_required: project.materialsRequired,
-    exam_interview_info: project.examInterviewInfo,
-    contact_info: project.contactInfo,
-    remarks: project.remarks,
-    tags: project.tags,
-    status: project.status,
-    year: project.year,
-    deadline_level: project.deadlineLevel,
-    source_site: project.sourceSite,
-    is_private: isPrivate,
-    collected_at: project.collectedAt,
-    updated_at: project.updatedAt,
-    last_checked_at: project.lastCheckedAt,
-    is_verified: project.isVerified,
-    change_log: project.changeLog,
-    history_records: project.historyRecords,
-    created_by: userId
-  };
+function profileHasMeaningfulContent(profile: UserProfile | null | undefined) {
+  if (!profile) {
+    return false;
+  }
+
+  return Object.values(profile).some((value) => String(value || '').trim());
 }
 
-function mapRecordToApplicationUpsert(record: UserProjectRecord, userId: string) {
+async function upsertRemoteManualProjects(
+  projects: PublicNoticeProject[],
+  sourceOwner: WorkspaceStorageOwner
+) {
+  // D1 deliberately exposes manual-project creation as an idempotent command,
+  // while it does not expose a bulk replacement endpoint. Existing manual
+  // entries remain durable in the account-scoped local snapshot until their
+  // create command is submitted from the add-entry flow.
+  void projects;
+  void sourceOwner;
+}
+
+async function upsertRemoteApplications(
+  records: UserProjectRecord[],
+  sourceOwner: WorkspaceStorageOwner
+) {
+  const context = getCloudflareMemberContext();
+  if (
+    !context ||
+    sourceOwner.kind !== 'member' ||
+    sourceOwner.userId !== context.userId ||
+    !records.length
+  ) {
+    return;
+  }
+
+  const ownedRecords = records.filter((record) => record.userId === context.userId);
+  if (!ownedRecords.length) {
+    return;
+  }
+
+  const remoteRecords = await fetchRemoteApplications(context.userId);
+  const remoteByProject = new Map(remoteRecords.map((record) => [record.projectId, record]));
+
+  for (const record of ownedRecords) {
+    let remote = remoteByProject.get(record.projectId);
+    if (!remote) {
+      try {
+        const created = await cloudflareRequest<{ id?: string; sync_revision?: number }>(
+          '/v1/me/applications',
+          { method: 'POST', body: JSON.stringify({ projectId: record.projectId }) },
+          true
+        );
+        remote = {
+          ...record,
+          userProjectId: String(created.id || ''),
+          syncRevision: Number(created.sync_revision || 1)
+        } as UserProjectRecord & { syncRevision?: number };
+      } catch (error) {
+        // A manual project may still be local-only. It will be retried after
+        // the explicit D1 manual-project create flow has produced its ID.
+        if (String((error as { code?: unknown })?.code || '') === 'NOTICE_UNAVAILABLE') continue;
+        throw error;
+      }
+    }
+
+    const remoteRevision = Number((remote as UserProjectRecord & { syncRevision?: number }).syncRevision || 1);
+    await cloudflareRequest(
+      `/v1/me/applications/${encodeURIComponent(String(remote.userProjectId))}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          expectedRevision: remoteRevision,
+          patch: mapRecordToApplicationPatch(record)
+        })
+      },
+      true
+    );
+  }
+}
+function mapRecordToApplicationPatch(record: UserProjectRecord) {
   return {
-    user_id: userId,
-    project_id: record.projectId,
     is_favorited: record.isFavorited,
     my_status: record.myStatus,
     priority_level: record.priorityLevel,
@@ -808,70 +819,6 @@ function mapRecordToApplicationUpsert(record: UserProjectRecord, userId: string)
     my_notes: record.myNotes,
     custom_reminder_enabled: record.customReminderEnabled
   };
-}
-
-function profileHasMeaningfulContent(profile: UserProfile | null | undefined) {
-  if (!profile) {
-    return false;
-  }
-
-  return Object.values(profile).some((value) => String(value || '').trim());
-}
-
-async function upsertRemoteManualProjects(
-  projects: PublicNoticeProject[],
-  sourceOwner: WorkspaceStorageOwner
-) {
-  const context = getSupabaseMemberContext();
-  if (
-    !context ||
-    sourceOwner.kind !== 'member' ||
-    sourceOwner.userId !== context.userId ||
-    !projects.length
-  ) {
-    return;
-  }
-
-  const supabase = getSupabaseBrowserClient();
-  const payload = projects.map((project) => mapProjectToNoticeUpsert(project, context.userId, true));
-
-  const { error } = await supabase.from('notices').upsert(payload, {
-    onConflict: 'id'
-  });
-
-  if (error) {
-    throw error;
-  }
-}
-
-async function upsertRemoteApplications(
-  records: UserProjectRecord[],
-  sourceOwner: WorkspaceStorageOwner
-) {
-  const context = getSupabaseMemberContext();
-  if (
-    !context ||
-    sourceOwner.kind !== 'member' ||
-    sourceOwner.userId !== context.userId ||
-    !records.length
-  ) {
-    return;
-  }
-
-  const ownedRecords = records.filter((record) => record.userId === context.userId);
-  if (!ownedRecords.length) {
-    return;
-  }
-
-  const supabase = getSupabaseBrowserClient();
-  const payload = ownedRecords.map((record) => mapRecordToApplicationUpsert(record, context.userId));
-  const { error } = await supabase.from('applications').upsert(payload, {
-    onConflict: 'user_id,project_id'
-  });
-
-  if (error) {
-    throw error;
-  }
 }
 
 const manualApplicationSyncCoordinator = createKeyedSyncRetryCoordinator({
@@ -943,7 +890,7 @@ async function assertApplicationQuota(currentCount: number) {
 }
 
 async function deleteRemoteApplication(projectId: string, sourceOwner: WorkspaceStorageOwner) {
-  const context = getSupabaseMemberContext();
+  const context = getCloudflareMemberContext();
   if (
     !context ||
     sourceOwner.kind !== 'member' ||
@@ -953,141 +900,109 @@ async function deleteRemoteApplication(projectId: string, sourceOwner: Workspace
     return;
   }
 
-  const supabase = getSupabaseBrowserClient();
-  const { error } = await supabase
-    .from('applications')
-    .delete()
-    .eq('user_id', context.userId)
-    .eq('project_id', projectId);
-
-  if (error) {
-    throw error;
-  }
+  const remote = (await fetchRemoteApplications(context.userId)).find((record) => record.projectId === projectId);
+  if (!remote) return;
+  const revision = Number((remote as UserProjectRecord & { syncRevision?: number }).syncRevision || 1);
+  await cloudflareRequest(
+    `/v1/me/applications/${encodeURIComponent(remote.userProjectId)}`,
+    { method: 'DELETE', body: JSON.stringify({ expectedRevision: revision }) },
+    true
+  );
 }
 
 async function deleteRemoteManualProject(projectId: string, sourceOwner: WorkspaceStorageOwner) {
-  const context = getSupabaseMemberContext();
-  if (
-    !context ||
-    sourceOwner.kind !== 'member' ||
-    sourceOwner.userId !== context.userId ||
-    !projectId
-  ) {
-    return;
-  }
-
-  const supabase = getSupabaseBrowserClient();
-  const { error } = await supabase
-    .from('notices')
-    .delete()
-    .eq('id', projectId)
-    .eq('created_by', context.userId)
-    .eq('is_private', true);
-
-  if (error) {
-    throw error;
-  }
+  void projectId;
+  void sourceOwner;
 }
 
 async function upsertRemoteProfile(profile: UserProfile | null | undefined) {
-  const context = getSupabaseMemberContext();
+  const context = getCloudflareMemberContext();
   if (!context || !profileHasMeaningfulContent(profile)) {
     return;
   }
-
-  const supabase = getSupabaseBrowserClient();
-  const { error } = await supabase.from('profiles').upsert(
+  const remote = await fetchRemoteProfile(context.userId);
+  const expectedRevision = Number(remote?.sync_revision || 1);
+  await cloudflareRequest(
+    '/v1/me/profile',
     {
-      id: context.userId,
-      nickname: profile?.nickname || '',
-      age: profile?.age || '',
-      undergraduate_school: profile?.undergraduateSchool || '',
-      major: profile?.major || '',
-      grade: profile?.grade || '大四',
-      target_major: profile?.targetMajor || '',
-      target_region: profile?.targetRegion || ''
+      method: 'PUT',
+      body: JSON.stringify({
+        expectedRevision,
+        patch: {
+          nickname: profile?.nickname || '',
+          age: profile?.age || '',
+          undergraduate_school: profile?.undergraduateSchool || '',
+          major: profile?.major || '',
+          grade: profile?.grade || '大四',
+          target_major: profile?.targetMajor || '',
+          target_region: profile?.targetRegion || ''
+        }
+      })
     },
-    {
-      onConflict: 'id'
-    }
+    true
   );
-
-  if (error) {
-    throw error;
-  }
 }
 
 async function fetchRemoteManualProjects(expectedUserId?: string) {
-  const context = getSupabaseMemberContext();
-  if (!context || (expectedUserId && context.userId !== expectedUserId)) {
-    return [] as PublicNoticeProject[];
-  }
-
-  const supabase = getSupabaseBrowserClient();
-  const { data, error } = await supabase
-    .from('notices')
-    .select('*')
-    .eq('created_by', context.userId)
-    .eq('is_private', true)
-    .order('updated_at_ts', { ascending: false });
-
-  if (error) {
-    throw error;
-  }
-
-  return (data || []).map((row) => mapNoticeRowToProject(row)).filter(Boolean) as PublicNoticeProject[];
+  void expectedUserId;
+  return [] as PublicNoticeProject[];
 }
 
 async function fetchRemoteApplications(expectedUserId?: string) {
-  const context = getSupabaseMemberContext();
+  const context = getCloudflareMemberContext();
   if (!context || (expectedUserId && context.userId !== expectedUserId)) {
     return [] as UserProjectRecord[];
   }
 
-  const supabase = getSupabaseBrowserClient();
-  const { data, error } = await supabase
-    .from('applications')
-    .select('*')
-    .eq('user_id', context.userId)
-    .order('updated_at', { ascending: false });
-
-  if (error) {
-    throw error;
-  }
-
-  return (data || []).map((row) => mapApplicationRowToRecord(row));
+  const rows: Record<string, unknown>[] = [];
+  let cursor = '';
+  do {
+    const suffix = cursor ? `?after=${encodeURIComponent(cursor)}` : '';
+    const result = await cloudflareRequest<{
+      items?: Record<string, unknown>[];
+      nextCursor?: string | null;
+    }>(`/v1/me/applications${suffix}`, {}, true);
+    const items = Array.isArray(result.items) ? result.items : [];
+    rows.push(...items);
+    cursor = String(result.nextCursor || '');
+    if (!items.length) break;
+  } while (cursor);
+  return rows.map((row) => ({ ...mapApplicationRowToRecord(row), syncRevision: Number(row.sync_revision || 1) } as UserProjectRecord));
 }
 
 async function fetchRemoteProfile(expectedUserId?: string) {
-  const context = getSupabaseMemberContext();
+  const context = getCloudflareMemberContext();
   if (!context || (expectedUserId && context.userId !== expectedUserId)) {
     return null;
   }
 
-  const supabase = getSupabaseBrowserClient();
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', context.userId).maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    return null;
-  }
-
+  const row = await cloudflareRequest<({
+    id?: string;
+    nickname?: string;
+    age?: string | number;
+    undergraduate_school?: string;
+    major?: string;
+    grade?: string;
+    target_major?: string;
+    target_region?: string;
+    sync_revision?: number;
+  }) | null>('/v1/me/profile', {}, true);
+  if (!row?.id) return null;
   return {
-    nickname: String(data.nickname || ''),
-    age: String(data.age || ''),
-    undergraduateSchool: String(data.undergraduate_school || ''),
-    major: String(data.major || ''),
-    grade: String(data.grade || '大四'),
-    targetMajor: String(data.target_major || ''),
-    targetRegion: String(data.target_region || '')
-  } satisfies UserProfile;
+    id: row.id,
+    nickname: String(row.nickname || ''),
+    age: String(row.age || ''),
+    undergraduateSchool: String(row.undergraduate_school || ''),
+    major: String(row.major || ''),
+    grade: String(row.grade || '大四'),
+    targetMajor: String(row.target_major || ''),
+    targetRegion: String(row.target_region || ''),
+    sync_revision: Number(row.sync_revision || 1)
+  } satisfies RemoteProfile;
 }
 
-async function hydrateWorkspaceFromSupabase() {
-  const context = getSupabaseMemberContext();
+async function hydrateWorkspaceFromCloudflare() {
+  const context = getCloudflareMemberContext();
   if (!context) {
     hydratedWorkspaceUserId = '';
     hydrateWorkspacePromise = null;
@@ -1196,7 +1111,7 @@ async function hydrateWorkspaceFromSupabase() {
  */
 export async function synchronizeApplicationWorkspace(expectedUserId: string) {
   const userId = expectedUserId.trim();
-  const context = getSupabaseMemberContext();
+  const context = getCloudflareMemberContext();
   if (!userId || !context || context.userId !== userId || !isActiveWorkspaceMember(userId)) {
     throw new Error('The active workspace account changed before synchronization started.');
   }
@@ -1257,35 +1172,23 @@ export async function synchronizeApplicationWorkspace(expectedUserId: string) {
 }
 
 async function readRemotePublicNotices() {
-  const supabase = getSupabaseBrowserClient();
-  const rows: Record<string, unknown>[] = [];
+  const [latest, deadlines] = await Promise.all([
+    cloudflareRequest<{ items?: Record<string, unknown>[] }>(
+      `/v1/notices?page=1&pageSize=${PUBLIC_NOTICE_COMPACT_PAGE_SIZE}&year=${NOTICE_TARGET_YEAR}&sort=publish`
+    ),
+    cloudflareRequest<{ items?: Record<string, unknown>[] }>(
+      `/v1/notices?page=1&pageSize=${PUBLIC_NOTICE_COMPACT_PAGE_SIZE}&year=${NOTICE_TARGET_YEAR}&status=报名中&deadline=within7days&sort=deadline`
+    )
+  ]);
+  const byId = new Map<string, Record<string, unknown>>();
+  [...(latest.items || []), ...(deadlines.items || [])].forEach((row) => {
+    const id = String(row.id || '').trim();
+    if (id) byId.set(id, row);
+  });
 
-  for (let from = 0; from < PUBLIC_NOTICE_QUERY_LIMIT; from += PUBLIC_NOTICE_QUERY_PAGE_SIZE) {
-    const to = Math.min(from + PUBLIC_NOTICE_QUERY_PAGE_SIZE - 1, PUBLIC_NOTICE_QUERY_LIMIT - 1);
-    const { data, error } = await supabase
-      .from('notices')
-      .select('*')
-      .eq('year', NOTICE_TARGET_YEAR)
-      .eq('is_private', false)
-      .eq('admin_status', 'published')
-      .is('admin_deleted_at', null)
-      .order('publish_date', { ascending: false })
-      .order('id', { ascending: true })
-      .range(from, to);
-
-    if (error) {
-      throw error;
-    }
-
-    const pageRows = (data || []) as Record<string, unknown>[];
-    rows.push(...pageRows);
-
-    if (pageRows.length < PUBLIC_NOTICE_QUERY_PAGE_SIZE) {
-      break;
-    }
-  }
-
-  return rows.map((row) => mapNoticeRowToProject(row)).filter(Boolean) as PublicNoticeProject[];
+  return [...byId.values()]
+    .map((row) => mapD1NoticeRowToProject(row))
+    .filter(Boolean) as PublicNoticeProject[];
 }
 
 export function watchApplicationTable(callback: () => void) {
@@ -1316,7 +1219,7 @@ export async function fetchPublicNotices(options: { refresh?: boolean } = {}) {
           return filterMainNoticeProjects(baseNoticeProjects);
         }
 
-        // Once Supabase has data, it becomes the moderation source of truth.
+        // Once Cloudflare D1 has data, it becomes the moderation source of truth.
         // Local JSON is only a disaster-recovery fallback; otherwise admin hide/delete
         // actions would be reintroduced by the bundled static seed data.
         return sortProjectsByFreshness(filterMainNoticeProjects(remoteProjects));
@@ -1329,21 +1232,54 @@ export async function fetchPublicNotices(options: { refresh?: boolean } = {}) {
   return publicNoticeCachePromise;
 }
 
-async function getAllProjectsAsync(owner = getCurrentWorkspaceStorageContext().owner) {
-  const noticeProjects = await fetchPublicNotices();
-  const manualProjects = readStoredManualProjects(owner);
-  const projectMap = new Map<string, PublicNoticeProject>();
+export async function fetchNoticeById(id: string) {
+  const normalizedId = id.trim();
+  if (!normalizedId) return null;
+  const owner = getCurrentWorkspaceStorageContext().owner;
+  const manual = readStoredManualProjects(owner).find((item) => item.id === normalizedId);
+  if (manual) return manual;
 
-  [...noticeProjects, ...manualProjects].forEach((project) => {
-    projectMap.set(project.id, project);
-  });
-
-  return Array.from(projectMap.values());
+  try {
+    const row = await cloudflareRequest<Record<string, unknown>>(
+      `/v1/notices/${encodeURIComponent(normalizedId)}`
+    );
+    return mapD1NoticeRowToProject(row);
+  } catch {
+    return baseNoticeProjects.find((item) => item.id === normalizedId) || null;
+  }
 }
 
-export async function fetchNoticeById(id: string) {
-  const source = await getAllProjectsAsync();
-  return source.find((item) => item.id === id) || null;
+function buildUnavailableNoticeProject(projectId: string): PublicNoticeProject {
+  return {
+    id: projectId,
+    schoolName: '原通知暂不可用',
+    departmentName: '你的申请记录仍已保留',
+    projectName: '这条通知可能已下架、删除或暂时无法访问',
+    projectType: '正式推免',
+    discipline: '原通知信息暂不可用',
+    publishDate: '',
+    deadlineDate: '',
+    eventStartDate: '',
+    eventEndDate: '',
+    applyLink: '',
+    sourceLink: '',
+    requirements: '',
+    materialsRequired: [],
+    examInterviewInfo: '',
+    contactInfo: '',
+    remarks: '',
+    tags: ['申请记录已保留'],
+    status: '报名中',
+    year: NOTICE_TARGET_YEAR,
+    deadlineLevel: 'future',
+    sourceSite: '通知暂不可用',
+    collectedAt: '',
+    updatedAt: '',
+    lastCheckedAt: '',
+    isVerified: false,
+    changeLog: [],
+    historyRecords: []
+  };
 }
 
 export async function fetchDeadlineNotices() {
@@ -1352,7 +1288,7 @@ export async function fetchDeadlineNotices() {
 }
 
 export async function fetchUserProjects() {
-  await hydrateWorkspaceFromSupabase();
+  await hydrateWorkspaceFromCloudflare();
   return readStoredRecords();
 }
 
@@ -1360,20 +1296,54 @@ export async function fetchApplicationRows(expectedUserId?: string) {
   const owner: WorkspaceStorageOwner = expectedUserId
     ? { kind: 'member', userId: expectedUserId }
     : getCurrentWorkspaceStorageContext().owner;
-  await hydrateWorkspaceFromSupabase();
+  await hydrateWorkspaceFromCloudflare();
   const records = readStoredRecords(owner);
-  const projects = await getAllProjectsAsync(owner);
-  const projectMap = new Map(projects.map((project) => [project.id, project]));
+  const manualProjects = readStoredManualProjects(owner);
+  const projectMap = new Map<string, PublicNoticeProject>(
+    [...baseNoticeProjects, ...manualProjects].map((project) => [project.id, project])
+  );
+
+  const projectIds = records.map((record) => record.projectId).filter(Boolean);
+  if (projectIds.length) {
+    const context = getCloudflareMemberContext();
+    try {
+      const result =
+        owner.kind === 'member' && context?.userId === owner.userId
+          ? await cloudflareRequest<{ items?: Record<string, unknown>[] }>(
+              '/v1/me/notices/by-ids',
+              { method: 'POST', body: JSON.stringify({ ids: projectIds }) },
+              true
+            )
+          : await cloudflareRequest<{ items?: Record<string, unknown>[] }>(
+              '/v1/notices/by-ids',
+              { method: 'POST', body: JSON.stringify({ ids: projectIds }) }
+            );
+      (result.items || [])
+        .map((row) => mapD1NoticeRowToProject(row))
+        .filter(Boolean)
+        .forEach((project) => projectMap.set(project!.id, project!));
+    } catch {
+      // Local seed data remains available when the public API is rate limited
+      // or temporarily unavailable. The row stays visible with its original
+      // project id if neither source contains the project.
+    }
+  }
 
   const rows = records.reduce<ApplicationRow[]>((list, item) => {
     const project = projectMap.get(item.projectId);
-    if (project) {
-      list.push({ item, project });
-    }
+    list.push({
+      item,
+      project: project || buildUnavailableNoticeProject(item.projectId),
+      noticeAvailable: Boolean(project),
+      noticeAvailability: project ? 'available' : 'lookup-failed'
+    });
     return list;
   }, []);
 
-  return rows.sort((left, right) => left.project.deadlineDate.localeCompare(right.project.deadlineDate));
+  return rows.sort((left, right) => {
+    if (left.noticeAvailable !== right.noticeAvailable) return left.noticeAvailable ? -1 : 1;
+    return left.project.deadlineDate.localeCompare(right.project.deadlineDate);
+  });
 }
 
 /**
@@ -1396,14 +1366,22 @@ export function readLocalApplicationRows(expectedUserId: string) {
   return records
     .reduce<ApplicationRow[]>((rows, item) => {
       const project = projectMap.get(item.projectId);
-      if (project) rows.push({ item, project });
+      rows.push({
+        item,
+        project: project || buildUnavailableNoticeProject(item.projectId),
+        noticeAvailable: Boolean(project),
+        noticeAvailability: project ? 'available' : 'lookup-failed'
+      });
       return rows;
     }, [])
-    .sort((left, right) => left.project.deadlineDate.localeCompare(right.project.deadlineDate));
+    .sort((left, right) => {
+      if (left.noticeAvailable !== right.noticeAvailable) return left.noticeAvailable ? -1 : 1;
+      return left.project.deadlineDate.localeCompare(right.project.deadlineDate);
+    });
 }
 
 export async function addProjectToApplicationTable(projectId: string) {
-  await hydrateWorkspaceFromSupabase();
+  await hydrateWorkspaceFromCloudflare();
   const storageOwner = getCurrentWorkspaceStorageContext().owner;
   const current = readStoredRecords(storageOwner);
   const existing = current.find((item) => item.projectId === projectId);
@@ -1563,7 +1541,7 @@ export async function createManualApplicationEntry(
 }
 
 export async function saveUserProfileToWorkspace(profile: UserProfile) {
-  const context = getSupabaseMemberContext();
+  const context = getCloudflareMemberContext();
   if (!context) {
     return false;
   }
@@ -1573,7 +1551,7 @@ export async function saveUserProfileToWorkspace(profile: UserProfile) {
 }
 
 export async function updateUserProject(userProjectId: string, patch: Partial<UserProjectRecord>) {
-  await hydrateWorkspaceFromSupabase();
+  await hydrateWorkspaceFromCloudflare();
   const storageOwner = getCurrentWorkspaceStorageContext().owner;
   const recordUserId = getRecordUserIdForOwner(storageOwner);
   const current = readStoredRecords(storageOwner);
@@ -1616,7 +1594,7 @@ export async function updateUserProject(userProjectId: string, patch: Partial<Us
 }
 
 export async function deleteUserProject(userProjectId: string) {
-  await hydrateWorkspaceFromSupabase();
+  await hydrateWorkspaceFromCloudflare();
 
   const storageOwner = getCurrentWorkspaceStorageContext().owner;
   const currentRecords = readStoredRecords(storageOwner);

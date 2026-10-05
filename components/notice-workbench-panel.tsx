@@ -11,7 +11,6 @@ import {
   type ApplicationRow
 } from '@/lib/cloudbase-data';
 import { openAuthModal, writeAuthIntent } from '@/lib/auth-intent';
-import { trackDesktopPendingWrite } from '@/lib/desktop-pending-writes';
 import { useUserSessionState } from '@/hooks/use-user-session';
 import {
   materialChecklistDefinitions,
@@ -83,9 +82,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
         return;
       }
 
-      await trackDesktopPendingWrite('notice-project-add', () =>
-        addProjectToApplicationTable(projectId)
-      );
+      await addProjectToApplicationTable(projectId);
       const rows = await fetchApplicationRows();
       const current = rows.find((item) => item.project.id === projectId) || null;
       setRow(current);
@@ -102,9 +99,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
 
     setSaving(true);
     try {
-      const next = await trackDesktopPendingWrite('notice-project-update', () =>
-        updateUserProject(row.item.userProjectId, patch)
-      );
+      const next = await updateUserProject(row.item.userProjectId, patch);
       if (next) {
         const rows = await fetchApplicationRows();
         const current = rows.find((item) => item.project.id === projectId) || null;
@@ -126,7 +121,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
   if (!ready) {
     return (
       <section className="surface-card rounded-[32px] p-6 text-sm text-slate-500">
-        正在检查申请状态...
+        正在检查你的工作台状态...
       </section>
     );
   }
@@ -134,7 +129,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
   if (!loggedIn) {
     return (
       <section className="surface-card rounded-[32px] p-6">
-        <div className="text-lg font-semibold text-ink">加入申请</div>
+        <div className="text-lg font-semibold text-ink">加入我的工作台</div>
         <p className="mt-3 text-sm leading-7 text-slate-600">
           登录后可把这条通知直接接入申请管理流程，并继续记录状态、备注和提醒。
         </p>
@@ -153,14 +148,14 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
   if (!row) {
     return (
       <section className="surface-card rounded-[32px] p-6">
-        <div className="text-lg font-semibold text-ink">加入申请</div>
+        <div className="text-lg font-semibold text-ink">加入我的工作台</div>
         <p className="mt-3 text-sm leading-7 text-slate-600">
           一旦加入，这条通知会立刻接到你的申请表、待办和提醒逻辑里，后续就不需要重复整理。
         </p>
         <div className="mt-5 grid gap-3 rounded-[24px] bg-slate-50 p-4 text-sm text-slate-600">
           <div>默认状态：已收藏</div>
           <div>默认提醒：开启 7 天 / 3 天 / 当天提醒</div>
-          <div>默认动作：后续可在全部申请中继续补充材料和备注</div>
+          <div>默认动作：后续可在工作台里继续补充材料和备注</div>
         </div>
         <button
           onClick={handleJoin}
@@ -168,7 +163,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
           className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white"
         >
           {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          加入申请
+          加入我的工作台
         </button>
       </section>
     );
@@ -177,7 +172,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
   return (
     <section className="surface-card rounded-[32px] p-6">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-lg font-semibold text-ink">全部申请</div>
+        <div className="text-lg font-semibold text-ink">我的工作台</div>
         <span className="rounded-full bg-brand-cream px-3 py-1 text-xs font-semibold text-brand">
           材料完成度 {progress}%
         </span>
@@ -258,7 +253,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
           className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white"
         >
           {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          保存到全部申请
+          保存到工作台
         </button>
       </div>
     </section>
