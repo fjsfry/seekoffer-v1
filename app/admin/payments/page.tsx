@@ -10,8 +10,8 @@ type PaymentMonitor = {
   checkedAt: string;
   window: { from: string; to: string };
   provider: { name: string; configured: boolean; callbackPath: string };
-  orders: { total: number; pending: number; fulfilled: number; expired: number; refunded: number; lastCreatedAt: string | null };
-  payments: { total: number; creating: number; createUnknown: number; pending: number; succeeded: number; failed: number; closed: number; needsReview: number; terminalOther: number; succeededAmountCents: number; lastUpdatedAt: string | null };
+  orders: { total: number; pending: number; stalePending: number; fulfilled: number; expired: number; refunded: number; lastCreatedAt: string | null };
+  payments: { total: number; creating: number; staleCreating: number; createUnknown: number; staleCreateUnknown: number; pending: number; stalePending: number; succeeded: number; failed: number; closed: number; needsReview: number; terminalOther: number; succeededAmountCents: number; lastUpdatedAt: string | null };
   callbacks: { total: number; successful: number; stateChanged: number; needsReview: number; lastAt: string | null; lastSuccessAt: string | null; lastReviewAt: string | null };
   alerts: Array<{ code: string; severity: 'info' | 'warning' | 'critical'; message: string }>;
 };
@@ -75,7 +75,7 @@ export default function AdminPaymentsPage() {
                   <span className={adminClassNames('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', alert.severity === 'critical' ? 'bg-rose-50 text-rose-600' : alert.severity === 'warning' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600')}>
                     {alert.severity === 'info' ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
                   </span>
-                  <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="font-semibold text-slate-800">{alert.message}</span><AdminStatusBadge status={alert.severity === 'critical' ? '失败' : alert.severity === 'warning' ? '处理中' : '正常'} /></div><p className="mt-1 text-sm text-slate-500">{alert.code === 'payments_need_review' ? '先核对订单、支付平台状态和履约记录，再决定是否补发权益。' : alert.code === 'callback_not_seen' ? '可先等待回调；若订单已在支付平台完成，使用订单页的状态核对流程。' : alert.message}</p></div>
+                  <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="font-semibold text-slate-800">{alert.message}</span><AdminStatusBadge status={alert.severity === 'critical' ? '失败' : alert.severity === 'warning' ? '处理中' : '正常'} /></div><p className="mt-1 text-sm text-slate-500">{alert.code === 'payments_need_review' || alert.code === 'payment_create_unknown' ? '先核对订单、支付平台状态和履约记录，再决定是否补发权益。' : alert.code === 'callback_not_seen' ? '先检查 JianPay 回调可达性和商户配置，再核对支付平台订单状态。' : alert.code === 'payment_create_stuck' || alert.code === 'payment_pending_stale' ? '先核对支付平台订单状态；确认未支付后再关闭订单，确认已支付则进入人工复核。' : alert.message}</p></div>
                 </div>
               ))}
             </div>
@@ -98,7 +98,10 @@ export default function AdminPaymentsPage() {
               ['待支付', data?.payments.pending ?? 0],
               ['创建中', data?.payments.creating ?? 0],
               ['结果未知', data?.payments.createUnknown ?? 0],
-              ['失败/关闭', (data?.payments.failed ?? 0) + (data?.payments.closed ?? 0)]
+              ['失败/关闭', (data?.payments.failed ?? 0) + (data?.payments.closed ?? 0)],
+              ['超时待支付', data?.payments.stalePending ?? 0],
+              ['超时创建中', data?.payments.staleCreating ?? 0],
+              ['超时结果未知', data?.payments.staleCreateUnknown ?? 0]
             ].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3"><div className="text-xs text-slate-500">{label}</div><div className="mt-1 text-2xl font-semibold text-slate-950">{value}</div></div>)}
           </div>
         </AdminPanel>
