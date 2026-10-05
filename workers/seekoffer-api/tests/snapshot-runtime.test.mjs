@@ -124,9 +124,11 @@ test('16-item list uses a persistent count cache, returns no internal fields, hi
 test('public metadata uses one bounded shared snapshot across filters and ingest versions',async()=>{
   const {db,request,queries}=setup();
   const fullScans=()=>queries.filter(q=>q.startsWith("SELECT catalog_projection FROM main__notices n WHERE n.is_private=0")&&!q.includes(' ORDER BY ')).length;
-  assert.equal((await request('/v1/notices?page=1')).status,200);assert.equal(fullScans(),1);
+  const countScans=()=>queries.filter(q=>q.startsWith('SELECT count(*) AS total FROM main__notices')).length;
+  assert.equal((await request('/v1/notices?page=1')).status,200);assert.equal(fullScans(),1);const initialCountScans=countScans();
   assert.equal((await request('/v1/notices?page=1&category=工学')).status,200);assert.equal(fullScans(),1);
   db.prepare("UPDATE _runtime_state SET value=? WHERE key='notice_version'").run('fixture-v2');
+  assert.equal((await request('/v1/notices?page=1')).status,200);assert.equal(fullScans(),1);assert.equal(countScans(),initialCountScans);
   assert.equal((await request('/v1/notices?page=1&region=北京')).status,200);assert.equal(fullScans(),1);
   db.close();
 });

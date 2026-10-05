@@ -17,6 +17,8 @@ export const summaryProjectionSql="json_object('summary',json_extract(catalog_pr
 type Metadata={stats:{total2026:number;todayUpdates:number;deadlineWithin3Days:number};sideData:{urgentProjects:unknown[];latestProjects:unknown[];todaySchoolUpdates:{date:string;hasTodayRows:boolean;rows:[string,number][]};latestPublishDate:string;topColleges:CollegeNoticeStats[]};facets:{regions:string[];schools:string[];categories:string[];disciplines:string[];collegeStats:CollegeNoticeStats[]};expiresAt:number};
 const PUBLIC_METADATA_CACHE_VERSION='public-metadata-v3';
 const PUBLIC_METADATA_TTL=15*60*1000;
+const PUBLIC_COUNT_CACHE_VERSION='public-count-v3';
+const PUBLIC_COUNT_TTL=5*60*1000;
 
 // Stores only bounded public aggregate data. Each lease is shared across
 // instances, failures back off, and callers can choose whether a cache entry
@@ -159,7 +161,10 @@ export async function publicNoticePage(db:D1Database,params:URLSearchParams,now=
   // incremental sync from multiplying D1 row reads while keeping the list
   // response itself version-checked below.
   const meta=await cacheReader(db,PUBLIC_METADATA_CACHE_VERSION,'metadata:global',now,async()=>{const value=await metadata(db,'全部','全部',now);return{value,expiresAt:value.expiresAt};});
- const count=await cacheReader(db,version,'count:'+query.countKey,now,async()=>({value:Number(await db.prepare('SELECT count(*) total FROM main__notices n WHERE '+query.where).bind(...query.values).first('total')),expiresAt:meta.value.expiresAt}));
+  // Counts are display metadata, not an authorization decision. Keep them
+  // briefly stale and independent from the per-batch notice version so a
+  // crawler refresh cannot force another filtered table scan for every user.
+  const count=await cacheReader(db,PUBLIC_COUNT_CACHE_VERSION,'count:'+query.countKey,now,async()=>({value:Number(await db.prepare('SELECT count(*) total FROM main__notices n WHERE '+query.where).bind(...query.values).first('total')),expiresAt:Math.min(meta.value.expiresAt,now+PUBLIC_COUNT_TTL)}));
  const total=count.value,totalPages=Math.max(1,Math.ceil(total/query.pageSize)),page=Math.min(query.page,totalPages);
  const rows=await db.prepare('SELECT catalog_projection FROM main__notices n WHERE '+query.where+' ORDER BY '+query.order+' LIMIT ? OFFSET ?').bind(...query.values,query.pageSize,(page-1)*query.pageSize).all<ProjectionRow>();
  const finalVersion=await db.prepare("SELECT value FROM _runtime_state WHERE key='notice_version'").first<string>('value');
