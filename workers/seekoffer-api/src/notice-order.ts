@@ -2,6 +2,7 @@ import {ApiError} from './auth';
 type Row=Record<string,unknown>;
 type Order={sourceRank:number;schoolRank:number};
 const compare=new Intl.Collator('zh-CN').compare;
+function stableRank(value:string){let hash=2166136261;for(const char of value){hash^=char.codePointAt(0)||0;hash=Math.imul(hash,16777619);}return 1000000000+(hash>>>0)%100000000;}
 function previous(row:Row|null):Order&{schoolName:string}|null{
  if(!row?.catalog_projection||row.admin_status!=='published'||row.is_private||row.admin_deleted_at||row.source_site==='用户手动录入'||String(row.id).startsWith('custom-'))return null;
  try{const p=JSON.parse(String(row.catalog_projection));if(!Number.isFinite(p.sourceRank)||!Number.isFinite(p.schoolRank)||typeof p.schoolName!=='string')throw Error();return p;}catch{throw new ApiError(503,'NOTICE_ORDER_INVALID');}
@@ -14,6 +15,21 @@ export async function prepareNoticeOrder(db:D1Database,changes:{before:Row|null;
  const orders=new Map<string,Order>();
  const needing=visible.filter(c=>{const p=previous(c.before);if(p&&p.schoolName===c.after.school_name){orders.set(String(c.after.id),p);return false;}return true;});
  if(needing.length){
+  if(rowsGuarded){
+   // Crawler batches are already CAS-guarded. Look up only the affected
+   // schools; the historical global GROUP BY scanned the whole notice table
+   // and exhausted D1's free row-read budget on every small batch.
+   const names=[...new Set(needing.map(c=>String(c.after.school_name||'')).filter(Boolean))];
+   const known=new Map<string,Order>();
+   if(names.length){
+    const rows=await db.prepare("SELECT catalog_projection FROM main__notices WHERE school_name IN ("+names.map(()=>'?').join(',')+") AND catalog_projection IS NOT NULL AND is_private=0 AND admin_status='published' AND admin_deleted_at IS NULL AND source_site<>'用户手动录入' AND id NOT LIKE 'custom-%'").bind(...names).all<{catalog_projection:string}>();
+    for(const row of rows.results){try{const parsed=JSON.parse(String(row.catalog_projection));if(typeof parsed.schoolName==='string'&&Number.isFinite(parsed.schoolRank)&&Number.isFinite(parsed.sourceRank)&&!known.has(parsed.schoolName))known.set(parsed.schoolName,{schoolRank:Number(parsed.schoolRank),sourceRank:Number(parsed.sourceRank)});}catch{/* Invalid historical projections are repaired by the full reconciliation. */}}
+   }
+   for(const c of needing){
+    const id=String(c.after.id),name=String(c.after.school_name||''),existing=known.get(name);
+    orders.set(id,existing||{sourceRank:stableRank(id),schoolRank:stableRank(name)});
+   }
+  } else {
   const result=await db.prepare("SELECT json_extract(catalog_projection,'$.schoolName') name,min(json_extract(catalog_projection,'$.schoolRank')) low,max(json_extract(catalog_projection,'$.schoolRank')) high,max(json_extract(catalog_projection,'$.sourceRank')) source FROM main__notices WHERE catalog_projection IS NOT NULL AND is_private=0 AND admin_status='published' AND admin_deleted_at IS NULL AND source_site<>'用户手动录入' AND id NOT LIKE 'custom-%' GROUP BY json_extract(catalog_projection,'$.schoolName') LIMIT 1001").all<{name:string;low:number;high:number;source:number}>();
   if(result.results.length>1000)throw new ApiError(503,'NOTICE_ORDER_REBUILD_REQUIRED');
   const schools=result.results.map(r=>({name:r.name,rank:r.low})).sort((a,b)=>compare(a.name,b.name));
@@ -26,6 +42,7 @@ export async function prepareNoticeOrder(db:D1Database,changes:{before:Row|null;
     if(!Number.isFinite(rank)||rank===left||rank===right)throw new ApiError(503,'NOTICE_ORDER_REBUILD_REQUIRED');school={name,rank};schools.splice(at,0,school);
    }
    orders.set(String(c.after.id),{sourceRank:previous(c.before)?.sourceRank??nextSource++,schoolRank:school.rank});
+  }
   }
  }
  const guard='notice-order:'+crypto.randomUUID();
