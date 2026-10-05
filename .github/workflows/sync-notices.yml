@@ -16,6 +16,7 @@ on:
       - 'scripts/notice-d1-transport.mjs'
       - 'scripts/notice-sync-report.mjs'
       - 'scripts/verify-notice-website-sync.mjs'
+      - 'scripts/d1-readiness-preflight.mjs'
       - 'tests/notice-d1-transport.test.mjs'
       - 'tests/notice-website-sync.test.mjs'
       - 'lib/notice-quality.ts'
@@ -77,8 +78,9 @@ jobs:
       REQUEST_TIMEOUT_MS: '15000'
       MAX_RATE_LIMIT_RETRY_AFTER_SECONDS: '30'
       DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
-      NOTICE_SYNC_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-sync.json
-      NOTICE_WEBSITE_RECEIPT_PATH: ${{ runner.temp }}/seekoffer-notice-website.json
+      NOTICE_SYNC_RECEIPT_PATH: ${{ github.workspace }}/.seekoffer-notice-sync.json
+      NOTICE_WEBSITE_RECEIPT_PATH: ${{ github.workspace }}/.seekoffer-notice-website.json
+      D1_PREFLIGHT_RECEIPT_PATH: ${{ github.workspace }}/.seekoffer-d1-preflight.json
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -93,9 +95,25 @@ jobs:
       - name: Check D1 transport boundaries
         run: node --test tests/notice-d1-transport.test.mjs tests/notice-website-sync.test.mjs
 
+      - name: Check D1 readiness before acquisition
+        id: d1_preflight
+        if: ${{ env.DRY_RUN != 'true' }}
+        run: node scripts/d1-readiness-preflight.mjs
+
       - name: Sync notices through authenticated D1 ingestion
         id: ingest
+        if: ${{ env.DRY_RUN == 'true' || steps.d1_preflight.outputs.ready == 'true' }}
         run: npm run sync:notices:github
+
+      - name: Record deferred sync due to D1 quota
+        if: ${{ steps.d1_preflight.outputs.reason == 'D1_SERVICE_QUOTA_EXCEEDED' }}
+        run: |
+          {
+            echo '## Notice sync deferred'
+            echo
+            echo 'Cloudflare D1 free-tier read quota is exhausted. No source crawl or write was attempted.'
+            echo 'The next scheduled run will retry automatically after the quota window resets.'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify live website ordering and detail
         if: ${{ !cancelled() && steps.ingest.outcome == 'success' && env.DRY_RUN != 'true' }}
@@ -107,8 +125,9 @@ jobs:
         with:
           name: notice-sync-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/seekoffer-notice-sync.json
-            ${{ runner.temp }}/seekoffer-notice-website.json
+            ${{ github.workspace }}/.seekoffer-notice-sync.json
+            ${{ github.workspace }}/.seekoffer-notice-website.json
+            ${{ github.workspace }}/.seekoffer-d1-preflight.json
           if-no-files-found: ignore
           retention-days: 14
 
