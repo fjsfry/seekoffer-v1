@@ -29,6 +29,12 @@ import {publicNoticePage} from './public-notice-page.ts';
 export interface SnapshotEnv extends AuthConfig,BootstrapConfig,AnalyticsConfig,CommercialConfig {CORE:D1Database;MODE:'local'|'preview'|'production';ALLOWED_ORIGINS:string;PREVIEW_ACCESS_TOKEN?:string;BUSINESS_WRITES_ENABLED?:string;PUBLIC_READ_ENABLED?:string;PAYMENT_PROCESSING_ENABLED?:string;OPERATIONS_WRITES_ENABLED?:string;JIANPAY_CLIENT_NO?:string;JIANPAY_MERCHANT_KEY?:string;INGEST_ENABLED?:string;SEEKOFFER_INGEST_SECRET?:string;NATIVE_OAUTH_CLIENT_ID?:string;EXTENSION_OAUTH_CLIENT_ID?:string;LICENSE_ENABLED?:string;LICENSE_ATTEMPTS_PER_DAY?:string;ACCOUNT_ENTITLEMENT_ENABLED?:string}
 export interface SnapshotEnv {ASSET_BUCKET?:R2Bucket;COMMERCE_LOCAL_PAYMENT_ENABLED?:string;COMMERCE_ORDER_IDEMPOTENCY_KEY?:string;COMMERCE_NOTIFY_URL?:string;COMMERCE_RETURN_ORIGIN?:string}
 const MAIN='mnotoltpythkayguhnrk';
+let publicD1QuotaBackoffUntil=0;
+function isPublicD1Read(path:string,method:string){
+  if(!['GET','HEAD','POST'].includes(method))return false;
+  return path==='/v1/notices'||path.startsWith('/v1/notices/')||path==='/v1/product-link'||path==='/v1/resources/products'||path.startsWith('/v1/resources/products/')||path==='/v1/billing/plans'||path==='/v1/community/posts'||path==='/v1/community/comments'||path==='/v1/notices/by-ids'||path==='/v1/public/notice-overrides'||path==='/v1/public/notice-detail';
+}
+function markPublicD1QuotaBackoff(){publicD1QuotaBackoffUntil=Math.max(publicD1QuotaBackoffUntil,Date.now()+60000);}
 function inputId(value:unknown){if(typeof value!=='string'||!value||value.length>180||/[\u0000-\u001f]/.test(value))throw new ApiError(400,'INVALID_ID');return value;}
 function only(body:Record<string,unknown>,keys:readonly string[]){if(Object.keys(body).some(k=>!keys.includes(k)))throw new ApiError(400,'UNSUPPORTED_FIELD');}
 const profileFields=['nickname','age','undergraduate_school','major','grade','target_major','target_region'] as const;
@@ -47,11 +53,36 @@ function normalizedPatch(input:unknown,allowed:readonly string[]){
 function revision(value:unknown){if(!Number.isSafeInteger(value)||Number(value)<1)throw new ApiError(400,'REVISION_REQUIRED');return value;}
 function parseRow(row:Record<string,unknown>){const value={...row};for(const k of ['tags','materials_required','encrypted_payload','custom_todos','completed_todo_ids','mentor_contacts'])if(typeof value[k]==='string')value[k]=JSON.parse(value[k] as string);for(const k of boolFields)if(k in value)value[k]=Boolean(value[k]);if('is_verified'in value)value.is_verified=Boolean(value.is_verified);return value;}
 function publicNoticeCacheKey(request:Request,origin:string|null){
- const url=new URL(request.url);
- // CORS is part of the cached response, so keep the small set of allowed
- // browser origins in separate edge-cache entries.
- url.searchParams.set('__edge_origin',origin||'none');
- return new Request(url.toString(),{method:'GET'});
+  const url=new URL(request.url);
+  // CORS is part of the cached response, so keep the small set of allowed
+  // browser origins in separate edge-cache entries.
+  url.searchParams.set('__edge_origin',origin||'none');
+  return new Request(url.toString(),{method:'GET'});
+}
+type EdgeCache=Cache;
+function publicEdgeCache(request:Request,origin:string|null,scope:string){
+  const url=new URL(request.url);
+  // Cache keys are private to a public route and origin. Never include an
+  // Authorization-bearing request in this helper.
+  url.searchParams.set('__edge_scope',scope);
+  url.searchParams.set('__edge_origin',origin||'none');
+  return new Request(url.toString(),{method:'GET'});
+}
+function edgeCacheStore(){return typeof caches!=='undefined'?(caches as CacheStorage & {default:EdgeCache}).default:null;}
+async function edgeCacheHit(cache:EdgeCache|null,key:Request,requestId:string){
+  if(!cache)return null;
+  try{
+    const hit=await cache.match(key);if(!hit)return null;
+    const headers=new Headers(hit.headers);headers.set('X-Edge-Cache','HIT');headers.set('X-Request-ID',requestId);headers.set('X-D1-Queries','0');headers.set('X-D1-Rows-Read','0');headers.set('X-D1-Rows-Written','0');
+    return new Response(hit.body,{status:hit.status,statusText:hit.statusText,headers});
+  }catch{return null;}
+}
+function edgeCachePut(cache:EdgeCache|null,key:Request,fresh:Response,browserSeconds:number,edgeSeconds:number){
+  if(!cache)return fresh;
+  const headers=new Headers(fresh.headers);headers.set('Cache-Control',`public,max-age=${browserSeconds},s-maxage=${edgeSeconds},stale-while-revalidate=60`);headers.set('X-Edge-Cache','MISS');
+  const cacheable=new Response(fresh.body,{status:fresh.status,statusText:fresh.statusText,headers});
+  void cache.put(key,cacheable.clone()).catch(()=>undefined);
+  return cacheable;
 }
 async function privateProfileCacheKey(identity:{issuer:string;subject:string}){
  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(identity.issuer+'|'+identity.subject));
@@ -88,7 +119,7 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
   const fillCapability=url.pathname.replace(/\/$/,'')==='/v1/billing/consume';
   const licenseOrigin=url.pathname.replace(/\/$/,'')==='/v1/license-entitlement'&&Boolean(origin&&/^chrome-extension:\/\/[a-p]{32}$/.test(origin));
   const extensionOrigin=Boolean(origin&&/^chrome-extension:\/\/[a-p]{32}$/.test(origin)&&(clientKind==='extension-pkce'||request.method==='OPTIONS'&&request.headers.get('access-control-request-headers')?.toLowerCase().includes('x-seekoffer-client')));
-  const allowed=env.ALLOWED_ORIGINS.split(',').map(s=>s.trim()).filter(Boolean);const cors:Record<string,string>=origin&&(allowed.includes(origin)||fillCapability||licenseOrigin||extensionOrigin)?{'Access-Control-Allow-Origin':origin,'Access-Control-Expose-Headers':'X-Request-ID,X-D1-Queries,X-D1-Rows-Read,X-D1-Rows-Written',Vary:'Origin'}:{};
+   const allowed=env.ALLOWED_ORIGINS.split(',').map(s=>s.trim()).filter(Boolean);const cors:Record<string,string>=origin&&(allowed.includes(origin)||fillCapability||licenseOrigin||extensionOrigin)?{'Access-Control-Allow-Origin':origin,'Access-Control-Expose-Headers':'X-Request-ID,X-D1-Queries,X-D1-Rows-Read,X-D1-Rows-Written,X-Edge-Cache',Vary:'Origin'}:{};
   const response=(body:unknown,status=200,extra:Record<string,string>={})=>Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Request-ID':requestId,'X-D1-Queries':String(usage.queries),'X-D1-Rows-Read':String(usage.rowsRead),'X-D1-Rows-Written':String(usage.rowsWritten),...cors,...extra}});
   try{
    if(!['local','preview','production'].includes(env.MODE))throw new ApiError(503,'MODE_NOT_CONFIGURED');
@@ -103,8 +134,9 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
      if(url.origin!=='https://migration.seekoffer.com.cn'||!url.pathname.startsWith('/v1/me/')||!bearer.startsWith('Bearer '))throw new ApiError(401,'PREVIEW_ACCESS_REQUIRED');
      previewIdentity=await identify(bearer.slice(7));
     }
-   }
+    }
    const path=url.pathname.replace(/\/$/,'').replace(/^\/api\/public\/notices/,'/v1/notices');
+   if(isPublicD1Read(path,request.method)&&publicD1QuotaBackoffUntil>Date.now())throw new ApiError(402,'SERVICE_QUOTA_EXCEEDED');
    if(path==='/v1/internal/wechat-publications'){
     if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');
     if(origin||env.MODE==='preview'||env.BUSINESS_WRITES_ENABLED!=='true')throw new ApiError(403,'SERVER_JOB_ONLY');
@@ -125,9 +157,14 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
    }
    if(path==='/v1/product-link'){
     if(!['GET','HEAD'].includes(request.method))throw new ApiError(405,'METHOD_NOT_ALLOWED');
+    const cacheable=request.method==='GET',edgeCache=cacheable?edgeCacheStore():null,cacheKey=cacheable?publicEdgeCache(request,origin,'product-link'):null;
+    if(cacheKey){const hit=await edgeCacheHit(edgeCache,cacheKey,requestId);if(hit)return hit;}
     const link=await productLink(env.CORE,request,env.PAYMENT_PROCESSING_ENABLED==='true'&&env.PAYMENT_CHECKOUT_ENABLED==='true');
-    if(url.searchParams.get('format')!=='json'&&link.enabled&&link.destinationUrl)return new Response(null,{status:302,headers:Object.fromEntries([...response(null).headers,['Location',link.destinationUrl],['Referrer-Policy','no-referrer']])});
-    const result=response(link);return request.method==='HEAD'?new Response(null,{status:result.status,headers:result.headers}):result;
+    if(url.searchParams.get('format')!=='json'&&link.enabled&&link.destinationUrl){
+     const redirected=new Response(null,{status:302,headers:Object.fromEntries([...response(null).headers,['Location',link.destinationUrl],['Referrer-Policy','no-referrer']])});
+     return cacheKey?edgeCachePut(edgeCache,cacheKey,redirected,60,600):redirected;
+    }
+    const result=response(link);if(cacheKey)return edgeCachePut(edgeCache,cacheKey,result,60,600);return request.method==='HEAD'?new Response(null,{status:result.status,headers:result.headers}):result;
    }
    if(path==='/v1/internal/ingest-notices'){
     if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');
@@ -145,10 +182,14 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     else await applyJianPayNotification(env.CORE,payload,{clientNo:env.JIANPAY_CLIENT_NO,merchantKey:env.JIANPAY_MERCHANT_KEY});
     const headers=new Headers(response(null).headers);headers.set('Content-Type','text/plain; charset=utf-8');return new Response('success',{status:200,headers});
    }
-   if(path==='/v1/resources/products'&&request.method==='GET')return response(await listResourceProducts(env.CORE));
+   if(path==='/v1/resources/products'&&request.method==='GET'){
+    const edgeCache=edgeCacheStore(),cacheKey=publicEdgeCache(request,origin,'resource-products'),hit=await edgeCacheHit(edgeCache,cacheKey,requestId);if(hit)return hit;
+    return edgeCachePut(edgeCache,cacheKey,response(await listResourceProducts(env.CORE)),300,600);
+   }
    if(path.startsWith('/v1/resources/products/')&&request.method==='GET'){
+    const edgeCache=edgeCacheStore(),cacheKey=publicEdgeCache(request,origin,'resource-product'),hit=await edgeCacheHit(edgeCache,cacheKey,requestId);if(hit)return hit;
     const slug=inputId(decodeURIComponent(path.slice('/v1/resources/products/'.length)));
-    return response(await readResourceProduct(env.CORE,slug));
+    return edgeCachePut(edgeCache,cacheKey,response(await readResourceProduct(env.CORE,slug)),300,600);
    }
    if(path==='/v1/resources/orders'&&request.method==='POST'){
     if(env.MODE==='preview'||env.MODE!=='local'&&env.BUSINESS_WRITES_ENABLED!=='true')throw new ApiError(503,'COMMERCE_MAINTENANCE');
@@ -201,7 +242,11 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     const result=await licenseAction(env.CORE,body,env.PREVIEW_ACCESS_TOKEN,ip,Number(env.LICENSE_ATTEMPTS_PER_DAY||100));return response(result,['activate','renew'].includes(String(body.action))&&!result.active?400:200);
    }
    if(path==='/health')return response({status:'ok',backend:'d1',mode:env.MODE,migrationComplete:true,businessWritesEnabled:env.BUSINESS_WRITES_ENABLED==='true'});
-   if(path==='/v1/billing/plans'){if(request.method!=='GET')throw new ApiError(405,'METHOD_NOT_ALLOWED');return response(await billingPlans(env.CORE));}
+   if(path==='/v1/billing/plans'){
+    if(request.method!=='GET')throw new ApiError(405,'METHOD_NOT_ALLOWED');
+    const edgeCache=edgeCacheStore(),cacheKey=publicEdgeCache(request,origin,'billing-plans'),hit=await edgeCacheHit(edgeCache,cacheKey,requestId);if(hit)return hit;
+    return edgeCachePut(edgeCache,cacheKey,response(await billingPlans(env.CORE)),300,600);
+   }
    if(path==='/v1/billing/consume'){
     if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');
     if(env.MODE==='preview'||env.BUSINESS_WRITES_ENABLED!=='true')throw new ApiError(503,'MIGRATION_READ_ONLY');
@@ -210,7 +255,9 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
    if(path==='/v1/public/notice-overrides'&&request.method==='GET')return response(await readNoticeOverrides(env.CORE,url.searchParams));
    if(path==='/v1/public/notice-detail'&&request.method==='GET')return response(await readOverrideDetail(env.CORE,url.searchParams.get('id')||''));
    if(path==='/v1/community/posts'||path==='/v1/community/comments'){
-    if(request.method!=='GET')throw new ApiError(405,'METHOD_NOT_ALLOWED');return response(await readCommunity(env.CORE,path,url.searchParams));
+    if(request.method!=='GET')throw new ApiError(405,'METHOD_NOT_ALLOWED');
+    const edgeCache=edgeCacheStore(),cacheKey=publicEdgeCache(request,origin,'community'),hit=await edgeCacheHit(edgeCache,cacheKey,requestId);if(hit)return hit;
+    return edgeCachePut(edgeCache,cacheKey,response(await readCommunity(env.CORE,path,url.searchParams)),30,60);
    }
    if(path==='/v1/community/report'){
     if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');
@@ -249,36 +296,30 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
    if(path==='/v1/admin'){
     if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');const bearer=request.headers.get('authorization')||'';if(!bearer.startsWith('Bearer '))throw new ApiError(401,'AUTH_REQUIRED');const identity=await identify(bearer.slice(7)),owner=await resolveSnapshotOwner(env.CORE,identity);
     const admin=await requireSnapshotAdmin(env.CORE,owner,identity,env,clerkFetch);return response(await adminAction(env.CORE,admin,await boundedBody(request,100000),env.MODE!=='preview'&&env.BUSINESS_WRITES_ENABLED==='true'&&(env.MODE==='local'||env.OPERATIONS_WRITES_ENABLED==='true'),env,clerkFetch));
-   }
-   if(path==='/v1/notices'&&request.method==='GET'){
-    const edgeCache=typeof caches!=='undefined'?(caches as CacheStorage & {default:Cache}).default:null;
-    const cacheKey=publicNoticeCacheKey(request,origin);
-    try{const hit=await edgeCache?.match(cacheKey);if(hit)return hit;}catch{/* Cache is optional; D1 remains the source of truth. */}
-    const now=Date.now();
-    // The public page helper keeps the expensive count, facets and summary
-    // queries in D1's versioned cache. Each browser request now reads only
-    // the requested page instead of hydrating the entire notice catalogue.
-    const result=await publicNoticePage(env.CORE,url.searchParams,now);
-    const fresh=response(result.body,200,{'X-Notice-Version':result.version,'X-Count-Cache':result.cache.count,'X-Metadata-Cache':result.cache.metadata});
-    if(edgeCache){
+    }
+    if(path==='/v1/notices'&&request.method==='GET'){
+     const edgeCache=edgeCacheStore(),cacheKey=publicNoticeCacheKey(request,origin),hit=await edgeCacheHit(edgeCache,cacheKey,requestId);if(hit)return hit;
+     const now=Date.now();
+     // The public page helper keeps the expensive count, facets and summary
+     // queries in D1's shared bounded-staleness cache. Each browser request now reads only
+     // the requested page instead of hydrating the entire notice catalogue.
+     const result=await publicNoticePage(env.CORE,url.searchParams,now);
+     const fresh=response(result.body,200,{'X-Notice-Version':result.version,'X-Count-Cache':result.cache.count,'X-Metadata-Cache':result.cache.metadata});
      // Public notice data changes through the ingestion job, so a short edge
      // TTL keeps normal browsing off D1 while allowing updates to appear
      // within a few minutes.
-     const headers=new Headers(fresh.headers);headers.set('Cache-Control','public,max-age=60,s-maxage=300,stale-while-revalidate=60');
-     const cacheable=new Response(fresh.body,{status:fresh.status,headers});
-     try{await edgeCache.put(cacheKey,cacheable.clone());}catch{/* Cache is optional; do not fail a successful D1 response. */}
-     return cacheable;
+     return edgeCachePut(edgeCache,cacheKey,fresh,60,300);
     }
-    return fresh;
-   }
    if(path==='/v1/notices/by-ids'&&request.method==='POST'){
     const body=await boundedBody(request,32768);only(body,['ids']);if(!Array.isArray(body.ids)||body.ids.length>100)throw new ApiError(400,'ID_BATCH_LIMIT');const ids=[...new Set(body.ids.map(inputId))];if(!ids.length)return response({items:[],source:'d1'});
     const rows=await env.CORE.prepare('SELECT n.catalog_projection FROM main__notices n WHERE '+publicVisibility+' AND n.catalog_projection IS NOT NULL AND n.id IN ('+ids.map(()=>'?').join(',')+')').bind(...ids).all<{catalog_projection:string}>();return response({items:rows.results.map(r=>liveSummary(JSON.parse(r.catalog_projection))),source:'d1'});
-   }
-   if(path.startsWith('/v1/notices/')&&request.method==='GET'){
-    const id=inputId(path==='/v1/notices/detail'?url.searchParams.get('id'):decodeURIComponent(path.slice('/v1/notices/'.length)));
-    const row=await env.CORE.prepare('SELECT '+NOTICE_DETAIL_COLUMNS+' FROM main__notices n WHERE n.id=? AND '+publicVisibility).bind(id).first<Record<string,unknown>>();if(!row)throw new ApiError(404,'NOTICE_UNAVAILABLE');return response(mapNoticeRowToProject(parseRow(row)));
-   }
+    }
+    if(path.startsWith('/v1/notices/')&&request.method==='GET'){
+     const edgeCache=edgeCacheStore(),cacheKey=publicEdgeCache(request,origin,'notice-detail'),hit=await edgeCacheHit(edgeCache,cacheKey,requestId);if(hit)return hit;
+     const id=inputId(path==='/v1/notices/detail'?url.searchParams.get('id'):decodeURIComponent(path.slice('/v1/notices/'.length)));
+     const row=await env.CORE.prepare('SELECT '+NOTICE_DETAIL_COLUMNS+' FROM main__notices n WHERE n.id=? AND '+publicVisibility).bind(id).first<Record<string,unknown>>();if(!row)throw new ApiError(404,'NOTICE_UNAVAILABLE');
+     return edgeCachePut(edgeCache,cacheKey,response(mapNoticeRowToProject(parseRow(row))),60,300);
+    }
    if(!path.startsWith('/v1/me/'))throw new ApiError(501,'ROUTE_NOT_YET_MIGRATED');
    const bearer=request.headers.get('authorization')||'';if(!bearer.startsWith('Bearer '))throw new ApiError(401,'AUTH_REQUIRED');
    const identity=previewIdentity||await identify(bearer.slice(7));
@@ -307,7 +348,7 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
      if(profileCache&&row){
       const headers=new Headers({'Cache-Control':'private,max-age=300','Content-Type':'application/json;charset=utf-8'});
       try{await profileCache.put(profileKey,new Response(JSON.stringify(row),{status:200,headers}));}catch{/* Cache is optional. */}
-     }
+    }
      return fresh;
     }catch(error){
      if(cached){
@@ -410,15 +451,15 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     }
    }
    throw new ApiError(501,'ROUTE_NOT_YET_MIGRATED');
-  }catch(error){
-   if(error instanceof ApiError)return response({error:error.message,requestId},error.status,error.status===503?{'Retry-After':'15'}:{});
-   const message=error instanceof Error?error.message:'';
-   if(message.includes('ACCOUNT_CLOSED'))return response({error:'ACCOUNT_BLOCKED',requestId},403);
-   if(message.includes('FREE_APPLICATION_LIMIT'))return response({error:'FREE_APPLICATION_LIMIT',requestId},403);
-   if(/UNIQUE constraint failed: main__(user_vaults|workbench_states)\./.test(message))return response({error:'REVISION_CONFLICT',requestId},409);
-   if(/daily.*limit|quota.*exceed|exceed.*quota|D1.*limit/i.test(message))return response({error:'SERVICE_QUOTA_EXCEEDED',requestId},402);
-   return response({error:'SERVICE_UNAVAILABLE',requestId},503,{'Retry-After':'15'});
-  }
+   }catch(error){
+    if(error instanceof ApiError){if(error.message==='SERVICE_QUOTA_EXCEEDED')markPublicD1QuotaBackoff();return response({error:error.message,requestId},error.status,error.status===503?{'Retry-After':'15'}:error.message==='SERVICE_QUOTA_EXCEEDED'?{'Retry-After':'60'}:{});}
+    const message=error instanceof Error?error.message:'';
+    if(message.includes('ACCOUNT_CLOSED'))return response({error:'ACCOUNT_BLOCKED',requestId},403);
+    if(message.includes('FREE_APPLICATION_LIMIT'))return response({error:'FREE_APPLICATION_LIMIT',requestId},403);
+    if(/UNIQUE constraint failed: main__(user_vaults|workbench_states)\./.test(message))return response({error:'REVISION_CONFLICT',requestId},409);
+    if(/daily.*limit|quota.*exceed|exceed.*quota|D1.*limit/i.test(message)){markPublicD1QuotaBackoff();return response({error:'SERVICE_QUOTA_EXCEEDED',requestId},402,{'Retry-After':'60'});}
+    return response({error:'SERVICE_UNAVAILABLE',requestId},503,{'Retry-After':'15'});
+   }
  }};
 }
 export default createSnapshotWorker();

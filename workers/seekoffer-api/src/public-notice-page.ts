@@ -16,9 +16,9 @@ type ProjectionRow={catalog_projection:string};
 export const summaryProjectionSql="json_object('summary',json_extract(catalog_projection,'$.summary'),'rawStatus',json_extract(catalog_projection,'$.rawStatus')) AS catalog_projection";
 type Metadata={stats:{total2026:number;todayUpdates:number;deadlineWithin3Days:number};sideData:{urgentProjects:unknown[];latestProjects:unknown[];todaySchoolUpdates:{date:string;hasTodayRows:boolean;rows:[string,number][]};latestPublishDate:string;topColleges:CollegeNoticeStats[]};facets:{regions:string[];schools:string[];categories:string[];disciplines:string[];collegeStats:CollegeNoticeStats[]};expiresAt:number};
 const PUBLIC_METADATA_CACHE_VERSION='public-metadata-v3';
-const PUBLIC_METADATA_TTL=15*60*1000;
+const PUBLIC_METADATA_TTL=60*60*1000;
 const PUBLIC_COUNT_CACHE_VERSION='public-count-v3';
-const PUBLIC_COUNT_TTL=5*60*1000;
+const PUBLIC_COUNT_TTL=15*60*1000;
 
 // Stores only bounded public aggregate data. Each lease is shared across
 // instances, failures back off, and callers can choose whether a cache entry
@@ -29,11 +29,13 @@ async function cached<T>(db:D1Database,version:string,name:string,now:number,loa
  const row=await db.prepare('SELECT result_json,expires_at FROM _notice_query_cache WHERE cache_key=? AND data_version=?').bind(key,version).first<{result_json:string|null;expires_at:number}>();
  if(row?.result_json&&row.expires_at>now)return{value:JSON.parse(row.result_json) as T,cache:'HIT'};
  const lease=await db.prepare('INSERT INTO _notice_query_cache(cache_key,data_version,expires_at,lock_until,result_json) VALUES(?,?,0,?,NULL) ON CONFLICT(cache_key) DO UPDATE SET lock_until=excluded.lock_until WHERE lock_until<=? RETURNING cache_key').bind(key,version,now+15000,now).first();
- if(!lease)throw new ApiError(503,'PUBLIC_REFRESH_IN_PROGRESS');
- const result=await load(),json=JSON.stringify(result.value);
- if(new TextEncoder().encode(json).byteLength>512000)throw new ApiError(503,'PUBLIC_AGGREGATE_TOO_LARGE');
- await db.prepare('UPDATE _notice_query_cache SET result_json=?,expires_at=?,lock_until=0 WHERE cache_key=? AND data_version=?').bind(json,result.expiresAt,key,version).run();
- return{value:result.value,cache:'MISS'};
+ if(!lease){if(row?.result_json)return{value:JSON.parse(row.result_json) as T,cache:'STALE'};throw new ApiError(503,'PUBLIC_REFRESH_IN_PROGRESS');}
+ try{
+  const result=await load(),json=JSON.stringify(result.value);
+  if(new TextEncoder().encode(json).byteLength>512000)throw new ApiError(503,'PUBLIC_AGGREGATE_TOO_LARGE');
+  await db.prepare('UPDATE _notice_query_cache SET result_json=?,expires_at=?,lock_until=0 WHERE cache_key=? AND data_version=?').bind(json,result.expiresAt,key,version).run();
+  return{value:result.value,cache:'MISS'};
+ }catch(error){if(row?.result_json)return{value:JSON.parse(row.result_json) as T,cache:'STALE'};throw error;}
 }
 
 async function metadata(db:D1Database,category:string,region:string,now:number,part:'full'|'summary'|'facets'|'colleges'='full'):Promise<Metadata> {
@@ -75,7 +77,7 @@ async function metadata(db:D1Database,category:string,region:string,now:number,p
   // This aggregate scans the public catalogue. Keep it shared across notice
   // versions and filter combinations; a crawler batch changes notice_version
   // for every small upsert, which must not turn into another full-table scan.
-  // A bounded 15-minute staleness window is acceptable for facets and summary
+  // A bounded one-hour staleness window is acceptable for facets and summary
   // cards because the list itself is independently edge-cached and refreshed.
   const expiresAt=Math.min(now+PUBLIC_METADATA_TTL,Date.parse(today+'T00:00:00+08:00')+86400000);
  return{stats:{total2026,todayUpdates,deadlineWithin3Days},sideData:{urgentProjects:urgent.slice(0,5).map(value=>liveSummary(value,now)),latestProjects:latest.slice(0,5).map(value=>liveSummary(value,now)),todaySchoolUpdates:{date:todayDate,hasTodayRows:todayUpdates>0,rows:todaySchoolUpdates},latestPublishDate,topColleges:collegeStats.slice(0,6)},facets:{regions:getNoticeRegionOptions([...regions].map(value=>({tags:[value]} as PublicNoticeProject))),schools:[...schoolNames].sort(chineseOrder.compare),categories:[...categories],disciplines:[...disciplines],collegeStats},expiresAt};
@@ -157,7 +159,7 @@ export async function publicNoticePage(db:D1Database,params:URLSearchParams,now=
  const version=await db.prepare("SELECT value FROM _runtime_state WHERE key='notice_version'").first<string>('value');
  if(!version)throw new ApiError(503,'NOTICE_PROJECTION_PENDING');
   // Do not key this full-catalogue read by notice_version: ingestion updates
-  // that version once per small batch. A 15-minute shared snapshot prevents
+  // that version once per small batch. A one-hour shared snapshot prevents
   // incremental sync from multiplying D1 row reads while keeping the list
   // response itself version-checked below.
   const meta=await cacheReader(db,PUBLIC_METADATA_CACHE_VERSION,'metadata:global',now,async()=>{const value=await metadata(db,'全部','全部',now);return{value,expiresAt:value.expiresAt};});
