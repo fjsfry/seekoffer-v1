@@ -81,6 +81,10 @@ jobs:
       - name: Check D1 transport boundaries
         run: node --test tests/notice-d1-transport.test.mjs tests/notice-website-sync.test.mjs
 
+      - name: Check D1 readiness before acquisition
+        if: ${{ env.DRY_RUN != 'true' }}
+        run: node scripts/d1-readiness-preflight.mjs
+
       - name: Sync notices through authenticated D1 ingestion
         id: ingest
         run: npm run sync:notices:github
