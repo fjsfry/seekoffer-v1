@@ -136,7 +136,16 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     }
     }
    const path=url.pathname.replace(/\/$/,'').replace(/^\/api\/public\/notices/,'/v1/notices');
-   if(isPublicD1Read(path,request.method)&&publicD1QuotaBackoffUntil>Date.now())throw new ApiError(402,'SERVICE_QUOTA_EXCEEDED');
+   if(isPublicD1Read(path,request.method)&&publicD1QuotaBackoffUntil>Date.now()){
+    // A D1 outage must not block an existing edge entry or extend itself on
+    // every rejected request. Only a real database quota error starts a lease.
+    if(request.method==='GET'){
+     const scope=path==='/v1/product-link'?'product-link':path==='/v1/resources/products'?'resource-products':path.startsWith('/v1/resources/products/')?'resource-product':path==='/v1/billing/plans'?'billing-plans':path.startsWith('/v1/community/')?'community':path.startsWith('/v1/notices/')?'notice-detail':null;
+     const key=path==='/v1/notices'?publicNoticeCacheKey(request,origin):scope?publicEdgeCache(request,origin,scope):null;
+     if(key){const hit=await edgeCacheHit(edgeCacheStore(),key,requestId);if(hit)return hit;}
+    }
+    return response({error:'SERVICE_QUOTA_EXCEEDED',requestId},402,{'Retry-After':String(Math.max(1,Math.ceil((publicD1QuotaBackoffUntil-Date.now())/1000)))});
+   }
    if(path==='/v1/internal/wechat-publications'){
     if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');
     if(origin||env.MODE==='preview'||env.BUSINESS_WRITES_ENABLED!=='true')throw new ApiError(403,'SERVER_JOB_ONLY');

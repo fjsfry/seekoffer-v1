@@ -5,6 +5,7 @@ import {getDeadlineTimestamp} from '../../../lib/deadline-display';
 import {overrideStatements} from './notice-overrides.ts';
 import {prepareNoticeOrder} from './notice-order';
 import {readPaymentMonitor} from './payments/payment-monitor.ts';
+import {cachedAdminRead,adminNoticeStatistics,ADMIN_AGGREGATE_TTL} from './admin-read-cache.ts';
 export type Admin={email:string;name:string;role:string;status:string;ownerId?:string};
 const permissions:Record<string,string[]>={super_admin:['overview','content','users','settings','logs'],ops_manager:['overview','content','users','logs'],content_reviewer:['overview','content'],readonly_admin:['overview','logs']};
 function permit(admin:Admin,permission:string){if(!permissions[admin.role]?.includes(permission))throw new ApiError(403,'ADMIN_PERMISSION_DENIED');}
@@ -40,19 +41,24 @@ async function listUsers(db:D1Database,body:Record<string,unknown>,config:Bootst
  const moderation=await grouped(db,'main__user_moderation','status'),all=await scalar(db,'SELECT count(*) AS n FROM main__profiles');
  return{users:rows.results.map(r=>({...r,email:email.get(String(r.id))||'',notice_count:submitted.get(String(r.id))||0})),total,page,pageSize,metrics:{totalUsers:all,todayUsers:await scalar(db,'SELECT count(*) AS n FROM main__profiles WHERE created_at>=?',[today()]),normalUsers:all-(moderation.restricted||0)-(moderation.banned||0)-(moderation.deleted||0),restrictedUsers:moderation.restricted||0,bannedUsers:moderation.banned||0,deletedUsers:moderation.deleted||0}};
 }
-async function grouped(db:D1Database,table:string,status:string,extra=''){const r=await db.prepare(`SELECT ${status} AS status,count(*) AS n FROM ${table} ${extra} GROUP BY ${status}`).all<{status:string;n:number}>();return Object.fromEntries(r.results.map(r=>[r.status,r.n]));}
+async function grouped(db:D1Database,table:string,status:string,extra=''){if(table==='main__notices'&&status==='admin_status'&&!extra)return(await adminNoticeStatistics(db)).counts;const r=await db.prepare(`SELECT ${status} AS status,count(*) AS n FROM ${table} ${extra} GROUP BY ${status}`).all<{status:string;n:number}>();return Object.fromEntries(r.results.map(r=>[r.status,r.n]));}
 async function scalar(db:D1Database,sql:string,values:unknown[]=[]){const r=await db.prepare(sql).bind(...values).first<{n:number}>();return Number(r?.n||0);}
 async function overview(db:D1Database){
+ return cachedAdminRead(db,'overview',ADMIN_AGGREGATE_TTL,async()=>{
  const metrics:Record<string,number>={};
- const specs=[['Users','main__profiles'],['Notices','main__notices'],['Offers','main__offer_posts'],['Applications','main__applications'],['Feedback','main__feedback_reports']];
- for(const [label,table]of specs){const where=label==='Notices'?' WHERE admin_deleted_at IS NULL':label==='Offers'?' WHERE deleted_at IS NULL':'';const row=await db.prepare(`SELECT count(*) AS total,sum(created_at>=?) AS today FROM ${table}${where}`).bind(today()).first<{total:number;today:number}>();metrics['total'+label]=row!.total;metrics['today'+label]=row!.today||0;}
- for(const [suffix,table,column]of [['Users','main__user_moderation','status'],['Notices','main__notices','admin_status'],['Offers','main__offer_posts','review_status'],['Feedback','main__feedback_reports','status']]){
+ const notices=await adminNoticeStatistics(db);
+ metrics.totalNotices=notices.total;metrics.todayNotices=notices.today;
+ for(const state of ['pending','published','rejected','hidden','deleted','approved','restricted','banned','processing','resolved','closed'])metrics[state+'Notices']=notices.counts[state]||0;
+ const specs=[['Users','main__profiles'],['Offers','main__offer_posts'],['Applications','main__applications'],['Feedback','main__feedback_reports']];
+ for(const [label,table]of specs){const where=label==='Offers'?' WHERE deleted_at IS NULL':'';const row=await db.prepare(`SELECT count(*) AS total,sum(created_at>=?) AS today FROM ${table}${where}`).bind(today()).first<{total:number;today:number}>();metrics['total'+label]=row!.total;metrics['today'+label]=row!.today||0;}
+ for(const [suffix,table,column]of [['Users','main__user_moderation','status'],['Offers','main__offer_posts','review_status'],['Feedback','main__feedback_reports','status']]){
   const values=await grouped(db,table,column);for(const state of ['pending','published','rejected','hidden','deleted','approved','restricted','banned','processing','resolved','closed'])metrics[state+suffix]=values[state]||0;
  }
  metrics.normalUsers=Math.max(0,metrics.totalUsers-metrics.restrictedUsers-metrics.bannedUsers-metrics.deletedUsers);
- const trends=Array.from({length:7},(_,i)=>({date:new Date(Date.parse(today(i-6))+28800000).toISOString().slice(5,10),users:0,notices:0,offers:0,applications:0}));
- for(const [key,table]of [['users','main__profiles'],['notices','main__notices'],['offers','main__offer_posts'],['applications','main__applications']] as const){const r=await db.prepare(`SELECT strftime('%m-%d',created_at,'+8 hours') AS day,count(*) AS n FROM ${table} WHERE created_at>=? GROUP BY day`).bind(today(-6)).all<{day:string;n:number}>();for(const row of r.results){const t=trends.find(t=>t.date===row.day);if(t)t[key]=row.n;}}
- return{metrics,trends};
+ const trends=notices.trends.map(trend=>({...trend,users:0,offers:0,applications:0}));
+ for(const [key,table]of [['users','main__profiles'],['offers','main__offer_posts'],['applications','main__applications']] as const){const r=await db.prepare(`SELECT strftime('%m-%d',created_at,'+8 hours') AS day,count(*) AS n FROM ${table} WHERE created_at>=? GROUP BY day`).bind(today(-6)).all<{day:string;n:number}>();for(const row of r.results){const t=trends.find(t=>t.date===row.day);if(t)t[key]=row.n;}}
+ return{metrics,trends,generatedAt:new Date().toISOString(),refreshIntervalSeconds:ADMIN_AGGREGATE_TTL/1000};
+ });
 }
 async function list(db:D1Database,resource:string,body:Record<string,unknown>){
  const page=int(body.page,1,100000),pageSize=int(body.pageSize,10,100),filter=body.filters&&typeof body.filters==='object'&&!Array.isArray(body.filters)?body.filters as Record<string,unknown>:{};
@@ -75,7 +81,12 @@ async function list(db:D1Database,resource:string,body:Record<string,unknown>){
  }
  const q=str(filter.query);if(q){terms.push('('+d.search.map(c=>`instr(lower(${c}),lower(?))>0`).join(' OR ')+')');values.push(...d.search.map(()=>q));}
  for(const [key,op]of [['dateFrom','>='],['dateTo','<=']]){const v=str(filter[key]);if(v){if(!/^\d{4}-\d{2}-\d{2}$/.test(v))throw new ApiError(400,'INVALID_DATE');terms.push(d.date+op+'?');values.push(resource==='notices'?v:new Date(v+(op==='>='?'T00:00:00+08:00':'T23:59:59.999+08:00')).toISOString());}}
- const where=terms.length?' WHERE '+terms.join(' AND '):'',total=await scalar(db,`SELECT count(*) AS n FROM ${d.table}`+where,values);
+ const where=terms.length?' WHERE '+terms.join(' AND '):'';
+ let total:number;
+ if(resource==='notices'&&!values.length&&(terms.length===0||terms.length===1&&['admin_deleted_at IS NULL','admin_deleted_at IS NOT NULL'].includes(terms[0]))){
+  const stats=await adminNoticeStatistics(db),all=Object.values(stats.counts).reduce((sum,n)=>sum+n,0);
+  total=terms.length===0?all:terms[0]==='admin_deleted_at IS NULL'?stats.total:all-stats.total;
+ }else total=await scalar(db,`SELECT count(*) AS n FROM ${d.table}`+where,values);
  const sorts:Record<string,string>={publish_desc:'publish_date DESC,id',deadline_asc:'deadline_date,id',updated_desc:'updated_at_ts DESC,id'};
  const order=resource==='notices'?(sorts[str(body.sort)||'publish_desc']||''):d.date+' DESC,id';if(!order)throw new ApiError(400,'INVALID_SORT');
  const rows=await db.prepare(`SELECT ${d.columns} FROM ${d.table}${where} ORDER BY ${order} LIMIT ? OFFSET ?`).bind(...values,pageSize,(page-1)*pageSize).all<Record<string,unknown>>();

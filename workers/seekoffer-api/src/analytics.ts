@@ -1,5 +1,6 @@
 import {ApiError} from './auth.ts';
 import {isoMicro} from './payments/transaction.ts';
+import {cachedAdminRead,ADMIN_AGGREGATE_TTL} from './admin-read-cache.ts';
 
 type Row=Record<string,unknown>;
 export interface AnalyticsConfig {ANALYTICS_ENABLED?:string;ANALYTICS_EVENTS_PER_DAY?:string}
@@ -45,12 +46,15 @@ export async function recordPageview(db:D1Database,body:Row,config:AnalyticsConf
 export const unavailableAnalytics={available:false,reason:'访问统计暂停；历史日志尚未迁完，指标不可用不代表零。',metrics:{onlineVisitors:null,totalVisitors:null,todayVisitors:null,todayPageViews:null,activeWindowMinutes:6},onlineVisitors:[],recentVisitors:[]};
 export async function readAnalytics(db:D1Database,config:AnalyticsConfig,now=Date.now()){
  if(config.ANALYTICS_ENABLED!=='true')return unavailableAnalytics;
+ return cachedAdminRead(db,'analytics:'+analyticsLimit(config),60000,()=>loadAnalytics(db,config,now),now);
+}
+async function loadAnalytics(db:D1Database,config:AnalyticsConfig,now:number){
  const started=await db.prepare("SELECT value FROM _runtime_state WHERE key='analytics_started_at'").first<{value:string}>();
  if(!started)return{...unavailableAnalytics,reason:'访问采集已就绪，尚未收到第一条有效记录。'};
  const today=isoMicro(Date.parse(new Date(now+28800000).toISOString().slice(0,10)+'T00:00:00+08:00')),cutoff=isoMicro(now-6*60000),since=started.value>today?started.value:today;
  const columns='visitor_id,first_seen_at,last_seen_at,last_path,last_title,last_referrer,last_locale,last_timezone,visit_count,page_view_count';
+ const totalVisitors=await cachedAdminRead(db,'total-visitors',ADMIN_AGGREGATE_TTL,async()=>Number(await db.prepare('SELECT count(*) AS n FROM main__site_visitors').first('n')||0),now);
  const results=await db.batch([
-  db.prepare('SELECT count(*) AS n FROM main__site_visitors'),
   db.prepare('SELECT count(*) AS n FROM main__site_visitors WHERE last_seen_at>=?').bind(today),
   db.prepare('SELECT count(*) AS n FROM main__site_visitors WHERE last_seen_at>=?').bind(cutoff),
   db.prepare("SELECT count(*) AS n FROM main__site_visit_events WHERE created_at>=? AND event_type='pageview'").bind(since),
@@ -58,6 +62,6 @@ export async function readAnalytics(db:D1Database,config:AnalyticsConfig,now=Dat
   db.prepare('SELECT '+columns+' FROM main__site_visitors ORDER BY last_seen_at DESC LIMIT 20'),
   db.prepare('SELECT value FROM _runtime_state WHERE key=?').bind('analytics_events_day:'+new Date(now).toISOString().slice(0,10))
  ]);
- const used=Number((results[6].results[0] as Row|undefined)?.value||0),limit=analyticsLimit(config);
- return{available:true,reason:'访客累计来自已迁入的访客档案；今日浏览仅统计恢复采集后已记录的访问。历史访问日志仍按要求暂停，采集达到日上限后停止，不能视为完整流量。',coverage:{startedAt:started.value,todayFrom:since,historicalEventsComplete:false,dailyAccepted:used,dailyLimit:limit,budgetReached:used>=limit},metrics:{totalVisitors:Number((results[0].results[0] as Row).n),todayVisitors:Number((results[1].results[0] as Row).n),onlineVisitors:Number((results[2].results[0] as Row).n),todayPageViews:Number((results[3].results[0] as Row).n),activeWindowMinutes:6},onlineVisitors:results[4].results,recentVisitors:results[5].results};
+ const used=Number((results[5].results[0] as Row|undefined)?.value||0),limit=analyticsLimit(config);
+ return{available:true,reason:'访客累计来自已迁入的访客档案；今日浏览仅统计恢复采集后已记录的访问。历史访问日志仍按要求暂停，采集达到日上限后停止，不能视为完整流量。',coverage:{startedAt:started.value,todayFrom:since,historicalEventsComplete:false,dailyAccepted:used,dailyLimit:limit,budgetReached:used>=limit},metrics:{totalVisitors,todayVisitors:Number((results[0].results[0] as Row).n),onlineVisitors:Number((results[1].results[0] as Row).n),todayPageViews:Number((results[2].results[0] as Row).n),activeWindowMinutes:6},onlineVisitors:results[3].results,recentVisitors:results[4].results};
 }
