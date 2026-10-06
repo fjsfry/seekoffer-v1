@@ -28,6 +28,6 @@ export function orderD1Notices(notices) {
   return notices.map(toD1Notice).sort((a,b) => String(b.publish_date).localeCompare(String(a.publish_date)) || a.id.localeCompare(b.id));
 }
 export function ingestionShouldRetry(status, code='') {
-  if ([402,409].includes(status) || ['INGEST_DAILY_BUDGET','INGEST_CONFLICT_OR_DAILY_BUDGET'].includes(code)) return false;
+  if ([402,409].includes(status) || ['INGEST_DAILY_BUDGET','INGEST_CONFLICT_OR_DAILY_BUDGET','READ_BUDGET_EXHAUSTED'].includes(code)) return false;
   return [408,425,429].includes(status) || status >= 500 && status <= 599;
 }

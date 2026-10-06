@@ -17,6 +17,8 @@ on:
       - 'scripts/notice-sync-report.mjs'
       - 'scripts/verify-notice-website-sync.mjs'
       - 'scripts/d1-readiness-preflight.mjs'
+      - 'scripts/d1-readiness-core.mjs'
+      - 'tests/d1-readiness-preflight.test.mjs'
       - 'tests/notice-d1-transport.test.mjs'
       - 'tests/notice-website-sync.test.mjs'
       - 'lib/notice-quality.ts'
@@ -81,7 +83,7 @@ jobs:
           node-version: '24'
 
       - name: Check D1 transport boundaries
-        run: node --test tests/notice-d1-transport.test.mjs tests/notice-website-sync.test.mjs
+        run: node --test tests/notice-d1-transport.test.mjs tests/notice-website-sync.test.mjs tests/d1-readiness-preflight.test.mjs
 
       - name: Check D1 readiness before acquisition
         id: d1_preflight
@@ -94,12 +96,12 @@ jobs:
         run: npm run sync:notices:github
 
       - name: Record deferred sync due to D1 quota
-        if: ${{ steps.d1_preflight.outputs.reason == 'D1_SERVICE_QUOTA_EXCEEDED' }}
+        if: ${{ steps.d1_preflight.outputs.reason == 'D1_SERVICE_QUOTA_EXCEEDED' || steps.d1_preflight.outputs.reason == 'D1_SCAN_BUDGET_EXHAUSTED' }}
         run: |
           {
             echo '## Notice sync deferred'
             echo
-            echo 'Cloudflare D1 free-tier read quota is exhausted. No source crawl or write was attempted.'
+            echo 'The live D1 probe reached a provider quota or protected scan budget. No source crawl or write was attempted.'
             echo 'The next scheduled run will retry automatically after the quota window resets.'
           } >> "$GITHUB_STEP_SUMMARY"
 
