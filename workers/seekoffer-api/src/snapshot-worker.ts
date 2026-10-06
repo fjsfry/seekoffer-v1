@@ -77,11 +77,11 @@ async function edgeCacheHit(cache:EdgeCache|null,key:Request,requestId:string){
     return new Response(hit.body,{status:hit.status,statusText:hit.statusText,headers});
   }catch{return null;}
 }
-function edgeCachePut(cache:EdgeCache|null,key:Request,fresh:Response,browserSeconds:number,edgeSeconds:number){
+async function edgeCachePut(cache:EdgeCache|null,key:Request,fresh:Response,browserSeconds:number,edgeSeconds:number){
   if(!cache)return fresh;
   const headers=new Headers(fresh.headers);headers.set('Cache-Control',`public,max-age=${browserSeconds},s-maxage=${edgeSeconds},stale-while-revalidate=60`);headers.set('X-Edge-Cache','MISS');
   const cacheable=new Response(fresh.body,{status:fresh.status,statusText:fresh.statusText,headers});
-  void cache.put(key,cacheable.clone()).catch(()=>undefined);
+  try{await cache.put(key,cacheable.clone());}catch{/* Cache is optional; do not fail a successful D1 response. */}
   return cacheable;
 }
 async function privateProfileCacheKey(identity:{issuer:string;subject:string}){
