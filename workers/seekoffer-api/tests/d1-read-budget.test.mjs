@@ -125,14 +125,24 @@ test('order retrieval and payment callbacks remain outside discretionary scan bu
 
 test('readiness probe requires server credentials and cannot return cached health as D1 readiness',async()=>{
  const f=fixture(),worker=createSnapshotWorker(),secret='synthetic-ingest-key-0123456789abcdef';
+ f.db.exec("CREATE TABLE main__notices(id TEXT PRIMARY KEY);INSERT INTO main__notices VALUES('synthetic')");
  const env={CORE:f.core,MODE:'production',ALLOWED_ORIGINS:'https://www.seekoffer.com.cn',INGEST_ENABLED:'true',SEEKOFFER_INGEST_SECRET:secret,...f.policy};
  const url='https://migration.seekoffer.com.cn/v1/internal/d1-status';
  assert.equal((await worker.fetch(new Request(url,{method:'POST'}),env)).status,401);
  assert.equal(f.queries.length,0);
  const ok=await worker.fetch(new Request(url,{method:'POST',headers:{'x-seekoffer-ingest-secret':secret}}),env);
- assert.equal(ok.status,200);assert.equal(ok.headers.get('Cache-Control'),'no-store');assert.equal((await ok.json()).budget.limit,2500000);assert.equal(f.queries.length,1);
+ assert.equal(ok.status,200);assert.equal(ok.headers.get('Cache-Control'),'no-store');const body=await ok.json();assert.equal(body.budget.limit,2500000);assert.equal(body.probeRowsRead,1);assert.equal(f.queries.length,2);
  const denied=await worker.fetch(new Request(url,{method:'POST',headers:{Origin:'https://www.seekoffer.com.cn','x-seekoffer-ingest-secret':secret}}),env);
  assert.equal(denied.status,403);f.db.close();
+});
+
+test('readiness never accepts a zero-row probe or bypasses a business-table quota failure',async()=>{
+ const worker=createSnapshotWorker(),secret='synthetic-ingest-key-0123456789abcdef';
+ for(const exhausted of [false,true]){
+  const core={prepare(sql){assert.match(sql,/FROM main__notices/);return{async all(){if(exhausted)throw new Error('D1 daily read limit exceeded');return result(0);}};}};
+  const response=await worker.fetch(new Request('https://migration.seekoffer.com.cn/v1/internal/d1-status',{method:'POST',headers:{'x-seekoffer-ingest-secret':secret}}),{CORE:core,MODE:'production',ALLOWED_ORIGINS:'',INGEST_ENABLED:'true',SEEKOFFER_INGEST_SECRET:secret,...config});
+  assert.equal(response.status,exhausted?402:503);assert.equal((await response.json()).error,exhausted?'SERVICE_QUOTA_EXCEEDED':'D1_READINESS_NOT_PROVEN');
+ }
 });
 
 test('a cached profile must never override an explicit account ban',async()=>{

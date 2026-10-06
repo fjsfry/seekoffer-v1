@@ -5,6 +5,7 @@ export interface ReadBudgetConfig {
  D1_SCAN_ROWS_PER_DAY?:string;
 }
 export const SCAN_RESERVATION=100000;
+export const READINESS_SQL='SELECT id FROM main__notices ORDER BY id LIMIT 1';
 const DEFAULT_DAILY_LIMIT=2500000;
 const PREFIX='d1_scan_budget:v1:';
 
@@ -16,6 +17,7 @@ export function scanBudgetLimit(config:ReadBudgetConfig){
 export function readBudgetReset(now=Date.now()){return(Math.floor(now/86400000)+1)*86400000;}
 export function isBudgetedScan(sql:string){
  if(!/^\s*SELECT\b/i.test(sql))return false;
+ if(sql===READINESS_SQL)return false;
  // Point lookups and indexed owner/time-window reads keep working when
  // discretionary reporting/search has spent its allowance.
  const table=sql.match(/\bFROM\s+(main__(?:notices|applications|profiles|site_visitors|site_visit_events)|commerce__(?:orders|payments|payment_events))\b/i)?.[1]?.toLowerCase();

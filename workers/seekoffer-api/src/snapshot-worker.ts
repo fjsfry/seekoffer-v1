@@ -26,7 +26,7 @@ import {accountDeletionAction,type AccountDeletionConfig} from './account-deleti
 import {processAccountDeletion} from './account-deletion-execution.ts';
 import {applyResourceJianPayNotification,createResourceOrder,createResourcePayment,downloadResourceFile,readOwnedResources,listResourceProducts,reconcileResourcePayment,readOrderForAccess,readResourceProduct,simulateResourcePayment} from './resource-commerce.ts';
 import {publicNoticePage} from './public-notice-page.ts';
-import {createReadBudget,readBudgetReset,readScanBudget,scanBudgetLimit,type ReadBudgetConfig} from './d1-read-budget.ts';
+import {createReadBudget,readBudgetReset,readScanBudget,scanBudgetLimit,READINESS_SQL,type ReadBudgetConfig} from './d1-read-budget.ts';
 export interface SnapshotEnv extends AuthConfig,BootstrapConfig,AnalyticsConfig,CommercialConfig {CORE:D1Database;MODE:'local'|'preview'|'production';ALLOWED_ORIGINS:string;PREVIEW_ACCESS_TOKEN?:string;BUSINESS_WRITES_ENABLED?:string;PUBLIC_READ_ENABLED?:string;PAYMENT_PROCESSING_ENABLED?:string;OPERATIONS_WRITES_ENABLED?:string;JIANPAY_CLIENT_NO?:string;JIANPAY_MERCHANT_KEY?:string;INGEST_ENABLED?:string;SEEKOFFER_INGEST_SECRET?:string;NATIVE_OAUTH_CLIENT_ID?:string;EXTENSION_OAUTH_CLIENT_ID?:string;LICENSE_ENABLED?:string;LICENSE_ATTEMPTS_PER_DAY?:string;ACCOUNT_ENTITLEMENT_ENABLED?:string}
 export interface SnapshotEnv {ASSET_BUCKET?:R2Bucket;COMMERCE_LOCAL_PAYMENT_ENABLED?:string;COMMERCE_ORDER_IDEMPOTENCY_KEY?:string;COMMERCE_NOTIFY_URL?:string;COMMERCE_RETURN_ORIGIN?:string}
 export interface SnapshotEnv extends ReadBudgetConfig {}
@@ -143,8 +143,10 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');
     if(origin||env.MODE==='preview'||env.INGEST_ENABLED!=='true')throw new ApiError(403,'SERVER_JOB_ONLY');
     await requireIngestSecret(request,env.SEEKOFFER_INGEST_SECRET);
+    const probe=await env.CORE.prepare(READINESS_SQL).all();
+    if(!probe.results.length||!(probe.meta.rows_read>0))throw new ApiError(503,'D1_READINESS_NOT_PROVEN');
     const budget=await readScanBudget(env.CORE,env);
-    return response({available:true,budget,checkedAt:new Date().toISOString()});
+    return response({available:true,probeRowsRead:probe.meta.rows_read,budget,checkedAt:new Date().toISOString()});
    }
    if(isPublicD1Read(path,request.method)&&publicD1QuotaBackoffUntil>Date.now()){
     // A D1 outage must not block an existing edge entry or extend itself on

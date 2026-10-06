@@ -43,7 +43,8 @@ debits the measured cost. Keep headroom and inspect actual account usage.
 
 `GET /health` reports configuration only and performs no D1 reads.
 `POST /v1/internal/d1-status` requires the existing ingestion secret, performs a
-single indexed read and never uses HTTP/edge caching. Scheduled preflight must
+real one-row business-table read plus an indexed budget lookup, and never uses
+HTTP/edge caching. A zero-row lookup is not proof of readiness. Scheduled preflight must
 use this endpoint, not the cached product or notice pages.
 
 Administrators can query `{resource: "read_budget", action: "snapshot"}` through
