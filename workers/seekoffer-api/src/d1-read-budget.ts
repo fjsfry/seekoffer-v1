@@ -3,6 +3,7 @@ import {ApiError} from './auth.ts';
 export interface ReadBudgetConfig {
  D1_READ_BUDGET_ENABLED?:string;
  D1_SCAN_ROWS_PER_DAY?:string;
+ D1_QUOTA_PAUSE_UNTIL?:string;
 }
 export const SCAN_RESERVATION=100000;
 export const READINESS_SQL='SELECT id FROM main__notices ORDER BY id LIMIT 1';
@@ -15,6 +16,10 @@ export function scanBudgetLimit(config:ReadBudgetConfig){
  return value;
 }
 export function readBudgetReset(now=Date.now()){return(Math.floor(now/86400000)+1)*86400000;}
+export function quotaPauseUntil(config:ReadBudgetConfig,now=Date.now()){
+ const until=Date.parse(config.D1_QUOTA_PAUSE_UNTIL||'');
+ return Number.isFinite(until)&&until>now?until:0;
+}
 export function isBudgetedScan(sql:string){
  if(!/^\s*SELECT\b/i.test(sql))return false;
  if(sql===READINESS_SQL)return false;

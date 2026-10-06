@@ -26,7 +26,7 @@ import {accountDeletionAction,type AccountDeletionConfig} from './account-deleti
 import {processAccountDeletion} from './account-deletion-execution.ts';
 import {applyResourceJianPayNotification,createResourceOrder,createResourcePayment,downloadResourceFile,readOwnedResources,listResourceProducts,reconcileResourcePayment,readOrderForAccess,readResourceProduct,simulateResourcePayment} from './resource-commerce.ts';
 import {publicNoticePage} from './public-notice-page.ts';
-import {createReadBudget,readBudgetReset,readScanBudget,scanBudgetLimit,READINESS_SQL,type ReadBudgetConfig} from './d1-read-budget.ts';
+import {createReadBudget,readBudgetReset,readScanBudget,scanBudgetLimit,quotaPauseUntil,READINESS_SQL,type ReadBudgetConfig} from './d1-read-budget.ts';
 export interface SnapshotEnv extends AuthConfig,BootstrapConfig,AnalyticsConfig,CommercialConfig {CORE:D1Database;MODE:'local'|'preview'|'production';ALLOWED_ORIGINS:string;PREVIEW_ACCESS_TOKEN?:string;BUSINESS_WRITES_ENABLED?:string;PUBLIC_READ_ENABLED?:string;PAYMENT_PROCESSING_ENABLED?:string;OPERATIONS_WRITES_ENABLED?:string;JIANPAY_CLIENT_NO?:string;JIANPAY_MERCHANT_KEY?:string;INGEST_ENABLED?:string;SEEKOFFER_INGEST_SECRET?:string;NATIVE_OAUTH_CLIENT_ID?:string;EXTENSION_OAUTH_CLIENT_ID?:string;LICENSE_ENABLED?:string;LICENSE_ATTEMPTS_PER_DAY?:string;ACCOUNT_ENTITLEMENT_ENABLED?:string}
 export interface SnapshotEnv {ASSET_BUCKET?:R2Bucket;COMMERCE_LOCAL_PAYMENT_ENABLED?:string;COMMERCE_ORDER_IDEMPOTENCY_KEY?:string;COMMERCE_NOTIFY_URL?:string;COMMERCE_RETURN_ORIGIN?:string}
 export interface SnapshotEnv extends ReadBudgetConfig {}
@@ -143,12 +143,15 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');
     if(origin||env.MODE==='preview'||env.INGEST_ENABLED!=='true')throw new ApiError(403,'SERVER_JOB_ONLY');
     await requireIngestSecret(request,env.SEEKOFFER_INGEST_SECRET);
+    if(quotaPauseUntil(env))throw new ApiError(402,'SERVICE_QUOTA_EXCEEDED');
     const probe=await env.CORE.prepare(READINESS_SQL).all();
     if(!probe.results.length||!(probe.meta.rows_read>0))throw new ApiError(503,'D1_READINESS_NOT_PROVEN');
+    const writeProbe=await env.CORE.prepare("INSERT INTO _runtime_state(key,value) VALUES('d1_readiness_probe',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(new Date().toISOString()).run();
+    if(!(writeProbe.meta.rows_written>0))throw new ApiError(503,'D1_WRITE_READINESS_NOT_PROVEN');
     const budget=await readScanBudget(env.CORE,env);
-    return response({available:true,probeRowsRead:probe.meta.rows_read,budget,checkedAt:new Date().toISOString()});
+    return response({available:true,probeRowsRead:probe.meta.rows_read,probeRowsWritten:writeProbe.meta.rows_written,budget,checkedAt:new Date().toISOString()});
    }
-   if(isPublicD1Read(path,request.method)&&publicD1QuotaBackoffUntil>Date.now()){
+   if(isPublicD1Read(path,request.method)&&(publicD1QuotaBackoffUntil>Date.now()||quotaPauseUntil(env))){
     // A D1 outage must not block an existing edge entry or extend itself on
     // every rejected request. Only a real database quota error starts a lease.
     if(request.method==='GET'){
@@ -191,6 +194,7 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');
     if(env.MODE==='preview'||env.BUSINESS_WRITES_ENABLED!=='true'||env.INGEST_ENABLED!=='true')throw new ApiError(503,'INGEST_MAINTENANCE');
     await requireIngestSecret(request,env.SEEKOFFER_INGEST_SECRET);
+    if(quotaPauseUntil(env))throw new ApiError(402,'SERVICE_QUOTA_EXCEEDED');
     return response(await ingestNotices(env.CORE,await boundedBody(request,524288)));
    }
    if(env.PUBLIC_READ_ENABLED==='false'&&path.startsWith('/v1/notices'))throw new ApiError(503,'PUBLIC_DATA_SERVED_BY_WEBSITE');

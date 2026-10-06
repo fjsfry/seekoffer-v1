@@ -29,6 +29,10 @@ clean, commit the patch and push its production branch before deployment.
 - The configured optional-scan budget is 2,500,000 rows/day. Indexed identity,
   per-user data, notice-ID and payment lookups remain available when it is spent.
 - Uncertain failed scans keep their reservation. Failed cache refreshes back off.
+- A confirmed provider incident can set `D1_QUOTA_PAUSE_UNTIL` to the known reset
+  timestamp. Public cache hits remain available, while uncached public reads and
+  ingestion defer without D1 access. This incident pause expires automatically;
+  it must not be set as a permanent disable flag.
 - Cache JSON must fit the database's 128 KiB constraint.
 - All limits reset at UTC midnight, or 08:00 in Asia/Shanghai. Admin daily cards
   separately roll over at Beijing midnight.
@@ -43,8 +47,9 @@ debits the measured cost. Keep headroom and inspect actual account usage.
 
 `GET /health` reports configuration only and performs no D1 reads.
 `POST /v1/internal/d1-status` requires the existing ingestion secret, performs a
-real one-row business-table read plus an indexed budget lookup, and never uses
-HTTP/edge caching. A zero-row lookup is not proof of readiness. Scheduled preflight must
+real one-row business-table read, one internal heartbeat write, and an indexed
+budget lookup. It never uses HTTP/edge caching. A zero-row lookup or a successful
+read alone is not proof that ingestion can write. Scheduled preflight must
 use this endpoint, not the cached product or notice pages.
 
 Administrators can query `{resource: "read_budget", action: "snapshot"}` through

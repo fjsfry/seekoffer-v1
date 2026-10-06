@@ -10,7 +10,7 @@ await build({stdin:{contents:`export * from './workers/seekoffer-api/src/d1-read
 export {noticeSql} from './workers/seekoffer-api/src/notice-sql.ts';
 export {publicNoticePage} from './workers/seekoffer-api/src/public-notice-page.ts';
 export {createSnapshotWorker} from './workers/seekoffer-api/src/snapshot-worker.ts';`,resolveDir:fileURLToPath(root),loader:'ts'},bundle:true,platform:'node',format:'esm',outfile:fileURLToPath(out),logLevel:'silent'});
-const {createReadBudget,isBudgetedScan,readScanBudget,scanBudgetLimit,SCAN_RESERVATION,noticeSql,publicNoticePage,createSnapshotWorker}=await import(out);
+const {createReadBudget,isBudgetedScan,readScanBudget,scanBudgetLimit,quotaPauseUntil,SCAN_RESERVATION,noticeSql,publicNoticePage,createSnapshotWorker}=await import(out);
 const config={D1_READ_BUDGET_ENABLED:'true',D1_SCAN_ROWS_PER_DAY:'2500000'};
 const sql='SELECT count(*) FROM main__notices';
 const result=rows=>({success:true,results:[],meta:{rows_read:rows,rows_written:0}});
@@ -19,8 +19,8 @@ function fixture(limit='2500000'){
  let failSettlement=false;const queries=[];
  const core={prepare(query){let values=[];const all=async()=>{
   queries.push(query);if(failSettlement&&query.startsWith('UPDATE _runtime_state'))throw new Error('synthetic settlement failure');
-  return{...result(1),results:db.prepare(query).all(...values)};
- };const s={bind(...v){values=v;return s;},all,async first(column){const row=(await all()).results[0];return column?row?.[column]:row;}};return s;}};
+  return{...result(1),meta:{rows_read:1,rows_written:/^(INSERT|UPDATE)/i.test(query)?1:0},results:db.prepare(query).all(...values)};
+ };const s={bind(...v){values=v;return s;},all,run:all,async first(column){const row=(await all()).results[0];return column?row?.[column]:row;}};return s;}};
  const policy={...config,D1_SCAN_ROWS_PER_DAY:limit};
  return{db,core,queries,policy,budget:()=>createReadBudget(core,policy),failSettlement:()=>{failSettlement=true;}};
 }
@@ -131,7 +131,7 @@ test('readiness probe requires server credentials and cannot return cached healt
  assert.equal((await worker.fetch(new Request(url,{method:'POST'}),env)).status,401);
  assert.equal(f.queries.length,0);
  const ok=await worker.fetch(new Request(url,{method:'POST',headers:{'x-seekoffer-ingest-secret':secret}}),env);
- assert.equal(ok.status,200);assert.equal(ok.headers.get('Cache-Control'),'no-store');const body=await ok.json();assert.equal(body.budget.limit,2500000);assert.equal(body.probeRowsRead,1);assert.equal(f.queries.length,2);
+ assert.equal(ok.status,200);assert.equal(ok.headers.get('Cache-Control'),'no-store');const body=await ok.json();assert.equal(body.budget.limit,2500000);assert.equal(body.probeRowsRead,1);assert.equal(body.probeRowsWritten,1);assert.equal(f.queries.length,3);
  const denied=await worker.fetch(new Request(url,{method:'POST',headers:{Origin:'https://www.seekoffer.com.cn','x-seekoffer-ingest-secret':secret}}),env);
  assert.equal(denied.status,403);f.db.close();
 });
@@ -143,6 +143,25 @@ test('readiness never accepts a zero-row probe or bypasses a business-table quot
   const response=await worker.fetch(new Request('https://migration.seekoffer.com.cn/v1/internal/d1-status',{method:'POST',headers:{'x-seekoffer-ingest-secret':secret}}),{CORE:core,MODE:'production',ALLOWED_ORIGINS:'',INGEST_ENABLED:'true',SEEKOFFER_INGEST_SECRET:secret,...config});
   assert.equal(response.status,exhausted?402:503);assert.equal((await response.json()).error,exhausted?'SERVICE_QUOTA_EXCEEDED':'D1_READINESS_NOT_PROVEN');
  }
+});
+
+test('readiness fails when tiny reads succeed but writes remain quota blocked',async()=>{
+ const secret='synthetic-ingest-key-0123456789abcdef',worker=createSnapshotWorker();
+ const core={prepare(sql){return{bind(){return this;},async all(){assert.match(sql,/FROM main__notices/);return{...result(1),results:[{id:'synthetic'}]};},async run(){throw new Error('D1 daily limit exceeded');}};}};
+ const response=await worker.fetch(new Request('https://migration.seekoffer.com.cn/v1/internal/d1-status',{method:'POST',headers:{'x-seekoffer-ingest-secret':secret}}),{CORE:core,MODE:'production',ALLOWED_ORIGINS:'',INGEST_ENABLED:'true',SEEKOFFER_INGEST_SECRET:secret,...config});
+ assert.equal(response.status,402);assert.equal((await response.json()).error,'SERVICE_QUOTA_EXCEEDED');
+});
+
+test('confirmed provider incident pauses server jobs without D1 access and expires at its deadline',async()=>{
+ const now=Date.now(),pause=new Date(now+3600000).toISOString(),secret='synthetic-ingest-key-0123456789abcdef';
+ assert.equal(quotaPauseUntil({D1_QUOTA_PAUSE_UNTIL:pause},now),now+3600000);
+ assert.equal(quotaPauseUntil({D1_QUOTA_PAUSE_UNTIL:pause},now+3600000),0);
+ const core={prepare(){throw new Error('incident guard must not read D1');}},env={CORE:core,MODE:'production',ALLOWED_ORIGINS:'',INGEST_ENABLED:'true',BUSINESS_WRITES_ENABLED:'true',SEEKOFFER_INGEST_SECRET:secret,D1_QUOTA_PAUSE_UNTIL:pause,...config};
+ for(const path of ['/v1/internal/d1-status','/v1/internal/ingest-notices']){
+  const response=await createSnapshotWorker().fetch(new Request('https://migration.seekoffer.com.cn'+path,{method:'POST',headers:{'x-seekoffer-ingest-secret':secret},body:'{}'}),env);
+  assert.equal(response.status,402);assert.equal(response.headers.get('X-D1-Rows-Read'),'0');
+ }
+ const health=await createSnapshotWorker().fetch(new Request('https://migration.seekoffer.com.cn/health'),env);assert.equal(health.status,200);
 });
 
 test('a cached profile must never override an explicit account ban',async()=>{
