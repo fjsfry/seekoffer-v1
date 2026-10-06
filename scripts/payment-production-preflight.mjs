@@ -1,3 +1,5 @@
+import {probeD1} from './d1-readiness-core.mjs';
+
 const baseUrl = (process.env.API_BASE_URL || 'https://migration.seekoffer.com.cn').replace(/\/$/, '');
 
 async function request(path, init = {}) {
@@ -16,6 +18,12 @@ function check(name, ok, detail) {
 
 const health = await request('/health');
 check('health', health.status === 200 && health.body?.status === 'ok' && health.body?.backend === 'd1', {status: health.status, backend: health.body?.backend || null, mode: health.body?.mode || null});
+const readiness = await probeD1({baseUrl,secret:process.env.SEEKOFFER_INGEST_SECRET});
+if(readiness.deferred){
+  checks.push({name:'d1_live_read',ok:true,deferred:true,detail:readiness});
+  console.log(JSON.stringify({event:'payment_preflight_check',name:'d1_live_read',ok:true,deferred:true,detail:readiness}));
+  console.log(`::warning::${readiness.reason}; live D1 verification deferred.`);
+}else check('d1_live_read',readiness.ready,readiness);
 
 const products = await request('/v1/resources/products');
 const quotaDeferred = products.status === 402 && products.body?.error === 'SERVICE_QUOTA_EXCEEDED';
