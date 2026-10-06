@@ -46,5 +46,5 @@ check('unsigned_callback_rejected', [400, 401, 403].includes(callback.status), {
 
 const failed = checks.filter((item) => !item.ok);
 const deferred = checks.filter((item) => item.deferred);
-console.log(JSON.stringify({event: 'payment_preflight_summary', baseUrl, passed: checks.length - failed.length, deferred: deferred.length, failed: failed.length, checks}));
+console.log(JSON.stringify({event: 'payment_preflight_summary', baseUrl, passed: checks.filter((item) => item.ok && !item.deferred).length, deferred: deferred.length, failed: failed.length, checks}));
 if (failed.length) process.exitCode = 1;
