@@ -32,10 +32,15 @@ async function cached<T>(db:D1Database,version:string,name:string,now:number,loa
  if(!lease){if(row?.result_json)return{value:JSON.parse(row.result_json) as T,cache:'STALE'};throw new ApiError(503,'PUBLIC_REFRESH_IN_PROGRESS');}
  try{
   const result=await load(),json=JSON.stringify(result.value);
-  if(new TextEncoder().encode(json).byteLength>512000)throw new ApiError(503,'PUBLIC_AGGREGATE_TOO_LARGE');
+  if(new TextEncoder().encode(json).byteLength>131072)throw new ApiError(503,'PUBLIC_AGGREGATE_TOO_LARGE');
   await db.prepare('UPDATE _notice_query_cache SET result_json=?,expires_at=?,lock_until=0 WHERE cache_key=? AND data_version=?').bind(json,result.expiresAt,key,version).run();
   return{value:result.value,cache:'MISS'};
- }catch(error){if(row?.result_json)return{value:JSON.parse(row.result_json) as T,cache:'STALE'};throw error;}
+ }catch(error){
+  // Retain a longer cooldown after failed refreshes; the table's JSON limit
+  // and transient failures must not cause a full scan every fifteen seconds.
+  try{await db.prepare('UPDATE _notice_query_cache SET lock_until=? WHERE cache_key=? AND data_version=?').bind(now+5*60*1000,key,version).run();}catch{/* The database may already be unavailable. */}
+  if(row?.result_json)return{value:JSON.parse(row.result_json) as T,cache:'STALE'};throw error;
+ }
 }
 
 async function metadata(db:D1Database,category:string,region:string,now:number,part:'full'|'summary'|'facets'|'colleges'='full'):Promise<Metadata> {
@@ -166,7 +171,9 @@ export async function publicNoticePage(db:D1Database,params:URLSearchParams,now=
   // Counts are display metadata, not an authorization decision. Keep them
   // briefly stale and independent from the per-batch notice version so a
   // crawler refresh cannot force another filtered table scan for every user.
-  const count=await cacheReader(db,PUBLIC_COUNT_CACHE_VERSION,'count:'+query.countKey,now,async()=>({value:Number(await db.prepare('SELECT count(*) total FROM main__notices n WHERE '+query.where).bind(...query.values).first('total')),expiresAt:Math.min(meta.value.expiresAt,now+PUBLIC_COUNT_TTL)}));
+  const count=query.where===visible+' AND n.year=?'&&query.values[0]===2026
+   ?{value:meta.value.stats.total2026,cache:meta.cache}
+   :await cacheReader(db,PUBLIC_COUNT_CACHE_VERSION,'count:'+query.countKey,now,async()=>({value:Number(await db.prepare('SELECT count(*) total FROM main__notices n WHERE '+query.where).bind(...query.values).first('total')),expiresAt:Math.min(meta.value.expiresAt,now+PUBLIC_COUNT_TTL)}));
  const total=count.value,totalPages=Math.max(1,Math.ceil(total/query.pageSize)),page=Math.min(query.page,totalPages);
  const rows=await db.prepare('SELECT catalog_projection FROM main__notices n WHERE '+query.where+' ORDER BY '+query.order+' LIMIT ? OFFSET ?').bind(...query.values,query.pageSize,(page-1)*query.pageSize).all<ProjectionRow>();
  const finalVersion=await db.prepare("SELECT value FROM _runtime_state WHERE key='notice_version'").first<string>('value');

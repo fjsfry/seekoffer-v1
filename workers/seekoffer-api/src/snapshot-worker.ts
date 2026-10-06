@@ -26,8 +26,10 @@ import {accountDeletionAction,type AccountDeletionConfig} from './account-deleti
 import {processAccountDeletion} from './account-deletion-execution.ts';
 import {applyResourceJianPayNotification,createResourceOrder,createResourcePayment,downloadResourceFile,readOwnedResources,listResourceProducts,reconcileResourcePayment,readOrderForAccess,readResourceProduct,simulateResourcePayment} from './resource-commerce.ts';
 import {publicNoticePage} from './public-notice-page.ts';
+import {createReadBudget,readBudgetReset,readScanBudget,scanBudgetLimit,type ReadBudgetConfig} from './d1-read-budget.ts';
 export interface SnapshotEnv extends AuthConfig,BootstrapConfig,AnalyticsConfig,CommercialConfig {CORE:D1Database;MODE:'local'|'preview'|'production';ALLOWED_ORIGINS:string;PREVIEW_ACCESS_TOKEN?:string;BUSINESS_WRITES_ENABLED?:string;PUBLIC_READ_ENABLED?:string;PAYMENT_PROCESSING_ENABLED?:string;OPERATIONS_WRITES_ENABLED?:string;JIANPAY_CLIENT_NO?:string;JIANPAY_MERCHANT_KEY?:string;INGEST_ENABLED?:string;SEEKOFFER_INGEST_SECRET?:string;NATIVE_OAUTH_CLIENT_ID?:string;EXTENSION_OAUTH_CLIENT_ID?:string;LICENSE_ENABLED?:string;LICENSE_ATTEMPTS_PER_DAY?:string;ACCOUNT_ENTITLEMENT_ENABLED?:string}
 export interface SnapshotEnv {ASSET_BUCKET?:R2Bucket;COMMERCE_LOCAL_PAYMENT_ENABLED?:string;COMMERCE_ORDER_IDEMPOTENCY_KEY?:string;COMMERCE_NOTIFY_URL?:string;COMMERCE_RETURN_ORIGIN?:string}
+export interface SnapshotEnv extends ReadBudgetConfig {}
 const MAIN='mnotoltpythkayguhnrk';
 let publicD1QuotaBackoffUntil=0;
 function isPublicD1Read(path:string,method:string){
@@ -100,16 +102,17 @@ export async function resolveSnapshotOwner(db:D1Database,identity:{issuer:string
   return row.id;
 }
 type IdentityVerifier=(token:string,env:AuthConfig)=>Promise<{issuer:string;subject:string}>;
-function meterDatabase(db:D1Database,usage:{queries:number;rowsRead:number;rowsWritten:number}){
- const originals=new WeakMap<object,D1PreparedStatement>();
+function meterDatabase(db:D1Database,usage:{queries:number;rowsRead:number;rowsWritten:number},config:ReadBudgetConfig={}){
+ const originals=new WeakMap<object,{statement:D1PreparedStatement;sql:string}>();
  const record=(result:D1Result)=>{usage.queries++;usage.rowsRead+=Number(result.meta?.rows_read||0);usage.rowsWritten+=Number(result.meta?.rows_written||0);};
- const wrap=(statement:D1PreparedStatement):D1PreparedStatement=>{const wrapped={bind(...args:unknown[]):D1PreparedStatement{return wrap(statement.bind(...args));},async all(){const result=await statement.all();record(result);return result;},async run(){const result=await statement.run();record(result);return result;},async first(column?:string){const result=await statement.all();record(result);const row=result.results[0] as Record<string,unknown>|undefined;return column?row?.[column]??null:row??null;}};originals.set(wrapped,statement);return wrapped as unknown as D1PreparedStatement;};
- return {prepare(sql:string){return wrap(db.prepare(sql));},async batch(statements:D1PreparedStatement[]){const raw=statements.map(s=>{const original=originals.get(s);if(!original)throw new ApiError(503,'FOREIGN_BATCH_STATEMENT');return original;});const results=await db.batch(raw);results.forEach(record);return results;}
+ const budget=createReadBudget(db,config,record);
+ const wrap=(statement:D1PreparedStatement,sql:string):D1PreparedStatement=>{const all=async()=>(await budget([sql],async()=>[await statement.all()]))[0];const wrapped={bind(...args:unknown[]):D1PreparedStatement{return wrap(statement.bind(...args),sql);},all,async run(){return(await budget([sql],async()=>[await statement.run()]))[0];},async first(column?:string){const result=await all();const row=result.results[0] as Record<string,unknown>|undefined;return column?row?.[column]??null:row??null;}};originals.set(wrapped,{statement,sql});return wrapped as unknown as D1PreparedStatement;};
+ return {prepare(sql:string){return wrap(db.prepare(sql),sql);},async batch(statements:D1PreparedStatement[]){const raw=statements.map(s=>{const original=originals.get(s);if(!original)throw new ApiError(503,'FOREIGN_BATCH_STATEMENT');return original;});return budget(raw.map(s=>s.sql),()=>db.batch(raw.map(s=>s.statement)));}
  } as unknown as D1Database;
 }
 export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,clerkFetch:typeof fetch=fetch){
  return {async fetch(request:Request,env:SnapshotEnv):Promise<Response>{
-  const usage={queries:0,rowsRead:0,rowsWritten:0};env={...env,CORE:meterDatabase(env.CORE,usage)};
+  const usage={queries:0,rowsRead:0,rowsWritten:0};env={...env,CORE:meterDatabase(env.CORE,usage,env)};
   let previewIdentity:{issuer:string;subject:string}|null=null;
   const requestId=crypto.randomUUID(),url=new URL(request.url),origin=request.headers.get('origin');
   const clientKind=request.headers.get('x-seekoffer-client');
@@ -136,6 +139,13 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     }
     }
    const path=url.pathname.replace(/\/$/,'').replace(/^\/api\/public\/notices/,'/v1/notices');
+   if(path==='/v1/internal/d1-status'){
+    if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');
+    if(origin||env.MODE==='preview'||env.INGEST_ENABLED!=='true')throw new ApiError(403,'SERVER_JOB_ONLY');
+    await requireIngestSecret(request,env.SEEKOFFER_INGEST_SECRET);
+    const budget=await readScanBudget(env.CORE,env);
+    return response({available:true,budget,checkedAt:new Date().toISOString()});
+   }
    if(isPublicD1Read(path,request.method)&&publicD1QuotaBackoffUntil>Date.now()){
     // A D1 outage must not block an existing edge entry or extend itself on
     // every rejected request. Only a real database quota error starts a lease.
@@ -250,7 +260,7 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     const body=await boundedBody(request,4096),ip=env.MODE==='local'?'synthetic-local':request.headers.get('cf-connecting-ip');if(!ip)throw new ApiError(503,'LICENSE_GUARD_UNAVAILABLE');
     const result=await licenseAction(env.CORE,body,env.PREVIEW_ACCESS_TOKEN,ip,Number(env.LICENSE_ATTEMPTS_PER_DAY||100));return response(result,['activate','renew'].includes(String(body.action))&&!result.active?400:200);
    }
-   if(path==='/health')return response({status:'ok',backend:'d1',mode:env.MODE,migrationComplete:true,businessWritesEnabled:env.BUSINESS_WRITES_ENABLED==='true'});
+   if(path==='/health')return response({status:'ok',backend:'d1',mode:env.MODE,migrationComplete:true,businessWritesEnabled:env.BUSINESS_WRITES_ENABLED==='true',scanBudgetEnabled:env.D1_READ_BUDGET_ENABLED==='true',scanRowsPerDay:env.D1_READ_BUDGET_ENABLED==='true'?scanBudgetLimit(env):null});
    if(path==='/v1/billing/plans'){
     if(request.method!=='GET')throw new ApiError(405,'METHOD_NOT_ALLOWED');
     const edgeCache=edgeCacheStore(),cacheKey=publicEdgeCache(request,origin,'billing-plans'),hit=await edgeCacheHit(edgeCache,cacheKey,requestId);if(hit)return hit;
@@ -360,7 +370,7 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     }
      return fresh;
     }catch(error){
-     if(cached){
+     if(cached&&(!(error instanceof ApiError)||error.status>=500||error.message==='SERVICE_QUOTA_EXCEEDED')){
       const body=await cached.json().catch(()=>null);
       if(body&&typeof body==='object')return response(body,200,{'X-Profile-Cache':'STALE'});
      }
@@ -461,7 +471,7 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
    }
    throw new ApiError(501,'ROUTE_NOT_YET_MIGRATED');
    }catch(error){
-    if(error instanceof ApiError){if(error.message==='SERVICE_QUOTA_EXCEEDED')markPublicD1QuotaBackoff();return response({error:error.message,requestId},error.status,error.status===503?{'Retry-After':'15'}:error.message==='SERVICE_QUOTA_EXCEEDED'?{'Retry-After':'60'}:{});}
+    if(error instanceof ApiError){if(error.message==='SERVICE_QUOTA_EXCEEDED')markPublicD1QuotaBackoff();return response({error:error.message,requestId},error.status,error.message==='READ_BUDGET_EXHAUSTED'?{'Retry-After':String(Math.max(1,Math.ceil((readBudgetReset()-Date.now())/1000)))}:error.status===503?{'Retry-After':'15'}:error.message==='SERVICE_QUOTA_EXCEEDED'?{'Retry-After':'60'}:{});}
     const message=error instanceof Error?error.message:'';
     if(message.includes('ACCOUNT_CLOSED'))return response({error:'ACCOUNT_BLOCKED',requestId},403);
     if(message.includes('FREE_APPLICATION_LIMIT'))return response({error:'FREE_APPLICATION_LIMIT',requestId},403);

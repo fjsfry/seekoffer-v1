@@ -6,6 +6,7 @@ import {overrideStatements} from './notice-overrides.ts';
 import {prepareNoticeOrder} from './notice-order';
 import {readPaymentMonitor} from './payments/payment-monitor.ts';
 import {cachedAdminRead,adminNoticeStatistics,ADMIN_AGGREGATE_TTL} from './admin-read-cache.ts';
+import {readScanBudget,type ReadBudgetConfig} from './d1-read-budget.ts';
 export type Admin={email:string;name:string;role:string;status:string;ownerId?:string};
 const permissions:Record<string,string[]>={super_admin:['overview','content','users','settings','logs'],ops_manager:['overview','content','users','logs'],content_reviewer:['overview','content'],readonly_admin:['overview','logs']};
 function permit(admin:Admin,permission:string){if(!permissions[admin.role]?.includes(permission))throw new ApiError(403,'ADMIN_PERMISSION_DENIED');}
@@ -101,10 +102,11 @@ async function auditMutation(db:D1Database,admin:Admin,module:string,target:stri
  const log=db.prepare('INSERT INTO main__admin_operation_logs(admin_email,action,module,target_id,before_data,after_data,remark) VALUES(?,?,?,?,?,?,?)').bind(admin.email,'update_'+module,module,target,JSON.stringify(before||{}),JSON.stringify(after||{}),note);
  const results=await db.batch([change,...extra,log]);return results[0].results[0];
 }
-export async function adminAction(db:D1Database,admin:Admin,body:Record<string,unknown>,writes:boolean,config:BootstrapConfig&AnalyticsConfig={},fetcher:typeof fetch=fetch){
+export async function adminAction(db:D1Database,admin:Admin,body:Record<string,unknown>,writes:boolean,config:BootstrapConfig&AnalyticsConfig&ReadBudgetConfig={},fetcher:typeof fetch=fetch){
  fields(body,['resource','action','id','ids','status','note','key','value','notice','page','pageSize','filters','sort']);const resource=str(body.resource,40),action=str(body.action,40)||'list';
  if(resource==='me')return{admin};
  const permission=resource==='settings'?'settings':['users','feedback','ai_waitlist'].includes(resource)?'users':resource==='logs'?'logs':['notices','offers','comments'].includes(resource)?'content':'overview';permit(admin,permission);
+ if(resource==='read_budget'&&action==='snapshot')return readScanBudget(db,config);
  if(resource==='analytics')return readAnalytics(db,config);
  if(resource==='payment_monitor'&&action==='snapshot')return readPaymentMonitor(db,config);
  if(resource==='users'&&action==='list')return listUsers(db,body,config,fetcher);

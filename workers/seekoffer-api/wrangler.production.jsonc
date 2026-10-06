@@ -36,6 +36,8 @@
     "CLERK_AUDIENCE": "seekoffer",
     "AUTHORIZED_PARTIES": "https://www.seekoffer.com.cn,https://seekoffer.com.cn,https://migration.seekoffer.com.cn,chrome-extension://lmppfkhnomljidhplhhnboolhbleodeg,https://preview.seekoffer.com.cn",
     "PUBLIC_READ_ENABLED": "true",
+    "D1_READ_BUDGET_ENABLED": "true",
+    "D1_SCAN_ROWS_PER_DAY": "2500000",
     "INGEST_ENABLED": "true",
     "NATIVE_OAUTH_CLIENT_ID": "bXDBbWjJFxXqoeG3",
     "EXTENSION_OAUTH_CLIENT_ID": "uOgpBiVrePh1RgDk",

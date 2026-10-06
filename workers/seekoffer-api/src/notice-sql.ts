@@ -38,7 +38,8 @@ export function noticeSql(params:URLSearchParams,now=Date.now()){
   const date=text(params,'date',10);if(date){if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new ApiError(400,'INVALID_DATE');where.push('n.publish_date=?');values.push(date);}
   const sort=pick(params,'sort',['publish','updated','deadline','school'],'publish');
   const orders:Record<string,string>={publish:'n.publish_date DESC,'+projection('sourceRank'),updated:projection('updatedSort')+' DESC,'+projection('sourceRank'),school:projection('schoolRank')+','+projection('sourceRank'),deadline:`CASE WHEN ${deadline}<=${Math.trunc(now)} THEN 1 ELSE 0 END,coalesce(${deadline},9007199254740991),`+projection('sourceRank')};
-  const countKey=[...params.entries()].filter(([k])=>!['page','pageSize','sort'].includes(k)).sort(([a],[b])=>a.localeCompare(b));
+  const countKey=[...params.entries()].map(([k,v])=>[k,v.trim()] as [string,string]).filter(([k,v])=>!['page','pageSize','sort','year'].includes(k)&&v!==''&&v!=='全部').map(([k,v])=>[k,['q','school','major'].includes(k)?v.toLowerCase():v]);
+  countKey.push(['year',year]);countKey.sort(([a],[b])=>a.localeCompare(b));
   return {page,pageSize,where:where.join(' AND '),values,order:orders[sort],countKey:JSON.stringify(countKey),cacheMilliseconds:status!=='全部'||quick!=='全部'||fresh==='today'?60000:3600000};
 }
 export async function cachedCount(db:D1Database,query:ReturnType<typeof noticeSql>,now:number){
