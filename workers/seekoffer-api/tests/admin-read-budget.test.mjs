@@ -9,9 +9,11 @@ const root=new URL('../../../',import.meta.url);
 const out=new URL('artifacts/d1-migration/admin-read-budget-tests.mjs',root);
 await build({stdin:{contents:`export {adminAction} from './workers/seekoffer-api/src/admin.ts';
 export {cachedAdminRead,adminNoticeStatistics} from './workers/seekoffer-api/src/admin-read-cache.ts';
-export {readAnalytics} from './workers/seekoffer-api/src/analytics.ts';
+export {readAnalytics,recordPageview} from './workers/seekoffer-api/src/analytics.ts';
+export {buildPageview,postPageview,analyticsResumeAt} from './lib/visitor-analytics.ts';
+export {formatMetric,isStatisticsFresh} from './lib/admin-statistics.ts';
 export {createSnapshotWorker} from './workers/seekoffer-api/src/snapshot-worker.ts';`,resolveDir:fileURLToPath(root),loader:'ts'},bundle:true,platform:'node',format:'esm',outfile:fileURLToPath(out),logLevel:'silent'});
-const {adminAction,cachedAdminRead,adminNoticeStatistics,readAnalytics,createSnapshotWorker}=await import(out);
+const {adminAction,cachedAdminRead,adminNoticeStatistics,readAnalytics,recordPageview,buildPageview,postPageview,analyticsResumeAt,formatMetric,isStatisticsFresh,createSnapshotWorker}=await import(out);
 const admin={email:'synthetic@example.invalid',name:'Synthetic admin',role:'super_admin',status:'active'};
 const now=Date.parse('2026-10-06T03:00:00Z');
 
@@ -104,6 +106,97 @@ test('analytics retains live counts but reads the lifetime visitor total only ho
  assert.equal(result.metrics.totalVisitors,1);assert.equal(result.metrics.onlineVisitors,0);
  assert.equal(queries.filter(sql=>sql==='SELECT count(*) AS n FROM main__site_visitors').length,1);
  assert.equal((await readAnalytics(core,{ANALYTICS_ENABLED:'false'},now)).available,false);db.close();
+});
+
+const pageview = (overrides={}) => buildPageview({
+ requestId:crypto.randomUUID(),visitorId:'v_1234567890abcdef',sessionId:'s_1234567890abcdef',
+ path:'/resources/?order=private#secret',title:'Synthetic page',referrer:'https://example.invalid/path?secret=1',
+ locale:'zh-CN',timezone:'Asia/Shanghai',...overrides
+});
+function setupAnalytics(){
+ const fixture=setup();
+ fixture.db.exec("CREATE TABLE _business_sequences(name TEXT PRIMARY KEY, next_value INTEGER NOT NULL); INSERT INTO _business_sequences VALUES('main__site_visit_events',106396)");
+ return fixture;
+}
+
+test('the actual browser payload is accepted and increments real analytics atomically',async()=>{
+ const {db,core}=setupAnalytics(),payload=pageview(),config={ANALYTICS_ENABLED:'true',ANALYTICS_EVENTS_PER_DAY:'300'};
+ assert.equal(payload.path,'/resources/');assert.equal(payload.referrer,'https://example.invalid');
+ const result=await postPageview('https://example.invalid/v1/analytics',payload,async(_url,init)=>{
+  assert.equal(init.credentials,'omit');
+  return Response.json(await recordPageview(core,JSON.parse(init.body),config,now));
+ });
+ assert.equal(result.ok,true);
+ const stats=await readAnalytics(core,config,now);
+ assert.equal(stats.metrics.todayPageViews,1);assert.equal(stats.metrics.todayVisitors,1);
+ assert.equal(stats.metrics.onlineVisitors,1);assert.equal(stats.metrics.totalVisitors,1);
+ assert.equal(stats.coverage.dailyAccepted,1);assert.equal(stats.generatedAt,new Date(now).toISOString());
+ assert.equal(Date.parse(stats.lastReceivedAt),now);
+ assert.equal(db.prepare('SELECT id FROM main__site_visit_events').get().id,106396);db.close();
+});
+
+test('idempotency and duplicate route views never double count and budgets still stop writes',async()=>{
+ const {db,core}=setupAnalytics(),config={ANALYTICS_ENABLED:'true',ANALYTICS_EVENTS_PER_DAY:'1'},payload=pageview();
+ await recordPageview(core,payload,config,now);
+ assert.equal((await recordPageview(core,payload,config,now+1)).deduplicated,true);
+ await assert.rejects(()=>recordPageview(core,{...payload,path:'/notices/'},config,now+1),/ANALYTICS_REQUEST_CONFLICT/);
+ await assert.rejects(()=>recordPageview(core,pageview({path:'/notices/'}),config,now+1),/ANALYTICS_DAILY_BUDGET/);
+ assert.equal(db.prepare('SELECT count(*) n FROM main__site_visit_events').get().n,1);
+ assert.equal(db.prepare('SELECT page_view_count n FROM main__site_visitors').get().n,1);
+ const stats=await readAnalytics(core,config,now+2);
+ assert.equal(stats.coverage.budgetReached,true);
+ assert.equal(stats.coverage.budgetResetsAt,'2026-10-07T00:00:00.000Z');db.close();
+});
+
+test('unsupported legacy payloads fail before any database access and optional strings are bounded',async()=>{
+ const {db,core,queries}=setupAnalytics();
+ await assert.rejects(()=>recordPageview(core,{...pageview(),requestId:undefined},{ANALYTICS_ENABLED:'true'},now),/INVALID_ANALYTICS_EVENT/);
+ await assert.rejects(()=>recordPageview(core,{...pageview(),eventType:'heartbeat'},{ANALYTICS_ENABLED:'true'},now),/INVALID_ANALYTICS_EVENT/);
+ assert.equal(queries.length,0);
+ assert.equal(pageview({path:'/admin/dashboard'}),null);assert.equal(pageview({path:'//other.invalid'}),null);
+ assert.equal(pageview({title:'x'.repeat(300),referrer:'invalid'}).title.length,180);
+ assert.equal(pageview({referrer:'javascript:alert(1)'}).referrer,'');db.close();
+});
+
+test('route replays within 30 seconds are deduplicated, later real visits count again',async()=>{
+ const {db,core}=setupAnalytics(),config={ANALYTICS_ENABLED:'true',ANALYTICS_EVENTS_PER_DAY:'300'};
+ await recordPageview(core,pageview(),config,now);
+ assert.equal((await recordPageview(core,pageview(),config,now+1000)).deduplicated,true);
+ assert.equal((await recordPageview(core,pageview(),config,now+31000)).recorded,true);
+ assert.equal(db.prepare('SELECT count(*) n FROM main__site_visit_events').get().n,2);
+ assert.equal(db.prepare('SELECT page_view_count n FROM main__site_visitors').get().n,2);
+ const plan=db.prepare('EXPLAIN QUERY PLAN SELECT 1 FROM main__site_visit_events WHERE visitor_id=? AND created_at>=? AND session_id=? AND path=?').all('v_1234567890abcdef','2026-10-06','s_1234567890abcdef','/resources/');
+ assert.ok(plan.some(row=>row.detail.includes('main__site_visit_events_visitor_created_idx')));db.close();
+});
+
+test('an expired analytics snapshot is marked unavailable when its refresh fails',async()=>{
+ const {db,core}=setupAnalytics(),config={ANALYTICS_ENABLED:'true'};
+ await recordPageview(core,pageview(),config,now);
+ await readAnalytics(core,config,now);
+ const broken={...core,prepare(sql){if(sql.includes("key='analytics_started_at'"))throw new Error('synthetic outage');return core.prepare(sql);}};
+ const stale=await readAnalytics(broken,config,now+180000);
+ assert.equal(stale.available,false);assert.equal(stale.metrics.todayPageViews,1);
+ assert.equal(stale.generatedAt,new Date(now).toISOString());db.close();
+});
+
+test('collector failures back off; unsuccessful responses are never treated as recorded',async()=>{
+ assert.equal(analyticsResumeAt(402,'ANALYTICS_DAILY_BUDGET',null,now),Date.parse('2026-10-07T00:00:00Z'));
+ assert.equal(analyticsResumeAt(503,'SERVICE_UNAVAILABLE','120',now),now+120000);
+ assert.equal(analyticsResumeAt(400,'INVALID_ANALYTICS_EVENT',null,now),now+300000);
+ for(const status of [400,402,429,503]) {
+  const result=await postPageview('https://example.invalid',pageview(),async()=>Response.json({error:'synthetic'},{status}));
+  assert.equal(result.ok,false);
+ }
+ assert.equal((await postPageview('https://example.invalid',pageview(),async()=>Response.json({}))).ok,false);
+});
+
+test('unknown statistics do not become zero and stale or previous-day snapshots are identified',()=>{
+ assert.equal(formatMetric(null),'--');assert.equal(formatMetric(undefined),'--');assert.equal(formatMetric(NaN),'--');
+ assert.equal(formatMetric(0),'0');assert.equal(formatMetric(12090),'12,090');
+ assert.equal(isStatisticsFresh(new Date(now).toISOString(),60,now+59000),true);
+ assert.equal(isStatisticsFresh(new Date(now).toISOString(),60,now+120000),false);
+ assert.equal(isStatisticsFresh('2026-10-06T15:59:59Z',3600,Date.parse('2026-10-06T16:00:01Z')),false);
+ assert.equal(isStatisticsFresh(undefined,60,now),false);
 });
 
 test('quota backoff serves edge hits and repeated rejections do not postpone recovery',async()=>{

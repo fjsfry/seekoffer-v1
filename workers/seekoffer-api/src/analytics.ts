@@ -43,14 +43,21 @@ export async function recordPageview(db:D1Database,body:Row,config:AnalyticsConf
  return{recorded:false,deduplicated:true};
 }
 
-export const unavailableAnalytics={available:false,reason:'访问统计暂停；历史日志尚未迁完，指标不可用不代表零。',metrics:{onlineVisitors:null,totalVisitors:null,todayVisitors:null,todayPageViews:null,activeWindowMinutes:6},onlineVisitors:[],recentVisitors:[]};
+export const unavailableAnalytics={available:false,generatedAt:null as string|null,refreshIntervalSeconds:60,lastReceivedAt:null as string|null,reason:'访问统计暂不可用，未获取到的指标不代表零。',metrics:{onlineVisitors:null,totalVisitors:null,todayVisitors:null,todayPageViews:null,activeWindowMinutes:6},onlineVisitors:[],recentVisitors:[]};
 export async function readAnalytics(db:D1Database,config:AnalyticsConfig,now=Date.now()){
  if(config.ANALYTICS_ENABLED!=='true')return unavailableAnalytics;
- return cachedAdminRead(db,'analytics:'+analyticsLimit(config),60000,()=>loadAnalytics(db,config,now),now);
+ const result=await cachedAdminRead(db,'analytics-v2:'+analyticsLimit(config),60000,()=>loadAnalytics(db,config,now),now);
+ // Cache fallback must remain visible as an old snapshot, never as live traffic.
+ const generated=Date.parse(result.generatedAt||'');
+ const day=(time:number)=>new Date(time+28800000).toISOString().slice(0,10);
+ if(result.available&&(!Number.isFinite(generated)||now-generated>=120000||day(now)!==day(generated))){
+  return{...result,available:false,reason:'访问统计暂未更新，保留上次记录；当前指标不可用。'};
+ }
+ return result;
 }
 async function loadAnalytics(db:D1Database,config:AnalyticsConfig,now:number){
  const started=await db.prepare("SELECT value FROM _runtime_state WHERE key='analytics_started_at'").first<{value:string}>();
- if(!started)return{...unavailableAnalytics,reason:'访问采集已就绪，尚未收到第一条有效记录。'};
+ if(!started)return{...unavailableAnalytics,generatedAt:new Date(now).toISOString(),reason:'访问采集已就绪，尚未收到第一条有效记录。'};
  const today=isoMicro(Date.parse(new Date(now+28800000).toISOString().slice(0,10)+'T00:00:00+08:00')),cutoff=isoMicro(now-6*60000),since=started.value>today?started.value:today;
  const columns='visitor_id,first_seen_at,last_seen_at,last_path,last_title,last_referrer,last_locale,last_timezone,visit_count,page_view_count';
  const totalVisitors=await cachedAdminRead(db,'total-visitors',ADMIN_AGGREGATE_TTL,async()=>Number(await db.prepare('SELECT count(*) AS n FROM main__site_visitors').first('n')||0),now);
@@ -63,5 +70,5 @@ async function loadAnalytics(db:D1Database,config:AnalyticsConfig,now:number){
   db.prepare('SELECT value FROM _runtime_state WHERE key=?').bind('analytics_events_day:'+new Date(now).toISOString().slice(0,10))
  ]);
  const used=Number((results[5].results[0] as Row|undefined)?.value||0),limit=analyticsLimit(config);
- return{available:true,reason:'访客累计来自已迁入的访客档案；今日浏览仅统计恢复采集后已记录的访问。历史访问日志仍按要求暂停，采集达到日上限后停止，不能视为完整流量。',coverage:{startedAt:started.value,todayFrom:since,historicalEventsComplete:false,dailyAccepted:used,dailyLimit:limit,budgetReached:used>=limit},metrics:{totalVisitors,todayVisitors:Number((results[0].results[0] as Row).n),onlineVisitors:Number((results[1].results[0] as Row).n),todayPageViews:Number((results[2].results[0] as Row).n),activeWindowMinutes:6},onlineVisitors:results[3].results,recentVisitors:results[4].results};
+ return{available:true,generatedAt:new Date(now).toISOString(),refreshIntervalSeconds:60,lastReceivedAt:String((results[4].results[0] as Row|undefined)?.last_seen_at||'')||null,reason:'访客按浏览器去重；仅统计已采集访问，不代表完整流量。未采集的历史访问无法补回。',coverage:{startedAt:started.value,todayFrom:since,historicalEventsComplete:false,dailyAccepted:used,dailyLimit:limit,budgetReached:used>=limit,budgetResetsAt:new Date((Math.floor(now/86400000)+1)*86400000).toISOString()},metrics:{totalVisitors,todayVisitors:Number((results[0].results[0] as Row).n),onlineVisitors:Number((results[1].results[0] as Row).n),todayPageViews:Number((results[2].results[0] as Row).n),activeWindowMinutes:6},onlineVisitors:results[3].results,recentVisitors:results[4].results};
 }

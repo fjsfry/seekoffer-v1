@@ -42,6 +42,10 @@ function toSafeAdminMessage(message?: string) {
     return '操作暂时无法完成，请稍后重试。';
   }
 
+  if (/failed to fetch|fetch failed|network|timeout|timed out|aborted|load failed/i.test(message)) {
+    return '网络连接异常，数据暂未更新，请稍后重试。';
+  }
+
   if (/edge function|api|env|environment|jwt|token|function|\u63a5\u53e3|\u540e\u7aef|\u73af\u5883\u53d8\u91cf|\u767b\u5f55\u901a\u9053/i.test(message)) {
     return '系统服务暂时不可用，请稍后重试。';
   }

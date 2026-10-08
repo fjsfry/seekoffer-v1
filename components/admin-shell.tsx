@@ -53,15 +53,6 @@ type ShellOverviewMetrics = {
   pendingFeedback: number;
 };
 
-type ShellAnalyticsPayload = {
-  metrics: {
-    onlineVisitors: number;
-    totalVisitors: number;
-    todayPageViews: number;
-    activeWindowMinutes: number;
-  };
-};
-
 type ShellStatus = {
   loading: boolean;
   error: string;
@@ -69,9 +60,6 @@ type ShellStatus = {
   pendingNotices: number;
   pendingOffers: number;
   pendingFeedback: number;
-  onlineVisitors: number;
-  totalVisitors: number;
-  todayPageViews: number;
   lastCheckedAt: string;
 };
 
@@ -82,9 +70,6 @@ const emptyShellStatus: ShellStatus = {
   pendingNotices: 0,
   pendingOffers: 0,
   pendingFeedback: 0,
-  onlineVisitors: 0,
-  totalVisitors: 0,
-  todayPageViews: 0,
   lastCheckedAt: ''
 };
 
@@ -209,16 +194,16 @@ export function AdminShell({
     }
 
     let disposed = false;
+    let refreshing = false;
 
     const loadShellStatus = async () => {
+      if (refreshing || document.visibilityState !== 'visible') return;
+      refreshing = true;
       const startedAt = performance.now();
       setShellStatus((current) => ({ ...current, loading: true, error: '' }));
 
       try {
-        const [overview, analytics] = await Promise.all([
-          invokeAdminApi<{ metrics: ShellOverviewMetrics }>({ resource: 'overview', action: 'get' }),
-          invokeAdminApi<ShellAnalyticsPayload>({ resource: 'analytics', action: 'overview' })
-        ]);
+        const overview = await invokeAdminApi<{ metrics: ShellOverviewMetrics }>({ resource: 'overview', action: 'get' });
 
         if (disposed) {
           return;
@@ -231,9 +216,6 @@ export function AdminShell({
           pendingNotices: overview.metrics.pendingNotices || 0,
           pendingOffers: overview.metrics.pendingOffers || 0,
           pendingFeedback: overview.metrics.pendingFeedback || 0,
-          onlineVisitors: analytics.metrics.onlineVisitors || 0,
-          totalVisitors: analytics.metrics.totalVisitors || 0,
-          todayPageViews: analytics.metrics.todayPageViews || 0,
           lastCheckedAt: new Date().toISOString()
         });
       } catch (error) {
@@ -248,6 +230,8 @@ export function AdminShell({
           apiLatencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
           lastCheckedAt: new Date().toISOString()
         }));
+      } finally {
+        refreshing = false;
       }
     };
 
