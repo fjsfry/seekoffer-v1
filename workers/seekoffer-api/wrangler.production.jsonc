@@ -37,7 +37,7 @@
     "AUTHORIZED_PARTIES": "https://www.seekoffer.com.cn,https://seekoffer.com.cn,https://migration.seekoffer.com.cn,chrome-extension://lmppfkhnomljidhplhhnboolhbleodeg,https://preview.seekoffer.com.cn",
     "PUBLIC_READ_ENABLED": "true",
     "D1_READ_BUDGET_ENABLED": "true",
-    "D1_SCAN_ROWS_PER_DAY": "2500000",
+    "D1_SCAN_ROWS_PER_DAY": "1500000",
     "D1_QUOTA_PAUSE_UNTIL": "2026-10-07T00:00:00Z",
     "INGEST_ENABLED": "true",
     "NATIVE_OAUTH_CLIENT_ID": "bXDBbWjJFxXqoeG3",

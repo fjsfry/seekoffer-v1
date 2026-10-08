@@ -4,6 +4,7 @@ import {liveSummary,type NoticeProjection} from './notice-projection.ts';
 import {getDisplaySchoolName} from '../../../lib/notice-display';
 import {getNoticeRegionOptions,type CollegeNoticeStats} from '../../../lib/notice-analytics';
 import type {PublicNoticeProject} from '../../../lib/mock-data';
+import {noticeFeedSql} from './notice-feed-query.ts';
 
 const p=(key:string)=>`json_extract(n.catalog_projection,'$.${key}')`;
 const visible=publicVisibility+' AND n.catalog_projection IS NOT NULL';
@@ -18,28 +19,31 @@ type Metadata={stats:{total2026:number;todayUpdates:number;deadlineWithin3Days:n
 const PUBLIC_METADATA_CACHE_VERSION='public-metadata-v3';
 const PUBLIC_METADATA_TTL=60*60*1000;
 const PUBLIC_COUNT_CACHE_VERSION='public-count-v3';
-const PUBLIC_COUNT_TTL=15*60*1000;
+const PUBLIC_COUNT_TTL=60*60*1000;
 
 // Stores only bounded public aggregate data. Each lease is shared across
 // instances, failures back off, and callers can choose whether a cache entry
 // follows the live data version or a bounded staleness window.
-async function cached<T>(db:D1Database,version:string,name:string,now:number,load:()=>Promise<{value:T;expiresAt:number}>) {
- const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('public-sql-v1:'+version+':'+name));
+async function cached<T>(db:D1Database,version:string,name:string,now:number,load:()=>Promise<{value:T;expiresAt:number}>,options:{identity?:string;maxStaleMs?:number;maxBytes?:number}={}) {
+ const table=(options.maxBytes||0)>131072?'_public_notice_cache':'_notice_query_cache';
+ const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('public-sql-v1:'+(options.identity||version)+':'+name));
  const key=Array.from(new Uint8Array(bytes),v=>v.toString(16).padStart(2,'0')).join('');
- const row=await db.prepare('SELECT result_json,expires_at FROM _notice_query_cache WHERE cache_key=? AND data_version=?').bind(key,version).first<{result_json:string|null;expires_at:number}>();
+ const row=await db.prepare('SELECT result_json,expires_at FROM '+table+' WHERE cache_key=? AND data_version=?').bind(key,version).first<{result_json:string|null;expires_at:number}>();
  if(row?.result_json&&row.expires_at>now)return{value:JSON.parse(row.result_json) as T,cache:'HIT'};
- const lease=await db.prepare('INSERT INTO _notice_query_cache(cache_key,data_version,expires_at,lock_until,result_json) VALUES(?,?,0,?,NULL) ON CONFLICT(cache_key) DO UPDATE SET lock_until=excluded.lock_until WHERE lock_until<=? RETURNING cache_key').bind(key,version,now+15000,now).first();
- if(!lease){if(row?.result_json)return{value:JSON.parse(row.result_json) as T,cache:'STALE'};throw new ApiError(503,'PUBLIC_REFRESH_IN_PROGRESS');}
+ const stale=Boolean(row?.result_json&&now-row.expires_at<=(options.maxStaleMs??86400000));
+ const lease=await db.prepare('INSERT INTO '+table+'(cache_key,data_version,expires_at,lock_until,result_json) VALUES(?,?,0,?,NULL) ON CONFLICT(cache_key) DO UPDATE SET lock_until=excluded.lock_until,data_version=excluded.data_version,result_json=CASE WHEN data_version=excluded.data_version THEN result_json ELSE NULL END,expires_at=CASE WHEN data_version=excluded.data_version THEN expires_at ELSE 0 END WHERE lock_until<=? OR data_version<>excluded.data_version RETURNING cache_key').bind(key,version,now+15000,now).first();
+ if(!lease){if(stale)return{value:JSON.parse(row!.result_json!) as T,cache:'STALE'};throw new ApiError(503,'PUBLIC_REFRESH_IN_PROGRESS');}
  try{
   const result=await load(),json=JSON.stringify(result.value);
-  if(new TextEncoder().encode(json).byteLength>131072)throw new ApiError(503,'PUBLIC_AGGREGATE_TOO_LARGE');
-  await db.prepare('UPDATE _notice_query_cache SET result_json=?,expires_at=?,lock_until=0 WHERE cache_key=? AND data_version=?').bind(json,result.expiresAt,key,version).run();
+  if(new TextEncoder().encode(json).byteLength>(options.maxBytes??131072))throw new ApiError(503,'PUBLIC_AGGREGATE_TOO_LARGE');
+  await db.prepare('UPDATE '+table+' SET result_json=?,expires_at=?,lock_until=0 WHERE cache_key=? AND data_version=?').bind(json,result.expiresAt,key,version).run();
+  if(table==='_public_notice_cache')await db.prepare('DELETE FROM _public_notice_cache WHERE cache_key IN (SELECT cache_key FROM _public_notice_cache WHERE expires_at>0 AND expires_at<? ORDER BY expires_at LIMIT 20)').bind(now-86400000).run();
   return{value:result.value,cache:'MISS'};
  }catch(error){
   // Retain a longer cooldown after failed refreshes; the table's JSON limit
   // and transient failures must not cause a full scan every fifteen seconds.
-  try{await db.prepare('UPDATE _notice_query_cache SET lock_until=? WHERE cache_key=? AND data_version=?').bind(now+5*60*1000,key,version).run();}catch{/* The database may already be unavailable. */}
-  if(row?.result_json)return{value:JSON.parse(row.result_json) as T,cache:'STALE'};throw error;
+  try{await db.prepare('UPDATE '+table+' SET lock_until=? WHERE cache_key=? AND data_version=?').bind(now+5*60*1000,key,version).run();}catch{/* The database may already be unavailable. */}
+  if(stale)return{value:JSON.parse(row!.result_json!) as T,cache:'STALE'};throw error;
  }
 }
 
@@ -171,12 +175,39 @@ export async function publicNoticePage(db:D1Database,params:URLSearchParams,now=
   // Counts are display metadata, not an authorization decision. Keep them
   // briefly stale and independent from the per-batch notice version so a
   // crawler refresh cannot force another filtered table scan for every user.
-  const count=query.where===visible+' AND n.year=?'&&query.values[0]===2026
-   ?{value:meta.value.stats.total2026,cache:meta.cache}
-   :await cacheReader(db,PUBLIC_COUNT_CACHE_VERSION,'count:'+query.countKey,now,async()=>({value:Number(await db.prepare('SELECT count(*) total FROM main__notices n WHERE '+query.where).bind(...query.values).first('total')),expiresAt:Math.min(meta.value.expiresAt,now+PUBLIC_COUNT_TTL)}));
+  const simpleFeed=query.where===visible+' AND n.year=?'&&query.values[0]===2026&&query.sort==='publish';
+  // Search once for ordered IDs, not once for COUNT and again on every page.
+  // Re-check visibility and filter predicates by primary key when hydrating.
+  const search=simpleFeed?null:await cacheReader(db,'public-search-v1',JSON.stringify([query.countKey,query.sort]),now,async()=>{
+   const result=await db.prepare('SELECT /* public-notice-search-v1 */ n.id FROM main__notices n WHERE '+query.where+' ORDER BY '+query.order+' LIMIT 50001').bind(...query.values).all<{id:string}>();
+   if(result.results.length>50000)throw new ApiError(503,'PUBLIC_SEARCH_CAPACITY_EXCEEDED');
+   return{value:result.results.map(row=>row.id),expiresAt:now+Math.min(query.cacheMilliseconds,300000)};
+  },{maxBytes:1800000,maxStaleMs:query.cacheMilliseconds===60000?0:300000});
+  const count=search?{value:search.value.length,cache:search.cache}:{value:meta.value.stats.total2026,cache:meta.cache};
  const total=count.value,totalPages=Math.max(1,Math.ceil(total/query.pageSize)),page=Math.min(query.page,totalPages);
- const rows=await db.prepare('SELECT catalog_projection FROM main__notices n WHERE '+query.where+' ORDER BY '+query.order+' LIMIT ? OFFSET ?').bind(...query.values,query.pageSize,(page-1)*query.pageSize).all<ProjectionRow>();
+ const loadRows=async()=>{
+  const offset=(page-1)*query.pageSize;
+  if(search){
+   const ids=search.value.slice(offset,offset+query.pageSize),found=new Map<string,ProjectionRow>();
+   for(let start=0;start<ids.length;start+=70){
+    const chunk=ids.slice(start,start+70);
+    // SQLite otherwise sometimes chooses the year/visibility index and reads
+    // the whole year even though only a handful of cached IDs are requested.
+    const result=await db.prepare('SELECT n.id,'+summaryProjectionSql+' FROM main__notices n INDEXED BY sqlite_autoindex_main__notices_1 WHERE n.id IN ('+chunk.map(()=>'?').join(',')+') AND '+query.where).bind(...chunk,...query.values).all<ProjectionRow&{id:string}>();
+    for(const row of result.results)found.set(row.id,row);
+   }
+   return{value:ids.flatMap(id=>found.has(id)?[JSON.parse(found.get(id)!.catalog_projection) as NoticeProjection]:[]),expiresAt:now+query.cacheMilliseconds};
+  }
+  const indexed=query.where===visible+' AND n.year=?'&&query.sort==='publish'&&offset<=100000;
+  const sql=indexed?noticeFeedSql(query.pageSize,offset):'SELECT '+summaryProjectionSql+' FROM main__notices n WHERE '+query.where+' ORDER BY '+query.order+' LIMIT ? OFFSET ?';
+  const values=indexed?query.values:[...query.values,query.pageSize,offset];
+  const result=await db.prepare(sql).bind(...values).all<ProjectionRow>();
+  // Compact summaries keep the shared cache below D1's per-row size limit.
+  const value=result.results.map(row=>{const projection=JSON.parse(row.catalog_projection) as NoticeProjection;return{summary:projection.summary,rawStatus:projection.rawStatus};});
+  return{value,expiresAt:now+query.cacheMilliseconds};
+ };
+ const rows=search?{...await loadRows(),cache:'PRIMARY_KEY'}:await cacheReader(db,'public-rows-v1:'+version,query.pageKey,now,loadRows,{identity:'public-rows-v1',maxStaleMs:300000,maxBytes:1800000});
  const finalVersion=await db.prepare("SELECT value FROM _runtime_state WHERE key='notice_version'").first<string>('value');
  if(finalVersion!==version)throw new ApiError(503,'PUBLIC_VERSION_CHANGED');
- return{body:{items:rows.results.map(r=>liveSummary(JSON.parse(r.catalog_projection) as NoticeProjection,now)),pagination:{page,pageSize:query.pageSize,total,totalPages},stats:meta.value.stats,sideData:meta.value.sideData,facets:meta.value.facets,source:'d1',servedAt:new Date(now).toISOString()},version,cache:{metadata:meta.cache,count:count.cache}};
+ return{body:{items:rows.value.map(r=>liveSummary(r as NoticeProjection,now)),pagination:{page,pageSize:query.pageSize,total,totalPages},stats:meta.value.stats,sideData:meta.value.sideData,facets:meta.value.facets,source:'d1',servedAt:new Date(now).toISOString(),metadataStale:meta.cache==='STALE'},version,cache:{metadata:meta.cache,count:count.cache,rows:rows.cache}};
 }

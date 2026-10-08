@@ -40,7 +40,7 @@ export function noticeSql(params:URLSearchParams,now=Date.now()){
   const orders:Record<string,string>={publish:'n.publish_date DESC,'+projection('sourceRank'),updated:projection('updatedSort')+' DESC,'+projection('sourceRank'),school:projection('schoolRank')+','+projection('sourceRank'),deadline:`CASE WHEN ${deadline}<=${Math.trunc(now)} THEN 1 ELSE 0 END,coalesce(${deadline},9007199254740991),`+projection('sourceRank')};
   const countKey=[...params.entries()].map(([k,v])=>[k,v.trim()] as [string,string]).filter(([k,v])=>!['page','pageSize','sort','year'].includes(k)&&v!==''&&v!=='全部').map(([k,v])=>[k,['q','school','major'].includes(k)?v.toLowerCase():v]);
   countKey.push(['year',year]);countKey.sort(([a],[b])=>a.localeCompare(b));
-  return {page,pageSize,where:where.join(' AND '),values,order:orders[sort],countKey:JSON.stringify(countKey),cacheMilliseconds:status!=='全部'||quick!=='全部'||fresh==='today'?60000:3600000};
+  return {page,pageSize,sort,where:where.join(' AND '),values,order:orders[sort],countKey:JSON.stringify(countKey),pageKey:JSON.stringify([countKey,sort,page,pageSize]),cacheMilliseconds:status!=='全部'||quick!=='全部'||fresh==='today'?60000:3600000};
 }
 export async function cachedCount(db:D1Database,query:ReturnType<typeof noticeSql>,now:number){
   const state=await db.prepare("SELECT value FROM _runtime_state WHERE key='notice_version'").first<{value:string}>();if(!state)throw new ApiError(503,'NOTICE_PROJECTION_PENDING');

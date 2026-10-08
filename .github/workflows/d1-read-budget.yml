@@ -5,11 +5,25 @@ on:
     paths:
       - 'workers/seekoffer-api/**'
       - 'lib/notice-*.ts'
+      - 'lib/public-notice-*.ts'
+      - 'lib/workbench-state.ts'
+      - 'app/me/page.tsx'
+      - 'app/notices/page.tsx'
+      - 'tests/workbench*.test.ts'
+      - 'tests/public-notice*.test.ts'
+      - 'migrations/d1/snapshot/**'
       - '.github/workflows/d1-read-budget.yml'
   pull_request:
     paths:
       - 'workers/seekoffer-api/**'
       - 'lib/notice-*.ts'
+      - 'lib/public-notice-*.ts'
+      - 'lib/workbench-state.ts'
+      - 'app/me/page.tsx'
+      - 'app/notices/page.tsx'
+      - 'tests/workbench*.test.ts'
+      - 'tests/public-notice*.test.ts'
+      - 'migrations/d1/snapshot/**'
       - '.github/workflows/d1-read-budget.yml'
 
 permissions:
@@ -29,3 +43,14 @@ jobs:
       - run: npm run test:quota --prefix workers/seekoffer-api
       - run: npm run test:payments --prefix workers/seekoffer-api
       - run: npm run test:commerce --prefix workers/seekoffer-api
+
+  cloud-sync-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - run: npm ci --no-audit --no-fund
+      - run: npx vitest run tests/workbench-state.test.ts tests/workbench-cloud-sync.test.ts tests/public-notice-recovery.test.ts

@@ -493,10 +493,14 @@ function NoticesPageContent() {
 
         setSearchResponse(response);
         setLoadedQueryKey(apiQueryKey);
-        setLastLoadedAt(getBeijingTimeString());
+        setLastLoadedAt(response.stale ? new Date(response.servedAt).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : getBeijingTimeString());
         setLoadError(
-          response.source === 'bundled'
-            ? '云端通知暂时不可用，当前展示最近一次发布的本地兜底数据。'
+          response.stale
+            ? '连接暂时中断，保留上次加载的通知。可点击刷新重试。'
+            : response.source === 'bundled'
+            ? response.fallbackReason === 'busy'
+              ? '当前筛选查询繁忙，暂时显示本地历史资料，可能缺少最新通知。可清除筛选查看最新列表，或稍后刷新。'
+              : '连接暂时不可用，当前显示本地历史资料，可能缺少最新通知。请稍后刷新。'
             : ''
         );
 
@@ -545,7 +549,7 @@ function NoticesPageContent() {
   const disciplineOptions = ['全部', ...(visibleResponse?.facets.disciplines || [])];
   const regionOptions = ['全部', ...(visibleResponse?.facets.regions || [])];
   const schoolOptions = ['全部', ...(visibleResponse?.facets.schools || [])];
-  const urgentProjects = visibleResponse?.sideData.urgentProjects || [];
+  const urgentProjects = (visibleResponse?.sideData.urgentProjects || []).filter(project => getDeadlineLevelFromDate(project.deadlineDate) !== 'expired');
   const todayUpdates = visibleResponse?.sideData.todaySchoolUpdates || {
     date: '',
     hasTodayRows: false,
@@ -619,7 +623,7 @@ function NoticesPageContent() {
     },
     {
       label: '今日更新',
-      value: isNoticeLoading ? '加载中' : visibleResponse ? `${visibleResponse.stats.todayUpdates}` : '—',
+      value: isNoticeLoading ? '加载中' : visibleResponse && !visibleResponse.metadataStale ? `${visibleResponse.stats.todayUpdates}` : '—',
       icon: BookOpenText
     },
     {
@@ -627,7 +631,7 @@ function NoticesPageContent() {
       value: isNoticeLoading
         ? '加载中'
         : visibleResponse
-          ? `${visibleResponse.stats.deadlineWithin3Days}`
+          ? visibleResponse.metadataStale ? '—' : `${visibleResponse.stats.deadlineWithin3Days}`
           : '—',
       icon: Clock3
     }
@@ -1158,16 +1162,16 @@ function NoticesPageContent() {
                   );
                 })
               ) : (
-                <div className="rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-400">暂无 7 天内截止通知。</div>
+                <div className="rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-400">{visibleResponse?.metadataStale ? '截止提醒正在更新。' : '暂无 7 天内截止通知。'}</div>
               )}
             </div>
           </SideCard>
 
-          <SideCard title="今日更新" icon={RefreshCw}>
+          <SideCard title={visibleResponse?.metadataStale ? '最近更新' : '今日更新'} icon={RefreshCw}>
             <div className="grid gap-3">
-              {!todayUpdates.hasTodayRows && todayUpdates.date ? (
+              {(!todayUpdates.hasTodayRows || visibleResponse?.metadataStale) && todayUpdates.date ? (
                 <div className="rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500">
-                  暂无今日新增，以下显示最近同步日 {todayUpdates.date} 的更新。
+                  {visibleResponse?.metadataStale ? '汇总统计更新中，以下为' : '暂无今日新增，以下显示最近同步日'} {todayUpdates.date} 的更新。
                 </div>
               ) : null}
               {isNoticeLoading ? (

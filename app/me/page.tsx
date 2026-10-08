@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   BookCheck,
@@ -18,6 +18,7 @@ import {
   MoreHorizontal,
   PencilLine,
   PlusCircle,
+  RefreshCw,
   Save,
   Search,
   Settings2,
@@ -30,6 +31,7 @@ import { ExternalSiteMark } from '@/components/external-site-mark';
 import { LoginRequiredCard } from '@/components/login-required-card';
 import { ManualProjectEntryCard } from '@/components/manual-project-entry-card';
 import { SiteShell } from '@/components/site-shell';
+import { cloudflareApiErrorMessage } from '@/lib/cloudflare-api';
 import { useUserSessionState } from '@/hooks/use-user-session';
 import {
   deleteUserProject,
@@ -168,7 +170,9 @@ function readCustomTodos() {
             ...(item.type ? { type: String(item.type) } : {}),
             ...(item.note ? { note: String(item.note) } : {}),
             ...(item.createdAt ? { createdAt: String(item.createdAt) } : {}),
-            ...(item.updatedAt ? { updatedAt: String(item.updatedAt) } : {})
+            ...(item.updatedAt ? { updatedAt: String(item.updatedAt) } : {}),
+            ...(item.deletedAt ? { deletedAt: String(item.deletedAt) } : {}),
+            ...(typeof item.completed === 'boolean' ? { completed: item.completed } : {})
           }))
       : [];
   } catch {
@@ -514,6 +518,10 @@ export default function MePage() {
   const [todoSyncOwnerId, setTodoSyncOwnerId] = useState('');
   const [todoSyncReady, setTodoSyncReady] = useState(false);
   const [workbenchSyncStatus, setWorkbenchSyncStatus] = useState<'local' | 'syncing' | 'synced' | 'error'>('local');
+  const [workbenchSyncError, setWorkbenchSyncError] = useState('');
+  const [syncRetry, setSyncRetry] = useState(0);
+  const retryAttempts = useRef(0);
+  const workbenchEditVersion = useRef(0);
   const [rowsLoading, setRowsLoading] = useState(true);
   const [deletingProjectId, setDeletingProjectId] = useState('');
   const [activeSection, setActiveSection] = useState<WorkbenchSection>('applications');
@@ -601,6 +609,7 @@ export default function MePage() {
     let active = true;
 
     const hydrateRemoteTodos = async () => {
+      const editVersion = workbenchEditVersion.current;
       setWorkbenchSyncStatus('syncing');
       try {
         const mergedState = await hydrateWorkbenchState(syncableUserId, {
@@ -613,17 +622,19 @@ export default function MePage() {
           return;
         }
 
-        setCompletedTodoIds(mergedState.completedTodoIds);
-        setCustomTodos(mergedState.customTodos);
-        setContacts(mergedState.contacts.map((contact) => normalizeContact(contact)));
+        if (workbenchEditVersion.current === editVersion) {
+          setCompletedTodoIds(mergedState.completedTodoIds);
+          setCustomTodos(mergedState.customTodos);
+          setContacts(mergedState.contacts.map((contact) => normalizeContact(contact)));
+        }
+        setTodoSyncOwnerId(syncableUserId);
+        setTodoSyncReady(true);
         setWorkbenchSyncStatus('synced');
       } catch (error) {
         console.error('[Seekoffer][workbench] hydrate workbench state failed', error);
-        setWorkbenchSyncStatus('error');
-      } finally {
         if (active) {
-          setTodoSyncOwnerId(syncableUserId);
-          setTodoSyncReady(true);
+          setWorkbenchSyncStatus('error');
+          setWorkbenchSyncError(cloudflareApiErrorMessage(error, '连接暂时中断，修改已保存在本机'));
         }
       }
     };
@@ -633,7 +644,19 @@ export default function MePage() {
     return () => {
       active = false;
     };
-  }, [syncableUserId]);
+  }, [syncableUserId, syncRetry]);
+
+  useEffect(() => {
+    if (workbenchSyncStatus === 'synced') retryAttempts.current = 0;
+    if (workbenchSyncStatus !== 'error' || !syncableUserId) return;
+    const retry = () => setSyncRetry(value => value + 1);
+    const online = () => { retryAttempts.current = 0; retry(); };
+    window.addEventListener('online', online);
+    const timer = navigator.onLine && retryAttempts.current < 3
+      ? window.setTimeout(retry, 30000 * 2 ** retryAttempts.current++)
+      : undefined;
+    return () => { window.clearTimeout(timer); window.removeEventListener('online', online); };
+  }, [workbenchSyncStatus, syncableUserId]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -662,18 +685,23 @@ export default function MePage() {
     const persistRemoteTodos = async () => {
       setWorkbenchSyncStatus('syncing');
       try {
-        await saveWorkbenchState(syncableUserId, {
+        const saved = await saveWorkbenchState(syncableUserId, {
           completedTodoIds,
           customTodos,
           contacts
         });
         if (!cancelled) {
+          setCompletedTodoIds(current => JSON.stringify(current) === JSON.stringify(saved.completedTodoIds) ? current : saved.completedTodoIds);
+          setCustomTodos(current => JSON.stringify(current) === JSON.stringify(saved.customTodos) ? current : saved.customTodos);
+          const savedContacts = saved.contacts.map(contact => normalizeContact(contact));
+          setContacts(current => JSON.stringify(current) === JSON.stringify(savedContacts) ? current : savedContacts);
           setWorkbenchSyncStatus('synced');
         }
       } catch (error) {
         if (!cancelled) {
           console.error('[Seekoffer][workbench] save workbench state failed', error);
           setWorkbenchSyncStatus('error');
+          setWorkbenchSyncError(cloudflareApiErrorMessage(error, '连接暂时中断，修改已保存在本机'));
         }
       }
     };
@@ -726,6 +754,7 @@ export default function MePage() {
   const applicationPreview = filteredApplicationRows;
   const scheduleItems = useMemo<ScheduleItem[]>(() => {
     return customTodos
+      .filter(task => !task.deletedAt)
       .map((task) => ({
         id: task.id,
         title: task.text,
@@ -756,10 +785,10 @@ export default function MePage() {
 
   const contactSummary = useMemo(
     () => ({
-      total: contacts.length,
-      delivered: contacts.filter((item) => item.deliveryStatus === '已投递').length,
-      replied: contacts.filter((item) => item.feedbackStatus === '已回复' || item.feedbackStatus === '已offer').length,
-      followUp: contacts.filter((item) => item.feedbackStatus === '需跟进' || item.feedbackStatus === '无回复').length
+      total: contacts.filter(item => !item.deletedAt).length,
+      delivered: contacts.filter((item) => !item.deletedAt && item.deliveryStatus === '已投递').length,
+      replied: contacts.filter((item) => !item.deletedAt && (item.feedbackStatus === '已回复' || item.feedbackStatus === '已offer')).length,
+      followUp: contacts.filter((item) => !item.deletedAt && (item.feedbackStatus === '需跟进' || item.feedbackStatus === '无回复')).length
     }),
     [contacts]
   );
@@ -767,6 +796,7 @@ export default function MePage() {
   const filteredContacts = useMemo(() => {
     const keyword = contactKeyword.trim().toLowerCase();
     const filtered = contacts.filter((contact) => {
+      if (contact.deletedAt) return false;
       if (!matchesContactRange(contact.schoolRange, contactRangeFilter)) return false;
       if (contactFeedbackFilter !== '全部' && contact.feedbackStatus !== contactFeedbackFilter) return false;
       if (contactDeliveryFilter !== '全部' && contact.deliveryStatus !== contactDeliveryFilter) return false;
@@ -801,6 +831,8 @@ export default function MePage() {
   }
 
   function handleScheduleDoneChange(id: string, done: boolean) {
+    workbenchEditVersion.current++;
+    setCustomTodos(current => current.map(item => item.id === id ? { ...item, completed: done, updatedAt: new Date().toISOString() } : item));
     setCompletedTodoIds((current) => {
       if (done) {
         return current.includes(id) ? current : [...current, id];
@@ -811,8 +843,10 @@ export default function MePage() {
   }
 
   function handleClearCompleted() {
+    workbenchEditVersion.current++;
+    const now = new Date().toISOString();
     const customTodoIds = new Set(customTodos.map((item) => item.id));
-    setCustomTodos((current) => current.filter((item) => !completedTodoIds.includes(item.id)));
+    setCustomTodos((current) => current.map((item) => completedTodoIds.includes(item.id) ? { ...item, deletedAt: now, updatedAt: now } : item));
     setCompletedTodoIds((current) => current.filter((id) => !customTodoIds.has(id)));
   }
 
@@ -823,6 +857,7 @@ export default function MePage() {
     }
 
     const nextId = `custom-${Date.now()}`;
+    workbenchEditVersion.current++;
     setCustomTodos((current) => [
       ...current,
       {
@@ -844,6 +879,7 @@ export default function MePage() {
   }
 
   function handleUpdateScheduleTodo(id: string, patch: Partial<Omit<WorkbenchCustomTodo, 'id'>>) {
+    workbenchEditVersion.current++;
     setCustomTodos((current) =>
       current.map((todo) => {
         if (todo.id !== id) {
@@ -885,11 +921,14 @@ export default function MePage() {
   }
 
   function handleDeleteScheduleTodo(id: string) {
-    setCustomTodos((current) => current.filter((todo) => todo.id !== id));
+    workbenchEditVersion.current++;
+    const now = new Date().toISOString();
+    setCustomTodos((current) => current.map((todo) => todo.id === id ? { ...todo, deletedAt: now, updatedAt: now } : todo));
     setCompletedTodoIds((current) => current.filter((item) => item !== id));
   }
 
   function handleAddContact() {
+    workbenchEditVersion.current++;
     const nextContact = createEmptyContact();
     setContacts((current) => [nextContact, ...current]);
     setContactRangeFilter('全部');
@@ -902,6 +941,7 @@ export default function MePage() {
   }
 
   function handleContactChange<K extends keyof MentorContact>(id: string, key: K, value: MentorContact[K]) {
+    workbenchEditVersion.current++;
     setContacts((current) =>
       current.map((contact) =>
         contact.id === id
@@ -916,7 +956,9 @@ export default function MePage() {
   }
 
   function handleDeleteContact(id: string) {
-    setContacts((current) => current.filter((contact) => contact.id !== id));
+    workbenchEditVersion.current++;
+    const now = new Date().toISOString();
+    setContacts((current) => current.map((contact) => contact.id === id ? { ...contact, deletedAt: now, updatedAt: now } : contact));
   }
 
   if (!ready) {
@@ -984,15 +1026,20 @@ export default function MePage() {
           <p className="mt-4 text-base leading-8 text-slate-600">
             集中管理申请清单、日程和导师联系，把每个目标项目推进到下一步。
           </p>
-          <div className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-slate-500" role="status" aria-live="polite">
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500" role="status" aria-live="polite">
             <span className={`h-2 w-2 rounded-full ${workbenchSyncStatus === 'error' ? 'bg-rose-500' : workbenchSyncStatus === 'syncing' ? 'animate-pulse bg-amber-400' : 'bg-emerald-500'}`} />
             {workbenchSyncStatus === 'syncing'
-              ? '正在同步申请、日程和联系人'
+              ? '正在同步日程和联系人'
               : workbenchSyncStatus === 'error'
-                ? '云端同步失败，修改已保存在本机'
+                ? workbenchSyncError
                 : workbenchSyncStatus === 'synced'
-                  ? '申请、日程和联系人已同步'
+                  ? '日程和联系人已同步'
                   : '当前修改保存在本机'}
+            {workbenchSyncStatus === 'error' && (
+              <button type="button" onClick={() => { retryAttempts.current = 0; setSyncRetry(value => value + 1); }} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-teal-700 hover:bg-teal-50" aria-label="重新同步日程和联系人">
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />重新同步
+              </button>
+            )}
           </div>
         </div>
 
@@ -1264,7 +1311,7 @@ export default function MePage() {
       {activeSection === 'contacts' ? (
         <ContactsWorkspace
           contacts={filteredContacts}
-          totalCount={contacts.length}
+          totalCount={contactSummary.total}
           summary={contactSummary}
           rangeFilter={contactRangeFilter}
           feedbackFilter={contactFeedbackFilter}

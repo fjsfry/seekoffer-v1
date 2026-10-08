@@ -1,6 +1,6 @@
 import {ApiError,verifyIdentity,verifyNativeOAuth,recentlyVerified,type AuthConfig} from './auth.ts';
 import {boundedBody} from './index.ts';
-import {publicVisibility} from './notice-sql.ts';
+import {publicVisibility,noticeSql} from './notice-sql.ts';
 import {liveSummary,type NoticeProjection} from './notice-projection.ts';
 import {NOTICE_DETAIL_COLUMNS,mapNoticeRowToProject} from '../../../lib/notice-record';
 import {createManualProject} from './manual-project.ts';
@@ -10,7 +10,7 @@ import {readCommunity,communityOwnerAction,submitCommunityReport} from './commun
 import {requireSnapshotAdmin,adminAction} from './admin.ts';
 import {readNoticeOverrides,readOverrideDetail} from './notice-overrides.ts';
 import {recoverLegacyApplications} from './legacy-recovery.ts';
-import {protectWorkbenchUpdate} from './workbench-compatibility.ts';
+import {protectWorkbenchUpdate,assertWorkbenchOwner} from './workbench-compatibility.ts';
 import {ingestNotices,requireIngestSecret} from './ingest-notices.ts';
 import {billingAction,billingPlans,consumeFill} from './billing.ts';
 import {licenseAction} from './license.ts';
@@ -56,6 +56,8 @@ function revision(value:unknown){if(!Number.isSafeInteger(value)||Number(value)<
 function parseRow(row:Record<string,unknown>){const value={...row};for(const k of ['tags','materials_required','encrypted_payload','custom_todos','completed_todo_ids','mentor_contacts'])if(typeof value[k]==='string')value[k]=JSON.parse(value[k] as string);for(const k of boolFields)if(k in value)value[k]=Boolean(value[k]);if('is_verified'in value)value.is_verified=Boolean(value.is_verified);return value;}
 function publicNoticeCacheKey(request:Request,origin:string|null){
   const url=new URL(request.url);
+  const query=noticeSql(url.searchParams);
+  url.search=new URLSearchParams({query:query.pageKey}).toString();
   // CORS is part of the cached response, so keep the small set of allowed
   // browser origins in separate edge-cache entries.
   url.searchParams.set('__edge_origin',origin||'none');
@@ -128,7 +130,7 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
    if(!['local','preview','production'].includes(env.MODE))throw new ApiError(503,'MODE_NOT_CONFIGURED');
    if(env.MODE==='local'&&!['localhost','127.0.0.1','[::1]'].includes(url.hostname))throw new ApiError(503,'LOCAL_ONLY');
    if(origin&&!allowed.includes(origin)&&!fillCapability&&!licenseOrigin&&!extensionOrigin)throw new ApiError(403,'ORIGIN_NOT_ALLOWED');
-   if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{...cors,'Cache-Control':'no-store','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS','Access-Control-Allow-Headers':'Authorization,Content-Type,X-Preview-Access,X-Seekoffer-Client,X-Resource-Access-Token'}});
+   if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{...cors,'Cache-Control':'no-store','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS','Access-Control-Allow-Headers':'Authorization,Content-Type,X-Preview-Access,X-Seekoffer-Client,X-Resource-Access-Token,X-Workspace-Owner'}});
    if(env.MODE==='preview'){
     if(!env.PREVIEW_ACCESS_TOKEN||env.PREVIEW_ACCESS_TOKEN.length<32)throw new ApiError(503,'PREVIEW_AUTH_NOT_CONFIGURED');
     const hash=(s:string)=>crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));const [a,b]=await Promise.all([hash(request.headers.get('x-preview-access')||''),hash(env.PREVIEW_ACCESS_TOKEN)]);let difference=0;new Uint8Array(a).forEach((n,i)=>difference|=n^new Uint8Array(b)[i]);
@@ -329,15 +331,16 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
      // queries in D1's shared bounded-staleness cache. Each browser request now reads only
      // the requested page instead of hydrating the entire notice catalogue.
      const result=await publicNoticePage(env.CORE,url.searchParams,now);
-     const fresh=response(result.body,200,{'X-Notice-Version':result.version,'X-Count-Cache':result.cache.count,'X-Metadata-Cache':result.cache.metadata});
+     const fresh=response(result.body,200,{'X-Notice-Version':result.version,'X-Count-Cache':result.cache.count,'X-Metadata-Cache':result.cache.metadata,'X-Rows-Cache':result.cache.rows});
      // Public notice data changes through the ingestion job, so a short edge
      // TTL keeps normal browsing off D1 while allowing updates to appear
      // within a few minutes.
-     return edgeCachePut(edgeCache,cacheKey,fresh,60,300);
+     const ttl=noticeSql(url.searchParams,now).cacheMilliseconds===60000?30:300;
+     return edgeCachePut(edgeCache,cacheKey,fresh,Math.min(ttl,60),ttl);
     }
    if(path==='/v1/notices/by-ids'&&request.method==='POST'){
     const body=await boundedBody(request,32768);only(body,['ids']);if(!Array.isArray(body.ids)||body.ids.length>100)throw new ApiError(400,'ID_BATCH_LIMIT');const ids=[...new Set(body.ids.map(inputId))];if(!ids.length)return response({items:[],source:'d1'});
-    const rows=await env.CORE.prepare('SELECT n.catalog_projection FROM main__notices n WHERE '+publicVisibility+' AND n.catalog_projection IS NOT NULL AND n.id IN ('+ids.map(()=>'?').join(',')+')').bind(...ids).all<{catalog_projection:string}>();return response({items:rows.results.map(r=>liveSummary(JSON.parse(r.catalog_projection))),source:'d1'});
+    const rows=await env.CORE.prepare('SELECT n.catalog_projection FROM main__notices n INDEXED BY sqlite_autoindex_main__notices_1 WHERE '+publicVisibility+' AND n.catalog_projection IS NOT NULL AND n.id IN ('+ids.map(()=>'?').join(',')+')').bind(...ids).all<{catalog_projection:string}>();return response({items:rows.results.map(r=>liveSummary(JSON.parse(r.catalog_projection))),source:'d1'});
     }
     if(path.startsWith('/v1/notices/')&&request.method==='GET'){
      const edgeCache=edgeCacheStore(),cacheKey=publicEdgeCache(request,origin,'notice-detail'),hit=await edgeCacheHit(edgeCache,cacheKey,requestId);if(hit)return hit;
@@ -446,6 +449,7 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     if(request.method==='DELETE'){const row=await env.CORE.prepare('DELETE FROM main__applications WHERE user_id=? AND id=? AND sync_revision=? RETURNING id').bind(owner,id,expected).first();if(!row)throw new ApiError(409,'REVISION_CONFLICT');return response({deleted:true,id});}
    }
    if(path==='/v1/me/workbench'){
+    assertWorkbenchOwner(request,owner);
     if(request.method==='GET'){const row=await env.CORE.prepare('SELECT completed_todo_ids,custom_todos,mentor_contacts,sync_revision FROM main__workbench_states WHERE user_id=?').bind(owner).first<Record<string,unknown>>();return response(row?parseRow(row):null);}
     if(request.method==='PUT'){
      const body=await boundedBody(request,512000);only(body,['expectedRevision','completed_todo_ids','custom_todos','mentor_contacts']);const expected=body.expectedRevision===0?0:revision(body.expectedRevision);

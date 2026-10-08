@@ -54,6 +54,9 @@ export type PublicNoticeSearchResponse = {
   };
   source: PublicNoticeDataSource;
   servedAt: string;
+  stale?: boolean;
+  metadataStale?: boolean;
+  fallbackReason?: 'busy' | 'quota' | 'network';
 };
 
 type BuildSearchResultOptions = {

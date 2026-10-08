@@ -1,4 +1,5 @@
 import {ApiError} from './auth.ts';
+import {noticeFeedReservation} from './notice-feed-query.ts';
 
 export interface ReadBudgetConfig {
  D1_READ_BUDGET_ENABLED?:string;
@@ -41,18 +42,28 @@ export function createReadBudget(db:D1Database,config:ReadBudgetConfig,record:Us
  const enabled=config.D1_READ_BUDGET_ENABLED==='true';
  const limit=enabled?scanBudgetLimit(config):0;
  return async(sqls:string[],execute:()=>Promise<D1Result[]>):Promise<D1Result[]>=>{
-  const scans=enabled?sqls.map((sql,i)=>isBudgetedScan(sql)?i:-1).filter(i=>i>=0):[];
-  if(!scans.length){const results=await execute();results.forEach(record);return results;}
-  const now=Date.now(),key=PREFIX+new Date(now).toISOString().slice(0,10),reservation=scans.length*SCAN_RESERVATION;
+  const scans=enabled?sqls.map((sql,i)=>isBudgetedScan(sql)&&!noticeFeedReservation(sql)?i:-1).filter(i=>i>=0):[];
+  const searches=scans.filter(i=>sqls[i].startsWith('SELECT /* public-notice-search-v1 */ n.id FROM main__notices n WHERE ')&&sqls[i].endsWith(' LIMIT 50001'));
+  const feeds=enabled?sqls.map((sql,i)=>noticeFeedReservation(sql)?i:-1).filter(i=>i>=0):[];
+  if(!scans.length&&!feeds.length){const results=await execute();results.forEach(record);return results;}
+  const day=new Date(Date.now()).toISOString().slice(0,10);
+  const groups=[
+   {indices:scans.filter(i=>!searches.includes(i)),key:PREFIX+day,reservation:(scans.length-searches.length)*SCAN_RESERVATION,limit},
+   {indices:searches,key:'d1_search_budget:v1:'+day,reservation:searches.length*SCAN_RESERVATION,limit:1000000},
+   {indices:feeds,key:'d1_feed_budget:v1:'+day,reservation:feeds.reduce((sum,i)=>sum+noticeFeedReservation(sqls[i]),0),limit:500000}
+  ].filter(group=>group.indices.length);
   // Reserve before executing, atomically across isolates and concurrent callers.
   // Keep uncertain/failed executions charged instead of retrying at no cost.
+  for(const {key,reservation,limit} of groups){
   const ticket=await db.prepare('INSERT INTO _runtime_state(key,value) SELECT ?,? WHERE ?<=? ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(value AS INTEGER)+? AS TEXT) WHERE CAST(value AS INTEGER)+?<=? RETURNING value').bind(key,String(reservation),reservation,limit,reservation,reservation,limit).all<{value:string}>();
   record(ticket);
   if(!ticket.results.length)throw new ApiError(503,'READ_BUDGET_EXHAUSTED');
+  }
   const results=await execute();results.forEach(record);
-  const actual=scans.reduce((sum,i)=>{
+  for(const {indices,key,reservation,limit} of groups){
+  const actual=indices.reduce((sum,i)=>{
    const rows=results[i]?.meta?.rows_read;
-   return sum+(Number.isSafeInteger(rows)&&rows>=0?rows:SCAN_RESERVATION);
+   return sum+(Number.isSafeInteger(rows)&&rows>=0?rows:noticeFeedReservation(sqls[i])||SCAN_RESERVATION);
   },0)+4;
   try{
    const settled=await db.prepare('UPDATE _runtime_state SET value=CAST(max(0,CAST(value AS INTEGER)+?) AS TEXT) WHERE key=? RETURNING value').bind(actual-reservation,key).all<{value:string}>();
@@ -61,6 +72,7 @@ export function createReadBudget(db:D1Database,config:ReadBudgetConfig,record:Us
   }catch{
    // A lost accounting write leaves the larger reservation in place.
    console.warn(JSON.stringify({event:'d1_scan_settlement_failed',reservation}));
+  }
   }
   return results;
  };

@@ -1,4 +1,4 @@
-import { cloudflareRequest } from './cloudflare-api';
+import { CloudflareApiError, cloudflareRequest } from './cloudflare-api';
 
 export const WORKBENCH_TODO_CATEGORIES = ['申请', '学习', '作业', '工作', '生活', '其他'] as const;
 export const WORKBENCH_TODO_PRIORITIES = ['重要且紧急', '重要不紧急', '不重要紧急', '不重要不紧急'] as const;
@@ -276,38 +276,98 @@ export function mergeWorkbenchState(localState: WorkbenchState, remoteState: Par
   } satisfies WorkbenchState;
 }
 
-export async function hydrateWorkbenchState(userId: string, localState: WorkbenchState) {
-  void userId;
-  const data = await cloudflareRequest<{
-    completed_todo_ids?: unknown;
-    custom_todos?: unknown;
-    mentor_contacts?: unknown;
-    sync_revision?: number;
-  } | null>('/v1/me/workbench', {}, true);
-
-  const mergedState = mergeWorkbenchState(localState, {
-    completedTodoIds: data?.completed_todo_ids as string[] | undefined,
-    customTodos: data?.custom_todos as WorkbenchCustomTodo[] | undefined,
-    contacts: data?.mentor_contacts as WorkbenchMentorContact[] | undefined
-  });
-
-  await saveWorkbenchState(userId, mergedState, Number(data?.sync_revision || 0));
-  return mergedState;
+function normalizedState(state: Partial<WorkbenchState>): WorkbenchState {
+  const completedTodoIds = normalizeCompletedTodoIds(state.completedTodoIds);
+  return {
+    completedTodoIds,
+    customTodos: normalizeCustomTodos(state.customTodos).map(item => ({ ...item, completed: !item.deletedAt && completedTodoIds.includes(item.id) })),
+    contacts: normalizeContacts(state.contacts)
+  };
 }
 
-export async function saveWorkbenchState(userId: string, state: WorkbenchState, expectedRevision = 0) {
-  void userId;
-  await cloudflareRequest(
-    '/v1/me/workbench',
-    {
-      method: 'PUT',
-      body: JSON.stringify({
-        expectedRevision,
-        completed_todo_ids: normalizeCompletedTodoIds(state.completedTodoIds),
-        custom_todos: normalizeCustomTodos(state.customTodos),
-        mentor_contacts: normalizeContacts(state.contacts)
-      })
-    },
-    true
-  );
+type RemoteWorkbench = {
+  completed_todo_ids: string[];
+  custom_todos: WorkbenchCustomTodo[];
+  mentor_contacts: WorkbenchMentorContact[];
+  sync_revision: number;
+};
+type SyncedWorkbench = { state: WorkbenchState; revision: number };
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+let lastChangeTime = 0;
+
+function localChanges(local: WorkbenchState, base: WorkbenchState): WorkbenchState {
+  lastChangeTime = Math.max(Date.now(), lastChangeTime + 1, ...base.customTodos.map(item => getUpdatedTime(item.updatedAt) + 1), ...base.contacts.map(item => getUpdatedTime(item.updatedAt) + 1));
+  const now = new Date(lastChangeTime).toISOString();
+  function changed<T extends { id: string; updatedAt?: string; deletedAt?: string }>(items: T[], previous: T[]) {
+    const before = new Map(previous.map(item => [item.id, item]));
+    const result = items.map(item => {
+      const old = before.get(item.id);
+      before.delete(item.id);
+      return same(item, old) ? item : { ...item, updatedAt: now };
+    });
+    for (const item of before.values()) result.push(item.deletedAt ? item : { ...item, updatedAt: now, deletedAt: now });
+    return result;
+  }
+  return { ...local, customTodos: changed(local.customTodos, base.customTodos), contacts: changed(local.contacts, base.contacts) };
 }
+
+export function createWorkbenchSyncClient(request: typeof cloudflareRequest) {
+  const snapshots = new Map<string, SyncedWorkbench>();
+  const queues = new Map<string, Promise<unknown>>();
+  async function read(userId: string): Promise<SyncedWorkbench> {
+    const data = await request<RemoteWorkbench | null>('/v1/me/workbench', { headers: { 'X-Workspace-Owner': userId } }, true);
+    if (data && (!Number.isSafeInteger(data.sync_revision) || data.sync_revision < 1)) throw new Error('WORKBENCH_REVISION_INVALID');
+    return { revision: data?.sync_revision || 0, state: normalizedState({ completedTodoIds: data?.completed_todo_ids, customTodos: data?.custom_todos, contacts: data?.mentor_contacts }) };
+  }
+  function enqueue(userId: string, local: WorkbenchState, hydrate: boolean) {
+    if (!userId.trim()) return Promise.reject(new Error('WORKBENCH_OWNER_REQUIRED'));
+    // Capture the edit, not a mutable React object that can change while queued.
+    const captured = normalizedState(local);
+    const baseline = snapshots.get(userId);
+    const desired = baseline && !hydrate ? localChanges(captured, baseline.state) : captured;
+    const task = (queues.get(userId) || Promise.resolve()).catch(() => undefined).then(async () => {
+      let remote = !hydrate && snapshots.get(userId) || await read(userId);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        let state = normalizedState(mergeWorkbenchState(desired, remote.state));
+        // Built-in checklist IDs have no timestamps. Rebase explicit local
+        // unchecks against the last acknowledged snapshot, retaining other devices' additions.
+        if (baseline && !hydrate) {
+          const removed = new Set(baseline.state.completedTodoIds.filter(id => !captured.completedTodoIds.includes(id)));
+          state = normalizedState({ ...state, completedTodoIds: state.completedTodoIds.filter(id => !removed.has(id)) });
+        }
+        if (same(state, remote.state)) {
+          snapshots.set(userId, remote);
+          return state;
+        }
+        try {
+          const result = await request<{ sync_revision: number }>('/v1/me/workbench', {
+            method: 'PUT',
+            headers: { 'X-Workspace-Owner': userId },
+            body: JSON.stringify({ expectedRevision: remote.revision, completed_todo_ids: state.completedTodoIds, custom_todos: state.customTodos, mentor_contacts: state.contacts })
+          }, true);
+          if (!Number.isSafeInteger(result.sync_revision) || result.sync_revision <= remote.revision) throw new Error('WORKBENCH_REVISION_INVALID');
+          snapshots.set(userId, { state, revision: result.sync_revision });
+          return state;
+        } catch (error) {
+          // A lost response may already have committed. Refetch on the next
+          // attempt; never retry by creating or overwriting version zero.
+          snapshots.delete(userId);
+          if (!(error instanceof CloudflareApiError) || error.status !== 409 || error.code !== 'REVISION_CONFLICT' || attempt === 2) throw error;
+          remote = await read(userId);
+        }
+      }
+      throw new Error('WORKBENCH_SYNC_RETRY_EXHAUSTED');
+    });
+    queues.set(userId, task);
+    void task.finally(() => { if (queues.get(userId) === task) queues.delete(userId); }).catch(() => undefined);
+    return task;
+  }
+  return {
+    hydrate: (userId: string, state: WorkbenchState) => enqueue(userId, state, true),
+    save: (userId: string, state: WorkbenchState) => enqueue(userId, state, false)
+  };
+}
+
+const workbenchSync = createWorkbenchSyncClient(cloudflareRequest);
+export const hydrateWorkbenchState = workbenchSync.hydrate;
+export const saveWorkbenchState = workbenchSync.save;

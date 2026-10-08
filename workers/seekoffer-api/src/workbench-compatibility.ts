@@ -1,4 +1,8 @@
 import {ApiError} from './auth.ts';
+export function assertWorkbenchOwner(request:Request,owner:string){
+ const expected=request.headers.get('X-Workspace-Owner');
+ if(expected!==null&&expected!==owner)throw new ApiError(403,'WORKSPACE_OWNER_CHANGED');
+}
 type Item=Record<string,unknown>&{id:string};
 function records(value:unknown):Item[]{
  if(!Array.isArray(value))throw new ApiError(503,'WORKBENCH_STATE_INVALID');

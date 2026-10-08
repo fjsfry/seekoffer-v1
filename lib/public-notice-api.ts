@@ -1,4 +1,4 @@
-import { cloudflareRequest } from './cloudflare-api';
+import { CloudflareApiError, cloudflareRequest } from './cloudflare-api';
 import { buildPublicNoticeSearchResult, type PublicNoticeSearchResponse } from './public-notice-search';
 import { filterMainNoticeProjects } from './notice-quality';
 import { baseNoticeProjects } from './notice-source';
@@ -53,7 +53,7 @@ function buildNoticeSearchParams(filters: NoticeSearchFilters, page: number, pag
   ];
 
   values.forEach(([key, value]) => {
-    if (value) params.set(key, value);
+    if (value && (value !== '全部' || key === 'year')) params.set(key, value);
   });
 
   return params;
@@ -76,7 +76,7 @@ function buildBundledSearchResult(
 }
 
 export function clearPublicNoticeSearchCache() {
-  searchCache.clear();
+  for (const entry of searchCache.values()) entry.cachedAt = 0;
 }
 
 export async function fetchPublicNoticeSearch(
@@ -89,7 +89,7 @@ export async function fetchPublicNoticeSearch(
   const pageSize = options.pageSize || 16;
   const key = cacheKey(filters, page, pageSize);
   const cached = searchCache.get(key);
-  if (cached && Date.now() - cached.cachedAt < CACHE_TTL) return cached.data;
+  if (cached && Date.now() - cached.cachedAt < (cached.data.source === 'bundled' || cached.data.stale ? 30000 : CACHE_TTL)) return cached.data;
 
   try {
     const params = buildNoticeSearchParams(filters, page, pageSize);
@@ -99,10 +99,16 @@ export async function fetchPublicNoticeSearch(
     );
     const data = { ...result, source: 'cloudflare' as const };
     searchCache.set(key, { cachedAt: Date.now(), data });
+    if (searchCache.size > 40) searchCache.delete(searchCache.keys().next().value!);
     return data;
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
-    const data = buildBundledSearchResult(filters, page, pageSize);
+    if (error instanceof CloudflareApiError && error.status < 500 && error.status !== 402 && error.status !== 429) throw error;
+    const fallbackReason = error instanceof CloudflareApiError && ['READ_BUDGET_EXHAUSTED', 'PUBLIC_REFRESH_IN_PROGRESS'].includes(error.code || '')
+      ? 'busy' as const : error instanceof CloudflareApiError && error.status === 402 ? 'quota' as const : 'network' as const;
+    const data: PublicNoticeSearchResponse = cached?.data.source === 'cloudflare' && Date.now() - Date.parse(cached.data.servedAt) < 10 * 60000
+      ? { ...cached.data, stale: true, fallbackReason }
+      : { ...buildBundledSearchResult(filters, page, pageSize), fallbackReason };
     searchCache.set(key, { cachedAt: Date.now(), data });
     return data;
   }
@@ -168,7 +174,8 @@ export async function fetchPublicNoticeById(id: string) {
     return await cloudflareRequest<PublicNoticeProject>(
       `/v1/notices/${encodeURIComponent(normalizedId)}`
     );
-  } catch {
+  } catch (error) {
+    if (error instanceof CloudflareApiError && [401, 403, 404].includes(error.status)) return null;
     return bundledCatalog().find((item) => item.id === normalizedId) || null;
   }
 }
