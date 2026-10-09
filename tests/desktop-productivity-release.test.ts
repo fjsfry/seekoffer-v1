@@ -42,7 +42,7 @@ describe('desktop productivity release contract', () => {
   it('only exposes popover relationships while open and deliberately moves focus', () => {
     expect(scheduleSource.match(/aria-controls=\{open \? popoverId : undefined\}/g)).toHaveLength(3);
     expect(contactsSource.match(/aria-controls=\{open \? popoverId : undefined\}/g)).toHaveLength(2);
-    expect(scheduleSource).toContain("surface.querySelector<HTMLElement>('select, input, button')?.focus");
+    expect(scheduleSource).toContain('surface.querySelector<HTMLElement>(focusSelector)?.focus({ preventScroll: true })');
     expect(contactsSource).toContain("surface.querySelector<HTMLElement>('button[aria-pressed=\"true\"], button, select, input')?.focus");
     expect(contactsSource).toContain('contactDetailCloseButtonRef.current?.focus({ preventScroll: true })');
   });

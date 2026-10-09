@@ -55,7 +55,7 @@ import {
 } from '@/lib/workbench-state';
 import { writeSessionStorageValue } from '@/lib/safe-session-storage';
 import { DESKTOP_NEW_SCHEDULE_EVENT } from '@/lib/desktop-route-events';
-import { schedulePopoverPlacement } from './desktop-schedule-popover';
+import { observeSchedulePopoverViewport, schedulePopoverPlacement } from './desktop-schedule-popover';
 import styles from './desktop-workspace.module.css';
 
 const isDesktopSurface = process.env.NEXT_PUBLIC_SEEKOFFER_SURFACE === 'desktop';
@@ -181,16 +181,12 @@ function getScheduleGroupLabel(dateKey: string, today: string) {
   return formatDateTitle(dateKey);
 }
 
-function toggleAnchoredPopover(
+function positionAnchoredPopover(
   trigger: HTMLElement,
   surface: HTMLElement,
   preferredWidth: number,
   estimatedHeight: number
 ) {
-  if (surface.matches(':popover-open')) {
-    surface.hidePopover();
-    return;
-  }
   const { left, top, width, maxHeight } = schedulePopoverPlacement({
     trigger: trigger.getBoundingClientRect(),
     triggerLayoutWidth: trigger.offsetWidth,
@@ -203,28 +199,51 @@ function toggleAnchoredPopover(
   surface.style.setProperty('--schedule-popover-top', `${top}px`);
   surface.style.setProperty('--schedule-popover-width', `${width}px`);
   surface.style.setProperty('--schedule-popover-max-height', `${maxHeight}px`);
+}
+
+function toggleAnchoredPopover(trigger: HTMLElement, surface: HTMLElement, preferredWidth: number, estimatedHeight: number) {
+  if (surface.matches(':popover-open')) {
+    surface.hidePopover();
+    return;
+  }
+  positionAnchoredPopover(trigger, surface, preferredWidth, estimatedHeight);
   surface.showPopover();
 }
 
 function closePopover(surface: HTMLElement | null, returnFocus?: HTMLElement | null) {
   if (surface?.matches(':popover-open')) surface.hidePopover();
-  window.requestAnimationFrame(() => returnFocus?.focus());
+  // Restore synchronously: a queued frame must not steal focus from a picker
+  // opened immediately afterwards, and focus must never scroll its anchor.
+  if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
 }
 
-function useDismissPopoverOnViewportChange(surfaceRef: RefObject<HTMLElement | null>, open: boolean) {
+function useAnchoredPopoverOnViewportChange(
+  surfaceRef: RefObject<HTMLElement | null>,
+  triggerRef: RefObject<HTMLElement | null>,
+  open: boolean,
+  preferredWidth: number,
+  estimatedHeight: number,
+  focusSelector: string
+) {
   useEffect(() => {
-    if (!open) return;
-    const dismiss = (event?: Event) => {
-      if (event?.type === 'scroll' && event.target instanceof Node && surfaceRef.current?.contains(event.target)) return;
-      if (surfaceRef.current?.matches(':popover-open')) surfaceRef.current.hidePopover();
-    };
-    document.addEventListener('scroll', dismiss, true);
-    window.addEventListener('resize', dismiss);
+    const surface = surfaceRef.current;
+    const trigger = triggerRef.current;
+    if (!open || !surface || !trigger) return;
+    const stopPositioning = observeSchedulePopoverViewport({
+      surface,
+      trigger,
+      reposition: () => positionAnchoredPopover(trigger, surface, preferredWidth, estimatedHeight)
+    });
+    const focusFrame = window.requestAnimationFrame(() => {
+      if (surface.isConnected && surface.matches(':popover-open')) {
+        surface.querySelector<HTMLElement>(focusSelector)?.focus({ preventScroll: true });
+      }
+    });
     return () => {
-      document.removeEventListener('scroll', dismiss, true);
-      window.removeEventListener('resize', dismiss);
+      stopPositioning();
+      window.cancelAnimationFrame(focusFrame);
     };
-  }, [open, surfaceRef]);
+  }, [open, surfaceRef, triggerRef, preferredWidth, estimatedHeight, focusSelector]);
 }
 
 type ScheduleContext = {
@@ -585,6 +604,16 @@ export function DesktopScheduleWorkspace({
     if (event.key === 'Escape' && detailOpen) {
       if (event.defaultPrevented) return;
       event.preventDefault();
+      const popover = event.currentTarget.querySelector<HTMLElement>('[popover]:popover-open');
+      if (popover) {
+        // An opening picker may still have focus on its trigger. Let Escape
+        // dismiss that nested surface before the unsaved detail behind it.
+        event.stopPropagation();
+        const trigger = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[aria-controls]'))
+          .find(element => element.getAttribute('aria-controls') === popover.id);
+        closePopover(popover, trigger);
+        return;
+      }
       closeDetail();
     }
   }
@@ -1543,7 +1572,7 @@ function CategoryPicker({ value, onChange }: { value: ScheduleCategory; onChange
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const CurrentIcon = CATEGORY_META[value].Icon;
-  useDismissPopoverOnViewportChange(surfaceRef, open);
+  useAnchoredPopoverOnViewportChange(surfaceRef, triggerRef, open, 304, 196, '[role="radio"][aria-checked="true"]');
 
   return (
     <div className={styles.attributePicker}>
@@ -1575,7 +1604,6 @@ function CategoryPicker({ value, onChange }: { value: ScheduleCategory; onChange
           const surface = event.currentTarget;
           const nextOpen = surface.matches(':popover-open');
           setOpen(nextOpen);
-          if (nextOpen) window.requestAnimationFrame(() => surface.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.focus({ preventScroll: true }));
         }}
         onKeyDown={(event) => {
           if (event.key !== 'Escape') return;
@@ -1620,7 +1648,7 @@ function PriorityPicker({ value, onChange }: { value: SchedulePriority; onChange
   const triggerRef = useRef<HTMLButtonElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  useDismissPopoverOnViewportChange(surfaceRef, open);
+  useAnchoredPopoverOnViewportChange(surfaceRef, triggerRef, open, 276, 224, '[role="radio"][aria-checked="true"]');
 
   return (
     <div className={styles.attributePicker}>
@@ -1652,7 +1680,6 @@ function PriorityPicker({ value, onChange }: { value: SchedulePriority; onChange
           const surface = event.currentTarget;
           const nextOpen = surface.matches(':popover-open');
           setOpen(nextOpen);
-          if (nextOpen) window.requestAnimationFrame(() => surface.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.focus({ preventScroll: true }));
         }}
         onKeyDown={(event) => {
           if (event.key !== 'Escape') return;
@@ -1709,7 +1736,7 @@ function ScheduleAdvancedFilters({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  useDismissPopoverOnViewportChange(surfaceRef, open);
+  useAnchoredPopoverOnViewportChange(surfaceRef, triggerRef, open, 320, 318, 'select, input, button');
 
   return (
     <div className={styles.scheduleAdvancedFilters}>
@@ -1741,9 +1768,6 @@ function ScheduleAdvancedFilters({
           const surface = event.currentTarget;
           const nextOpen = surface.matches(':popover-open');
           setOpen(nextOpen);
-          if (nextOpen) {
-            window.requestAnimationFrame(() => surface.querySelector<HTMLElement>('select, input, button')?.focus({ preventScroll: true }));
-          }
         }}
         onKeyDown={(event) => {
           if (event.key !== 'Escape') return;

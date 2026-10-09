@@ -31,3 +31,53 @@ export function schedulePopoverPlacement({
     maxHeight: Math.min(physicalMaxHeight, viewportHeight - physicalTop - gutter) / scale
   };
 }
+
+export function schedulePopoverAnchorVisible(
+  rect: Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom' | 'width' | 'height'>,
+  viewportWidth: number,
+  viewportHeight: number
+) {
+  return rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 &&
+    rect.left < viewportWidth && rect.top < viewportHeight;
+}
+
+/** Keep a visible anchor attached through late focus/scroll events. The old
+ * blanket scroll dismissal could close a newly opened picker before input. */
+export function observeSchedulePopoverViewport({
+  surface,
+  trigger,
+  reposition
+}: {
+  surface: HTMLElement;
+  trigger: HTMLElement;
+  reposition: () => void;
+}) {
+  let frame: number | null = null;
+  let disposed = false;
+  const refresh = () => {
+    frame = null;
+    if (disposed || !surface.isConnected || !surface.matches(':popover-open')) return;
+    const rect = trigger.getBoundingClientRect();
+    const style = window.getComputedStyle(trigger);
+    if (!trigger.isConnected || !trigger.getClientRects().length ||
+      style.visibility === 'hidden' || style.display === 'none' ||
+      !schedulePopoverAnchorVisible(rect, window.innerWidth, window.innerHeight)) {
+      surface.hidePopover();
+      return;
+    }
+    reposition();
+  };
+  const schedule = (event?: Event) => {
+    if (disposed || (event?.type === 'scroll' && event.target instanceof Node && surface.contains(event.target))) return;
+    if (frame === null) frame = window.requestAnimationFrame(refresh);
+  };
+  document.addEventListener('scroll', schedule, { capture: true, passive: true });
+  window.addEventListener('resize', schedule);
+  schedule();
+  return () => {
+    disposed = true;
+    document.removeEventListener('scroll', schedule, true);
+    window.removeEventListener('resize', schedule);
+    if (frame !== null) window.cancelAnimationFrame(frame);
+  };
+}
