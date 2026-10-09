@@ -1,0 +1,782 @@
+/* Desktop notice-library final alignment authority.
+ * Imported after every legacy desktop skin so one coherent geometry owns the
+ * hero, filters, results toolbar, notice cards and support rail. */
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-hero,
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-filters,
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-toolbar {
+  padding-inline: 20px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-search-row {
+  grid-template-columns: minmax(280px, 1fr) repeat(3, minmax(150px, 168px)) 148px !important;
+  gap: 12px !important;
+  align-items: center !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-advanced-filters {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  grid-auto-rows: max-content !important;
+  align-items: start !important;
+  gap: 12px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-advanced-filters > label {
+  height: auto !important;
+  min-height: 61px !important;
+  align-self: start !important;
+  overflow: visible !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-results {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 320px !important;
+  grid-template-areas:
+    'toolbar toolbar'
+    'main sidebar' !important;
+  gap: 16px 20px !important;
+  align-items: start !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-toolbar {
+  grid-area: toolbar !important;
+  display: grid !important;
+  min-height: 60px !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 16px !important;
+  padding-block: 12px !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-toolbar > div:last-child {
+  justify-content: flex-end !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-toolbar-action {
+  min-height: 32px !important;
+  padding-inline: 8px !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-main-column {
+  grid-area: main !important;
+  min-width: 0 !important;
+  gap: 14px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-sidebar {
+  grid-area: sidebar !important;
+  min-width: 0 !important;
+  gap: 16px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card {
+  min-height: 220px !important;
+  padding: 20px !important;
+  border: 1px solid var(--so-border) !important;
+  border-radius: 18px !important;
+  background: var(--so-surface) !important;
+  box-shadow: 0 5px 18px rgba(29, 43, 50, 0.055) !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-layout {
+  grid-template-columns: 88px minmax(0, 1fr) 190px !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  gap: 20px !important;
+  align-items: stretch !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-layout > :first-child {
+  width: 88px !important;
+  height: 88px !important;
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  margin-block-start: 0 !important;
+  align-self: start !important;
+  border-radius: 16px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-copy {
+  display: grid !important;
+  min-width: 0 !important;
+  height: auto !important;
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  grid-template-rows: 30px 60px 24px 36px !important;
+  align-content: start !important;
+  row-gap: 10px !important;
+  overflow: hidden !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-heading {
+  display: grid !important;
+  min-width: 0 !important;
+  min-height: 30px !important;
+  grid-template-columns: minmax(0, 1fr) max-content !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-heading h2 {
+  min-width: 0 !important;
+  max-width: none !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 20px !important;
+  line-height: 30px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-status {
+  justify-self: end !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-title {
+  min-height: 60px !important;
+  margin-top: 0 !important;
+  overflow: hidden !important;
+  font-size: 20px !important;
+  line-height: 30px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-meta {
+  height: 24px !important;
+  min-height: 24px !important;
+  margin-top: 0 !important;
+  gap: 14px !important;
+  flex-wrap: nowrap !important;
+  font-size: 14px !important;
+  line-height: 24px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-tags {
+  height: 36px !important;
+  min-height: 36px !important;
+  margin-top: 0 !important;
+  gap: 8px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-tags > span {
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 10px !important;
+  font-size: 13px !important;
+  line-height: 20px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-source {
+  display: none !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-actions {
+  display: grid !important;
+  width: 190px !important;
+  min-height: 100% !important;
+  grid-column: 3 !important;
+  grid-row: 1 !important;
+  grid-template-rows: auto 1fr !important;
+  align-content: stretch !important;
+  justify-items: stretch !important;
+  padding-left: 20px !important;
+  border-left: 1px solid var(--so-divider) !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-deadline {
+  display: grid !important;
+  width: 100% !important;
+  min-height: 48px !important;
+  justify-self: stretch !important;
+  justify-items: end !important;
+  align-content: start !important;
+  padding-left: 0 !important;
+  border-left: 0 !important;
+  text-align: right !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-deadline > div:first-child {
+  font-size: 15px !important;
+  line-height: 22px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell)
+  .desktop-notice-card-actions > .desktop-notice-card-buttons {
+  width: 100% !important;
+  max-width: 100% !important;
+  align-self: end !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  margin-top: 0 !important;
+  gap: 10px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-buttons > div {
+  width: 100% !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-actions :is(a, button) {
+  width: 100% !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-buttons > div button {
+  background: var(--so-brand-strong) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-buttons--expired {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-sidecard {
+  padding: 20px !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-sidecard-header {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-bottom: 14px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-deadline-item {
+  margin-inline: -8px !important;
+  padding: 9px 8px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-deadline-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) max-content !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-today-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 48px !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-today-count {
+  text-align: right !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-deadline-distance {
+  color: #c4273f !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-deadline-date {
+  color: var(--so-text-secondary) !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-filters {
+  padding-block: 16px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-toolbar {
+  min-height: 52px !important;
+  padding-block: 8px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-card {
+  min-height: 188px !important;
+  padding: 14px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-card-layout {
+  grid-template-columns: 72px minmax(0, 1fr) 170px !important;
+  gap: 14px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-card-layout > :first-child {
+  width: 72px !important;
+  height: 72px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-card-copy {
+  grid-template-rows: 26px 48px 22px 30px !important;
+  row-gap: 6px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-card-heading h2 {
+  font-size: 18px !important;
+  line-height: 26px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-card-title {
+  min-height: 48px !important;
+  font-size: 17px !important;
+  line-height: 24px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-card-meta {
+  height: 22px !important;
+  min-height: 22px !important;
+  line-height: 22px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-card-tags {
+  height: 30px !important;
+  min-height: 30px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-card-tags > span {
+  min-height: 28px !important;
+  padding-inline: 10px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-card-actions {
+  width: 170px !important;
+  padding-left: 14px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-card-actions :is(a, button) {
+  height: 40px !important;
+  min-height: 40px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-sidecard {
+  padding: 16px !important;
+}
+
+.desktop-app-shell[data-density='compact']:is(.desktop-app-shell) .desktop-notice-deadline-item {
+  padding-block: 7px !important;
+}
+
+@media (max-width: 1240px) {
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-search-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-search-field {
+    grid-column: 1 / -1 !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-advanced-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-results {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-areas:
+      'toolbar'
+      'main'
+      'sidebar' !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-sidebar {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-toolbar {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-toolbar > div:last-child {
+    justify-content: flex-start !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-advanced-filters,
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-sidebar {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@container notice-cards (max-width: 759px) {
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card {
+    min-height: 0 !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-layout {
+    grid-template-columns: clamp(72px, 12cqi, 88px) minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    align-items: start !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-layout > :first-child {
+    width: clamp(64px, 10cqi, 80px) !important;
+    height: clamp(64px, 10cqi, 80px) !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-actions {
+    width: 100% !important;
+    min-height: 0 !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    grid-template-columns: minmax(0, 1fr) minmax(160px, 190px) !important;
+    grid-template-rows: auto !important;
+    align-items: end !important;
+    column-gap: 16px !important;
+    padding: 16px 0 0 !important;
+    border-top: 1px solid var(--so-divider) !important;
+    border-left: 0 !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-deadline {
+    grid-column: 1 !important;
+    min-height: 28px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    text-align: left !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell)
+    .desktop-notice-card-actions > .desktop-notice-card-buttons {
+    grid-column: 2 !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    margin-top: 0 !important;
+  }
+}
+
+@container notice-cards (max-width: 520px) {
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-actions {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell)
+    .desktop-notice-card-actions > .desktop-notice-card-buttons {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    margin-top: 10px !important;
+  }
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-library {
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-hero,
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-filters {
+  margin-bottom: 20px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-search-row,
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-advanced-filters {
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-auto-rows: max-content !important;
+  align-items: start !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-search-row > *,
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-advanced-filters > label {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-compact-filter select {
+  width: 100% !important;
+  min-width: 0 !important;
+  padding-inline: 12px 34px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-hero h1 {
+  white-space: nowrap !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-search-field {
+  grid-column: auto !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-results {
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-main-column {
+  height: auto !important;
+  margin-top: 16px !important;
+  margin-bottom: 16px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-card {
+  min-height: 0 !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-card-layout {
+  grid-template-columns: clamp(72px, 12cqi, 88px) minmax(0, 1fr) !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-card-layout > :first-child {
+  width: clamp(64px, 10cqi, 80px) !important;
+  height: clamp(64px, 10cqi, 80px) !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-card-actions {
+  width: 100% !important;
+  min-height: 0 !important;
+  grid-column: 1 / -1 !important;
+  grid-template-rows: auto auto !important;
+  padding: 16px 0 0 !important;
+  border-top: 1px solid var(--so-divider) !important;
+  border-left: 0 !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-card-deadline {
+  min-height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  text-align: left !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-card-actions > .desktop-notice-card-buttons {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  margin-top: 12px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-sidebar {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+html.seekoffer-desktop-surface[data-desktop-theme='dark']
+  .desktop-app-shell[data-density]:is(.desktop-app-shell)
+  .desktop-notice-deadline-distance {
+  color: #ff8fa0 !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell)
+  .desktop-notice-card-actions > .desktop-notice-card-buttons--expired {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+@container notice-cards (max-width: 379px) {
+  .desktop-app-shell[data-density]:is(.desktop-app-shell)
+    .desktop-notice-card-actions > .desktop-notice-card-buttons,
+  .desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+    [data-zoom-level='150'],
+    [data-zoom-level='175'],
+    [data-zoom-level='200']
+  ) .desktop-notice-card-actions > .desktop-notice-card-buttons {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* Full-scale integrity authority. Core school and notice copy is content-led
+ * at every zoom; secondary columns reflow instead of clipping text. */
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-copy {
+  height: auto !important;
+  min-height: 0 !important;
+  grid-template-rows: auto auto auto auto !important;
+  overflow: visible !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-heading h2,
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-title {
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-title {
+  display: block !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-meta,
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-tags {
+  height: auto !important;
+  min-height: 0 !important;
+  flex-wrap: wrap !important;
+}
+
+/* The source department can be longer than the notice title at accessibility
+ * zoom.  Tailwind's `truncate` utility must not turn that verified source
+ * context into an incomplete label. */
+html.seekoffer-desktop-surface
+  .desktop-app-shell[data-density]:is(.desktop-app-shell)
+  .desktop-notice-card-department.desktop-notice-card-department.truncate {
+  max-width: 100% !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-actions :is(a, button) {
+  height: auto !important;
+  min-height: 44px !important;
+  padding-block: 8px !important;
+  white-space: normal !important;
+  line-height: 20px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) :is(.desktop-notice-search-row, .desktop-notice-advanced-filters) {
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-auto-rows: max-content !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-results {
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-card-layout {
+  grid-template-columns: clamp(64px, 11cqi, 82px) minmax(0, 1fr) !important;
+  grid-template-rows: auto auto !important;
+  align-items: start !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-card-actions {
+  width: 100% !important;
+  min-height: 0 !important;
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+  padding: 14px 0 0 !important;
+  border-top: 1px solid var(--so-divider) !important;
+  border-left: 0 !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-card-deadline {
+  min-height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  text-align: left !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'],
+  [data-zoom-level='150'],
+  [data-zoom-level='175'],
+  [data-zoom-level='200']
+) .desktop-notice-card-actions > .desktop-notice-card-buttons {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  margin-top: 10px !important;
+}
+
+@media (max-width: 1024px) {
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-sidebar {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@container notice-cards (max-width: 379px) {
+  .desktop-app-shell[data-density]:is(.desktop-app-shell) .desktop-notice-card-actions > .desktop-notice-card-buttons {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}

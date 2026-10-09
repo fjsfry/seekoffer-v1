@@ -1,0 +1,181 @@
+import { CloudflareApiError, cloudflareRequest } from './cloudflare-api';
+import { buildPublicNoticeSearchResult, type PublicNoticeSearchResponse } from './public-notice-search';
+import { filterMainNoticeProjects } from './notice-quality';
+import { baseNoticeProjects } from './notice-source';
+import { toNoticeListItem, type NoticeListItem } from './notice-record';
+import type { NoticeSearchFilters } from './notice-query';
+import type { PublicNoticeProject } from './mock-data';
+
+export type PublicNoticeDataSource = 'cloudflare' | 'bundled';
+
+type NoticeByIdsResponse = {
+  items: NoticeListItem[];
+  source: PublicNoticeDataSource;
+};
+
+type DeadlineNoticeResponse = {
+  items: NoticeListItem[];
+  source: PublicNoticeDataSource;
+  servedAt: string;
+};
+
+type RemoteNoticeSearchResponse = Omit<PublicNoticeSearchResponse, 'source'> & {
+  source?: string;
+};
+
+const searchCache = new Map<string, { cachedAt: number; data: PublicNoticeSearchResponse }>();
+const CACHE_TTL = 5 * 60_000;
+
+function cacheKey(filters: NoticeSearchFilters, page: number, pageSize: number) {
+  return JSON.stringify({ filters, page, pageSize });
+}
+
+function buildNoticeSearchParams(filters: NoticeSearchFilters, page: number, pageSize: number) {
+  const params = new URLSearchParams();
+  const values: Array<[string, string]> = [
+    ['page', String(page)],
+    ['pageSize', String(pageSize)],
+    ['year', filters.year],
+    ['sort', filters.sortBy],
+    ['q', filters.keyword],
+    ['school', filters.schoolName],
+    ['region', filters.region],
+    ['major', filters.majorKeyword],
+    ['category', filters.category],
+    ['discipline', filters.discipline],
+    ['range', filters.schoolRange],
+    ['status', filters.progress],
+    ['deadline', filters.deadlineQuick],
+    ['fresh', filters.fresh],
+    ['date', filters.publishDate],
+    ['type', filters.projectType],
+    ['kind', filters.noticeKind]
+  ];
+
+  values.forEach(([key, value]) => {
+    if (value && (value !== '全部' || key === 'year')) params.set(key, value);
+  });
+
+  return params;
+}
+
+function bundledCatalog() {
+  return filterMainNoticeProjects(baseNoticeProjects);
+}
+
+function buildBundledSearchResult(
+  filters: NoticeSearchFilters,
+  page: number,
+  pageSize: number
+) {
+  return buildPublicNoticeSearchResult(bundledCatalog(), filters, {
+    page,
+    pageSize,
+    source: 'bundled'
+  });
+}
+
+export function clearPublicNoticeSearchCache() {
+  for (const entry of searchCache.values()) entry.cachedAt = 0;
+}
+
+export async function fetchPublicNoticeSearch(
+  filters: NoticeSearchFilters,
+  page: number,
+  options: { pageSize?: number; signal?: AbortSignal } = {}
+) {
+  if (options.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
+
+  const pageSize = options.pageSize || 16;
+  const key = cacheKey(filters, page, pageSize);
+  const cached = searchCache.get(key);
+  if (cached && Date.now() - cached.cachedAt < (cached.data.source === 'bundled' || cached.data.stale ? 30000 : CACHE_TTL)) return cached.data;
+
+  try {
+    const params = buildNoticeSearchParams(filters, page, pageSize);
+    const result = await cloudflareRequest<RemoteNoticeSearchResponse>(
+      `/v1/notices?${params.toString()}`,
+      { signal: options.signal }
+    );
+    const data = { ...result, source: 'cloudflare' as const };
+    searchCache.set(key, { cachedAt: Date.now(), data });
+    if (searchCache.size > 40) searchCache.delete(searchCache.keys().next().value!);
+    return data;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    if (error instanceof CloudflareApiError && error.status < 500 && error.status !== 402 && error.status !== 429) throw error;
+    const fallbackReason = error instanceof CloudflareApiError && ['READ_BUDGET_EXHAUSTED', 'PUBLIC_REFRESH_IN_PROGRESS'].includes(error.code || '')
+      ? 'busy' as const : error instanceof CloudflareApiError && error.status === 402 ? 'quota' as const : 'network' as const;
+    const data: PublicNoticeSearchResponse = cached?.data.source === 'cloudflare' && Date.now() - Date.parse(cached.data.servedAt) < 10 * 60000
+      ? { ...cached.data, stale: true, fallbackReason }
+      : { ...buildBundledSearchResult(filters, page, pageSize), fallbackReason };
+    searchCache.set(key, { cachedAt: Date.now(), data });
+    return data;
+  }
+}
+
+export async function fetchPublicNoticesByIds(ids: string[], signal?: AbortSignal): Promise<NoticeByIdsResponse> {
+  if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
+  const wanted = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean))).slice(0, 100);
+  if (!wanted.length) return { items: [], source: 'cloudflare' };
+
+  try {
+    const result = await cloudflareRequest<{ items?: NoticeListItem[] }>(
+      '/v1/notices/by-ids',
+      { method: 'POST', body: JSON.stringify({ ids: wanted }), signal }
+    );
+    return { items: Array.isArray(result.items) ? result.items : [], source: 'cloudflare' };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    return {
+      items: bundledCatalog()
+        .filter((row) => wanted.includes(row.id))
+        .map(toNoticeListItem),
+      source: 'bundled'
+    };
+  }
+}
+
+export async function fetchPublicDeadlineNotices(signal?: AbortSignal): Promise<DeadlineNoticeResponse> {
+  const result = await fetchPublicNoticeSearch(
+    {
+      keyword: '',
+      schoolName: '',
+      region: '全部',
+      majorKeyword: '',
+      category: '全部',
+      discipline: '全部',
+      schoolRange: '全部',
+      progress: '报名中',
+      deadlineQuick: 'within7days',
+      fresh: '全部',
+      publishDate: '',
+      projectType: '全部',
+      noticeKind: '全部',
+      year: '2026',
+      sortBy: 'deadline'
+    },
+    1,
+    { pageSize: 1000, signal }
+  );
+
+  return {
+    items: result.items,
+    source: result.source,
+    servedAt: result.servedAt
+  };
+}
+
+export async function fetchPublicNoticeById(id: string) {
+  const normalizedId = id.trim();
+  if (!normalizedId) return null;
+
+  try {
+    return await cloudflareRequest<PublicNoticeProject>(
+      `/v1/notices/${encodeURIComponent(normalizedId)}`
+    );
+  } catch (error) {
+    if (error instanceof CloudflareApiError && [401, 403, 404].includes(error.status)) return null;
+    return bundledCatalog().find((item) => item.id === normalizedId) || null;
+  }
+}

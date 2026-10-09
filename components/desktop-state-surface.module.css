@@ -1,0 +1,228 @@
+.surface {
+  --state-accent: var(--so-brand, #0f6b61);
+  --state-accent-soft: var(--so-brand-soft, #eaf5f3);
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  min-height: 156px;
+  padding: 24px;
+  border: 1px solid var(--so-border, #dee0e3);
+  border-radius: var(--app-radius-panel, var(--desktop-radius-panel, 12px));
+  background: var(--so-surface, #ffffff);
+  color: var(--so-text, #1f2329);
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  text-align: left;
+}
+
+.section {
+  min-height: 156px;
+}
+
+.full {
+  min-height: 240px;
+  grid-template-columns: 44px minmax(0, 520px);
+  justify-content: center;
+}
+
+.inline {
+  min-height: 52px;
+  padding: 10px 14px;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: var(--app-radius-control, 8px);
+  background: var(--state-accent-soft);
+  color: var(--state-accent);
+}
+
+.full .icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--app-radius-card, 12px);
+}
+
+.inline .icon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--app-radius-control, 8px);
+}
+
+.icon > svg {
+  width: 20px;
+  height: 20px;
+}
+
+.copy {
+  min-width: 0;
+}
+
+.title {
+  display: block;
+  margin: 0;
+  color: var(--so-text, #1f2329);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.detail {
+  display: block;
+  margin: 3px 0 0;
+  color: var(--so-text-secondary, #646a73);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.inline .detail {
+  margin-top: 1px;
+}
+
+.action {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.action :where(button, a) {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid var(--so-border-strong, #d0d3d6);
+  border-radius: var(--app-radius-control, var(--desktop-radius-control, 8px));
+  background: var(--so-surface, #ffffff);
+  color: var(--state-accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast, 167ms) var(--motion-ease-enter, cubic-bezier(0, 0, 0, 1)),
+    background-color var(--motion-fast, 167ms) var(--motion-ease-enter, cubic-bezier(0, 0, 0, 1)),
+    color var(--motion-fast, 167ms) var(--motion-ease-enter, cubic-bezier(0, 0, 0, 1));
+}
+
+.action :where(button, a):hover:not(:disabled, [aria-disabled='true']) {
+  border-color: var(--state-accent);
+  background: var(--state-accent-soft);
+}
+
+.action :where(button, a):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--state-accent) 28%, transparent);
+  outline-offset: 2px;
+}
+
+.action :where(button, a):active:not(:disabled, [aria-disabled='true']) {
+  background: color-mix(in srgb, var(--state-accent) 14%, var(--so-surface, #ffffff));
+}
+
+.action :where(button, a):disabled,
+.action :where(button, a)[aria-disabled='true'] {
+  border-color: var(--so-border, #dee0e3);
+  color: var(--so-text-disabled, #bbbfc4);
+  background: var(--so-surface-subtle, #f8f9fa);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.neutral {
+  --state-accent: var(--so-text-secondary, #646a73);
+  --state-accent-soft: var(--so-surface-subtle, #f8f9fa);
+}
+
+.stale {
+  --state-accent: var(--so-warning, #8a5200);
+  --state-accent-soft: var(--so-warning-soft, #fff5e6);
+  border-color: color-mix(in srgb, var(--state-accent) 34%, var(--so-border, #dee0e3));
+  background: color-mix(in srgb, var(--state-accent-soft) 76%, var(--so-surface, #ffffff));
+}
+
+.error {
+  --state-accent: var(--so-danger, #c9443d);
+  --state-accent-soft: var(--so-danger-soft, #fff0ee);
+  border-color: color-mix(in srgb, var(--state-accent) 34%, var(--so-border, #dee0e3));
+  background: color-mix(in srgb, var(--state-accent-soft) 76%, var(--so-surface, #ffffff));
+}
+
+.success {
+  --state-accent: var(--so-success, var(--so-brand-strong, #2b8a5a));
+  --state-accent-soft: var(--so-success-soft, var(--so-brand-soft, #eaf5f3));
+}
+
+.loading .icon > svg {
+  animation: desktop-state-spin 900ms linear infinite;
+}
+
+@keyframes desktop-state-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 720px) {
+  .surface,
+  .full {
+    grid-template-columns: 36px minmax(0, 1fr);
+    justify-content: stretch;
+    padding: 18px;
+  }
+
+  .action {
+    grid-column: 1 / -1;
+    justify-content: stretch;
+  }
+
+  .action > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+:global(html[data-desktop-reduce-motion='true']) .loading .icon > svg {
+  animation: none;
+}
+
+:global(html[data-desktop-reduce-motion='true']) .action :where(button, a) {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading .icon > svg {
+    animation: none;
+  }
+
+  .action :where(button, a) {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .surface,
+  .action :where(button, a) {
+    border-color: CanvasText;
+  }
+
+  .action :where(button, a):focus-visible {
+    outline-color: Highlight;
+  }
+}

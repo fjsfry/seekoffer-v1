@@ -1,0 +1,1249 @@
+.resourcePage {
+  --resource-canvas: var(--desktop-canvas, var(--so-canvas, #f7faf9));
+  --resource-surface: var(--desktop-surface, var(--so-surface, #ffffff));
+  --resource-surface-subtle: var(--desktop-surface-subtle, var(--so-surface-subtle, #f3f7f6));
+  --resource-surface-hover: var(--desktop-surface-hover, var(--so-surface-hover, #eaf3f0));
+  --resource-border: var(--desktop-border, var(--so-border, #dfe8e5));
+  --resource-border-strong: var(--desktop-border-strong, var(--so-border-strong, #c8d6d1));
+  --resource-text: var(--desktop-text, var(--so-text, #122026));
+  --resource-text-secondary: var(--desktop-text-secondary, var(--so-text-secondary, #475b62));
+  --resource-text-tertiary: var(--desktop-text-tertiary, var(--so-text-tertiary, #718087));
+  --resource-accent: var(--desktop-accent, var(--so-brand, #17494d));
+  --resource-accent-soft: var(--desktop-accent-muted, var(--so-brand-soft, #eff7f6));
+  width: min(1320px, 100%);
+  max-width: 100%;
+  min-width: 0;
+  margin: 0 auto;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  color: var(--resource-text);
+}
+
+.pageHeader {
+  min-height: 116px;
+  margin: 0;
+  padding: 22px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border: 1px solid var(--resource-border);
+  border-radius: var(--desktop-radius-panel, 14px);
+  background: var(--resource-surface);
+  box-shadow: none;
+}
+
+.headerCopy {
+  min-width: 0;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--resource-accent);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0.04em;
+}
+
+.pageHeader h1 {
+  margin: 0;
+  color: var(--resource-text);
+  font-size: clamp(25px, 2.1vw, 30px);
+  font-weight: 600;
+  line-height: 38px;
+  letter-spacing: -0.025em;
+}
+
+.pageHeader p {
+  max-width: 720px;
+  margin: 5px 0 0;
+  color: var(--resource-text-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.headerMeta {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.deviceBadge {
+  min-height: 30px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--resource-border);
+  border-radius: 999px;
+  color: var(--resource-text-secondary);
+  background: var(--resource-surface-subtle);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.deviceBadge svg {
+  width: 14px;
+  height: 14px;
+  color: var(--resource-accent);
+}
+
+.searchPanel {
+  min-height: 66px;
+  padding: 11px 14px;
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--resource-border);
+  border-radius: var(--desktop-radius-panel, 14px);
+  background: var(--resource-surface);
+}
+
+.searchField {
+  height: 42px;
+  min-width: 0;
+  padding: 0 10px 0 12px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--resource-border-strong);
+  border-radius: var(--desktop-radius-control, 10px);
+  color: var(--resource-text-secondary);
+  background: var(--resource-surface-subtle);
+  transition: border-color var(--motion-fast, 167ms) ease, background-color var(--motion-fast, 167ms) ease, box-shadow var(--motion-fast, 167ms) ease;
+}
+
+.searchField:focus-within {
+  border-color: var(--resource-accent);
+  background: var(--resource-surface);
+  box-shadow: 0 0 0 3px var(--resource-accent-soft);
+}
+
+.searchField > svg {
+  width: 18px;
+  height: 18px;
+}
+
+.searchField input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: var(--resource-text);
+  background: transparent;
+  font-size: 14px;
+}
+
+.searchField input::placeholder {
+  color: var(--resource-text-tertiary);
+}
+
+.searchField input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.searchField button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  color: var(--resource-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.searchField button:hover {
+  color: var(--resource-text);
+  background: var(--resource-surface-hover);
+}
+
+.searchField button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.searchField kbd {
+  min-width: 48px;
+  padding: 2px 7px;
+  border: 1px solid var(--resource-border);
+  border-radius: 6px;
+  color: var(--resource-text-tertiary);
+  background: var(--resource-surface);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 19px;
+  text-align: center;
+}
+
+.searchHint {
+  margin: 0;
+  color: var(--resource-text-tertiary);
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.workspace {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 214px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+}
+
+.categoryPanel {
+  position: sticky;
+  top: 0;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--resource-border);
+  border-radius: var(--desktop-radius-panel, 14px);
+  background: var(--resource-surface);
+}
+
+.categoryHeading {
+  min-height: 34px;
+  padding: 0 8px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--resource-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.categoryHeading small {
+  min-width: 24px;
+  height: 22px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--resource-text-tertiary);
+  background: var(--resource-surface-subtle);
+  font-size: 12px;
+}
+
+.categoryList {
+  display: grid;
+  gap: 3px;
+}
+
+.categoryButton {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 10px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--resource-text-secondary);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.categoryButton:hover {
+  color: var(--resource-text);
+  background: var(--resource-surface-hover);
+}
+
+.categoryButtonActive {
+  color: var(--resource-accent);
+  background: var(--resource-accent-soft);
+  font-weight: 600;
+}
+
+.categoryButton svg {
+  width: 18px;
+  height: 18px;
+}
+
+.categoryButton small {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.72;
+}
+
+.localBoundary {
+  margin-top: 12px;
+  padding: 12px;
+  border-top: 1px solid var(--resource-border);
+  color: var(--resource-text-tertiary);
+}
+
+.localBoundary strong {
+  display: block;
+  color: var(--resource-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.localBoundary p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.contentColumn {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.quickPanel,
+.directory {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--resource-border);
+  border-radius: var(--desktop-radius-panel, 14px);
+  background: var(--resource-surface);
+}
+
+.panelHeading,
+.directoryHeading {
+  min-height: 64px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--resource-border);
+}
+
+.panelHeading > div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panelIcon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--resource-accent);
+  background: var(--resource-accent-soft);
+}
+
+.panelIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.panelHeading h2,
+.directoryHeading h2 {
+  margin: 0;
+  color: var(--resource-text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.panelHeading p,
+.directoryHeading p {
+  margin: 1px 0 0;
+  color: var(--resource-text-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.panelHeading > button,
+.resetButton {
+  min-height: 34px;
+  padding: 0 8px 0 10px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--resource-accent);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.panelHeading > button:hover,
+.resetButton:hover {
+  background: var(--resource-accent-soft);
+}
+
+.panelHeading > button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.quickGrid {
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.quickGrid > div {
+  min-width: 0;
+}
+
+.quickResource {
+  min-width: 0;
+  min-height: 64px;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  border-radius: 9px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.quickResource:hover {
+  background: var(--resource-surface-hover);
+}
+
+.quickResource > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--resource-text-tertiary);
+}
+
+.quickCopy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.quickCopy strong {
+  color: var(--resource-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 21px;
+  white-space: normal;
+}
+
+.quickCopy span {
+  color: var(--resource-text-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.directoryHeading > div {
+  min-width: 0;
+}
+
+.directoryGroups {
+  min-width: 0;
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+  background: var(--resource-surface-subtle);
+}
+
+.resourceGroup {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--resource-border);
+  border-radius: 11px;
+  background: var(--resource-surface);
+  box-shadow: none;
+}
+
+.resourcePage .groupHeader {
+  min-height: 66px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--resource-border);
+  background: var(--resource-surface);
+}
+
+.resourcePage .resourceList,
+.resourcePage :global(.desktop-resource-tool-list) {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  display: block;
+  list-style: none;
+  background: var(--resource-surface);
+}
+
+.resourcePage .resourceList:global(.desktop-resource-link-grid) {
+  padding: 0 !important;
+  display: block !important;
+  background: var(--resource-surface) !important;
+}
+
+.resourcePage .resourceItem {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 78px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  align-items: stretch;
+  overflow: visible;
+  border: 0;
+  border-bottom: 1px solid var(--resource-border);
+  border-radius: 0;
+  background: var(--resource-surface);
+  box-shadow: none;
+  transform: none;
+}
+
+.resourcePage .resourceItem:last-child {
+  border-bottom: 0;
+}
+
+.resourcePage .resourceItem:hover {
+  background: var(--resource-surface-hover);
+}
+
+.resourceLink {
+  width: 100%;
+  min-width: 0;
+  min-height: 78px;
+  padding: 11px 12px 11px 14px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) minmax(80px, auto);
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.resourcePage .resourceLink:global(.desktop-resource-link) {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 78px !important;
+  padding: 11px 12px 11px 14px !important;
+  display: grid !important;
+  grid-template-columns: 40px minmax(0, 1fr) minmax(80px, auto) !important;
+  align-items: center !important;
+  gap: 12px !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.resourcePage .resourceLink:global(.desktop-resource-tool-row) {
+  min-height: 78px !important;
+  padding: 11px 12px 11px 14px !important;
+  grid-template-columns: 40px minmax(0, 1fr) minmax(80px, auto) !important;
+  gap: 12px !important;
+}
+
+.resourcePage .resourceItem .resourceMark {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--resource-border);
+  border-radius: 10px;
+  color: var(--resource-accent);
+  background: var(--resource-surface-subtle);
+}
+
+.resourcePage .resourceItem .resourceMark {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  flex: 0 0 40px !important;
+}
+
+.resourcePage .resourceMark > div {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  border: 0 !important;
+  border-radius: 9px !important;
+  box-shadow: none !important;
+}
+
+.resourceMark > svg {
+  width: 19px;
+  height: 19px;
+}
+
+.resourceCopy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.resourceTitle {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
+}
+
+.resourcePage .resourceItem .resourceTitle strong {
+  min-width: 0 !important;
+  overflow: visible !important;
+  color: var(--resource-text) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  line-height: 22px !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+.resourcePage .resourceItem .resourceTitle small {
+  min-height: 20px;
+  padding: 1px 6px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 5px;
+  color: var(--resource-accent);
+  background: var(--resource-accent-soft);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.resourcePage .resourceItem .resourceDescription {
+  min-width: 0 !important;
+  overflow: visible !important;
+  color: var(--resource-text-secondary) !important;
+  font-size: 13px !important;
+  line-height: 20px !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+.resourcePage .resourceItem .resourceKeywords {
+  min-width: 0 !important;
+  overflow: visible !important;
+  color: var(--resource-text-tertiary) !important;
+  font-size: 12px !important;
+  font-style: normal !important;
+  line-height: 18px !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+.resourcePage .resourceItem .openAction {
+  min-width: 80px;
+  min-height: 36px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  border-radius: 8px;
+  color: var(--resource-text-tertiary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.resourcePage .resourceItem .openAction {
+  min-width: 80px !important;
+  min-height: 36px !important;
+  padding: 0 7px !important;
+}
+
+.resourceItem:hover .openAction {
+  color: var(--resource-accent);
+  background: var(--resource-surface);
+}
+
+.favoriteButton {
+  position: static;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  margin: auto 6px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  color: var(--resource-text-tertiary);
+  background: transparent;
+  cursor: pointer;
+  transform: none;
+}
+
+.favoriteButton:hover {
+  color: var(--resource-accent);
+  background: var(--resource-accent-soft);
+}
+
+.favoriteButton:focus-visible {
+  outline: 2px solid var(--resource-accent);
+  outline-offset: 1px;
+}
+
+.favoriteButtonActive {
+  color: var(--resource-accent);
+  background: var(--resource-accent-soft);
+}
+
+.favoriteButton svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* A resource row has four stable zones: mark, copy, destination and favorite.
+ * The high-specificity module authority intentionally beats the later global
+ * toolkit rules, which otherwise turn the list item back into a clipped block. */
+.resourcePage .resourceGroup .resourceItem {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 78px !important;
+  padding: 0 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 48px !important;
+  align-items: stretch !important;
+  overflow: visible !important;
+}
+
+.resourcePage .resourceGroup .resourceItem .resourceLink {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 78px !important;
+  padding: 11px 10px 11px 14px !important;
+  display: grid !important;
+  grid-template-columns: 40px minmax(0, 1fr) minmax(80px, auto) !important;
+  align-items: center !important;
+  gap: 12px !important;
+  overflow: visible !important;
+  border-radius: 0 !important;
+}
+
+.resourcePage .resourceGroup .resourceItem .resourceCopy,
+.resourcePage .resourceGroup .resourceItem .resourceTitle {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.resourcePage .resourceGroup .resourceItem .resourceTitle {
+  flex-wrap: wrap !important;
+}
+
+.resourcePage .resourceGroup .resourceItem .resourceTitle strong,
+.resourcePage .resourceGroup .resourceItem .resourceDescription,
+.resourcePage .resourceGroup .resourceItem .resourceKeywords {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  overflow-wrap: anywhere !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+.resourcePage .resourceGroup .resourceItem .resourceTitle small {
+  flex: 0 0 auto !important;
+}
+
+.resourcePage .resourceGroup .resourceItem .openAction {
+  min-width: 80px !important;
+  padding: 0 8px !important;
+  justify-content: flex-end !important;
+}
+
+.resourcePage .resourceGroup .resourceItem .favoriteButton {
+  position: static !important;
+  z-index: auto !important;
+  width: 36px !important;
+  height: 36px !important;
+  margin: auto 6px !important;
+  transform: none !important;
+}
+
+.emptyState {
+  min-height: clamp(300px, 44vh, 520px);
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--resource-text-secondary);
+  text-align: center;
+}
+
+.emptyState > span {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: var(--resource-accent);
+  background: var(--resource-accent-soft);
+}
+
+.emptyState > span svg {
+  width: 22px;
+  height: 22px;
+}
+
+.emptyState strong {
+  margin-top: 14px;
+  color: var(--resource-text);
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.emptyState p {
+  max-width: 400px;
+  margin: 5px 0 0;
+  font-size: 13px;
+  line-height: 21px;
+}
+
+.emptyState button {
+  min-height: 38px;
+  margin-top: 16px;
+  padding: 0 14px;
+  border: 1px solid var(--resource-border-strong);
+  border-radius: 9px;
+  color: var(--resource-text);
+  background: var(--resource-surface);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.emptyState button:hover {
+  border-color: var(--resource-accent);
+  color: var(--resource-accent);
+  background: var(--resource-accent-soft);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 1050px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .categoryPanel {
+    position: static;
+  }
+
+  .categoryHeading,
+  .localBoundary {
+    display: none;
+  }
+
+  .categoryList {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .categoryButton {
+    width: auto;
+    min-width: max-content;
+    grid-template-columns: 18px auto auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .pageHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .headerMeta {
+    justify-content: flex-start;
+  }
+
+  .searchPanel {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .searchHint {
+    padding-left: 2px;
+    white-space: normal;
+  }
+
+  .quickGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .resourcePage .resourceLink:global(.desktop-resource-link),
+  .resourceLink,
+  .resourcePage .resourceLink:global(.desktop-resource-tool-row) {
+    grid-template-columns: 40px minmax(0, 1fr) 38px !important;
+  }
+
+  .resourcePage .resourceItem .openAction {
+    min-width: 38px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+  }
+
+  .openAction > span {
+    display: none;
+  }
+
+  .resourcePage .resourceGroup .resourceItem {
+    grid-template-columns: minmax(0, 1fr) 46px !important;
+  }
+
+  .resourcePage .resourceGroup .resourceItem .resourceLink {
+    grid-template-columns: 40px minmax(0, 1fr) 38px !important;
+  }
+
+  .resourcePage .resourceGroup .resourceItem .openAction {
+    min-width: 38px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+  }
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage {
+  width: 100% !important;
+  max-width: 100% !important;
+  gap: 10px !important;
+  overflow-x: hidden !important;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .categoryPanel {
+  position: static;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .categoryHeading,
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .localBoundary {
+  display: none;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .categoryList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .quickGrid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourceLink,
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage .resourceLink:global(.desktop-resource-tool-row) {
+  grid-template-columns: 40px minmax(0, 1fr) 38px !important;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .openAction {
+  min-width: 38px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .openAction > span {
+  display: none !important;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage .resourceGroup .resourceItem {
+  grid-template-columns: minmax(0, 1fr) 46px !important;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage .resourceGroup .resourceItem .resourceLink {
+  min-height: 92px !important;
+  padding: 12px 8px 12px 12px !important;
+  grid-template-columns: 40px minmax(0, 1fr) 38px !important;
+  align-items: start !important;
+}
+
+:global(.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage .resourceGroup .resourceItem .openAction {
+  min-width: 38px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+}
+
+:global(html[data-desktop-reduce-motion='true']) .resourcePage :where(a, button, label) {
+  transition: none !important;
+}
+
+/* Release authority scoped to the desktop-only resource component. It keeps
+ * the current two-column discovery layout while preventing the historical
+ * global layer from inflating rows or weakening small-label contrast. */
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage :is(
+  .resourceList.resourceList,
+  :global(.desktop-resource-tool-list.desktop-resource-tool-list)
+) {
+  padding: 10px !important;
+  gap: 10px !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .resourceGroup.resourceGroup {
+  border-color: var(--resource-border) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .groupHeader.groupHeader {
+  min-height: 60px !important;
+  padding: 9px 12px !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .resourceItem.resourceItem {
+  min-height: 92px !important;
+  grid-template-columns: minmax(0, 1fr) 40px !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .resourceItem.resourceItem:hover,
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .resourceItem.resourceItem:active {
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .resourceItem.resourceItem .resourceLink.resourceLink {
+  min-height: 90px !important;
+  padding: 9px 8px 9px 11px !important;
+  grid-template-columns: 42px minmax(0, 1fr) 68px !important;
+  gap: 10px !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .resourceItem.resourceItem .resourceMark.resourceMark {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  min-height: 42px !important;
+  flex-basis: 42px !important;
+  border-radius: 10px !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .resourceItem.resourceItem .resourceMark.resourceMark > div {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .resourceItem.resourceItem .resourceTitle.resourceTitle strong {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  line-height: 22px !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .resourceItem.resourceItem .resourceDescription.resourceDescription {
+  -webkit-line-clamp: 1 !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .resourceItem.resourceItem .resourceKeywords.resourceKeywords {
+  overflow: hidden !important;
+  color: var(--resource-text-secondary) !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .resourceItem.resourceItem .openAction.openAction {
+  min-width: 68px !important;
+  min-height: 36px !important;
+  border-radius: 8px !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .resourceItem.resourceItem .favoriteButton.favoriteButton {
+  width: 36px !important;
+  height: 36px !important;
+  margin: auto 2px !important;
+  border-radius: 8px !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage [data-resource-category='toolkit'] {
+  --resource-category: color-mix(in srgb, #7666de 68%, var(--resource-text) 32%) !important;
+  --resource-category-soft: color-mix(in srgb, var(--resource-category) 14%, var(--resource-surface)) !important;
+}
+
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage [data-resource-category='toolkit'] .resourceTitle.resourceTitle small,
+:global(.desktop-app-shell[data-density]) .resourcePage.resourcePage [data-resource-category='toolkit'] .resourceKeywords.resourceKeywords {
+  color: var(--resource-category) !important;
+}
+
+@container resource-center (max-width: 1100px) {
+  :global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .categoryList.categoryList {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: max-content !important;
+    padding: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)) !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    overflow: visible !important;
+  }
+
+  :global(.desktop-app-shell[data-density]) .resourcePage.resourcePage .categoryButton.categoryButton {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem {
+  min-height: 108px !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem .resourceLink.resourceLink {
+  min-height: 106px !important;
+  grid-template-columns: 42px minmax(0, 1fr) 38px !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem .resourceDescription.resourceDescription {
+  -webkit-line-clamp: 2 !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .emptyState.emptyState {
+  min-height: 260px !important;
+}
+
+/* Full-scale integrity: 125% joins the high-zoom one-column contract and the
+ * visible destination label remains available at every supported zoom. */
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='125'], [data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: hidden !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='125'], [data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage :is(
+  .quickGrid.quickGrid,
+  .resourceList.resourceList,
+  :global(.desktop-resource-tool-list.desktop-resource-tool-list)
+) {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='125'], [data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem {
+  height: auto !important;
+  min-height: 108px !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='125'], [data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem .resourceLink.resourceLink {
+  height: auto !important;
+  min-height: 106px !important;
+  grid-template-columns: 42px minmax(0, 1fr) minmax(68px, auto) !important;
+  align-items: center !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='125'], [data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem .resourceTitle.resourceTitle {
+  flex-wrap: wrap !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='125'], [data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem .resourceTitle.resourceTitle strong {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='125'], [data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem .resourceDescription.resourceDescription,
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='125'], [data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem .resourceKeywords.resourceKeywords {
+  display: block !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  -webkit-line-clamp: unset !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='125'], [data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem .openAction.openAction {
+  min-width: 68px !important;
+  justify-content: flex-end !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='125'], [data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem .openAction.openAction > span {
+  display: inline !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem .resourceLink.resourceLink {
+  grid-template-columns: 40px minmax(0, 1fr) !important;
+  grid-template-areas:
+    'mark copy'
+    'action action' !important;
+  align-items: start !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem .resourceMark.resourceMark {
+  grid-area: mark !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem .resourceCopy.resourceCopy {
+  grid-area: copy !important;
+}
+
+:global(.desktop-app-shell[data-density]:is([data-zoom-level='175'], [data-zoom-level='200'])) .resourcePage.resourcePage .resourceItem.resourceItem .openAction.openAction {
+  width: 100% !important;
+  grid-area: action !important;
+  justify-content: flex-start !important;
+}
+
+/* Structural hooks for the desktop-only reference sidebar. The final visual
+ * authority lives in desktop-resource-center.css alongside the rest of this
+ * route's desktop surface. */
+.resourceSidebar,
+.sidebarCard,
+.sidebarCardHeader,
+.sidebarQuickList,
+.sidebarFeaturedCard,
+.sidebarFeaturedBody,
+.resourceStatsBody,
+.resourceStatsChart,
+.resourceStatsList,
+.sidebarHelpCard {
+  min-width: 0;
+}
+
+.sidebarTextAction {
+  appearance: none;
+}

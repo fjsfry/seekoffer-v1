@@ -1,0 +1,120 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { ArrowUpRight, LayoutGrid, LoaderCircle, LogIn, LogOut } from 'lucide-react';
+import { openAuthModal, writeAuthIntent } from '@/lib/auth-intent';
+import { useUserSessionState } from '@/hooks/use-user-session';
+import { signOutUser } from '@/lib/user-session';
+
+export function UserSessionEntry() {
+  const pathname = usePathname();
+  const { ready, session } = useUserSessionState();
+  const [pendingAction, setPendingAction] = useState<'logout' | ''>('');
+  const workbenchActive = pathname === '/me' || pathname.startsWith('/me/') || pathname === '/applications';
+
+  function handleOpenLogin() {
+    const intent = {
+      type: 'open-workspace' as const,
+      returnTo: typeof window !== 'undefined' ? window.location.pathname + window.location.search + window.location.hash : pathname,
+      reason: 'workspace-entry',
+      requiredAuth: 'session' as const
+    };
+
+    writeAuthIntent(intent);
+    openAuthModal(intent);
+  }
+
+  function handleUpgrade() {
+    const intent = {
+      type: 'open-workspace' as const,
+      returnTo: typeof window !== 'undefined' ? window.location.pathname + window.location.search + window.location.hash : pathname,
+      reason: 'upgrade-session',
+      requiredAuth: 'member' as const
+    };
+
+    writeAuthIntent(intent);
+    openAuthModal(intent);
+  }
+
+  async function handleSignOut() {
+    if (pendingAction) {
+      return;
+    }
+
+    setPendingAction('logout');
+
+    try {
+      await signOutUser();
+    } finally {
+      setPendingAction('');
+    }
+  }
+
+  if (!ready) {
+    return (
+      <button
+        onClick={handleOpenLogin}
+        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-brand-deep md:h-11 md:px-4"
+      >
+        <LogIn className="h-4 w-4" />
+        登录 / 注册
+      </button>
+    );
+  }
+
+  if (!session) {
+    return (
+      <button
+        onClick={handleOpenLogin}
+        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-brand-deep md:h-11 md:px-4"
+      >
+        <LogIn className="h-4 w-4" />
+        登录 / 注册
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 whitespace-nowrap">
+      <Link
+        href="/me"
+        className={`inline-flex h-10 items-center gap-2 rounded-xl px-3 pr-4 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 md:h-11 md:px-3 md:pr-4 ${
+          workbenchActive
+            ? 'bg-brand/[0.08] text-brand ring-1 ring-brand/15'
+            : 'bg-slate-100 text-slate-800 hover:bg-white'
+        }`}
+      >
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand/10 text-brand md:h-8 md:w-8">
+          <LayoutGrid className="h-4 w-4" />
+        </span>
+        <span className="max-w-[7.5rem] truncate">{session.profile.nickname ? `${session.profile.nickname}的工作台` : '工作台'}</span>
+      </Link>
+
+      {session.authProvider === 'anonymous' ? (
+        <button
+          onClick={handleUpgrade}
+          className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-brand-deep md:h-11 md:px-4"
+        >
+          <ArrowUpRight className="h-4 w-4" />
+          登录并同步
+        </button>
+      ) : null}
+
+      {session.authProvider !== 'anonymous' ? (
+        <button
+          onClick={handleSignOut}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-200 md:h-11 md:w-11"
+          aria-label="退出登录"
+        >
+          {pendingAction === 'logout' ? (
+            <LoaderCircle className="h-4 w-4 animate-spin" />
+          ) : (
+            <LogOut className="h-4 w-4" />
+          )}
+        </button>
+      ) : null}
+    </div>
+  );
+}

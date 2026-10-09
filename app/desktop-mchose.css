@@ -1,0 +1,2484 @@
+/*
+ * SeekOffer desktop v0.2 — MCHOSE HUB visual system.
+ *
+ * The installed MCHOSE HUB renderer uses MiSans, a #e6e7ed application canvas,
+ * white floating work surfaces, #f2f3f7 secondary surfaces, #d7dee3 borders,
+ * 40px controls, 6–8px control radii and restrained 120–160ms feedback. This
+ * final cascade maps those product primitives to SeekOffer's green identity.
+ * It intentionally contains no MCHOSE brand artwork or proprietary icons.
+ */
+
+.desktop-app-shell {
+  --desktop-titlebar-height: 60px;
+  --desktop-master-width: 420px;
+  --desktop-canvas: #e6e7ed;
+  --desktop-rail-surface: transparent;
+  --desktop-surface: #ffffff;
+  --desktop-surface-subtle: #f2f3f7;
+  --desktop-surface-raised: #ffffff;
+  --desktop-surface-hover: #e5e9f0;
+  --desktop-border: #d7dee3;
+  --desktop-border-strong: #bfc8d7;
+  --desktop-text: #151515;
+  --desktop-text-secondary: rgba(21, 21, 21, 0.68);
+  --desktop-text-tertiary: rgba(21, 21, 21, 0.5);
+  --desktop-accent: #176c5b;
+  --desktop-accent-strong: #0f5147;
+  --desktop-accent-muted: #e1efeb;
+  --desktop-accent-hover: #d5e8e2;
+  --desktop-danger: #c4464f;
+  --desktop-danger-muted: #fdefee;
+  --desktop-shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --desktop-shadow-md: 0 9px 30px rgba(0, 0, 0, 0.16);
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: var(--desktop-titlebar-height) minmax(0, 1fr) !important;
+  color: var(--desktop-text);
+  background: var(--desktop-canvas) !important;
+  font-family:
+    MiSans,
+    "PingFang SC",
+    "Microsoft YaHei UI",
+    "Segoe UI Variable Text",
+    "Segoe UI",
+    sans-serif !important;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.desktop-app-shell[data-desktop-theme='dark'] {
+  color-scheme: dark;
+  --desktop-canvas: #0c0c0c;
+  --desktop-surface: #212225;
+  --desktop-surface-subtle: #303134;
+  --desktop-surface-raised: #262626;
+  --desktop-surface-hover: #28292c;
+  --desktop-border: #4a4b50;
+  --desktop-border-strong: #606166;
+  --desktop-text: #ffffff;
+  --desktop-text-secondary: rgba(255, 255, 255, 0.7);
+  --desktop-text-tertiary: rgba(255, 255, 255, 0.5);
+  --desktop-accent: #65b8a2;
+  --desktop-accent-strong: #8bd1be;
+  --desktop-accent-muted: rgba(101, 184, 162, 0.16);
+  --desktop-accent-hover: rgba(101, 184, 162, 0.24);
+  --desktop-danger-muted: rgba(196, 70, 79, 0.16);
+  --desktop-shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.28);
+  --desktop-shadow-md: 0 9px 30px rgba(0, 0, 0, 0.42);
+}
+
+.desktop-app-shell :where(button, a, input, select, textarea) {
+  transition-duration: 150ms !important;
+  transition-timing-function: ease !important;
+}
+
+.desktop-app-shell :where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--desktop-accent) 76%, transparent) !important;
+  outline-offset: 2px !important;
+}
+
+.desktop-app-shell :where(button, a):active:not(:disabled) {
+  transform: none !important;
+  transition-duration: 60ms !important;
+}
+
+/* Frameless MCHOSE-like title bar: canvas-colored, quiet and fully draggable. */
+.desktop-app-shell .desktop-brand-header,
+.desktop-app-shell .desktop-topbar {
+  grid-row: 1 !important;
+  min-height: var(--desktop-titlebar-height) !important;
+  border: 0 !important;
+  background: var(--desktop-canvas) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-brand-header {
+  z-index: 14;
+  grid-column: 1 !important;
+  width: 260px !important;
+  padding: 0 24px !important;
+}
+
+.desktop-app-shell .desktop-brand-link {
+  gap: 10px !important;
+}
+
+.desktop-app-shell .desktop-brand-mark,
+.desktop-app-shell .desktop-brand-header > a > span:first-child {
+  width: 38px !important;
+  height: 38px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-brand-logo-image {
+  -o-object-fit: contain !important;
+     object-fit: contain !important;
+}
+
+.desktop-app-shell .desktop-brand-wordmark {
+  display: inline-flex !important;
+  gap: 6px !important;
+  color: var(--desktop-text) !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.desktop-app-shell .desktop-brand-wordmark strong,
+.desktop-app-shell .desktop-brand-english {
+  color: var(--desktop-text) !important;
+  font: inherit !important;
+}
+
+.desktop-app-shell .desktop-topbar {
+  z-index: 13;
+  grid-column: 1 !important;
+  padding: 0 0 0 260px !important;
+}
+
+.desktop-app-shell .desktop-search-trigger,
+.desktop-app-shell .desktop-toolbar-icon,
+.desktop-app-shell .desktop-sync-label,
+.desktop-app-shell .desktop-account-button {
+  width: 38px !important;
+  min-width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  color: var(--desktop-text) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell :is(
+  .desktop-search-trigger,
+  .desktop-toolbar-icon,
+  .desktop-sync-label,
+  .desktop-account-button
+):hover:not(:disabled) {
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-surface-hover) !important;
+}
+
+.desktop-app-shell .desktop-search-trigger > span,
+.desktop-app-shell .desktop-search-trigger > kbd,
+.desktop-app-shell .desktop-sync-text,
+.desktop-app-shell .desktop-account-label,
+.desktop-app-shell .desktop-history-controls,
+.desktop-app-shell .desktop-route-label {
+  display: none !important;
+}
+
+.desktop-app-shell .desktop-account-avatar,
+.desktop-app-shell .desktop-account-button > span:first-child {
+  width: 32px !important;
+  height: 32px !important;
+  border: 1px solid color-mix(in srgb, var(--desktop-accent) 26%, var(--desktop-border)) !important;
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+  font-size: 13px !important;
+}
+
+.desktop-app-shell .desktop-caption-button {
+  width: 48px !important;
+  height: var(--desktop-titlebar-height) !important;
+  flex-basis: 48px !important;
+  color: var(--desktop-text) !important;
+  background: transparent !important;
+}
+
+.desktop-app-shell .desktop-caption-button:hover:not(.desktop-caption-close) {
+  background: var(--desktop-surface-hover) !important;
+}
+
+/* Floating horizontal launcher, matching MCHOSE's white action capsules. */
+.desktop-app-shell .desktop-primary-rail {
+  position: absolute !important;
+  z-index: 12;
+  top: calc(var(--desktop-titlebar-height) + 20px) !important;
+  right: 24px !important;
+  left: 24px !important;
+  display: flex !important;
+  width: auto !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  overflow: visible !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  pointer-events: none;
+}
+
+.desktop-app-shell .desktop-nav-list--primary,
+.desktop-app-shell .desktop-rail-utilities {
+  display: flex !important;
+  height: 48px !important;
+  align-items: center !important;
+  gap: 2px !important;
+  margin: 0 !important;
+  padding: 4px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: var(--desktop-shadow-sm) !important;
+  pointer-events: auto;
+}
+
+.desktop-app-shell .desktop-primary-nav-item,
+.desktop-app-shell .desktop-rail-utility-button {
+  position: relative;
+  display: inline-flex !important;
+  width: auto !important;
+  min-width: 88px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  padding: 0 12px !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  color: var(--desktop-text) !important;
+  background: transparent !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+.desktop-app-shell .desktop-primary-nav-item > span:not(.desktop-nav-badge),
+.desktop-app-shell .desktop-rail-utility-button > span {
+  display: inline !important;
+  white-space: nowrap;
+}
+
+.desktop-app-shell .desktop-rail-utility-button > kbd {
+  display: none !important;
+}
+
+.desktop-app-shell :is(.desktop-primary-nav-item, .desktop-rail-utility-button) svg {
+  width: 20px !important;
+  height: 20px !important;
+  flex: 0 0 20px !important;
+}
+
+.desktop-app-shell :is(.desktop-primary-nav-item, .desktop-rail-utility-button):hover {
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-app-shell :is(
+  .desktop-primary-nav-item[aria-current='page'],
+  .desktop-primary-nav-item--active,
+  .desktop-rail-utility-button[aria-current='page'],
+  .desktop-rail-utility-button--active
+) {
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-app-shell :is(
+  .desktop-primary-nav-item[aria-current='page'],
+  .desktop-primary-nav-item--active
+)::before {
+  display: none !important;
+}
+
+.desktop-app-shell .desktop-nav-badge {
+  top: -3px !important;
+  right: -3px !important;
+  border-color: var(--desktop-surface) !important;
+}
+
+/* Every route lives in one floating work surface below the launcher. */
+.desktop-app-shell .desktop-content-region {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden !important;
+  padding: 84px 24px 24px !important;
+  background: var(--desktop-canvas) !important;
+}
+
+.desktop-app-shell .desktop-view-stage {
+  width: 100%;
+  height: 100%;
+  min-height: 0 !important;
+  overflow: auto;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: var(--desktop-shadow-sm) !important;
+}
+
+.desktop-app-shell .desktop-view-stage:has(> .desktop-qq-workbench) {
+  overflow: hidden !important;
+}
+
+.desktop-app-shell[data-settings-open='true'] .desktop-primary-rail {
+  display: none !important;
+}
+
+.desktop-app-shell[data-settings-open='true'] .desktop-content-region {
+  grid-column: 1 !important;
+  padding-top: 20px !important;
+}
+
+.desktop-app-shell .desktop-statusbar {
+  display: none !important;
+}
+
+/* Application master/detail workbench. */
+.desktop-app-shell .desktop-qq-workbench,
+.desktop-app-shell .desktop-qq-workbench-layout {
+  width: 100%;
+  height: 100%;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  border-radius: inherit !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-app-shell .desktop-qq-workbench-layout {
+  grid-template-columns: var(--desktop-master-width) minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  align-items: stretch !important;
+}
+
+.desktop-app-shell .desktop-application-context {
+  border: 0 !important;
+  border-right: 1px solid var(--desktop-border) !important;
+  border-radius: 0 !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-app-shell .desktop-application-context-header {
+  min-height: 76px !important;
+  padding: 16px 18px 10px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.desktop-app-shell .desktop-application-context-copy h1 {
+  color: var(--desktop-text) !important;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  line-height: 30px !important;
+  letter-spacing: -0.02em !important;
+}
+
+.desktop-app-shell .desktop-application-context-count {
+  height: 22px !important;
+  border-radius: 11px !important;
+  color: var(--desktop-text-tertiary) !important;
+  background: var(--desktop-surface-hover) !important;
+}
+
+.desktop-app-shell .desktop-application-context-add,
+.desktop-app-shell .desktop-project-workspace-primary,
+.desktop-app-shell .desktop-primary-command {
+  min-height: 40px !important;
+  padding: 0 15px !important;
+  border: 1px solid var(--desktop-accent) !important;
+  border-radius: 8px !important;
+  color: #ffffff !important;
+  background: var(--desktop-accent) !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+.desktop-app-shell :is(
+  .desktop-application-context-add,
+  .desktop-project-workspace-primary,
+  .desktop-primary-command
+):hover {
+  border-color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-strong) !important;
+}
+
+.desktop-app-shell .desktop-application-context-toolbar {
+  gap: 8px !important;
+  padding: 0 14px 14px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.desktop-app-shell .desktop-application-context-toolbar .desktop-project-search,
+.desktop-app-shell .desktop-application-filter-row .desktop-project-filter select {
+  height: 40px !important;
+  border: 1px solid var(--desktop-border) !important;
+  border-radius: 6px !important;
+  color: var(--desktop-text) !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+}
+
+.desktop-app-shell .desktop-application-context-toolbar .desktop-project-search:focus-within,
+.desktop-app-shell .desktop-application-filter-row .desktop-project-filter select:focus {
+  border-color: color-mix(in srgb, var(--desktop-accent) 58%, var(--desktop-border)) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--desktop-accent) 12%, transparent) !important;
+}
+
+.desktop-app-shell .desktop-application-filter-row {
+  gap: 6px !important;
+}
+
+.desktop-app-shell .desktop-application-filter-row .desktop-project-filter select {
+  height: 36px !important;
+  padding-left: 9px !important;
+  color: var(--desktop-text-secondary) !important;
+  background-color: var(--desktop-surface) !important;
+}
+
+.desktop-app-shell .desktop-application-object-list {
+  min-height: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.desktop-app-shell .desktop-application-object-list .desktop-project-table-body {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  padding: 0 8px 12px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #bfc8d7 transparent;
+}
+
+.desktop-app-shell .desktop-application-object-row {
+  min-height: 116px !important;
+  margin: 0 0 6px !important;
+  padding: 13px 12px !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-application-object-row:hover {
+  border-color: transparent !important;
+  background: var(--desktop-surface-hover) !important;
+}
+
+.desktop-app-shell .desktop-application-object-row.is-selected {
+  border-color: color-mix(in srgb, var(--desktop-accent) 20%, transparent) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-app-shell .desktop-application-object-row.is-selected::before {
+  top: 10px !important;
+  bottom: 10px !important;
+  left: 0 !important;
+  width: 3px !important;
+  border-radius: 0 3px 3px 0 !important;
+  background: var(--desktop-accent) !important;
+}
+
+.desktop-app-shell .desktop-application-object-main > :first-child {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.desktop-app-shell .desktop-application-object-copy strong {
+  color: var(--desktop-text) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
+
+.desktop-app-shell .desktop-application-object-copy span,
+.desktop-app-shell .desktop-application-object-copy p,
+.desktop-app-shell .desktop-application-object-meta > span,
+.desktop-app-shell .desktop-application-object-deadline,
+.desktop-app-shell .desktop-application-object-materials > div:first-child {
+  color: var(--desktop-text-tertiary) !important;
+}
+
+.desktop-app-shell .desktop-application-object-materials > div:last-child,
+.desktop-app-shell .desktop-project-workspace-progress {
+  height: 3px !important;
+  background: var(--desktop-surface-hover) !important;
+}
+
+.desktop-app-shell .desktop-project-workspace {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-app-shell .desktop-project-workspace-header {
+  min-height: 96px !important;
+  padding: 18px 28px 14px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--desktop-border) !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-app-shell .desktop-project-workspace-identity h2 {
+  color: var(--desktop-text) !important;
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  line-height: 32px !important;
+}
+
+.desktop-app-shell .desktop-project-workspace-identity p,
+.desktop-app-shell .desktop-project-workspace-identity span,
+.desktop-app-shell .desktop-project-workspace-status {
+  color: var(--desktop-text-tertiary) !important;
+}
+
+.desktop-app-shell .desktop-project-workspace-tabs {
+  min-height: 56px !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 8px 24px !important;
+  border-bottom: 1px solid var(--desktop-border) !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-app-shell .desktop-project-workspace-tabs button {
+  height: 40px !important;
+  padding: 0 14px !important;
+  border-radius: 8px !important;
+  color: var(--desktop-text-secondary) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+.desktop-app-shell .desktop-project-workspace-tabs button:hover {
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-app-shell .desktop-project-workspace-tabs button[aria-selected='true'] {
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-app-shell .desktop-project-workspace-tabs button[aria-selected='true']::after {
+  display: none !important;
+}
+
+.desktop-app-shell .desktop-project-workspace-body {
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  padding: 20px 24px 28px !important;
+  background: var(--desktop-surface) !important;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #bfc8d7 transparent;
+}
+
+.desktop-app-shell .desktop-project-overview-grid {
+  gap: 8px !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.desktop-app-shell .desktop-project-overview-card {
+  min-height: 112px !important;
+  padding: 16px 18px !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-app-shell .desktop-project-workspace-section {
+  border-color: var(--desktop-border) !important;
+  border-radius: 8px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-project-stage-section,
+.desktop-app-shell .desktop-project-material-overview-section {
+  border-right: 0 !important;
+  border-left: 0 !important;
+  border-radius: 0 !important;
+}
+
+.desktop-app-shell .desktop-project-material-row,
+.desktop-app-shell .desktop-project-related-row,
+.desktop-app-shell .desktop-project-activity-list li {
+  min-height: 48px !important;
+  border-color: var(--desktop-border) !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-app-shell .desktop-project-material-row:hover,
+.desktop-app-shell .desktop-project-related-row:hover {
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-app-shell .desktop-qq-workbench:is([data-layout-mode='wide'], [data-layout-mode='split']) .desktop-qq-workbench-layout > .desktop-application-context,
+.desktop-app-shell .desktop-qq-workbench:is([data-layout-mode='wide'], [data-layout-mode='split']) .desktop-qq-workbench-layout > .desktop-project-workspace {
+  height: 100% !important;
+  min-height: 0 !important;
+  align-self: stretch !important;
+  box-sizing: border-box;
+}
+
+.desktop-app-shell .desktop-qq-workbench:is([data-layout-mode='wide'], [data-layout-mode='split']) .desktop-project-workspace {
+  position: relative !important;
+  z-index: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  width: auto !important;
+  max-width: none !important;
+  overflow: hidden !important;
+  visibility: visible !important;
+  transform: none !important;
+  pointer-events: auto !important;
+  box-shadow: none !important;
+  transition: none !important;
+}
+
+.desktop-app-shell .desktop-project-workspace-inline-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+  padding: 16px 0 2px;
+  border-top: 1px solid var(--desktop-border);
+  background: transparent;
+}
+
+.desktop-app-shell .desktop-project-workspace-inline-actions :is(a, button) {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px !important;
+  border: 1px solid var(--desktop-border) !important;
+  border-radius: 8px !important;
+  color: var(--desktop-text-secondary) !important;
+  background: var(--desktop-surface) !important;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.desktop-app-shell .desktop-project-workspace-inline-actions :is(a, button):hover {
+  border-color: var(--desktop-border-strong) !important;
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-app-shell .desktop-project-workspace-inline-actions :is(a, button):active {
+  background: var(--desktop-surface-hover) !important;
+}
+
+.desktop-app-shell .desktop-project-workspace-inline-actions svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Settings follows the MCHOSE device-settings composition. */
+.desktop-app-shell .desktop-settings-page {
+  height: 100%;
+  min-height: 0 !important;
+  overflow: hidden;
+  padding: 0 !important;
+  background: var(--desktop-canvas) !important;
+}
+
+.desktop-app-shell .desktop-settings-header {
+  width: 100% !important;
+  min-height: 66px;
+  margin: 0 !important;
+  padding: 12px 20px !important;
+  background: var(--desktop-canvas) !important;
+}
+
+.desktop-app-shell .desktop-settings-title {
+  color: var(--desktop-text) !important;
+  font-size: 24px !important;
+  line-height: 32px !important;
+}
+
+.desktop-app-shell .desktop-settings-subtitle {
+  color: var(--desktop-text-tertiary) !important;
+  font-size: 12px !important;
+}
+
+.desktop-app-shell .desktop-settings-layout {
+  grid-template-columns: 272px minmax(0, 1fr) !important;
+  width: 100% !important;
+  height: calc(100% - 66px);
+  min-height: 0 !important;
+  margin: 0 !important;
+  overflow: hidden;
+  border: 0 !important;
+  border-radius: 12px 12px 0 0 !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-settings-nav {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 12px !important;
+  border: 0 !important;
+  border-right: 1px solid var(--desktop-border) !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-app-shell .desktop-settings-nav-item {
+  min-height: 40px !important;
+  padding: 6px 12px !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  color: var(--desktop-text) !important;
+  background: transparent !important;
+}
+
+.desktop-app-shell .desktop-settings-nav-item:hover {
+  background: var(--desktop-surface-hover) !important;
+}
+
+.desktop-app-shell .desktop-settings-nav-item--active {
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+.desktop-app-shell .desktop-settings-content {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 30px 38px !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-app-shell .desktop-settings-section-heading {
+  margin-bottom: 14px !important;
+}
+
+.desktop-app-shell .desktop-settings-section-copy h2 {
+  color: var(--desktop-text) !important;
+  font-size: 20px !important;
+  line-height: 28px !important;
+}
+
+.desktop-app-shell .desktop-settings-group {
+  overflow: hidden;
+  border: 1px solid var(--desktop-border) !important;
+  border-radius: 8px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell :is(
+  .desktop-setting-row,
+  .desktop-setting-link-row,
+  .desktop-settings-shortcut-row
+) {
+  min-height: 56px !important;
+  border-color: var(--desktop-border) !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-app-shell :is(.desktop-setting-select, .desktop-setting-secondary-button) {
+  min-height: 36px !important;
+  border-color: var(--desktop-border) !important;
+  border-radius: 6px !important;
+  background: var(--desktop-surface) !important;
+}
+
+/* Reminder center and app-level overlays are floating MCHOSE panels. */
+.desktop-app-shell .desktop-reminder-backdrop {
+  background: rgba(21, 21, 21, 0.18) !important;
+  backdrop-filter: none !important;
+}
+
+.desktop-app-shell .desktop-reminder-center {
+  top: calc(var(--desktop-titlebar-height) + 12px) !important;
+  right: 16px !important;
+  bottom: 16px !important;
+  width: min(410px, calc(100vw - 32px)) !important;
+  overflow: hidden;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: var(--desktop-shadow-md) !important;
+}
+
+.desktop-app-shell .desktop-reminder-center > header,
+.desktop-app-shell .desktop-reminder-center > footer {
+  border-color: var(--desktop-border) !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-app-shell .desktop-reminder-center [role='tablist'] {
+  border-color: transparent !important;
+  border-radius: 8px !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-app-shell .desktop-reminder-scroll > div.grid {
+  gap: 6px !important;
+  overflow: visible !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.desktop-app-shell .desktop-reminder-scroll article {
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-app-shell .desktop-reminder-scroll article:hover {
+  background: var(--desktop-surface-hover) !important;
+}
+
+.desktop-app-shell .desktop-reminder-state {
+  border-color: var(--desktop-border) !important;
+  border-radius: 8px !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-app-shell .desktop-command-dialog,
+.desktop-app-shell .desktop-command-backdrop > [role='dialog'] {
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: var(--desktop-shadow-md) !important;
+}
+
+.desktop-app-shell .desktop-command-option {
+  border-radius: 8px !important;
+}
+
+.desktop-app-shell .desktop-command-option:hover,
+.desktop-app-shell .desktop-command-option[aria-selected='true'] {
+  background: var(--desktop-surface-subtle) !important;
+}
+
+.desktop-app-shell .desktop-account-popover,
+.desktop-app-shell .desktop-display-popover,
+.desktop-app-shell .desktop-zoom-menu {
+  border: 1px solid var(--desktop-border) !important;
+  border-radius: 8px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: var(--desktop-shadow-sm) !important;
+}
+
+.desktop-app-shell .desktop-feedback-toast {
+  border-color: var(--desktop-border) !important;
+  border-radius: 8px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: var(--desktop-shadow-sm) !important;
+}
+
+/* Website routes keep their data, but use the same desktop component metrics. */
+.desktop-app-shell .desktop-route-content {
+  width: 100%;
+  max-width: none !important;
+  min-height: 100%;
+  gap: 14px !important;
+  padding: 22px 24px 30px !important;
+  color: var(--desktop-text) !important;
+  background: var(--desktop-surface) !important;
+  font-size: 14px !important;
+}
+
+.desktop-app-shell .desktop-route-content > .page-hero {
+  min-height: 88px !important;
+  padding: 16px 18px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--desktop-surface-subtle) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-route-content > .page-hero h1 {
+  color: var(--desktop-text) !important;
+  font-size: 24px !important;
+  line-height: 32px !important;
+}
+
+.desktop-app-shell .desktop-route-content :where(input, select, textarea) {
+  min-height: 40px;
+  border-color: var(--desktop-border) !important;
+  border-radius: 6px !important;
+  background-color: var(--desktop-surface) !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+}
+
+.desktop-app-shell .desktop-route-content :where(.surface-card, .product-card),
+.desktop-app-shell :is(#schedule-board, #contacts-board) > section {
+  border-color: var(--desktop-border) !important;
+  border-radius: 8px !important;
+  background: var(--desktop-surface) !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-route-content :where(.surface-card, .product-card):hover,
+.desktop-app-shell #contacts-board article:hover {
+  border-color: var(--desktop-border-strong) !important;
+  background: var(--desktop-surface-subtle) !important;
+}
+
+/* Quiet, stable loading treatment — never shimmer at fractional WebView zoom. */
+.desktop-app-shell .desktop-workbench-loading-state,
+.desktop-app-shell .desktop-workbench-error-state,
+.desktop-app-shell .desktop-project-empty {
+  border-color: transparent !important;
+  border-radius: 8px !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-app-shell .desktop-workbench-loading-icon,
+.desktop-app-shell .desktop-reminder-state-icon {
+  border-radius: 8px !important;
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-accent-muted) !important;
+}
+
+/* Native-feeling scrollbars shared by both independently scrolling panes. */
+.desktop-app-shell :where(.desktop-scrollbar, .desktop-project-table-body, .desktop-project-workspace-body, .desktop-settings-nav, .desktop-settings-content)::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.desktop-app-shell :where(.desktop-scrollbar, .desktop-project-table-body, .desktop-project-workspace-body, .desktop-settings-nav, .desktop-settings-content)::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.desktop-app-shell :where(.desktop-scrollbar, .desktop-project-table-body, .desktop-project-workspace-body, .desktop-settings-nav, .desktop-settings-content)::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: #bfc8d7;
+}
+
+.desktop-app-shell :where(.desktop-scrollbar, .desktop-project-table-body, .desktop-project-workspace-body, .desktop-settings-nav, .desktop-settings-content)::-webkit-scrollbar-thumb:hover {
+  background: #aab5c6;
+}
+
+.desktop-app-shell[data-desktop-theme='dark'] :where(.desktop-scrollbar, .desktop-project-table-body, .desktop-project-workspace-body, .desktop-settings-nav, .desktop-settings-content)::-webkit-scrollbar-thumb {
+  background: #414141;
+}
+
+/* Responsive launcher and master/detail behavior. */
+@media (max-width: 1320px) {
+  .desktop-app-shell {
+    --desktop-master-width: 380px;
+  }
+}
+
+@media (max-width: 760px) {
+  .desktop-app-shell .desktop-primary-nav-item,
+  .desktop-app-shell .desktop-rail-utility-button {
+    min-width: 42px !important;
+    padding-inline: 10px !important;
+  }
+
+  .desktop-app-shell .desktop-primary-nav-item > span:not(.desktop-nav-badge),
+  .desktop-app-shell .desktop-rail-utility-button > span {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1120px) {
+  .desktop-app-shell {
+    --desktop-master-width: 340px;
+  }
+
+  .desktop-app-shell .desktop-primary-rail {
+    right: 16px !important;
+    left: 16px !important;
+  }
+
+  .desktop-app-shell .desktop-content-region {
+    padding-right: 16px !important;
+    padding-bottom: 16px !important;
+    padding-left: 16px !important;
+  }
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) {
+  --desktop-titlebar-height: 56px;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-brand-header {
+  width: 64px !important;
+  padding: 0 13px !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-brand-mark {
+  width: 36px !important;
+  height: 36px !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-brand-wordmark {
+  display: none !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-topbar {
+  padding-left: 64px !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-primary-rail {
+  top: calc(var(--desktop-titlebar-height) + 10px) !important;
+  right: 10px !important;
+  left: 10px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  overflow: visible !important;
+  padding: 0 !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) :is(
+  .desktop-nav-list--primary,
+  .desktop-rail-utilities
+) {
+  height: 44px !important;
+  gap: 1px !important;
+  padding: 3px !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) :is(
+  .desktop-primary-nav-item,
+  .desktop-rail-utility-button
+) {
+  width: 38px !important;
+  min-width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) :is(
+  .desktop-primary-nav-item,
+  .desktop-rail-utility-button
+) > span {
+  display: none !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-content-region {
+  padding: 64px 10px 10px !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-project-workspace {
+  top: calc(var(--desktop-titlebar-height) + 64px) !important;
+  right: 10px !important;
+  bottom: 10px !important;
+  width: min(var(--desktop-zoom-drawer-width), calc(100vw - 20px)) !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: var(--desktop-shadow-md) !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-inspector-backdrop {
+  top: var(--desktop-titlebar-height) !important;
+  left: 0 !important;
+  background: rgba(21, 21, 21, 0.2) !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200']) .desktop-rail-utilities > :not(:last-child) {
+  display: none !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200']) .desktop-settings-layout {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200']) .desktop-settings-nav {
+  flex-direction: row !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding: 8px !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid var(--desktop-border) !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200']) .desktop-settings-nav-title {
+  display: none !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='175'], [data-zoom-level='200']) .desktop-settings-nav-item {
+  min-width: -moz-max-content !important;
+  min-width: max-content !important;
+}
+
+@media (max-width: 840px) {
+  .desktop-app-shell .desktop-settings-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .desktop-app-shell .desktop-settings-nav {
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 8px !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--desktop-border) !important;
+  }
+
+  .desktop-app-shell .desktop-settings-nav-title {
+    display: none !important;
+  }
+
+  .desktop-app-shell .desktop-settings-nav-item {
+    min-width: -moz-max-content !important;
+    min-width: max-content !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-app-shell *,
+  .desktop-app-shell *::before,
+  .desktop-app-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+html[data-desktop-reduce-motion='true'] .desktop-app-shell *,
+html[data-desktop-reduce-motion='true'] .desktop-app-shell *::before,
+html[data-desktop-reduce-motion='true'] .desktop-app-shell *::after {
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+}
+
+/* Login retains SeekOffer's supplied background while adopting MCHOSE metrics. */
+.desktop-auth-shell {
+  --desktop-auth-titlebar-height: 60px !important;
+  font-family:
+    MiSans,
+    "PingFang SC",
+    "Microsoft YaHei UI",
+    "Segoe UI Variable Text",
+    sans-serif !important;
+}
+
+.desktop-auth-titlebar {
+  min-height: 60px !important;
+  border: 0 !important;
+  background: rgba(230, 231, 237, 0.94) !important;
+}
+
+.desktop-auth-shell .desktop-caption-button {
+  height: 60px !important;
+}
+
+.desktop-login-method-panel {
+  border: 1px solid #d7dee3 !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  box-shadow: 0 9px 30px rgba(0, 0, 0, 0.14) !important;
+}
+
+.desktop-login-field,
+.desktop-login-method-panel button.desktop-login-primary[type='submit'] {
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.desktop-auth-trust {
+  border-color: #d7dee3 !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+}
+
+/*
+ * Final shell composition: QQ-style vertical navigation with one MCHOSE-like
+ * work surface. MCHOSE remains the control and material language; navigation
+ * no longer competes with the title bar as a second horizontal toolbar.
+ */
+.desktop-app-shell {
+  --desktop-rail-width: 76px;
+  grid-template-columns: var(--desktop-rail-width) minmax(0, 1fr) !important;
+}
+
+.desktop-app-shell .desktop-brand-header {
+  grid-column: 1 !important;
+  width: auto !important;
+  padding: 0 19px !important;
+}
+
+.desktop-app-shell .desktop-brand-link {
+  width: 38px;
+  justify-content: center !important;
+}
+
+.desktop-app-shell .desktop-brand-wordmark {
+  display: none !important;
+}
+
+.desktop-app-shell .desktop-topbar {
+  grid-column: 2 !important;
+  padding-left: 12px !important;
+}
+
+.desktop-app-shell .desktop-primary-rail {
+  position: relative !important;
+  z-index: 12;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  display: flex !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  overflow: hidden !important;
+  padding: 12px 8px !important;
+  border: 0 !important;
+  background: var(--desktop-canvas) !important;
+  pointer-events: auto;
+}
+
+.desktop-app-shell .desktop-nav-list--primary,
+.desktop-app-shell .desktop-rail-utilities {
+  display: flex !important;
+  width: 100% !important;
+  height: auto !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.desktop-app-shell .desktop-nav-list--primary {
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+  justify-content: flex-start !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.desktop-app-shell .desktop-nav-list--primary::-webkit-scrollbar {
+  display: none;
+}
+
+.desktop-app-shell .desktop-rail-utilities {
+  flex: 0 0 auto !important;
+  margin-top: auto !important;
+  padding-top: 10px !important;
+  border-top: 1px solid var(--desktop-border) !important;
+}
+
+.desktop-app-shell .desktop-primary-nav-item,
+.desktop-app-shell .desktop-rail-utility-button {
+  width: 48px !important;
+  min-width: 48px !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  flex: 0 0 48px !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+}
+
+.desktop-app-shell .desktop-primary-nav-item > span:not(.desktop-nav-badge),
+.desktop-app-shell .desktop-rail-utility-button > span,
+.desktop-app-shell .desktop-rail-utility-button > kbd {
+  display: none !important;
+}
+
+.desktop-app-shell :is(.desktop-primary-nav-item, .desktop-rail-utility-button) > svg {
+  width: 22px !important;
+  height: 22px !important;
+  flex: 0 0 22px !important;
+}
+
+.desktop-app-shell :is(.desktop-primary-nav-item, .desktop-rail-utility-button):focus-visible {
+  outline-offset: -2px !important;
+}
+
+.desktop-app-shell .desktop-content-region,
+.desktop-app-shell[data-settings-open='true'] .desktop-content-region {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  padding: 12px 16px 16px !important;
+}
+
+.desktop-app-shell[data-settings-open='true'] .desktop-primary-rail {
+  display: flex !important;
+}
+
+@media (max-width: 959px) {
+  .desktop-app-shell .desktop-project-workspace {
+    top: calc(var(--desktop-titlebar-height) + 8px) !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    width: min(760px, calc(100vw - var(--desktop-rail-width) - 16px)) !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    border-radius: 12px !important;
+    box-shadow: var(--desktop-shadow-md) !important;
+  }
+
+  .desktop-app-shell .desktop-inspector-backdrop {
+    top: var(--desktop-titlebar-height) !important;
+    left: var(--desktop-rail-width) !important;
+  }
+}
+
+.desktop-app-shell[data-zoom-level='150'] {
+  --desktop-rail-width: 64px;
+}
+
+.desktop-app-shell[data-zoom-level='175'] {
+  --desktop-rail-width: 60px;
+}
+
+.desktop-app-shell[data-zoom-level='200'] {
+  --desktop-rail-width: 56px;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-brand-header {
+  width: auto !important;
+  padding-inline: calc((var(--desktop-rail-width) - 36px) / 2) !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-topbar {
+  grid-column: 2 !important;
+  padding-left: 8px !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-primary-rail {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 4px !important;
+  overflow: hidden !important;
+  padding: 6px 4px !important;
+  scrollbar-width: none;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-primary-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) :is(
+  .desktop-nav-list--primary,
+  .desktop-rail-utilities
+) {
+  width: 100% !important;
+  height: auto !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  padding: 0 !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) :is(
+  .desktop-primary-nav-item,
+  .desktop-rail-utility-button
+) {
+  width: 38px !important;
+  min-width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  flex-basis: 38px !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-content-region,
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200'])[data-settings-open='true'] .desktop-content-region {
+  grid-column: 2 !important;
+  padding: 8px 10px 10px !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-project-workspace {
+  top: calc(var(--desktop-titlebar-height) + 8px) !important;
+  right: 8px !important;
+  bottom: 8px !important;
+  width: min(
+    var(--desktop-zoom-drawer-width),
+    calc(100vw - var(--desktop-rail-width) - 16px)
+  ) !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-inspector-backdrop {
+  left: var(--desktop-rail-width) !important;
+}
+
+/*
+ * Final native top chrome contract. The 60px MCHOSE rhythm leaves the product
+ * identity readable, while QQ's left rail remains an independent navigation
+ * surface below it. Only compact icon actions occupy the right edge; the
+ * flexible middle stays available to the native drag handler.
+ */
+.desktop-app-shell .desktop-brand-header {
+  grid-column: 1 / 3 !important;
+  width: 264px !important;
+  padding: 0 20px !important;
+}
+
+.desktop-app-shell .desktop-brand-link {
+  width: auto !important;
+  min-width: 0;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+}
+
+.desktop-app-shell .desktop-brand-mark,
+.desktop-app-shell .desktop-brand-header > a > span:first-child {
+  width: 40px !important;
+  height: 40px !important;
+  flex: 0 0 40px !important;
+}
+
+.desktop-app-shell .desktop-brand-wordmark {
+  display: inline-flex !important;
+  align-items: baseline;
+  gap: 6px !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  line-height: 22px !important;
+}
+
+.desktop-app-shell .desktop-brand-wordmark strong {
+  color: var(--desktop-accent-strong) !important;
+  font: inherit !important;
+}
+
+.desktop-app-shell .desktop-brand-english {
+  color: var(--desktop-text) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 22px !important;
+}
+
+.desktop-app-shell .desktop-topbar {
+  grid-column: 1 / 3 !important;
+  gap: 4px !important;
+  padding: 0 0 0 272px !important;
+}
+
+.desktop-app-shell .desktop-titlebar-drag {
+  min-width: 72px !important;
+  height: 100%;
+  flex: 1 1 auto !important;
+}
+
+.desktop-app-shell .desktop-search-trigger,
+.desktop-app-shell .desktop-toolbar-icon,
+.desktop-app-shell .desktop-sync-label,
+.desktop-app-shell .desktop-account-button {
+  width: 40px !important;
+  min-width: 40px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  flex: 0 0 40px !important;
+  border-radius: 8px !important;
+}
+
+.desktop-app-shell .desktop-search-trigger svg,
+.desktop-app-shell .desktop-toolbar-icon svg,
+.desktop-app-shell .desktop-sync-label svg,
+.desktop-app-shell .desktop-account-button svg {
+  width: 20px !important;
+  height: 20px !important;
+  flex: 0 0 20px !important;
+}
+
+.desktop-app-shell .desktop-account-avatar,
+.desktop-app-shell .desktop-account-button > span:first-child {
+  width: 34px !important;
+  height: 34px !important;
+}
+
+.desktop-app-shell .desktop-window-controls {
+  width: 144px;
+  min-width: 144px;
+  flex: 0 0 144px;
+  margin-left: 4px;
+}
+
+.desktop-app-shell .desktop-caption-button {
+  display: inline-flex !important;
+  width: 48px !important;
+  min-width: 48px !important;
+  height: var(--desktop-titlebar-height) !important;
+  flex: 0 0 48px !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-app-shell .desktop-caption-button svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.desktop-app-shell .desktop-caption-close:hover {
+  color: #ffffff !important;
+  background: #c42b1c !important;
+}
+
+/* Search stays an icon command entry; legacy website chrome never returns. */
+.desktop-app-shell .desktop-search-trigger > span,
+.desktop-app-shell .desktop-search-trigger > kbd,
+.desktop-app-shell .desktop-sync-text,
+.desktop-app-shell .desktop-account-label,
+.desktop-app-shell .desktop-history-controls,
+.desktop-app-shell .desktop-route-label {
+  display: none !important;
+}
+
+/* At large UI scale the mark owns the rail column and the wordmark yields the
+ * space to a still-draggable middle plus all seven fixed right-side controls. */
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) {
+  --desktop-titlebar-height: 60px;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-brand-header {
+  grid-column: 1 !important;
+  width: var(--desktop-rail-width) !important;
+  padding-inline: calc((var(--desktop-rail-width) - 36px) / 2) !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-brand-link {
+  width: 36px !important;
+  justify-content: center !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) :is(
+  .desktop-brand-mark,
+  .desktop-brand-header > a > span:first-child
+) {
+  width: 36px !important;
+  height: 36px !important;
+  flex-basis: 36px !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-brand-wordmark {
+  display: none !important;
+}
+
+.desktop-app-shell:is([data-zoom-level='150'], [data-zoom-level='175'], [data-zoom-level='200']) .desktop-topbar {
+  grid-column: 1 / 3 !important;
+  padding-left: calc(var(--desktop-rail-width) + 8px) !important;
+}
+
+/* Application sync state: keep the QQ-style master/detail geometry fixed and
+ * use one restrained status indicator. No shimmer, progress theatre, or
+ * nested cards that can create moire patterns at fractional Windows scaling. */
+.desktop-app-shell .desktop-workbench-loading-state {
+  display: flex !important;
+  min-height: 240px !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  margin: 0 !important;
+  padding: 32px 20px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--desktop-text) !important;
+  text-align: center !important;
+}
+
+.desktop-app-shell .desktop-workbench-loading-icon {
+  display: inline-flex !important;
+  width: 36px !important;
+  height: 36px !important;
+  flex: 0 0 36px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid color-mix(in srgb, var(--desktop-accent) 18%, var(--desktop-border)) !important;
+  border-radius: 50% !important;
+  color: var(--desktop-accent-strong) !important;
+  background: var(--desktop-surface) !important;
+}
+
+.desktop-app-shell .desktop-workbench-loading-state > strong {
+  display: block !important;
+  margin-top: 12px !important;
+  font-size: 14px !important;
+  font-weight: 650 !important;
+  line-height: 20px !important;
+}
+
+.desktop-app-shell .desktop-workbench-loading-state > p {
+  max-width: 260px !important;
+  margin: 4px 0 0 !important;
+  color: var(--desktop-text-tertiary) !important;
+  font-size: 12px !important;
+  line-height: 18px !important;
+}
+
+/* Final alignment system: every route shares a centered work surface and a
+ * predictable inset. Wide monitors gain breathing room without stretching the
+ * application beyond a comfortable reading width. */
+.desktop-app-shell .desktop-content-region {
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  padding: 12px clamp(12px, 2vw, 32px) 16px !important;
+  scrollbar-gutter: stable;
+}
+
+.desktop-app-shell .desktop-view-stage {
+  width: min(100%, 1680px) !important;
+  max-width: 1680px !important;
+  margin-inline: auto !important;
+}
+
+.desktop-app-shell .desktop-route-content:not(.desktop-qq-workbench) {
+  width: min(100%, 1320px);
+  max-width: 1320px;
+  margin-inline: auto;
+}
+
+/* The layout mode is measured from the actual workbench, not guessed from the
+ * browser viewport. This keeps the drawer and its accessibility semantics in
+ * lockstep at 150%–200% zoom and in narrow split panes. */
+.desktop-app-shell .desktop-qq-workbench[data-layout-mode='drawer'] .desktop-qq-workbench-layout {
+  display: block !important;
+}
+
+.desktop-app-shell .desktop-qq-workbench[data-layout-mode='drawer'] .desktop-application-context {
+  width: 100% !important;
+  height: 100% !important;
+  border-right: 0 !important;
+}
+
+.desktop-app-shell .desktop-qq-workbench[data-layout-mode='drawer'] .desktop-project-workspace {
+  position: fixed !important;
+  z-index: 210 !important;
+  top: calc(var(--desktop-titlebar-height) + 8px) !important;
+  right: 8px !important;
+  bottom: 8px !important;
+  left: auto !important;
+  width: min(760px, calc(100vw - var(--desktop-rail-width) - 16px)) !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: var(--desktop-shadow-md) !important;
+  transform: translateX(calc(100% + 20px));
+  pointer-events: none;
+  transition: transform 160ms ease;
+}
+
+.desktop-app-shell .desktop-qq-workbench[data-layout-mode='drawer'] .desktop-project-workspace.is-open {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.desktop-app-shell .desktop-qq-workbench[data-layout-mode='drawer'] .desktop-inspector-backdrop {
+  top: var(--desktop-titlebar-height) !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: var(--desktop-rail-width) !important;
+}
+
+.desktop-app-shell .desktop-qq-workbench[data-layout-mode='drawer'] .desktop-project-workspace-body {
+  padding-bottom: 36px !important;
+}
+
+/* Workbench density is a preference, not a readability tradeoff. */
+.desktop-app-shell[data-density='comfortable'] .desktop-application-object-row {
+  min-height: 108px !important;
+}
+
+.desktop-app-shell[data-density='compact'] .desktop-application-object-row {
+  min-height: 88px !important;
+  padding-block: 8px !important;
+}
+
+.desktop-app-shell .desktop-qq-workbench[data-layout-mode='drawer']
+  .desktop-project-workspace-inline-actions > * {
+  flex: 1 1 180px;
+}
+
+/* The icon rail has one authoritative tooltip surface. Keeping it outside the
+ * clipped rail prevents duplicate native-title prompts and edge clipping. */
+.desktop-rail-tooltip {
+  position: fixed;
+  z-index: 1000;
+  transform: translateY(-50%);
+  max-width: 220px;
+  padding: 6px 9px;
+  border: 1px solid var(--desktop-border-strong);
+  border-radius: 6px;
+  color: var(--desktop-text);
+  background: var(--desktop-surface);
+  box-shadow: var(--desktop-shadow-sm);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Authentication surfaces use the same centering contract as the workbench. */
+.desktop-auth-shell {
+  display: grid !important;
+  min-height: 100dvh !important;
+  grid-template-rows: var(--desktop-auth-titlebar-height) minmax(0, 1fr) !important;
+  overflow: hidden !important;
+}
+
+.desktop-login-stage,
+.desktop-startup-stage {
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.desktop-login-stage {
+  grid-template-rows: minmax(0, 1fr) auto !important;
+}
+
+.desktop-auth-form-region {
+  display: grid !important;
+  place-items: center !important;
+  align-content: center !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+  padding: clamp(20px, 4vh, 48px) clamp(18px, 4vw, 56px) !important;
+}
+
+.desktop-login-method-panel {
+  width: min(520px, 100%) !important;
+  max-height: calc(100% - 8px) !important;
+  margin-inline: auto !important;
+  overflow-y: auto !important;
+  scrollbar-gutter: stable;
+}
+
+.desktop-auth-trust {
+  width: min(1320px, 100%) !important;
+  margin-inline: auto !important;
+}
+
+.desktop-startup-stage {
+  display: grid !important;
+  place-items: center !important;
+  align-content: center !important;
+  overflow: auto !important;
+  padding: clamp(24px, 5vh, 56px) 24px !important;
+}
+
+.desktop-startup-content {
+  margin-inline: auto !important;
+}
+
+@media (max-width: 860px) {
+  .desktop-app-shell .desktop-content-region {
+    padding-inline: 8px !important;
+  }
+
+  .desktop-auth-trust {
+    grid-template-columns: 1fr !important;
+  }
+
+  .desktop-auth-trust > div + div {
+    border-top: 1px solid rgba(215, 226, 222, 0.9);
+    border-left: 0;
+  }
+}
+
+/* Final polish: loading and empty states should keep both panes intentional.
+ * A quiet companion state in the detail pane prevents a half-loaded workbench
+ * from looking like a broken blank page. */
+.desktop-app-shell .desktop-workbench-stale-state {
+  border-color: color-mix(in srgb, var(--desktop-accent) 24%, var(--desktop-border)) !important;
+  color: var(--desktop-text-secondary) !important;
+  background: color-mix(in srgb, var(--desktop-accent-muted) 42%, var(--desktop-surface)) !important;
+}
+
+.desktop-app-shell .desktop-workbench-stale-state button {
+  color: var(--desktop-accent-strong) !important;
+}
+
+.desktop-app-shell .desktop-inspector-loading,
+.desktop-app-shell .desktop-inspector-empty {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 28px;
+  color: var(--desktop-text-secondary);
+  text-align: center;
+}
+
+.desktop-app-shell .desktop-inspector-loading-icon,
+.desktop-app-shell .desktop-inspector-empty > svg {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--desktop-accent) 18%, var(--desktop-border));
+  border-radius: 10px;
+  color: var(--desktop-accent);
+  background: var(--desktop-accent-muted);
+}
+
+.desktop-app-shell .desktop-inspector-loading-icon svg {
+  width: 20px;
+  height: 20px;
+  animation: desktop-workbench-loading-spin 1.1s linear infinite;
+}
+
+.desktop-app-shell .desktop-inspector-loading strong,
+.desktop-app-shell .desktop-inspector-empty p {
+  margin-top: 14px;
+  color: var(--desktop-text);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.desktop-app-shell .desktop-inspector-loading p {
+  max-width: 280px;
+  margin: 6px 0 0;
+  color: var(--desktop-text-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.desktop-app-shell .desktop-inspector-empty > svg {
+  padding: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-app-shell .desktop-inspector-loading-icon svg {
+    animation: none;
+  }
+}
+
+html[data-desktop-reduce-motion='true'] .desktop-app-shell .desktop-inspector-loading-icon svg {
+  animation: none;
+}
+
+@media (max-height: 720px) {
+  .desktop-auth-form-region {
+    align-content: start !important;
+    padding-block: 16px !important;
+  }
+
+  .desktop-startup-stage {
+    align-content: start !important;
+    padding-block: 24px !important;
+  }
+}
+
+/* QQ-style project actions: the row stays quiet until the user points at it,
+ * while the full context menu remains available from right click and the
+ * keyboard Context Menu / Shift+F10 command. */
+.desktop-app-shell .desktop-application-object-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 48px;
+  color: var(--desktop-muted, #7b8795);
+}
+
+.desktop-app-shell .desktop-application-object-actions > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--desktop-text-tertiary, #7b8795);
+}
+
+.desktop-app-shell .desktop-application-object-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  color: var(--desktop-accent-strong, #0b7568) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+}
+
+.desktop-app-shell .desktop-application-object-priority svg {
+  width: 13px;
+  height: 13px;
+}
+
+.desktop-app-shell .desktop-application-object-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  color: inherit;
+  background: transparent;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.desktop-app-shell .desktop-application-object-row:hover .desktop-application-object-menu-trigger,
+.desktop-app-shell .desktop-application-object-row:focus-within .desktop-application-object-menu-trigger,
+.desktop-app-shell .desktop-application-object-menu-trigger:focus-visible {
+  opacity: 1;
+}
+
+.desktop-app-shell .desktop-application-object-menu-trigger:hover {
+  color: var(--desktop-brand, #0b7568);
+  background: rgba(11, 117, 104, 0.09);
+}
+
+.desktop-app-shell .desktop-application-object-menu-trigger:active {
+  background: rgba(11, 117, 104, 0.15);
+}
+
+.desktop-app-shell .desktop-project-context-menu {
+  position: fixed;
+  z-index: 460;
+  width: 248px;
+  padding: 8px;
+  border: 1px solid rgba(29, 55, 62, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 44px rgba(29, 55, 62, 0.18), 0 3px 10px rgba(29, 55, 62, 0.08);
+  animation: desktop-project-context-menu-in 150ms cubic-bezier(0, 0, 0, 1) both;
+}
+
+.desktop-app-shell .desktop-project-context-menu-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px 9px;
+  border-bottom: 1px solid rgba(29, 55, 62, 0.09);
+}
+
+.desktop-app-shell .desktop-project-context-menu-heading strong {
+  overflow: hidden;
+  color: #15262b;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-app-shell .desktop-project-context-menu-heading span {
+  overflow: hidden;
+  color: #71808a;
+  font-size: 11px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-app-shell .desktop-project-context-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  color: #2a3a3f;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.desktop-app-shell .desktop-project-context-menu > button svg {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  color: #54727a;
+}
+
+.desktop-app-shell .desktop-project-context-menu > button span {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.desktop-app-shell .desktop-project-context-menu > button kbd {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border: 1px solid #dfe7e9;
+  border-radius: 5px;
+  color: #8a979d;
+  background: #f7f9f9;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.desktop-app-shell .desktop-project-context-menu > button:hover,
+.desktop-app-shell .desktop-project-context-menu > button:focus-visible {
+  color: #0b7568;
+  background: rgba(11, 117, 104, 0.09);
+  outline: none;
+}
+
+.desktop-app-shell .desktop-project-context-menu > button:active {
+  background: rgba(11, 117, 104, 0.15);
+}
+
+.desktop-app-shell .desktop-project-context-menu-separator {
+  height: 1px;
+  margin: 5px 6px;
+  background: rgba(29, 55, 62, 0.09);
+}
+
+@keyframes desktop-project-context-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+html[data-desktop-reduce-motion='true'] .desktop-app-shell .desktop-project-context-menu {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-app-shell .desktop-project-context-menu {
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .desktop-app-shell .desktop-application-object-menu-trigger {
+    opacity: 1;
+  }
+}
+
+/* Application flow: the selected project always exposes one clear next action. */
+.desktop-app-shell .desktop-project-stage-line {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.desktop-app-shell .desktop-project-next-action {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--desktop-accent) 18%, var(--desktop-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--desktop-accent-muted) 54%, #fff);
+}
+
+.desktop-app-shell .desktop-project-next-action-icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--desktop-accent-strong);
+  background: #fff;
+}
+
+.desktop-app-shell .desktop-project-next-action-copy {
+  min-width: 0;
+}
+
+.desktop-app-shell .desktop-project-next-action-copy > span {
+  display: block;
+  color: var(--desktop-text-tertiary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.desktop-app-shell .desktop-project-next-action-copy > strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--desktop-text);
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.desktop-app-shell .desktop-project-next-action-copy > p {
+  margin: 3px 0 0;
+  color: var(--desktop-text-secondary);
+  font-size: 12px;
+}
+
+.desktop-app-shell .desktop-project-next-action > button,
+.desktop-app-shell .desktop-project-material-panel-actions > button,
+.desktop-app-shell .desktop-project-related-empty > a {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--desktop-accent) 24%, var(--desktop-border));
+  border-radius: 8px;
+  color: var(--desktop-accent-strong);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.desktop-app-shell .desktop-project-next-action > button:hover,
+.desktop-app-shell .desktop-project-material-panel-actions > button:hover,
+.desktop-app-shell .desktop-project-related-empty > a:hover {
+  border-color: var(--desktop-accent);
+  background: var(--desktop-accent-muted);
+}
+
+.desktop-app-shell .desktop-application-object-next-action {
+  max-width: 170px;
+  overflow: hidden;
+  color: var(--desktop-accent-strong);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Material version ledger. This is metadata only; actual submission remains on the official portal. */
+.desktop-app-shell .desktop-project-material-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.desktop-app-shell .desktop-project-material-panel-actions > strong {
+  color: var(--desktop-accent-strong);
+  font-size: 18px;
+}
+
+.desktop-app-shell .desktop-project-material-panel-actions > button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.desktop-app-shell .desktop-project-material-meta-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.desktop-app-shell .desktop-project-material-meta-card {
+  padding: 13px 14px;
+  border: 1px solid var(--desktop-border);
+  border-radius: 10px;
+  background: var(--desktop-surface);
+}
+
+.desktop-app-shell .desktop-project-material-meta-card > header,
+.desktop-app-shell .desktop-project-material-meta-card > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.desktop-app-shell .desktop-project-material-meta-card > header > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-app-shell .desktop-project-material-meta-card > header strong {
+  color: var(--desktop-text);
+  font-size: 13px;
+}
+
+.desktop-app-shell .desktop-project-material-requirement {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.desktop-app-shell .desktop-project-material-requirement.is-required {
+  color: #a43b45;
+  background: #fff0f1;
+}
+
+.desktop-app-shell .desktop-project-material-requirement.is-optional {
+  color: #94650b;
+  background: #fff7df;
+}
+
+.desktop-app-shell .desktop-project-material-requirement.is-unknown {
+  color: #5f6c72;
+  background: #f1f4f5;
+}
+
+.desktop-app-shell .desktop-project-material-meta-grid {
+  display: grid;
+  grid-template-columns: minmax(100px, .75fr) minmax(160px, 1.4fr) minmax(72px, .55fr) minmax(120px, .9fr);
+  gap: 9px;
+  margin-top: 11px;
+}
+
+.desktop-app-shell .desktop-project-material-meta-grid label {
+  display: grid;
+  gap: 5px;
+}
+
+.desktop-app-shell .desktop-project-material-meta-grid label > span {
+  color: var(--desktop-text-tertiary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.desktop-app-shell .desktop-project-material-meta-grid input,
+.desktop-app-shell .desktop-project-material-meta-grid select {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--desktop-border);
+  border-radius: 7px;
+  color: var(--desktop-text);
+  background: var(--desktop-surface-subtle);
+  font-size: 12px;
+  outline: none;
+}
+
+.desktop-app-shell .desktop-project-material-meta-grid input:focus,
+.desktop-app-shell .desktop-project-material-meta-grid select:focus {
+  border-color: var(--desktop-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--desktop-accent) 18%, transparent);
+}
+
+.desktop-app-shell .desktop-project-material-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--desktop-text-secondary);
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.desktop-app-shell .desktop-project-material-toggle input {
+  accent-color: var(--desktop-accent);
+}
+
+.desktop-app-shell .desktop-project-material-meta-card > footer {
+  justify-content: flex-start;
+  margin-top: 11px;
+}
+
+.desktop-app-shell .desktop-project-material-meta-hint {
+  margin-left: auto;
+  color: var(--desktop-text-tertiary);
+  font-size: 11px;
+}
+
+.desktop-app-shell .desktop-project-mentor-summary-list {
+  display: grid;
+  gap: 8px;
+}
+
+.desktop-app-shell .desktop-project-related-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.desktop-app-shell .desktop-project-related-actions > button,
+.desktop-app-shell .desktop-project-related-actions > a {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 9px;
+  border: 1px solid var(--desktop-border);
+  border-radius: 7px;
+  color: var(--desktop-accent-strong);
+  background: var(--desktop-surface);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.desktop-app-shell .desktop-project-related-actions > button:hover,
+.desktop-app-shell .desktop-project-related-actions > a:hover {
+  border-color: color-mix(in srgb, var(--desktop-accent) 35%, var(--desktop-border));
+  background: var(--desktop-accent-muted);
+}
+
+.desktop-app-shell .desktop-project-mentor-summary-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid var(--desktop-border);
+  border-radius: 10px;
+  background: var(--desktop-surface);
+}
+
+.desktop-app-shell .desktop-project-mentor-summary-list article > div:first-child {
+  min-width: 0;
+}
+
+.desktop-app-shell .desktop-project-mentor-summary-list strong,
+.desktop-app-shell .desktop-project-mentor-summary-list span {
+  display: block;
+}
+
+.desktop-app-shell .desktop-project-mentor-summary-list strong {
+  color: var(--desktop-text);
+  font-size: 13px;
+}
+
+.desktop-app-shell .desktop-project-mentor-summary-list article > div:first-child span {
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--desktop-text-tertiary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-app-shell .desktop-project-mentor-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--desktop-accent-strong);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.desktop-app-shell .desktop-project-mentor-summary-meta span {
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: var(--desktop-accent-muted);
+}
+
+/* Master list rows must never create a second horizontal scroll surface. */
+.desktop-app-shell .desktop-application-object-list .desktop-project-table-body {
+  overflow-x: hidden !important;
+}
+
+.desktop-app-shell .desktop-application-object-row,
+.desktop-app-shell .desktop-application-object-main,
+.desktop-app-shell .desktop-application-object-copy {
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.desktop-app-shell .desktop-application-object-main {
+  grid-template-columns: 40px minmax(0, 1fr) 48px !important;
+}
+
+.desktop-app-shell .desktop-application-object-recommended {
+  display: inline-flex;
+  min-height: 20px;
+  align-items: center;
+  margin-left: 4px;
+  padding: 0 7px;
+  border-radius: 5px;
+  color: var(--desktop-accent-strong) !important;
+  background: color-mix(in srgb, var(--desktop-accent) 12%, var(--desktop-surface)) !important;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .desktop-app-shell .desktop-project-stage-line {
+    grid-template-columns: repeat(7, minmax(72px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+
+  .desktop-app-shell .desktop-project-material-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .desktop-app-shell .desktop-project-mentor-summary-list article {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .desktop-app-shell .desktop-project-mentor-summary-meta {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .desktop-app-shell .desktop-project-next-action {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+
+  .desktop-app-shell .desktop-project-next-action > button {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .desktop-app-shell .desktop-project-material-meta-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .desktop-app-shell .desktop-project-material-meta-card > header,
+  .desktop-app-shell .desktop-project-material-meta-card > footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .desktop-app-shell .desktop-project-material-meta-hint {
+    margin-left: 0;
+  }
+}

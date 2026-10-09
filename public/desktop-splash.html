@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>寻鹿 SeekOffer</title>
+    <script>
+      try {
+        const raw = localStorage.getItem('seekoffer-desktop-preferences-v1');
+        const preferences = raw ? JSON.parse(raw) : {};
+        const themePreference = ['system', 'light', 'dark'].includes(preferences.theme)
+          ? preferences.theme
+          : 'light';
+        const systemPrefersDark = typeof matchMedia === 'function'
+          && matchMedia('(prefers-color-scheme: dark)').matches;
+        const resolvedTheme = themePreference === 'system'
+          ? (systemPrefersDark ? 'dark' : 'light')
+          : themePreference;
+        document.documentElement.dataset.desktopTheme = resolvedTheme;
+        document.documentElement.dataset.desktopReduceMotion =
+          preferences.reduceMotion === true ? 'true' : 'false';
+        document.documentElement.style.colorScheme = resolvedTheme;
+      } catch (_) {
+        document.documentElement.dataset.desktopTheme = 'light';
+        document.documentElement.dataset.desktopReduceMotion = 'false';
+        document.documentElement.style.colorScheme = 'light';
+      }
+    </script>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      :root {
+        --splash-canvas: #eef0f4;
+        --splash-surface: #ffffff;
+        --splash-border: #c9d0d6;
+        --splash-card-border: #dde2e6;
+        --splash-text: #171a1f;
+        --splash-text-secondary: #626b75;
+        --splash-text-tertiary: #8b949e;
+        --splash-spinner-track: #dde2e6;
+        --splash-brand: #137765;
+        --splash-shadow: 0 8px 26px rgba(29, 43, 50, 0.1);
+      }
+
+      :root[data-desktop-theme="dark"] {
+        --splash-canvas: #101615;
+        --splash-surface: #18201f;
+        --splash-border: #2d3a37;
+        --splash-card-border: #43534f;
+        --splash-text: #edf4f2;
+        --splash-text-secondary: #b8c6c2;
+        --splash-text-tertiary: #899a95;
+        --splash-spinner-track: #35443f;
+        --splash-brand: #7bcdbd;
+        --splash-shadow: 0 14px 36px rgba(0, 0, 0, 0.34);
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        color: var(--splash-text);
+        background: var(--splash-canvas);
+        font-family: "Segoe UI Variable Text", "Noto Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        padding: 22px;
+        border: 1px solid var(--splash-border);
+      }
+
+      main {
+        display: flex;
+        width: min(100%, 340px);
+        min-height: 224px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 28px 34px 26px;
+        border: 1px solid var(--splash-card-border);
+        border-radius: 12px;
+        background: var(--splash-surface);
+        box-shadow: var(--splash-shadow);
+        text-align: center;
+      }
+
+      img {
+        display: block;
+        width: 58px;
+        height: 58px;
+        overflow: hidden;
+        border: 1px solid #ebe5d9;
+        border-radius: 12px;
+        object-fit: contain;
+      }
+
+      h1 {
+        margin: 12px 0 0;
+        font-size: 19px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        line-height: 29px;
+      }
+
+      p {
+        margin: 17px 0 0;
+        color: var(--splash-text-secondary);
+        font-size: 13px;
+        line-height: 20px;
+      }
+
+      .progress {
+        position: relative;
+        width: 22px;
+        height: 22px;
+        margin-top: 12px;
+        border: 2px solid var(--splash-spinner-track);
+        border-top-color: var(--splash-brand);
+        border-radius: 50%;
+        animation: spin 900ms linear infinite;
+      }
+
+      .progress span {
+        display: none;
+      }
+
+      small {
+        margin-top: 12px;
+        color: var(--splash-text-tertiary);
+        font-size: 12px;
+        line-height: 18px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .progress {
+          animation: none;
+        }
+      }
+
+      html[data-desktop-reduce-motion="true"] .progress {
+        animation: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main aria-labelledby="splash-title">
+      <img src="./desktop/seekoffer-mark.png" alt="" />
+      <h1 id="splash-title">寻鹿 SeekOffer</h1>
+      <p role="status">正在启动寻鹿</p>
+      <div class="progress" aria-hidden="true"><span></span></div>
+      <small>正在准备申请项目与提醒</small>
+    </main>
+  </body>
+</html>

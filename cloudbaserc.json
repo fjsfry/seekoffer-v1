@@ -1,0 +1,38 @@
+{
+  "version": "2.0",
+  "envId": "gongzhonghao-d5gc5vsrid0deaab8",
+  "app": {
+    "serviceName": "seekoffer-web",
+    "framework": "next",
+    "installCommand": "npm install",
+    "buildCommand": "npm run build",
+    "outputDir": ".next-web"
+  },
+  "functionRoot": "./functions",
+  "functions": [
+    {
+      "name": "wechat-daily-digest",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 120,
+      "memorySize": 512,
+      "triggers": [
+        {
+          "name": "wechat-daily-2130",
+          "type": "timer",
+          "config": "0 30 21 * * * *"
+        }
+      ]
+    }
+  ],
+  "ai": {
+    "defaultAgent": "codex",
+    "agents": {
+      "codex": {
+        "type": "cloudbase",
+        "provider": "kimi-exp",
+        "model": "kimi-k2-instruct-local"
+      }
+    }
+  }
+}

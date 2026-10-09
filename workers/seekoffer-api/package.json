@@ -1,0 +1,21 @@
+{
+  "name": "seekoffer-d1-migration-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:snapshot": "node --test tests/snapshot-runtime.test.mjs",
+    "test:auth-runtime": "node ../../scripts/migration/test-auth-bootstrap-workerd.mjs",
+    "test:payments": "node --test tests/payment-transactions.test.mjs",
+    "test:commerce": "node --test tests/resource-commerce.test.mjs",
+    "test:quota": "node --test tests/admin-read-budget.test.mjs tests/d1-read-budget.test.mjs",
+    "predeploy:production": "npm run typecheck && npm run test:quota && npm run test:payments && npm run test:commerce",
+    "deploy:production": "wrangler deploy --config wrangler.production.jsonc",
+    "dev:local": "wrangler dev --local",
+    "dev:commerce:local": "wrangler dev --config wrangler.commerce-local.jsonc --local --persist-to .wrangler/commerce-local --ip 127.0.0.1 --port 8787",
+    "build:local": "wrangler deploy --dry-run --outdir ../../artifacts/d1-worker-build"
+  },
+  "dependencies": { "jose": "6.2.12" },
+  "devDependencies": { "wrangler": "4.129.0", "@cloudflare/workers-types": "5.20260908.1", "typescript": "5.7.3", "@types/node": "22.10.7" }
+}
