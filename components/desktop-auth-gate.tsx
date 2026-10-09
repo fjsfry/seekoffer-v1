@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useUserSessionState } from '@/hooks/use-user-session';
 import { DesktopLoginScreen, DesktopStartupScreen } from '@/components/desktop-login-screen';
 import { isMemberSession } from '@/lib/user-session';
+import { DesktopAccountRecovery } from '@/components/desktop-account-recovery';
 import {
   DESKTOP_PREFERENCES_CHANGE_EVENT,
   readDesktopPreferences,
@@ -108,5 +109,5 @@ export function DesktopAuthGate({ children }: { children: ReactNode }) {
     );
   }
 
-  return children;
+  return <>{children}<DesktopAccountRecovery /></>;
 }

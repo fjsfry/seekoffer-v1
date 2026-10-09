@@ -1,6 +1,6 @@
 {
   "name": "seekoffer-web",
-  "version": "0.2.26",
+  "version": "0.2.27",
   "description": "寻鹿 SeekOffer 保研信息与申请管理平台",
   "author": "SeekOffer",
   "homepage": "https://www.seekoffer.com.cn",
@@ -12,7 +12,7 @@
     "build:desktop": "node ./scripts/run-desktop-next.mjs build",
     "desktop:auth:verify": "node ./scripts/verify-desktop-auth-export.mjs",
     "desktop": "tauri",
-    "desktop:dev": "tauri dev",
+    "desktop:dev": "tauri dev --config src-tauri/tauri.development.conf.json",
     "desktop:compile": "npm run build:desktop && tauri build --no-bundle --config ./src-tauri/tauri.release.conf.json",
     "desktop:bundle": "tauri bundle --bundles nsis --config ./src-tauri/tauri.release.conf.json",
     "desktop:build": "npm run desktop:compile && npm run desktop:bundle",

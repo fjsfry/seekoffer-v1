@@ -1428,7 +1428,8 @@ export async function loadPublicNotices(options: { refresh?: boolean } = {}) {
 }
 
 export async function fetchPublicNotices(options: { refresh?: boolean } = {}) {
-  if(isD1Backend()){const {nativeNoticeSearch}=await import('./native-public-notices');const {noticeListItemToProject}=await import('./notice-record');return (await nativeNoticeSearch()).items.map(noticeListItemToProject);}
+  // Legacy home callers need upcoming notices, not an incomplete 16-row catalog.
+  if(isD1Backend())return (await import('./native-public-notices')).nativeDeadlineNotices(undefined, options.refresh);
   return (await loadPublicNotices(options)).rows;
 }
 
@@ -1450,7 +1451,8 @@ export async function fetchNoticeById(id: string) {
   return source.find((item) => item.id === id) || null;
 }
 
-export async function fetchDeadlineNotices() {
+export async function fetchDeadlineNotices(options: {signal?: AbortSignal; refresh?: boolean} = {}) {
+  if(isD1Backend())return (await import('./native-public-notices')).nativeDeadlineNotices(options.signal, options.refresh);
   const projects = await fetchPublicNotices();
   return projects.filter((item) => getDeadlineLevelFromDate(item.deadlineDate) !== 'future');
 }

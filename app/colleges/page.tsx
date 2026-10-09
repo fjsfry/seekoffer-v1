@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
 import Link from 'next/link';
 import {isD1Backend} from '@/lib/backend-mode';
-import {nativeNoticeSearch} from '@/lib/native-public-notices';
+import {getNativeNoticeSnapshot, nativeNoticeSearch} from '@/lib/native-public-notices';
 import {getEmptyCollegeNoticeStats,type CollegeNoticeStats} from '@/lib/notice-analytics';
 import {
   ArrowSync20Regular,
@@ -364,7 +364,10 @@ function DesktopCollegePagination({
 }
 
 export default function CollegesPage() {
-  const [nativeStats,setNativeStats]=useState<CollegeNoticeStats[]|null>(null);
+  const [nativeStats,setNativeStats]=useState<CollegeNoticeStats[]|null>(() => {
+    const cached = isD1Backend() ? getNativeNoticeSnapshot() : null;
+    return cached && !cached.metadataStale && !cached.stale ? cached.facets.collegeStats : null;
+  });
   const [initialPublicNoticeSnapshot] = useState(() => getPublicNoticeSnapshot());
   const [keyword, setKeyword] = useState('');
   const [city, setCity] = useState(allCityLabel);
@@ -395,7 +398,25 @@ export default function CollegesPage() {
   const filterKey = `${keyword.trim().toLowerCase()}|${city}|${group}|${sortBy}`;
 
   const loadProjects = useCallback(async (options: { force?: boolean } = {}) => {
-    if(isD1Backend()){const sequence=++requestSequenceRef.current;setNoticeSyncStatus('loading');try{const result=await nativeNoticeSearch();if(sequence!==requestSequenceRef.current)return;setNativeStats(result.facets.collegeStats);setNoticeSyncAttemptedAt(new Date(result.servedAt));setNoticeSyncStatus('online');}catch{if(sequence===requestSequenceRef.current)setNoticeSyncStatus('stale');}return;}
+    if (isD1Backend()) {
+      const sequence = ++requestSequenceRef.current;
+      setNoticeSyncStatus('loading');
+      setNoticeSyncAttemptedAt(new Date());
+      try {
+        const result = await nativeNoticeSearch(undefined, 1, undefined, {refresh: options.force});
+        if (sequence !== requestSequenceRef.current) return;
+        // Aggregate data covers every school, independently of the 16 page rows.
+        // The API can explicitly mark aggregates unavailable during refresh.
+        const known = !result.metadataStale && !result.stale;
+        setNativeStats(known ? result.facets.collegeStats : null);
+        setNoticeSyncStatus(known ? 'online' : 'fallback');
+      } catch {
+        if (sequence !== requestSequenceRef.current) return;
+        setNativeStats(null);
+        setNoticeSyncStatus('fallback');
+      }
+      return;
+    }
     const requestSequence = requestSequenceRef.current + 1;
     requestSequenceRef.current = requestSequence;
     const cachedSnapshot = getPublicNoticeSnapshot();
@@ -486,7 +507,10 @@ export default function CollegesPage() {
   }, [city, filterKey, group, keyword, pageState, showAllCities, sortBy, viewRestored]);
 
   const collegeStats = useMemo(() => {
-    if(isD1Backend())return new Map(collegeDirectory.map(item=>[item.name,nativeStats?.find(s=>s.schoolName===item.name)||getEmptyCollegeNoticeStats(item.name)]));
+    if (isD1Backend()) {
+      const aggregateBySchool = new Map((nativeStats || []).map(stats => [stats.schoolName, stats]));
+      return new Map(collegeDirectory.map(item => [item.name, aggregateBySchool.get(item.name) || getEmptyCollegeNoticeStats(item.name)]));
+    }
     return new Map(collegeDirectory.map((item) => [item.name, buildCollegeNoticeStats(projects, item.name)]));
   }, [projects,nativeStats]);
 
@@ -754,7 +778,7 @@ export default function CollegesPage() {
       </section>
       ) : null}
 
-      {!isDesktopSurface && noticeSyncStatus === 'loading' ? (
+      {noticeSyncStatus === 'loading' ? (
         <DesktopStateSurface
           variant="inline"
           loading
@@ -768,8 +792,8 @@ export default function CollegesPage() {
           variant="inline"
           tone="stale"
           icon={<Warning20Regular />}
-          title={noticeSyncStatus === 'stale' ? '本次刷新失败' : '当前显示本地院校数据'}
-          detail={noticeSyncStatus === 'stale'
+          title={isD1Backend() ? '院校通知统计暂未同步' : noticeSyncStatus === 'stale' ? '本次刷新失败' : '当前显示本地院校数据'}
+          detail={isD1Backend() ? '院校目录仍可浏览。暂不能确认通知数量时显示“—”，重新同步后自动更新。' : noticeSyncStatus === 'stale'
             ? `继续展示上次同步成功的院校统计。上次尝试 ${formatSyncTime(noticeSyncAttemptedAt)}。`
             : `在线通知暂时不可用；本地数据可以继续浏览。上次尝试 ${formatSyncTime(noticeSyncAttemptedAt)}。`}
           action={(

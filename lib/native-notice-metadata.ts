@@ -1,30 +1,33 @@
 import type {PublicNoticeSearchResponse} from './public-notice-search';
 
-type Page = PublicNoticeSearchResponse & {metadataVersion?:string};
-type Part = {section:string;version:string;expiresAt:number;servedAt:string;stats?:Page['stats'];sideData?:Omit<Page['sideData'],'topColleges'>;facets?:Omit<Page['facets'],'collegeStats'>;collegeStats?:Page['facets']['collegeStats'];topColleges?:Page['sideData']['topColleges']};
+export type NativeNoticeResponse = PublicNoticeSearchResponse & {
+  metadataStale?: boolean;
+  stale?: boolean;
+};
 
-// The native client consumes the same versioned contract as the website.
-// Only small public metadata is reused; no private records or full catalog.
-export function createNativeNoticeMetadata(read:(path:string)=>Promise<unknown>,now=()=>performance.now()) {
- const cache=new Map<string,{value:Part;until:number}>();
- const flights=new Map<string,Promise<Part>>();
- const aborted=(signal?:AbortSignal)=>{if(signal?.aborted)throw new DOMException('Aborted','AbortError');};
- return async(data:Page,filters:URLSearchParams,signal?:AbortSignal):Promise<Page>=>{
-  aborted(signal);const version=data.metadataVersion;if(!version)return data;
-  if(typeof version!=='string'||version.length>100)throw Error('通知版本无效，请重新加载。');
-  const values=await Promise.all(['summary','facets','colleges'].map(async section=>{
-   const query=new URLSearchParams({section,version});if(section==='facets')for(const key of ['category','region'])if(filters.has(key))query.set(key,filters.get(key)!);
-   const key=query.toString(),known=cache.get(key);if(known&&known.until>now())return known.value;
-   let flight=flights.get(key);
-   if(!flight){flight=(async()=>{
-    const value=await read('/api/public/notices/metadata/?'+key) as Part;
-    if(!value||value.section!==section||value.version!==version||!Number.isFinite(value.expiresAt)||!Number.isFinite(Date.parse(value.servedAt))||value.expiresAt<=Date.parse(value.servedAt))throw Error('通知更新版本已变化，请重新加载。');
-    if(cache.size>=18)cache.clear();cache.set(key,{value,until:now()+Math.max(0,Math.min(60000,value.expiresAt-Date.parse(value.servedAt)-5000))});return value;
-   })();flights.set(key,flight);}
-   try{return await flight;}finally{if(flights.get(key)===flight)flights.delete(key);}
-  }));
-  aborted(signal);const [summary,facets,colleges]=values;
-  if(!summary.stats||!summary.sideData||!facets.facets||!Array.isArray(colleges.collegeStats)||!Array.isArray(colleges.topColleges))throw Error('通知筛选信息暂未完整加载，请重试。');
-  return {...data,stats:summary.stats,sideData:{...summary.sideData,topColleges:colleges.topColleges},facets:{...facets.facets,collegeStats:colleges.collegeStats}};
- };
+const count = (value: unknown) => Number.isSafeInteger(value) && Number(value) >= 0;
+const strings = (value: unknown) => Array.isArray(value) && value.every(item => typeof item === 'string');
+
+// The versioned API now returns its aggregate snapshot together with the page.
+// Never request the removed website metadata shards or derive totals from items.
+export function validateNativeNoticeResponse(value: unknown, pageSize: number): NativeNoticeResponse {
+  const data = value as NativeNoticeResponse | null;
+  const page = data?.pagination;
+  const facets = data?.facets;
+  const side = data?.sideData;
+  if (!data || !Array.isArray(data.items) || data.items.length > pageSize ||
+      data.items.some(item => !item || typeof item.id !== 'string' || !item.id || typeof item.projectName !== 'string' || typeof item.schoolName !== 'string') ||
+      !page || !count(page.total) || !count(page.page) || page.page < 1 ||
+      page.pageSize !== pageSize || !count(page.totalPages) || page.totalPages < 1 ||
+      page.page > page.totalPages || page.totalPages !== Math.max(1, Math.ceil(page.total / pageSize)) ||
+      !data.stats || !Object.values(data.stats).every(count) ||
+      !['total2026', 'todayUpdates', 'deadlineWithin3Days'].every(key => count(data.stats[key as keyof typeof data.stats])) ||
+      !facets || !strings(facets.regions) || !strings(facets.schools) || !strings(facets.categories) || !strings(facets.disciplines) ||
+      !Array.isArray(facets.collegeStats) || facets.collegeStats.some(item => !item || typeof item.schoolName !== 'string' || !count(item.total) || !count(item.active)) ||
+      !side || !Array.isArray(side.urgentProjects) || !Array.isArray(side.latestProjects) || !Array.isArray(side.topColleges) ||
+      !side.todaySchoolUpdates || !Array.isArray(side.todaySchoolUpdates.rows) || typeof side.latestPublishDate !== 'string' ||
+      !Number.isFinite(Date.parse(data.servedAt))) {
+    throw new Error('通知响应不完整，请稍后重试。');
+  }
+  return data;
 }

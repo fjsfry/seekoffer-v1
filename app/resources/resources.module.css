@@ -38,6 +38,79 @@
   min-width: 0;
 }
 
+.browserHandoffNote {
+  margin: 0 0 12px;
+  padding: 0 12px;
+  color: var(--resource-text-secondary);
+  font-size: 12px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.browserServiceBody {
+  min-width: 0;
+  padding: 13px;
+  display: grid;
+  gap: 12px;
+}
+
+.browserServiceBody p,
+.browserServiceBody small {
+  margin: 0;
+  color: var(--resource-text-secondary);
+  font-size: 13px;
+  line-height: 21px;
+  overflow-wrap: anywhere;
+}
+
+.browserServiceBody small {
+  color: var(--resource-text-tertiary);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.browserServiceAction {
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--resource-border);
+  border-radius: 8px;
+  background: var(--resource-surface);
+  color: var(--resource-accent);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color var(--motion-fast, 167ms) ease, border-color var(--motion-fast, 167ms) ease;
+}
+
+.browserServiceAction svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
+.browserServiceAction:hover {
+  background: var(--resource-surface-hover);
+  border-color: var(--resource-border-strong);
+}
+
+.browserServiceAction:focus-visible {
+  outline: 2px solid var(--resource-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .browserServiceAction {
+    transition: none;
+  }
+}
+
 .eyebrow {
   display: block;
   margin-bottom: 2px;

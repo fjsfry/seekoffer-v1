@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   parsePublicDesktopEnv,
@@ -9,6 +10,7 @@ import {
   verifyDesktopAuthExport,
   verifySupabasePublicAuthEndpoint
 } from '../scripts/desktop-auth-config.mjs';
+import { desktopD1PublicConfig } from '../scripts/desktop-d1-build-config.mjs';
 
 const temporaryDirectories = [];
 
@@ -226,7 +228,50 @@ describe('desktop auth build configuration', () => {
     expect(packageJson.scripts['dev:desktop']).toBe(
       'node ./scripts/run-desktop-next.mjs dev'
     );
-    expect(packageScript).toContain('resolveDesktopAuthConfig({ projectRoot })');
-    expect(packageScript).toContain('verifyDesktopAuthExport({');
+    expect(packageScript).toContain('resolveDesktopD1BuildEnvironment(process.env)');
+    expect(packageScript).toContain("verifyDesktopD1Export(path.join(projectRoot,'.next-desktop'))");
+  });
+
+  it('launches the real dev runner with the approved desktop environment and forwarded arguments', async () => {
+    const projectRoot = path.resolve(import.meta.dirname, '..');
+    const fixtureRoot = await createTemporaryProject();
+    const nextBin = path.join(fixtureRoot, 'node_modules', 'next', 'dist', 'bin');
+    await mkdir(nextBin, { recursive: true });
+    // The actual runner spawns this harmless fixture in place of a listening server.
+    // Only public build settings are returned; inherited process credentials are never printed.
+    await writeFile(path.join(nextBin, 'next'), `
+      const keys = ['NEXT_PUBLIC_BACKEND_PROVIDER','NEXT_PUBLIC_D1_API_URL','NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY','SEEKOFFER_BUILD_TARGET','NEXT_PUBLIC_SEEKOFFER_SURFACE','NEXT_TELEMETRY_DISABLED','SEEKOFFER_OFFLINE_BUILD'];
+      console.log(JSON.stringify({args: process.argv.slice(2), env: Object.fromEntries(keys.map(key => [key, process.env[key]])), staleSupabase: Object.keys(process.env).filter(key => key.startsWith('NEXT_PUBLIC_SUPABASE_'))}));
+    `, 'utf8');
+    const result = spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'run-desktop-next.mjs'), 'dev', '--', '--hostname', '127.0.0.1', '--port', '3000'], {
+      cwd: fixtureRoot, windowsHide: true, encoding: 'utf8', timeout: 10_000,
+      env: { ...process.env, ...desktopD1PublicConfig, NODE_OPTIONS: '', NEXT_PUBLIC_SUPABASE_URL: 'https://obsolete.example.invalid' }
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(JSON.parse(result.stdout)).toEqual({
+      args: ['dev', '--hostname', '127.0.0.1', '--port', '3000'],
+      env: { ...desktopD1PublicConfig, SEEKOFFER_BUILD_TARGET: 'desktop', NEXT_PUBLIC_SEEKOFFER_SURFACE: 'desktop', NEXT_TELEMETRY_DISABLED: '1', SEEKOFFER_OFFLINE_BUILD: 'true' },
+      staleSupabase: []
+    });
+  });
+
+  it('isolates the development app identifier without altering the release app identity', async () => {
+    const projectRoot = path.resolve(import.meta.dirname, '..');
+    const [base, development, release, packageJson] = await Promise.all([
+      'src-tauri/tauri.conf.json', 'src-tauri/tauri.development.conf.json',
+      'src-tauri/tauri.release.conf.json', 'package.json'
+    ].map(async filename => JSON.parse(await readFile(path.join(projectRoot, filename), 'utf8'))));
+    const developmentApp = { ...base, ...development };
+    const releaseApp = { ...base, ...release };
+    expect(developmentApp.identifier).toBe('com.seekoffer.desktop.development');
+    expect(developmentApp.identifier).not.toBe(releaseApp.identifier);
+    expect(developmentApp.bundle.active).toBe(false);
+    expect(releaseApp.identifier).toBe('com.seekoffer.desktop');
+    const configPath = script => path.resolve(projectRoot, script.match(/--config\s+(\S+)/)?.[1] || 'missing-config');
+    expect(configPath(packageJson.scripts['desktop:dev'])).toBe(path.join(projectRoot, 'src-tauri', 'tauri.development.conf.json'));
+    expect(configPath(packageJson.scripts['desktop:compile'])).toBe(path.join(projectRoot, 'src-tauri', 'tauri.release.conf.json'));
+    expect(packageJson.scripts['desktop:compile']).not.toContain('tauri.development.conf.json');
   });
 });

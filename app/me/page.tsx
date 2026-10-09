@@ -28,6 +28,8 @@ import { SiteShell } from '@/components/site-shell';
 import { useUserSessionState } from '@/hooks/use-user-session';
 import { beginDesktopPendingWrite, trackDesktopPendingWrite } from '@/lib/desktop-pending-writes';
 import { emitDesktopSyncStatus } from '@/lib/desktop-route-events';
+import { reconcileWorkbench } from '@/lib/workbench-reconciliation';
+import { watchWorkbenchRefresh } from '@/lib/workbench-refresh';
 import {
   readAccountScopedWorkbenchValue,
   writeAccountScopedWorkbenchValue,
@@ -253,6 +255,7 @@ function MePageContent() {
   const [workbenchSyncStatus, setWorkbenchSyncStatus] = useState<WorkbenchSyncStatus>('local');
   const [lastSyncedAt, setLastSyncedAt] = useState('');
   const [syncRetryNonce, setSyncRetryNonce] = useState(0);
+  const retryCountRef = useRef(0);
   const [scheduleTypeFilter, setScheduleTypeFilter] = useState<ScheduleTypeFilter>('全部');
   const [scheduleDoneFilter, setScheduleDoneFilter] = useState<ScheduleDoneFilter>('全部');
   const [scheduleKeyword, setScheduleKeyword] = useState('');
@@ -264,6 +267,22 @@ function MePageContent() {
   const [contactSort, setContactSort] = useState<ContactSortOption>('updated');
   const saveCoordinatorRef = useRef<ReturnType<typeof createWorkbenchSaveCoordinator> | null>(null);
   if (!saveCoordinatorRef.current) saveCoordinatorRef.current = createWorkbenchSaveCoordinator(saveWorkbenchState);
+  const editorStateRef = useRef<WorkbenchState>({completedTodoIds, customTodos, contacts});
+  editorStateRef.current = {completedTodoIds, customTodos, contacts};
+
+  useEffect(() => watchWorkbenchRefresh(change => {
+    if (change.userId !== profileOwnerId) return;
+    try {
+      const next = reconcileWorkbench(change.before, editorStateRef.current, change.state);
+      editorStateRef.current = next;
+      setCompletedTodoIds(next.completedTodoIds);
+      setCustomTodos(next.customTodos);
+      setContacts(next.contacts.map(contact => normalizeContact(contact)));
+    } catch {
+      // Keep the editor's draft; the user can explicitly retry a conflicting edit.
+      setWorkbenchSyncStatus('error');
+    }
+  }), [profileOwnerId]);
 
   useEffect(() => {
     if (!activeSection) router.replace('/');
@@ -306,19 +325,26 @@ function MePageContent() {
 
     const hydrateRemoteState = async () => {
       try {
+        const before:WorkbenchState={
+          completedTodoIds: readBrowserArray(WORKBENCH_COMPLETED_TODOS_KEY, syncableUserId),
+          customTodos: readCustomTodos(syncableUserId),
+          contacts: readStoredContacts(syncableUserId)
+        };
         const mergedState = await trackDesktopPendingWrite('me-workbench-hydrate', () =>
-          hydrateWorkbenchState(syncableUserId, {
-            completedTodoIds: readBrowserArray(WORKBENCH_COMPLETED_TODOS_KEY, syncableUserId),
-            customTodos: readCustomTodos(syncableUserId),
-            contacts: readStoredContacts(syncableUserId)
-          })
+          hydrateWorkbenchState(syncableUserId, before)
         );
         if (!active) return;
-        setCompletedTodoIds(mergedState.completedTodoIds);
-        setCustomTodos(mergedState.customTodos);
-        setContacts(mergedState.contacts.map((contact) => normalizeContact(contact)));
-        setLastSyncedAt(new Date().toISOString());
-        setWorkbenchSyncStatus('synced');
+        const current:WorkbenchState={
+          completedTodoIds: readBrowserArray(WORKBENCH_COMPLETED_TODOS_KEY, syncableUserId),
+          customTodos: readCustomTodos(syncableUserId),
+          contacts: readStoredContacts(syncableUserId)
+        };
+        const reconciled=reconcileWorkbench(before,current,mergedState);
+        setCompletedTodoIds(reconciled.completedTodoIds);
+        setCustomTodos(reconciled.customTodos);
+        setContacts(reconciled.contacts.map((contact) => normalizeContact(contact)));
+        // Reading the remote baseline does not acknowledge local edits yet.
+        setWorkbenchSyncStatus('local');
         setTodoSyncOwnerId(syncableUserId);
         setTodoSyncReady(true);
       } catch (error) {
@@ -332,6 +358,18 @@ function MePageContent() {
       active = false;
     };
   }, [syncRetryNonce, syncableUserId]);
+
+  useEffect(() => { retryCountRef.current=0;setLastSyncedAt(''); },[syncableUserId]);
+
+  useEffect(() => {
+    if(workbenchSyncStatus==='synced')retryCountRef.current=0;
+    if(!syncableUserId||workbenchSyncStatus!=='error')return;
+    const reconnect=()=>{if(navigator.onLine){retryCountRef.current=0;setSyncRetryNonce(n=>n+1);}};
+    window.addEventListener('online',reconnect);
+    const timer=navigator.onLine&&retryCountRef.current<3
+      ? window.setTimeout(()=>{retryCountRef.current+=1;setSyncRetryNonce(n=>n+1);},2000*2**retryCountRef.current):null;
+    return ()=>{window.removeEventListener('online',reconnect);if(timer!==null)window.clearTimeout(timer);};
+  },[syncableUserId,workbenchSyncStatus]);
 
   useEffect(() => {
     if (localWorkbenchOwnerId !== profileOwnerId) return;
@@ -366,6 +404,11 @@ function MePageContent() {
         const result = await saveCoordinatorRef.current!.enqueue(ownerId, snapshot);
         if (cancelled || !result.isLatest) return;
         if (result.ok) {
+          if(result.state&&JSON.stringify(result.state)!==JSON.stringify(snapshot)){
+            setCompletedTodoIds(result.state.completedTodoIds);
+            setCustomTodos(result.state.customTodos);
+            setContacts(result.state.contacts.map(contact=>normalizeContact(contact)));
+          }
           setLastSyncedAt(new Date().toISOString());
           setWorkbenchSyncStatus('synced');
         } else {

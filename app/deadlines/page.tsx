@@ -52,10 +52,11 @@ export default function DeadlinesPage() {
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
 
     setIsLoading(true);
     setLoadError('');
-    fetchDeadlineNotices()
+    fetchDeadlineNotices({signal: controller.signal, refresh: refreshNonce > 0})
       .then((rows) => {
         if (!active) return;
         setProjects(rows);
@@ -70,6 +71,7 @@ export default function DeadlinesPage() {
 
     return () => {
       active = false;
+      controller.abort();
     };
   }, [refreshNonce]);
 
@@ -128,7 +130,7 @@ export default function DeadlinesPage() {
           </select>
 
           <div className="desktop-deadlines-toolbar-summary rounded-2xl bg-white px-4 py-3 text-sm text-slate-500 shadow-sm" role="status">
-            共 {filteredProjects.length} 个即将截止项目，已按剩余时间从近到远分组。
+            {isLoading ? '正在核对最新截止项目…' : loadError ? '截止项目数量暂不可用' : `共 ${filteredProjects.length} 个即将截止项目，已按剩余时间从近到远分组。`}
           </div>
         </section>
 

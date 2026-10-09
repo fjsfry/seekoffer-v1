@@ -31,7 +31,7 @@ import { useUserSessionState } from '@/hooks/use-user-session';
 import {
   calculateMaterialsProgress,
   fetchApplicationRows,
-  fetchPublicNotices,
+  fetchDeadlineNotices,
   type ApplicationRow
 } from '@/lib/cloudbase-data';
 import {
@@ -255,6 +255,7 @@ export function DesktopToday({
 }) {
   const { session,ready } = useUserSessionState();
   const [projects, setProjects] = useState<PublicNoticeProject[]>(isD1Backend()?[]:fallbackProjects);
+  const [deadlineState, setDeadlineState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [scheduleItems, setScheduleItems] = useState<LocalScheduleItem[]>([]);
@@ -313,13 +314,15 @@ export function DesktopToday({
 
   useEffect(() => {
     let active = true;
-    void fetchPublicNotices()
+    const controller = new AbortController();
+    void fetchDeadlineNotices({signal: controller.signal})
       .then((rows) => {
-        if (active && rows.length) {
+        if (active) {
           setProjects(rows.filter((item) => String(item.year) === '2026'));
+          setDeadlineState('ready');
         }
       })
-      .catch(() => undefined);
+      .catch(() => { if (active) setDeadlineState('error'); });
 
     void fetchApplicationRows()
       .then((rows) => {
@@ -330,6 +333,7 @@ export function DesktopToday({
     setPanelVisibility(readPanelVisibility());
     return () => {
       active = false;
+      controller.abort();
     };
   }, []);
 
@@ -917,6 +921,7 @@ export function DesktopToday({
                 <Link href="/deadlines">截止专区</Link>
               </div>
               <div className="desktop-deadline-list">
+                {deadlineState === 'loading' ? <p className="text-sm text-slate-500">正在同步截止通知…</p> : deadlineState === 'error' ? <p className="text-sm text-slate-500">截止通知暂未同步，请到截止专区重试。</p> : deadlineProjects.length === 0 ? <p className="text-sm text-slate-500">暂无 7 天内截止通知。</p> : null}
                 {deadlineProjects.slice(0, 3).map((project) => (
                   <Link key={project.id} href="/notices" className="desktop-deadline-row">
                     <span className="desktop-deadline-date">

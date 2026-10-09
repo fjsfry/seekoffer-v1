@@ -20,7 +20,8 @@
 在 PowerShell 中进入发布目录后运行：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath '.\SeekOffer-Desktop-v*-Windows-x64-Setup.exe'
+Get-ChildItem -File -Filter 'SeekOffer-Desktop-v*-Windows-x64-Setup.exe' |
+  Get-FileHash -Algorithm SHA256
 ```
 
 输出应与 `SHA256SUMS.txt` 完全一致。

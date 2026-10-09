@@ -66,8 +66,8 @@ describe('desktop resource directory design', () => {
     expect(resourceSource).toContain('className="desktop-resource-tool-grid desktop-resource-tool-list" role="list"');
     expect(resourceSource).toContain('desktop-resource-link-grid');
     expect(resourceSource).toContain('role="listitem"');
-    expect(resourceSource).toContain("'noreferrer sponsored'");
-    expect(resourceSource).toContain('在新窗口打开');
+    expect(resourceSource).toContain('rel="noopener noreferrer"');
+    expect(resourceSource).toContain('在系统浏览器打开');
     expect(resourceSource).toContain('收藏仅存本机');
     expect(resourceSource).toContain('aria-label="本机偏好：收藏和最近使用仅保存在当前设备"');
     expect(resourceSource).toContain("fill={favorite ? 'currentColor' : 'none'}");

@@ -6,8 +6,17 @@ import { SEEKOFFER_SITE_URL, SUPABASE_ENABLE_PHONE_AUTH, isSupabaseConfigured } 
 import {isD1Backend} from './backend-mode';
 import {hydrateClerkD1Session,watchClerkIdentity,signOutClerkSession,D1SessionChangedError} from './clerk-d1-session';
 import {D1RequestError} from './d1-backend-client';
+import {getDesktopAuthState,isNativeSessionChanged,nativeAuthError,requiresNativeReauthentication,setDesktopAuthState} from './desktop-auth-state';
 let sessionHydrationError='';
 export function getSessionHydrationError(){return sessionHydrationError;}
+const usesNativeAuth=()=>process.env.NEXT_PUBLIC_SEEKOFFER_SURFACE==='desktop'&&isD1Backend();
+function reportD1HydrationError(error:unknown){
+  const needsLogin=requiresNativeReauthentication(error)||(error instanceof D1RequestError&&error.status===401);
+  const detail=error instanceof Error?error.message:'账号连接未完成，请检查网络后重试；本机资料已保留。';
+  sessionHydrationError=needsLogin?(requiresNativeReauthentication(error)?detail:'登录授权已失效，请重新登录。本机资料与未同步修改均已保留。'):detail;
+  if(usesNativeAuth())setDesktopAuthState(needsLogin?'reauth-required':'offline',sessionHydrationError);
+  emitSessionUpdate();
+}
 
 export type UserProfile = {
   nickname: string;
@@ -381,8 +390,8 @@ function writeUserSession(session: UserSession | null) {
 
 export async function confirmD1UserSession():Promise<UserSession>{
   sessionHydrationError='';
-  try{const session=await hydrateClerkD1Session();if(!session?.loggedIn||!session.userId)throw Error('认证会话未就绪，主站尚未登录。');writeUserSession(session);return session;}
-  catch(error){const detail=error instanceof Error?error.message:'暂时无法读取资料。';sessionHydrationError='主站账号同步未完成：'+detail+(error instanceof D1RequestError?`（${error.status}${error.code?' / '+error.code:''}）`:'');emitSessionUpdate();throw new Error(sessionHydrationError);}
+  try{const session=await hydrateClerkD1Session();if(!session?.loggedIn||!session.userId)throw usesNativeAuth()?nativeAuthError('NATIVE_LOGIN_EXPIRED'):Error('认证会话未就绪，主站尚未登录。');if(usesNativeAuth())setDesktopAuthState('ready');writeUserSession(session);return session;}
+  catch(error){if(!(error instanceof D1SessionChangedError)&&!isNativeSessionChanged(error))reportD1HydrationError(error);throw error instanceof Error?error:new Error(sessionHydrationError);}
 }
 
 async function getSupabaseUser() {
@@ -407,8 +416,15 @@ export async function hydrateSupabaseSession() {
   const current = getUserSession();
   if(isD1Backend()){
     sessionHydrationError='';
-    try{const session=await hydrateClerkD1Session();if(!session&&current?.authProvider==='anonymous')return current;writeUserSession(session);return session;}
-    catch(error){if(error instanceof D1SessionChangedError)return getUserSession();sessionHydrationError=error instanceof D1RequestError?error.message:'账号连接未完成，请检查网络后刷新一次；本地数据已保留。';return current;}
+    try{
+      const session=await hydrateClerkD1Session();
+      if(!session&&current?.authProvider==='anonymous')return current;
+      if(!session&&usesNativeAuth()&&isMemberSession(current)&&getDesktopAuthState().status!=='signed-out'){
+        throw nativeAuthError('NATIVE_LOGIN_EXPIRED');
+      }
+      if(usesNativeAuth())setDesktopAuthState(session?'ready':'signed-out');
+      writeUserSession(session);return session;
+    }catch(error){if(error instanceof D1SessionChangedError||isNativeSessionChanged(error))return getUserSession();reportD1HydrationError(error);return getUserSession();}
   }
 
   if (!isSupabaseConfigured()) {
@@ -733,7 +749,7 @@ export async function signInAsGuest() {
 }
 
 export async function signOutUser() {
-  if(isD1Backend()){await signOutClerkSession();writeUserSession(null);return;}
+  if(isD1Backend()){await signOutClerkSession();sessionHydrationError='';writeUserSession(null);return;}
   try {
     if (isSupabaseConfigured()) {
       const supabase = getSupabaseBrowserClient();

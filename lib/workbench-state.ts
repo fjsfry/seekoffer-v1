@@ -2,10 +2,11 @@ import { getSupabaseBrowserClient } from './supabase-browser';
 import {isD1Backend} from './backend-mode';
 import {d1ClientForUser} from './clerk-d1-session';
 import {reconcileWorkbench} from './workbench-reconciliation';
+import {D1RequestError} from './d1-backend-client';
 const d1Revisions=new Map<string,number>();
 const d1SavedSnapshots=new Map<string,string>();
 const d1ReadFlights=new Map<string,Promise<unknown>>();
-const d1SaveFlights=new Map<string,Promise<void>>();
+const d1SaveFlights=new Map<string,Promise<WorkbenchState>>();
 const baselines=new Map<string,WorkbenchState>();
 function snapshot(state:WorkbenchState){return {completed_todo_ids:normalizeCompletedTodoIds(state.completedTodoIds),custom_todos:normalizeCustomTodos(state.customTodos),mentor_contacts:normalizeContacts(state.contacts)};}
 function normalizedState(state:WorkbenchState):WorkbenchState {const data=snapshot(state);return {completedTodoIds:data.completed_todo_ids,customTodos:data.custom_todos,contacts:data.mentor_contacts};}
@@ -234,6 +235,7 @@ export type WorkbenchSaveResult = {
   isLatest: boolean;
   ok: boolean;
   error?: unknown;
+  state?: WorkbenchState;
 };
 
 /**
@@ -242,22 +244,35 @@ export type WorkbenchSaveResult = {
  * newer snapshot and from reporting a stale "synced" state in the UI.
  */
 export function createWorkbenchSaveCoordinator(
-  persist: (userId: string, state: WorkbenchState) => Promise<void>
+  persist: (userId: string, state: WorkbenchState, submissionBaseline?: WorkbenchState) => Promise<WorkbenchState | void>
 ) {
   let tail: Promise<void> = Promise.resolve();
   let latestRevision = 0;
+  let previous: {userId: string; submitted: WorkbenchState; acknowledged: Promise<WorkbenchState | void>} | undefined;
 
   return {
     enqueue(userId: string, state: WorkbenchState): Promise<WorkbenchSaveResult> {
       const revision = ++latestRevision;
-      const task = tail.then(() => persist(userId, state));
+      // Bind the baseline now, not after a preceding write imports remote edits.
+      const submissionBaseline = readBaseline(userId);
+      const predecessor = previous;
+      const task = tail.then(async () => {
+        const acknowledged = predecessor?.userId === userId
+          ? await predecessor.acknowledged.catch(() => undefined) : undefined;
+        // The preceding acknowledgement may contain both this editor's older
+        // edit and new remote rows. Apply only the delta since that older edit.
+        const desired = acknowledged
+          ? reconcileWorkbench(predecessor!.submitted, state, acknowledged) : state;
+        return persist(userId, desired, acknowledged || submissionBaseline);
+      });
+      previous = {userId, submitted: state, acknowledged: task};
       tail = task.then(
         () => undefined,
         () => undefined
       );
 
       return task.then(
-        () => ({ revision, isLatest: revision === latestRevision, ok: true }),
+        (state) => ({ revision, isLatest: revision === latestRevision, ok: true, ...(state ? { state } : {}) }),
         (error: unknown) => ({ revision, isLatest: revision === latestRevision, ok: false, error })
       );
     }
@@ -343,20 +358,42 @@ export async function hydrateWorkbenchState(userId: string, localState: Workbenc
   return mergedState;
 }
 
-export async function saveWorkbenchState(userId: string, state: WorkbenchState) {
+export async function saveWorkbenchState(userId: string, state: WorkbenchState, submissionBaseline = readBaseline(userId)) {
   if(isD1Backend()){
     const client=await d1ClientForUser(userId);
-    const key=userId+':'+client.sessionScope,payload=snapshot(state),serialized=JSON.stringify(payload);
+    const key=userId+':'+client.sessionScope;
+    // Capture what this editor saw before entering the serialized write queue.
+    // A preceding save may import changes from another device while we wait.
+    const submitted=normalizedState(state);
     const save=async()=>{
-      const expected=d1Revisions.get(key);if(expected===undefined)throw new Error('请先同步工作台基线，本地修改已保留。');
-      if(d1SavedSnapshots.get(key)===serialized)return;
-      const result=await client.saveWorkbench(expected,payload) as {sync_revision:number};
-      if(!result||!Number.isSafeInteger(result.sync_revision)||result.sync_revision<=expected)throw new Error('保存结果未确认，请保留本地修改。');
-      d1Revisions.set(key,result.sync_revision);d1SavedSnapshots.set(key,serialized);rememberBaseline(userId,{completedTodoIds:payload.completed_todo_ids,customTodos:payload.custom_todos,contacts:payload.mentor_contacts});
+      const currentBaseline=readBaseline(userId);
+      let desired=submissionBaseline&&currentBaseline
+        ? reconcileWorkbench(submissionBaseline,submitted,currentBaseline):submitted;
+      for(let attempt=0;attempt<3;attempt++){
+        const expected=d1Revisions.get(key);if(expected===undefined)throw new Error('请先同步工作台基线，本地修改已保留。');
+        const payload=snapshot(desired),serialized=JSON.stringify(payload);
+        if(d1SavedSnapshots.get(key)===serialized)return desired;
+        try {
+          const result=await client.saveWorkbench(expected,payload) as {sync_revision:number};
+          if(!result||!Number.isSafeInteger(result.sync_revision)||result.sync_revision<=expected)throw new Error('保存结果未确认，请保留本地修改。');
+          d1Revisions.set(key,result.sync_revision);d1SavedSnapshots.set(key,serialized);rememberBaseline(userId,desired);
+          return desired;
+        }catch(error){
+          if(!(error instanceof D1RequestError)||error.status!==409||error.code!=='REVISION_CONFLICT'||attempt===2)throw error;
+          const baseline=readBaseline(userId);
+          if(!baseline)throw error;
+          const data=await client.workbench() as {completed_todo_ids:unknown[];custom_todos:unknown[];mentor_contacts:unknown[];sync_revision:number}|null;
+          if(data!==null&&(!data||!Array.isArray(data.completed_todo_ids)||!Array.isArray(data.custom_todos)||!Array.isArray(data.mentor_contacts)||!Number.isSafeInteger(data.sync_revision)||data.sync_revision<1))throw new Error('工作台响应不完整，已保留本地数据。');
+          const remote=data===null?{completedTodoIds:[],customTodos:[],contacts:[]}:normalizedState({completedTodoIds:data.completed_todo_ids,customTodos:data.custom_todos,contacts:data.mentor_contacts} as WorkbenchState);
+          desired=reconcileWorkbench(baseline,desired,remote);
+          d1Revisions.set(key,data?.sync_revision??0);d1SavedSnapshots.set(key,JSON.stringify(snapshot(remote)));rememberBaseline(userId,remote);
+        }
+      }
+      throw new Error('其他设备仍在更新工作台，本机修改已保留，请稍后重试。');
     };
     // A failed predecessor also stops queued saves, instead of repeatedly hitting a quota or overwriting a conflict.
     const previous=d1SaveFlights.get(key),flight=previous?previous.then(save):save();d1SaveFlights.set(key,flight);
-    try{await flight;}finally{if(d1SaveFlights.get(key)===flight)d1SaveFlights.delete(key);}return;
+    try{return await flight;}finally{if(d1SaveFlights.get(key)===flight)d1SaveFlights.delete(key);}
   }
   const supabase = getSupabaseBrowserClient();
   const payload = {

@@ -11,16 +11,18 @@ import {
   CircleHelp,
   ClipboardList,
   Clock3,
+  Crown,
   FileText,
   FolderSearch2,
   Landmark,
   LibraryBig,
   Lightbulb,
-  Mail,
+  ReceiptText,
   RefreshCw,
   Rocket,
   Search,
   Star,
+  WandSparkles,
   Wrench,
   X,
   type LucideIcon
@@ -29,7 +31,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { emitDesktopFeedback } from '@/lib/desktop-route-events';
-import { taobaoTemplatePackHref } from '@/lib/external-links';
+import { desktopServiceLinks, migrateDesktopResourceId } from '@/lib/desktop-service-links';
 import { officialResourceSections } from '@/lib/portal-data';
 import styles from './resources.module.css';
 
@@ -45,7 +47,7 @@ type ResourceItem = {
   category: ResourceCategory;
   categoryLabel: string;
   external: boolean;
-  commercial?: boolean;
+  officialService?: boolean;
   keywords?: string[];
   icon?: LucideIcon;
 };
@@ -69,43 +71,43 @@ const RESOURCE_FILTER_VALUES: ResourceFilter[] = [
 
 const applicationKits: ResourceItem[] = [
   {
-    id: 'toolkit-resume',
-    title: '简历模板',
-    description: '适合夏令营、预推免和正式推免投递，突出成绩、科研、竞赛和项目经历。',
-    badge: '外部付费',
+    id: 'toolkit-application-kit',
+    title: '寻鹿保研资料包',
+    description: '简历、个人陈述、推荐信与提交清单，在官网查看内容与购买方式。',
+    badge: '官网资料',
     category: 'toolkit',
     categoryLabel: '申请资料与工具',
-    href: taobaoTemplatePackHref,
+    href: desktopServiceLinks.applicationKit,
     external: true,
-    commercial: true,
-    keywords: ['一页简历', '科研经历', '项目表达'],
+    officialService: true,
+    keywords: ['简历', '个人陈述', '推荐信'],
     icon: FileText
   },
   {
-    id: 'toolkit-personal-statement',
-    title: '个人陈述模板',
-    description: '按个人背景、科研经历、目标方向和未来规划组织内容，减少空泛表达。',
-    badge: '外部付费',
+    id: 'toolkit-purchases',
+    title: '资料购买记录',
+    description: '在购买时使用的浏览器中查看订单，继续支付或打开已购资料。',
+    badge: '官网订单',
     category: 'toolkit',
     categoryLabel: '申请资料与工具',
-    href: taobaoTemplatePackHref,
+    href: desktopServiceLinks.purchases,
     external: true,
-    commercial: true,
-    keywords: ['结构模板', '常见问题', '修改提示'],
-    icon: BookOpenText
+    officialService: true,
+    keywords: ['购买记录', '订单', '资料下载'],
+    icon: ReceiptText
   },
   {
-    id: 'toolkit-recommendation-letter',
-    title: '推荐信模板',
-    description: '整理推荐信写作结构、常见表述和提交注意事项，方便提前沟通老师。',
-    badge: '外部付费',
+    id: 'toolkit-autofill',
+    title: '寻鹿闪填',
+    description: 'Chrome / Edge 报名页填充助手。逐项核对后填入，最终提交由你完成。',
+    badge: '浏览器扩展',
     category: 'toolkit',
     categoryLabel: '申请资料与工具',
-    href: taobaoTemplatePackHref,
+    href: desktopServiceLinks.autofill,
     external: true,
-    commercial: true,
-    keywords: ['推荐信结构', '老师沟通', '提交提醒'],
-    icon: Mail
+    officialService: true,
+    keywords: ['申请档案', '报名填表', '不自动提交'],
+    icon: WandSparkles
   },
   {
     id: 'toolkit-gpa',
@@ -159,10 +161,10 @@ const externalResources: ResourceItem[] = officialResourceSections.flatMap((sect
 const allResources = [...applicationKits, ...externalResources];
 const allowedResourceIds = new Set(allResources.map((item) => item.id));
 const featuredResourceIds = [
+  'toolkit-application-kit',
+  'toolkit-autofill',
   'toolkit-gpa',
-  'official-yz.chsi.com.cn',
-  'official-chsi.com.cn',
-  'academic-cnki.net'
+  'official-yz.chsi.com.cn'
 ];
 
 const groupMeta: Array<{
@@ -173,7 +175,7 @@ const groupMeta: Array<{
   {
     id: 'toolkit',
     title: '申请资料与工具',
-    description: '材料模板、检查工具与申请期常用能力。'
+    description: '准备资料、查看订单、填写报名信息。'
   },
   ...officialResourceSections.map((section) => ({
     id: sectionCategoryMap[section.title],
@@ -185,7 +187,10 @@ const groupMeta: Array<{
 function uniqueKnownIds(value: unknown) {
   if (!Array.isArray(value)) return [];
 
-  return [...new Set(value.filter((id): id is string => typeof id === 'string' && allowedResourceIds.has(id)))];
+  return [...new Set(value
+    .filter((id): id is string => typeof id === 'string')
+    .map(migrateDesktopResourceId)
+    .filter((id) => allowedResourceIds.has(id)))];
 }
 
 function parseLocalResourceState(value: string | null): LocalResourceState {
@@ -248,7 +253,7 @@ function ResourceMark({ item }: { item: ResourceItem }) {
 function ResourceDestination({ item }: { item: ResourceItem }) {
   return (
     <span className={`${styles.openAction} desktop-resource-row-action`} aria-hidden="true">
-      <span>{item.external ? '访问' : '打开'}</span>
+      <span>{item.officialService ? '前往官网' : item.external ? '访问' : '打开'}</span>
       {item.external ? (
         <ArrowUpRight className="desktop-resource-open-icon" />
       ) : (
@@ -280,7 +285,7 @@ function ResourceRow({
           className={`${styles.resourceTitle} desktop-resource-item-title ${isToolkit ? 'desktop-resource-tool-title' : 'desktop-resource-link-title'}`}
         >
           <strong>{item.title}</strong>
-          <small className={item.commercial ? 'desktop-resource-badge--commercial' : undefined}>
+          <small>
             {item.badge}
           </small>
         </span>
@@ -298,7 +303,7 @@ function ResourceRow({
   );
 
   const accessibleLabel = item.external
-    ? `${item.title}，${item.badge}，在新窗口打开`
+    ? `${item.title}，${item.badge}，在系统浏览器打开`
     : `${item.title}，站内工具`;
 
   return (
@@ -311,7 +316,7 @@ function ResourceRow({
         <a
           href={item.href}
           target="_blank"
-          rel={item.commercial ? 'noreferrer sponsored' : 'noreferrer'}
+          rel="noopener noreferrer"
           className={`${styles.resourceLink} ${isToolkit ? 'desktop-resource-tool-row' : 'desktop-resource-link'}`}
           aria-label={accessibleLabel}
           onClick={() => onOpen(item)}
@@ -361,9 +366,9 @@ function QuickResource({ item, onOpen }: { item: ResourceItem; onOpen: (item: Re
       <a
         href={item.href}
         target="_blank"
-        rel={item.commercial ? 'noreferrer sponsored' : 'noreferrer'}
+        rel="noopener noreferrer"
         className={`${styles.quickResource} desktop-resource-quick-item`}
-        aria-label={`${item.title}，在新窗口打开`}
+        aria-label={`${item.title}，在系统浏览器打开`}
         onClick={() => onOpen(item)}
       >
         {content}
@@ -768,6 +773,12 @@ export default function DesktopResourceCenter() {
                         </header>
 
                         {isToolkit ? (
+                          <p className={styles.browserHandoffNote}>
+                            官网资料与闪填将在系统浏览器中打开。历史订单请在原购买时的浏览器中查看。
+                          </p>
+                        ) : null}
+
+                        {isToolkit ? (
                           <ul className="desktop-resource-tool-grid desktop-resource-tool-list" role="list">
                             {group.items.map((item) => (
                               <ResourceRow
@@ -819,6 +830,19 @@ export default function DesktopResourceCenter() {
           </div>
 
           <aside className={`${styles.resourceSidebar} desktop-resource-sidebar`} aria-label="资源快捷入口与统计">
+            <section className={`${styles.sidebarCard} desktop-resource-sidebar-card`} aria-labelledby="resource-services-title">
+              <header className={`${styles.sidebarCardHeader} desktop-resource-sidebar-heading`}>
+                <Crown aria-hidden="true" />
+                <h2 id="resource-services-title">寻鹿 Pro</h2>
+              </header>
+              <div className={styles.browserServiceBody}>
+                <p>查看官网最新会员方案与服务。登录官网后，可核对当前账号的权益。</p>
+                <a href={desktopServiceLinks.pro} target="_blank" rel="noopener noreferrer" className={styles.browserServiceAction}>
+                  前往官网查看 <ArrowUpRight aria-hidden="true" />
+                </a>
+                <small>官网登录与桌面端独立，请确认使用同一账号。</small>
+              </div>
+            </section>
             <section
               className={`${styles.sidebarCard} desktop-resource-sidebar-card`}
               aria-labelledby="resource-quick-links-title"
@@ -879,7 +903,7 @@ export default function DesktopResourceCenter() {
                       <a
                         href={featuredResource.href}
                         target="_blank"
-                        rel={featuredResource.commercial ? 'noreferrer sponsored' : 'noreferrer'}
+                        rel="noopener noreferrer"
                         onClick={() => handleOpen(featuredResource)}
                       >
                         查看入口 <ArrowRight aria-hidden="true" />

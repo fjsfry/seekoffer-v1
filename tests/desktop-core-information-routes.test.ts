@@ -169,7 +169,7 @@ describe('desktop core information route design contract', () => {
     }
   });
 
-  it('keeps the last successful online snapshot when a manual refresh fails', () => {
+  it('preserves usable notice snapshots and distinguishes unavailable aggregate statistics', () => {
     expect(noticeSource).toContain('const [initialPublicNoticeSnapshot] = useState(() => getPublicNoticeSnapshot())');
     expect(noticeSource).toContain('const hasOnlineSnapshotRef = useRef(initialPublicNoticeSnapshot.syncedAt !== null)');
     expect(noticeSource).toContain("result.source === 'stale'");
@@ -177,7 +177,12 @@ describe('desktop core information route design contract', () => {
     expect(collegeSource).toContain('const [initialPublicNoticeSnapshot] = useState(() => getPublicNoticeSnapshot())');
     expect(collegeSource).toContain('const hasOnlineSnapshotRef = useRef(initialPublicNoticeSnapshot.syncedAt !== null)');
     expect(collegeSource).toContain("result.source === 'stale' ? 'stale' : 'fallback'");
-    expect(collegeSource).toContain("title={noticeSyncStatus === 'stale' ? '本次刷新失败' : '当前显示本地院校数据'}");
+    expect(collegeSource).toContain("isD1Backend() ? '院校通知统计暂未同步' : noticeSyncStatus === 'stale' ? '本次刷新失败' : '当前显示本地院校数据'");
+    expect(collegeSource).toContain('const known = !result.metadataStale && !result.stale');
+    expect(collegeSource).toContain("known?stats.active:'—'");
+    expect(noticeSource).toContain('getNativeNoticeSnapshot(filterValues, requestedPage)');
+    expect(noticeSource).toContain('缓存中暂无匹配记录');
+    expect(noticeSource).toContain('title="通知加载失败"');
   });
 
   it('renders college results as a balanced two-column desktop grid', () => {

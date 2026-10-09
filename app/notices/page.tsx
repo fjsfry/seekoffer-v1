@@ -3,8 +3,8 @@
 import { Suspense, useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import {isD1Backend} from '@/lib/backend-mode';
-import {nativeNoticeSearch} from '@/lib/native-public-notices';
-import type {PublicNoticeSearchResponse} from '@/lib/public-notice-search';
+import {getNativeNoticeSnapshot, nativeNoticeSearch} from '@/lib/native-public-notices';
+import type {NativeNoticeResponse} from '@/lib/native-notice-metadata';
 import {noticeListItemToProject} from '@/lib/notice-record';
 const nativeData=isD1Backend();
 import { useSearchParams } from 'next/navigation';
@@ -476,11 +476,14 @@ function NoticesPageFallback() {
 }
 
 function NoticesPageContent() {
-  const [nativeResult,setNativeResult]=useState<PublicNoticeSearchResponse|null>(null);
   const [composing,setComposing]=useState(false);
   const searchParams = useSearchParams();
   const initialUrlState = useMemo(() => parseNoticeListUrlState(searchParams), [searchParams]);
   const initialNoticeState = initialUrlState || defaultNoticeListState;
+  const [nativeSnapshot, setNativeSnapshot] = useState<{key: string; result: NativeNoticeResponse | null}>(() => ({
+    key: `${buildNoticeFilterKey(initialNoticeState)}:${initialNoticeState.page}`,
+    result: nativeData ? getNativeNoticeSnapshot(initialNoticeState, initialNoticeState.page) : null
+  }));
   const [initialPublicNoticeSnapshot] = useState(() => getPublicNoticeSnapshot());
   const [projects, setProjects] = useState<PublicNoticeProject[]>(() =>
     initialPublicNoticeSnapshot.rows.filter((item) => String(item.year) === '2026')
@@ -490,6 +493,7 @@ function NoticesPageContent() {
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const nativeReloadTokenRef = useRef(0);
   const [lastLoadedAt, setLastLoadedAt] = useState(() =>
     initialPublicNoticeSnapshot.syncedAt
       ? getBeijingTimeString(new Date(initialPublicNoticeSnapshot.syncedAt))
@@ -559,6 +563,9 @@ function NoticesPageContent() {
     ]
   );
   const filterKey = buildNoticeFilterKey(filterValues);
+  const requestedPage = pageState.filterKey === filterKey ? pageState.page : 1;
+  const nativeQueryKey = `${filterKey}:${requestedPage}`;
+  const nativeResult = nativeSnapshot.key === nativeQueryKey ? nativeSnapshot.result : null;
   const activeFilterCount = useMemo(
     () =>
       [
@@ -767,14 +774,42 @@ function NoticesPageContent() {
     todayInBeijing
   ]);
 
-  const requestedPage = pageState.filterKey === filterKey ? pageState.page : 1;
   const totalCount=nativeData?nativeResult?.pagination.total??0:filteredProjects.length;
   const totalPages=nativeData?nativeResult?.pagination.totalPages??Math.max(1,requestedPage):Math.max(1,Math.ceil(totalCount/PAGE_SIZE));
   const currentPage = Math.min(requestedPage, totalPages);
-  const pagedProjects = nativeData?projects:filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  useEffect(()=>{if(!nativeData||composing)return;const controller=new AbortController();let active=true;const timer=setTimeout(()=>{setIsLoading(true);setIsRefreshing(true);setLoadError('');void nativeNoticeSearch(filterValues,requestedPage,controller.signal).then(result=>{if(!active)return;setNativeResult(result);setProjects(result.items.map(noticeListItemToProject));setLastLoadedAt(getBeijingTimeString(new Date(result.servedAt)));}).catch(error=>{if(active&&error?.name!=='AbortError'){setProjects([]);setLoadError('通知服务暂不可用，原浏览位置已保留，请手动重试。');}}).finally(()=>{if(active){setIsLoading(false);setIsRefreshing(false);}});},350);return()=>{active=false;clearTimeout(timer);controller.abort();};},[filterValues,requestedPage,reloadToken,composing]);
+  const pagedProjects = nativeData ? (nativeResult?.items || []).map(noticeListItemToProject) : filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  useEffect(() => {
+    if (!nativeData || composing) return;
+    const controller = new AbortController();
+    const cached = getNativeNoticeSnapshot(filterValues, requestedPage);
+    setNativeSnapshot({key: nativeQueryKey, result: cached});
+    setIsLoading(!cached);
+    setIsRefreshing(true);
+    setLoadError(cached?.stale ? '正在更新，当前显示最近缓存的通知。' : '');
+    const timer = setTimeout(() => {
+      const refresh = reloadToken !== nativeReloadTokenRef.current;
+      nativeReloadTokenRef.current = reloadToken;
+      void nativeNoticeSearch(filterValues, requestedPage, controller.signal, {refresh})
+        .then(result => {
+          if (controller.signal.aborted) return;
+          setNativeSnapshot({key: nativeQueryKey, result});
+          setLastLoadedAt(getBeijingTimeString(new Date(result.servedAt)));
+          setLoadError(result.stale ? '当前无法连接通知服务，展示最近 15 分钟内的缓存；提交前请核对学校原文。' : result.metadataStale ? '通知列表已加载，汇总统计正在更新，稍后可重试。' : '');
+        })
+        .catch(error => {
+          if (controller.signal.aborted || error?.name === 'AbortError') return;
+          setNativeSnapshot({key: nativeQueryKey, result: null});
+          setLoadError('通知服务暂不可用，请检查网络后重新加载。原筛选和浏览位置已保留。');
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) { setIsLoading(false); setIsRefreshing(false); }
+        });
+    }, cached ? 0 : 250);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [filterValues, nativeQueryKey, requestedPage, reloadToken, composing]);
   const visiblePages = getVisiblePages(currentPage, totalPages);
-  const isNoticeLoading = isLoading && projects.length === 0;
+  const isNoticeLoading = nativeData ? !nativeResult && (isLoading || nativeSnapshot.key !== nativeQueryKey) : isLoading && projects.length === 0;
+  const aggregateUnavailable = nativeData && (!nativeResult || nativeResult.metadataStale || nativeResult.stale);
   const latestPublishDate = nativeData?nativeResult?.sideData.latestPublishDate??'':projects.reduce((latest,item)=>item.publishDate>latest?item.publishDate:latest,'');
 
   useEffect(() => {
@@ -955,7 +990,7 @@ function NoticesPageContent() {
     <div className="desktop-notice-toolbar flex flex-wrap items-center justify-between gap-4 rounded-[22px] border border-slate-200 bg-white px-5 py-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <span className="font-semibold text-ink">
-          {isNoticeLoading?'正在加载通知...':loadError?'暂未能读取结果':`共 ${totalCount.toLocaleString('zh-CN')} 条结果`}
+          {isNoticeLoading ? '正在加载通知...' : nativeData && !nativeResult ? '通知尚未加载' : `共 ${totalCount.toLocaleString('zh-CN')} 条结果${nativeResult?.stale ? '（缓存）' : ''}`}
         </span>
         {!isDesktopSurface && lastLoadedAt ? <span className="text-slate-400">已同步 {lastLoadedAt}</span> : null}
       </div>
@@ -1246,7 +1281,16 @@ function NoticesPageContent() {
               })
             )}
 
-            {!isNoticeLoading && !pagedProjects.length ? (
+            {!isNoticeLoading && nativeData && !nativeResult && loadError ? (
+              <DesktopStateSurface
+                variant="section"
+                icon={<RefreshCw />}
+                title="通知加载失败"
+                detail="暂时无法连接通知服务，筛选条件和浏览位置已保留。"
+                action={<button type="button" className="desktop-setting-secondary-button" onClick={refreshLatestNotices}>重新加载</button>}
+              />
+            ) : null}
+            {!isNoticeLoading && !pagedProjects.length && (!nativeData || nativeResult && !nativeResult.stale) ? (
               <DesktopStateSurface
                 variant="section"
                 icon={<BookOpenText />}
@@ -1259,9 +1303,12 @@ function NoticesPageContent() {
                 )}
               />
             ) : null}
+            {!isNoticeLoading && nativeResult?.stale && !pagedProjects.length ? (
+              <DesktopStateSurface variant="section" icon={<RefreshCw />} title="缓存中暂无匹配记录" detail="当前连接不可用，无法确认最新结果。请恢复网络后重新加载。" action={<button type="button" className="desktop-setting-secondary-button" onClick={refreshLatestNotices}>重新加载</button>} />
+            ) : null}
           </div>
 
-          {!isNoticeLoading && filteredProjects.length && totalPages > 1 ? (
+          {!isNoticeLoading && pagedProjects.length > 0 && totalPages > 1 ? (
             <nav
               aria-label="通知分页"
               className="flex flex-wrap items-center justify-center gap-3 rounded-[22px] bg-white px-5 py-5 shadow-sm"
@@ -1309,6 +1356,8 @@ function NoticesPageContent() {
             <div className="desktop-notice-deadline-list grid gap-4">
               {isNoticeLoading ? (
                 <SideLoadingState icon={Clock3} label="正在整理截止提醒" />
+              ) : aggregateUnavailable ? (
+                <p className="desktop-notice-side-empty">截止提醒暂未同步，恢复连接后可重新加载。</p>
               ) : urgentProjects.length ? (
                 urgentProjects.map((project) => {
                   const daysLeft = getDaysLeft(project);
@@ -1346,13 +1395,15 @@ function NoticesPageContent() {
 
           <SideCard title="今日更新" icon={RefreshCw}>
             <div className="desktop-notice-today-list grid gap-3">
-              {!todayUpdates.hasTodayRows && todayUpdates.date ? (
+              {!aggregateUnavailable && !todayUpdates.hasTodayRows && todayUpdates.date ? (
                 <div className="desktop-notice-today-fallback rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500">
                   暂无今日新增，以下显示最近同步日 {todayUpdates.date} 的更新。
                 </div>
               ) : null}
               {isNoticeLoading ? (
                 <SideLoadingState icon={BookOpenText} label="正在汇总今日更新" />
+              ) : aggregateUnavailable ? (
+                <p className="desktop-notice-side-empty">更新统计暂不可用。</p>
               ) : todayUpdates.rows.length ? (
                 todayUpdates.rows.map(([school, count]) => (
                   <div key={school} className="desktop-notice-today-row flex items-center justify-between gap-3 text-sm">

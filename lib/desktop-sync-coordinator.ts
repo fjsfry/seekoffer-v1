@@ -4,7 +4,9 @@ import {reconnectDesktopAccount} from './desktop-account-reconnect';
 import { synchronizeApplicationWorkspace } from './cloudbase-data';
 import { emitDesktopSyncStatus, type DesktopSyncStatus } from './desktop-route-events';
 import { getUserSession } from './user-session';
-import { hydrateWorkbenchState, type WorkbenchState } from './workbench-state';
+import { hydrateWorkbenchState, saveWorkbenchState, type WorkbenchState } from './workbench-state';
+import { reconcileWorkbench } from './workbench-reconciliation';
+import { publishWorkbenchRefresh } from './workbench-refresh';
 import {
   readAccountScopedWorkbenchValue,
   writeAccountScopedWorkbenchValue,
@@ -55,7 +57,23 @@ function readLocalWorkbenchState(userId: string): WorkbenchState {
 }
 
 async function syncWorkbenchWorkspace(userId: string) {
-  const merged = await hydrateWorkbenchState(userId, readLocalWorkbenchState(userId));
+  const before=readLocalWorkbenchState(userId);
+  const merged = await hydrateWorkbenchState(userId, before);
+  if(getUserSession()?.userId!==userId)throw new Error('同步时账号已切换，原账号修改已保留。');
+  const pending=reconcileWorkbench(before,readLocalWorkbenchState(userId),merged);
+  storeLocalWorkbenchState(userId,pending);
+  const acknowledged=await saveWorkbenchState(userId,pending)??pending;
+  if(getUserSession()?.userId!==userId)throw new Error('同步时账号已切换，原账号修改已保留。');
+  const latest=reconcileWorkbench(pending,readLocalWorkbenchState(userId),acknowledged);
+  storeLocalWorkbenchState(userId,latest);
+  if(JSON.stringify(latest)!==JSON.stringify(acknowledged)){
+    // Never report edits created during the request as already synchronized.
+    throw new Error('同步期间有新的本机修改，请继续同步。');
+  }
+}
+
+function storeLocalWorkbenchState(userId:string,merged:WorkbenchState){
+  const before = readLocalWorkbenchState(userId);
   const writes = [
     writeAccountScopedWorkbenchValue(
       WORKBENCH_COMPLETED_TODOS_KEY,
@@ -76,6 +94,7 @@ async function syncWorkbenchWorkspace(userId: string) {
   if (writes.some((written) => !written)) {
     throw new Error('The synchronized workbench could not be stored on this device.');
   }
+  publishWorkbenchRefresh({userId, before, state: merged});
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {

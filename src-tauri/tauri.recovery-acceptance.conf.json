@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "com.seekoffer.desktop.recoveryacceptance20261009",
+  "productName": "寻鹿 SeekOffer 恢复验收",
+  "build": { "beforeBuildCommand": "" },
+  "bundle": { "active": false, "createUpdaterArtifacts": false },
+  "app": {
+    "windows": [
+      {
+        "label": "main", "title": "寻鹿 0.2.27 恢复验收（独立测试）",
+        "width": 1440, "height": 900, "minWidth": 960, "minHeight": 640,
+        "center": true, "visible": false, "focus": false, "resizable": true,
+        "fullscreen": false, "decorations": false, "backgroundColor": "#e6e7ed",
+        "zoomHotkeysEnabled": false
+      },
+      {
+        "label": "splashscreen", "url": "desktop-splash.html",
+        "title": "寻鹿 0.2.27 恢复验收（独立测试）",
+        "width": 520, "height": 320, "center": true, "visible": true, "focus": true,
+        "decorations": false, "resizable": false, "maximizable": false,
+        "minimizable": false, "closable": false, "fullscreen": false,
+        "shadow": true, "skipTaskbar": true, "backgroundColor": "#e6e7ed"
+      }
+    ]
+  }
+}

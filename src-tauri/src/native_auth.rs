@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         OnceLock,
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -18,6 +18,37 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 const ISSUER: &str = "https://clerk.seekoffer.com.cn";
 const CLIENT_ID: &str = "bXDBbWjJFxXqoeG3";
 const FILE: &str = "clerk-native-session-v1.dpapi";
+const AUTH_RESPONSE_LIMIT: usize = 128 * 1024;
+const PUBLIC_RESPONSE_LIMIT: usize = 2 * 1024 * 1024;
+const REAUTHENTICATION_SECONDS: u64 = 7 * 86400;
+
+fn public_url(path: &str, method: &str) -> Result<url::Url, String> {
+    if path.len() > 4096 || path.contains(['#', '\\']) || path.contains("..") {
+        return Err(error("PUBLIC_ROUTE_REJECTED"));
+    }
+    let endpoint = path.split('?').next().unwrap_or("");
+    if !matches!(
+        (endpoint, method),
+        ("/v1/notices", "GET")
+            | ("/v1/notices/detail", "GET")
+            | ("/v1/notices/by-ids", "POST")
+            | ("/v1/public/notice-detail", "GET")
+    ) {
+        return Err(error("PUBLIC_ROUTE_REJECTED"));
+    }
+    let url = url::Url::parse(&format!("https://migration.seekoffer.com.cn{path}"))
+        .map_err(|_| error("PUBLIC_ROUTE_REJECTED"))?;
+    if url.path() != endpoint
+        || url.host_str() != Some("migration.seekoffer.com.cn")
+        || url.scheme() != "https"
+        || url.port().is_some()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err(error("PUBLIC_ROUTE_REJECTED"));
+    }
+    Ok(url)
+}
 
 #[tauri::command]
 pub async fn native_public_request(
@@ -27,22 +58,8 @@ pub async fn native_public_request(
     body: Option<serde_json::Value>,
 ) -> Result<serde_json::Value, String> {
     require_main(&window)?;
-    if path.len() > 4096
-        || path.contains('#')
-        || path.contains("..")
-        || !matches!(method.as_str(), "GET" | "POST")
-    {
-        return Err(error("PUBLIC_ROUTE_REJECTED"));
-    }
-    let endpoint = path.split('?').next().unwrap_or("").trim_end_matches('/');
-    let base = match (endpoint, method.as_str()) {
-        ("/api/public/notices", "GET")
-        | ("/api/public/notices/metadata", "GET")
-        | ("/api/public/notices/deadlines", "GET")
-        | ("/api/public/notices/by-ids", "POST") => "https://www.seekoffer.com.cn",
-        ("/v1/public/notice-detail", "GET") => "https://migration.seekoffer.com.cn",
-        _ => return Err(error("PUBLIC_ROUTE_REJECTED")),
-    };
+    let url = public_url(&path, &method)?;
+    let endpoint = url.path().to_string();
     let data = body.map(|b| b.to_string()).unwrap_or_default();
     if data.len() > 32768 {
         return Err(error("PUBLIC_PAYLOAD_TOO_LARGE"));
@@ -54,7 +71,7 @@ pub async fn native_public_request(
             } else {
                 reqwest::Method::POST
             },
-            format!("{base}{path}"),
+            url,
         )
         .header("Accept", "application/json");
     if method == "POST" {
@@ -69,7 +86,12 @@ pub async fn native_public_request(
             "PUBLIC_NETWORK_UNAVAILABLE"
         })
     })?;
-    if response.status().as_u16() == 404 && endpoint == "/v1/public/notice-detail" {
+    if response.status().as_u16() == 404
+        && matches!(
+            endpoint.as_str(),
+            "/v1/public/notice-detail" | "/v1/notices/detail"
+        )
+    {
         return Ok(serde_json::Value::Null);
     }
     match response.status().as_u16() {
@@ -83,13 +105,24 @@ pub async fn native_public_request(
         status if status >= 500 => return Err(error("PUBLIC_SERVICE_UNAVAILABLE")),
         _ => {}
     }
-    json(response).await
+    if !response.status().is_success() {
+        return Err(error("PUBLIC_SERVICE_UNAVAILABLE"));
+    }
+    read_json(
+        response,
+        PUBLIC_RESPONSE_LIMIT,
+        "PUBLIC_NETWORK_UNAVAILABLE",
+        "PUBLIC_RESPONSE_TOO_LARGE",
+        "PUBLIC_RESPONSE_INVALID",
+    )
+    .await
 }
 
 #[derive(Default)]
 pub struct NativeAuthState {
     session: tokio::sync::Mutex<Option<StoredSession>>,
     busy: AtomicBool,
+    generation: AtomicU64,
 }
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -124,13 +157,22 @@ impl From<&StoredSession> for BrowserSession {
 }
 fn require_main(window: &tauri::WebviewWindow) -> Result<(), String> {
     let url = window.url().map_err(|_| error("NATIVE_WINDOW_REJECTED"))?;
-    if window.label() != "main"
-        || !((url.scheme() == "tauri" && url.host_str() == Some("localhost"))
-            || (url.scheme() == "http" && url.host_str() == Some("tauri.localhost")))
-    {
+    if window.label() != "main" || !trusted_window_origin(&url, cfg!(debug_assertions)) {
         return Err(error("NATIVE_WINDOW_REJECTED"));
     }
     Ok(())
+}
+fn trusted_window_origin(url: &url::Url, allow_development: bool) -> bool {
+    if !url.username().is_empty() || url.password().is_some() {
+        return false;
+    }
+    ((url.scheme() == "tauri" && url.host_str() == Some("localhost"))
+        || (url.scheme() == "http" && url.host_str() == Some("tauri.localhost")))
+        && url.port().is_none()
+        || (allow_development
+            && url.scheme() == "http"
+            && url.port() == Some(3000)
+            && matches!(url.host_str(), Some("localhost" | "127.0.0.1")))
 }
 fn now() -> u64 {
     SystemTime::now()
@@ -314,19 +356,37 @@ async fn json(response: reqwest::Response) -> Result<serde_json::Value, String> 
             "NATIVE_AUTH_UNAVAILABLE"
         }));
     }
+    read_json(
+        response,
+        AUTH_RESPONSE_LIMIT,
+        "NATIVE_AUTH_UNAVAILABLE",
+        "NATIVE_RESPONSE_TOO_LARGE",
+        "NATIVE_RESPONSE_INVALID",
+    )
+    .await
+}
+async fn read_json(
+    response: reqwest::Response,
+    limit: usize,
+    unavailable: &str,
+    too_large: &str,
+    invalid: &str,
+) -> Result<serde_json::Value, String> {
+    if response
+        .content_length()
+        .is_some_and(|length| length > limit as u64)
+    {
+        return Err(error(too_large));
+    }
     let mut r = response;
     let mut bytes = Vec::new();
-    while let Some(part) = r
-        .chunk()
-        .await
-        .map_err(|_| error("NATIVE_AUTH_UNAVAILABLE"))?
-    {
-        if bytes.len() + part.len() > 131072 {
-            return Err(error("NATIVE_RESPONSE_TOO_LARGE"));
+    while let Some(part) = r.chunk().await.map_err(|_| error(unavailable))? {
+        if bytes.len() + part.len() > limit {
+            return Err(error(too_large));
         }
         bytes.extend_from_slice(&part);
     }
-    serde_json::from_slice(&bytes).map_err(|_| error("NATIVE_RESPONSE_INVALID"))
+    serde_json::from_slice(&bytes).map_err(|_| error(invalid))
 }
 fn form(values: &[(&str, &str)]) -> String {
     let mut encoded = url::form_urlencoded::Serializer::new(String::new());
@@ -413,6 +473,7 @@ pub async fn native_auth_login(
         return Err(error("NATIVE_LOGIN_ALREADY_RUNNING"));
     }
     let _busy = Busy(&state.busy);
+    let generation = state.generation.load(Ordering::Acquire);
     let verifier = windows::random()?;
     let csrf = windows::random()?;
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
@@ -496,6 +557,9 @@ pub async fn native_auth_login(
         established_at: now(),
     };
     let mut current = state.session.lock().await;
+    if state.generation.load(Ordering::Acquire) != generation {
+        return Err(error("NATIVE_LOGIN_CANCELLED"));
+    }
     save(&app, &stored)?;
     let public = BrowserSession::from(&stored);
     *current = Some(stored);
@@ -518,7 +582,7 @@ pub async fn native_auth_session(
     };
     // Require an explicit browser login at least every seven days. Refresh tokens
     // are kept only in DPAPI, never used to create an unlimited application session.
-    if now().saturating_sub(s.established_at) > 7 * 86400 {
+    if reauthentication_required(s.established_at, now()) {
         return Err(error("NATIVE_REAUTHENTICATION_REQUIRED"));
     }
     if s.expires_at <= now() + 60 {
@@ -543,35 +607,121 @@ pub async fn native_auth_sign_out(
     state: State<'_, NativeAuthState>,
 ) -> Result<(), String> {
     require_main(&window)?;
+    // A pending browser callback must never restore a just-signed-out account.
+    state.generation.fetch_add(1, Ordering::AcqRel);
     let mut current = state.session.lock().await;
     let saved = if current.is_some() {
         current.clone()
     } else {
-        load(&app)?
+        // A corrupt/expired credential still needs to be removable locally.
+        load(&app).ok().flatten()
     };
-    if let Some(s) = saved {
-        let _ = http()?
-            .post(format!("{ISSUER}/oauth/token/revoke"))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(form(&[
-                ("client_id", CLIENT_ID),
-                ("token", &s.refresh_token),
-                ("token_type_hint", "refresh_token"),
-            ]))
-            .send()
-            .await;
-    }
     let p = file(&app)?;
     if p.exists() {
         std::fs::remove_file(p).map_err(|_| error("NATIVE_STORAGE_UNAVAILABLE"))?;
     }
     *current = None;
+    drop(current);
+    if let Some(s) = saved {
+        // Local sign-out succeeds even if the issuer is offline. Revoke best effort.
+        tauri::async_runtime::spawn(async move {
+            let Ok(client) = http() else {
+                return;
+            };
+            let _ = client
+                .post(format!("{ISSUER}/oauth/token/revoke"))
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .body(form(&[
+                    ("client_id", CLIENT_ID),
+                    ("token", &s.refresh_token),
+                    ("token_type_hint", "refresh_token"),
+                ]))
+                .send()
+                .await;
+        });
+    }
     Ok(())
+}
+
+fn reauthentication_required(established_at: u64, current_time: u64) -> bool {
+    established_at == 0
+        || established_at > current_time
+        || current_time.saturating_sub(established_at) >= REAUTHENTICATION_SECONDS
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn public_routes_are_exact_and_use_migrated_origin() {
+        for (path, method) in [
+            ("/v1/notices?pageSize=40&deadline=within7days", "GET"),
+            ("/v1/notices/detail?id=synthetic", "GET"),
+            ("/v1/notices/by-ids", "POST"),
+        ] {
+            let url = public_url(path, method).unwrap();
+            assert_eq!(
+                url.origin().ascii_serialization(),
+                "https://migration.seekoffer.com.cn"
+            );
+        }
+        for (path, method) in [
+            ("https://untrusted.invalid/v1/notices", "GET"),
+            ("//untrusted.invalid/v1/notices", "GET"),
+            ("/v1/notices/../me/profile", "GET"),
+            ("/v1/notices/%2e%2e/me/profile", "GET"),
+            ("/v1/notices#fragment", "GET"),
+            ("/v1/notices\\detail", "GET"),
+            ("/v1/notices", "POST"),
+            ("/v1/notices/by-ids", "DELETE"),
+            ("/v1/me/profile", "GET"),
+            ("/api/public/notices/metadata", "GET"),
+        ] {
+            assert!(public_url(path, method).is_err(), "accepted {path}");
+        }
+    }
+    #[test]
+    fn release_ipc_cannot_be_used_by_local_dev_or_remote_webpages() {
+        for input in [
+            "tauri://localhost/",
+            "http://tauri.localhost/me/?view=schedule",
+        ] {
+            assert!(trusted_window_origin(
+                &url::Url::parse(input).unwrap(),
+                false
+            ));
+        }
+        for input in ["http://localhost:3000/", "http://127.0.0.1:3000/"] {
+            let url = url::Url::parse(input).unwrap();
+            assert!(!trusted_window_origin(&url, false));
+            assert!(trusted_window_origin(&url, true));
+        }
+        for input in [
+            "http://localhost:3001/",
+            "https://www.seekoffer.com.cn/",
+            "http://localhost.evil:3000/",
+            "http://other@localhost:3000/",
+            "http://tauri.localhost:3000/",
+        ] {
+            assert!(!trusted_window_origin(
+                &url::Url::parse(input).unwrap(),
+                true
+            ));
+        }
+    }
+    #[test]
+    fn reauthorization_deadline_is_bounded_and_rejects_clock_rollback() {
+        assert!(!reauthentication_required(
+            100,
+            100 + REAUTHENTICATION_SECONDS - 1
+        ));
+        assert!(reauthentication_required(
+            100,
+            100 + REAUTHENTICATION_SECONDS
+        ));
+        assert!(reauthentication_required(100, 99));
+        assert!(reauthentication_required(0, 100));
+    }
     #[test]
     fn pkce_rfc_vector() {
         assert_eq!(

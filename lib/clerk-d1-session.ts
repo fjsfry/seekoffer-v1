@@ -77,7 +77,8 @@ export function createPinnedD1Client(getClerk:()=>Promise<ClerkBrowser>,resolveU
   const token=await session.getToken();if(!token||clerk.session?.id!==session.id||clerk.user?.id!==subject)throw new D1SessionChangedError();
   const pinnedFetch:typeof fetch=async(input,init)=>{
    if(clerk.session?.id!==session.id||clerk.user?.id!==subject)throw new D1SessionChangedError();
-   const result=await fetcher(input,init);
+   const headers=new Headers(init?.headers);headers.set('X-Workspace-Owner',userId);
+   const result=await fetcher(input,{...init,headers});
    if(clerk.session?.id!==session.id||clerk.user?.id!==subject)throw new D1SessionChangedError();
    return result;
   };
@@ -92,9 +93,16 @@ export async function updateD1Profile(userId:string,patch:Record<string,unknown>
 }
 export function watchClerkIdentity(callback:(signedIn:boolean)=>void){
  let stopped=false,dispose:(()=>void)|undefined;
- void loadClerkBrowser().then(clerk=>{
+ const source=process.env.NEXT_PUBLIC_SEEKOFFER_SURFACE==='desktop'
+  ?import('./native-auth-bridge').then(m=>m.getNativeClerkBrowser()):loadClerkBrowser();
+ void source.then(clerk=>{
   if(stopped)return;let identity=(clerk.session?.id||'')+':'+(clerk.user?.id||'');
   dispose=clerk.addListener(()=>{const next=(clerk.session?.id||'')+':'+(clerk.user?.id||'');if(next===identity)return;identity=next;callback(Boolean(clerk.session&&clerk.user));},{skipInitialEmit:true});
  }).catch(()=>{});return()=>{stopped=true;dispose?.();};
 }
-export async function signOutClerkSession(){const clerk=await loadClerkBrowser();if(clerk.session)await clerk.signOut({sessionId:clerk.session.id});}
+export async function signOutClerkSession(){
+ if(process.env.NEXT_PUBLIC_SEEKOFFER_SURFACE==='desktop'){
+  await import('./native-auth-bridge').then(m=>m.signOutNativeSession());
+ }else{const clerk=await loadClerkBrowser();if(clerk.session)await clerk.signOut({sessionId:clerk.session.id});}
+ identities.clear();profileRevisions.clear();client=null;
+}

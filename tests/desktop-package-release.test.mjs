@@ -653,11 +653,12 @@ describe('desktop release packaging guard', () => {
       /\[\[package\]\]\s*\nname\s*=\s*"seekoffer-desktop"\s*\nversion\s*=\s*"([^"]+)"/
     )?.[1];
 
-    expect(packageJson.version).toBe('0.2.23');
+    expect(packageJson.version).toBe('0.2.27');
     expect(packageLock.version).toBe(packageJson.version);
     expect(packageLock.packages[''].version).toBe(packageJson.version);
     expect(tauriConfig.version).toBe(packageJson.version);
     expect(tauriConfig.plugins?.updater?.endpoints).toEqual([
+      'https://download.seekoffer.com.cn/stable/latest.json',
       'https://seekoffer-desktop-updates.vercel.app/stable/latest.json',
       'https://seekoffer-desktop-updates.vercel.app/latest.json'
     ]);

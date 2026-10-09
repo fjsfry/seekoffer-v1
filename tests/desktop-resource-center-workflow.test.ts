@@ -63,7 +63,7 @@ describe('desktop resource center workflow', () => {
     expect(pageSource).toContain('export default function DesktopResourceCenter()');
   });
 
-  it('keeps all 22 real entries and their existing business sources', () => {
+  it('keeps the official directory and hands new services to the production website', () => {
     const officialEntryCount = officialResourceSections.reduce(
       (total, section) => total + section.links.length,
       0
@@ -74,7 +74,10 @@ describe('desktop resource center workflow', () => {
     expect(applicationEntryCount).toBe(4);
     expect(officialEntryCount + applicationEntryCount).toBe(22);
     expect(pageSource).toContain('const externalResources: ResourceItem[] = officialResourceSections.flatMap');
-    expect(pageSource).toContain("href: taobaoTemplatePackHref");
+    expect(pageSource).not.toContain('taobaoTemplatePackHref');
+    expect(pageSource).toContain('href: desktopServiceLinks.applicationKit');
+    expect(pageSource).toContain('href: desktopServiceLinks.purchases');
+    expect(pageSource).toContain('href: desktopServiceLinks.autofill');
     expect(pageSource).toContain("href: '/gpa'");
   });
 
@@ -87,8 +90,8 @@ describe('desktop resource center workflow', () => {
     expect(pageSource).toContain('aria-label="筛选资源分类"');
     expect(pageSource).toContain('aria-live="polite"');
     expect(pageSource).toContain('target="_blank"');
-    expect(pageSource).toContain("'noreferrer sponsored'");
-    expect(pageSource).toContain('在新窗口打开');
+    expect(pageSource).toContain('rel="noopener noreferrer"');
+    expect(pageSource).toContain('在系统浏览器打开');
   });
 
   it('keeps favorites and recents deliberately device-local and sanitizes stored ids', () => {

@@ -15,6 +15,29 @@ describe('D1 workbench synchronization',()=>{
 const empty={completedTodoIds:[],customTodos:[],contacts:[]};
 const row=(todos:{id:string;text:string;note?:string}[],revision=1,done:string[]=[])=>({completed_todo_ids:done,custom_todos:todos,mentor_contacts:[],sync_revision:revision});
 describe('persisted three-way workbench reconciliation',()=>{
+ it('rebases independent remote edits after a revision conflict and returns the acknowledged merged state',async()=>{
+  mocks.read.mockResolvedValueOnce(row([{id:'a',text:'original'}],1)).mockResolvedValueOnce(row([{id:'a',text:'original',note:'remote note'}],2));
+  const {D1RequestError}=await import('../lib/d1-backend-client');
+  mocks.save.mockRejectedValueOnce(new D1RequestError(409,'REVISION_CONFLICT')).mockResolvedValueOnce({sync_revision:3});
+  const api=await import('../lib/workbench-state');const initial=await api.hydrateWorkbenchState(owner,empty);
+  const result=await api.saveWorkbenchState(owner,{...initial,customTodos:initial.customTodos.map(t=>({...t,text:'local title'}))});
+  expect(mocks.save.mock.calls.map(c=>c[0])).toEqual([1,2]);
+  expect(result?.customTodos[0]).toMatchObject({text:'local title',note:'remote note'});
+ });
+ it('stops on a same-field conflict without overwriting either device',async()=>{
+  mocks.read.mockResolvedValueOnce(row([{id:'a',text:'original'}],1)).mockResolvedValueOnce(row([{id:'a',text:'remote title'}],2));
+  const {D1RequestError}=await import('../lib/d1-backend-client');mocks.save.mockRejectedValue(new D1RequestError(409,'REVISION_CONFLICT'));
+  const api=await import('../lib/workbench-state');const initial=await api.hydrateWorkbenchState(owner,empty);
+  await expect(api.saveWorkbenchState(owner,{...initial,customTodos:initial.customTodos.map(t=>({...t,text:'local title'}))})).rejects.toThrow('未覆盖任何一方');
+  expect(mocks.save).toHaveBeenCalledTimes(1);
+ });
+ it('bounds revision retries even when another device continuously changes unrelated records',async()=>{
+  mocks.read.mockResolvedValueOnce(row([],1)).mockResolvedValueOnce(row([{id:'r',text:'remote'}],2)).mockResolvedValueOnce(row([{id:'r',text:'remote changed'}],3));
+  const {D1RequestError}=await import('../lib/d1-backend-client');mocks.save.mockRejectedValue(new D1RequestError(409,'REVISION_CONFLICT'));
+  const api=await import('../lib/workbench-state');await api.hydrateWorkbenchState(owner,empty);
+  await expect(api.saveWorkbenchState(owner,{...empty,customTodos:[{id:'l',text:'local draft'}]})).rejects.toMatchObject({status:409});
+  expect(mocks.save).toHaveBeenCalledTimes(3);expect(mocks.read).toHaveBeenCalledTimes(3);
+ });
  it('does not resurrect another device deletion or unchecked completion after reloading the module',async()=>{
   mocks.read.mockResolvedValue(row([{id:'a',text:'original'}],1,['a']));
   const first=await import('../lib/workbench-state');const local=await first.hydrateWorkbenchState(owner,empty);

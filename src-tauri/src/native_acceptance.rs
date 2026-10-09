@@ -3,7 +3,7 @@
 use serde::Deserialize;
 use sha2::{Digest,Sha256};
 use tauri::{AppHandle,Manager};
-pub fn isolated(app:&AppHandle)->bool{matches!(app.config().identifier.as_str(),"com.seekoffer.desktop.d1acceptance"|"com.seekoffer.desktop.d1acceptance20260912")}
+pub fn isolated(app:&AppHandle)->bool{matches!(app.config().identifier.as_str(),"com.seekoffer.desktop.d1acceptance"|"com.seekoffer.desktop.d1acceptance20260912"|"com.seekoffer.desktop.recoveryacceptance20261009")}
 pub fn enabled(app:&AppHandle)->bool{isolated(app)&&std::env::args().any(|a|a=="--migration-self-test")}
 #[derive(Deserialize,serde::Serialize)]
 #[serde(deny_unknown_fields,rename_all="camelCase")]

@@ -38,6 +38,7 @@ const packageMetadata = JSON.parse(
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingRoot: projectRoot,
   distDir: isDesktopSurface ? desktopDistDir : '.next-web',
   output: 'export',
   ...(isDesktopSurface ? { devIndicators: false } : {}),

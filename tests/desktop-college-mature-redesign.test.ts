@@ -100,7 +100,7 @@ describe('desktop college mature aligned two-column redesign', () => {
     expect(desktopCardSource).toMatch(/className=\{styles\.noticeLabel\}[\s\S]*?报名通知/);
     expect(desktopCardSource).toContain('<span>条正在报名</span>');
     expect(desktopCardSource).toContain('<time dateTime={stats.latestPublishDate || undefined}>');
-    expect(desktopCardSource).toContain('<span>共 {stats.total} 条</span>');
+    expect(desktopCardSource).toContain("<span>共 {known?stats.total:'—'} 条</span>");
     expect(desktopCardSource).toContain("? '查看报名通知'");
     expect(desktopCardSource).toContain("? '查看历史通知'");
     expect(desktopCardSource).toContain(": '查看全部通知'");

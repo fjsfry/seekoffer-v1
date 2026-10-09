@@ -629,7 +629,7 @@ export function DesktopReminderCenter({
       try {
         const rows = await withReminderSyncTimeout(
           (async () => {
-            if (refreshNotices) {
+            if (refreshNotices && !isD1Backend()) {
               // Public notices use a shared five-minute SWR cache. The timer
               // revalidates only when stale and joins any page-level request.
               await fetchPublicNotices();

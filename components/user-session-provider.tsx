@@ -11,11 +11,13 @@ import {
   watchUserSession,
   type UserSession
 } from '@/lib/user-session';
+import {getDesktopAuthState,watchDesktopAuthState,type DesktopAuthState} from '@/lib/desktop-auth-state';
 
 type UserSessionContextValue = {
   session: UserSession | null;
   ready: boolean;
   authError: string;
+  desktopAuth: DesktopAuthState;
   loggedIn: boolean;
   isMember: boolean;
   refresh: () => Promise<UserSession | null>;
@@ -27,6 +29,9 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
   const [session, setSession] = useState<UserSession | null>(null);
   const [ready, setReady] = useState(false);
   const [authError,setAuthError]=useState('');
+  const [desktopAuth,setDesktopAuth]=useState(getDesktopAuthState);
+
+  useEffect(()=>watchDesktopAuthState(()=>setDesktopAuth(getDesktopAuthState())),[]);
 
   useEffect(() => {
     let active = true;
@@ -99,6 +104,7 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
         session,
         ready,
         authError,
+        desktopAuth,
         loggedIn: isLoggedInSession(session),
         isMember: isMemberSession(session),
         refresh
