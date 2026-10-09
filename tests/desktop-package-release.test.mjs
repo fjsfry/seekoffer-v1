@@ -631,7 +631,7 @@ describe('desktop release packaging guard', () => {
     expect(output).toContain('"cargoLock":"9.9.9"');
   });
 
-  it('keeps the current desktop release metadata aligned at v0.2.23', async () => {
+  it('keeps the current desktop release metadata aligned at v0.2.28', async () => {
     const [packageRaw, packageLockRaw, tauriRaw, cargoTomlRaw, cargoLockRaw, releaseNotes, designQa] =
       await Promise.all([
         readFile(path.join(projectRoot, 'package.json'), 'utf8'),
@@ -639,8 +639,8 @@ describe('desktop release packaging guard', () => {
         readFile(path.join(projectRoot, 'src-tauri/tauri.conf.json'), 'utf8'),
         readFile(path.join(projectRoot, 'src-tauri/Cargo.toml'), 'utf8'),
         readFile(path.join(projectRoot, 'src-tauri/Cargo.lock'), 'utf8'),
-        readFile(path.join(projectRoot, 'docs/releases/desktop-v0.2.22.md'), 'utf8'),
-        readFile(path.join(projectRoot, 'docs/design-qa/desktop-app-v0.2.22.md'), 'utf8')
+        readFile(path.join(projectRoot, 'docs/releases/desktop-v0.2.28.md'), 'utf8'),
+        readFile(path.join(projectRoot, 'docs/design-qa/desktop-app-v0.2.28.md'), 'utf8')
       ]);
 
     const packageJson = JSON.parse(packageRaw);
@@ -653,7 +653,7 @@ describe('desktop release packaging guard', () => {
       /\[\[package\]\]\s*\nname\s*=\s*"seekoffer-desktop"\s*\nversion\s*=\s*"([^"]+)"/
     )?.[1];
 
-    expect(packageJson.version).toBe('0.2.27');
+    expect(packageJson.version).toBe('0.2.28');
     expect(packageLock.version).toBe(packageJson.version);
     expect(packageLock.packages[''].version).toBe(packageJson.version);
     expect(tauriConfig.version).toBe(packageJson.version);
@@ -664,7 +664,7 @@ describe('desktop release packaging guard', () => {
     ]);
     expect(cargoPackageVersion).toBe(packageJson.version);
     expect(cargoLockPackageVersion).toBe(packageJson.version);
-    expect(releaseNotes).toContain('v0.2.22');
-    expect(designQa).toContain('v0.2.22');
+    expect(releaseNotes).toContain('v0.2.28');
+    expect(designQa).toContain('v0.2.28');
   });
 });

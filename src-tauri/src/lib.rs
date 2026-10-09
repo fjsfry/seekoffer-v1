@@ -12,8 +12,8 @@ use tauri::{
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 mod mentor_photo;
-mod native_auth;
 mod native_acceptance;
+mod native_auth;
 
 const MAX_PENDING_TRAY_COMMANDS: usize = 32;
 const DESKTOP_UPDATER_PROGRESS_EVENT: &str = "seekoffer-updater-progress";

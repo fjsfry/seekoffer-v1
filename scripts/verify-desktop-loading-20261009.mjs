@@ -8,7 +8,7 @@ import { chromium } from 'file:///C:/Users/Administrator/.cache/codex-runtimes/c
 // Compiled desktop UI only. Authentication and all HTTP/IPC responses below are
 // synthetic; this does not test native WebView2 or contact production services.
 const directory = path.resolve(process.env.SEEKOFFER_REVIEW_EXPORT || '.next-desktop');
-const output = path.resolve('artifacts/desktop-loading-20261009-browser');
+const output = path.resolve(process.env.SEEKOFFER_REVIEW_OUTPUT || 'artifacts/desktop-loading-20261009-browser');
 fs.mkdirSync(output, { recursive: true });
 assert.ok(fs.existsSync(path.join(directory, 'index.html')), 'Build the desktop export first.');
 const owner = '00000000-0000-4000-8000-000000000009';
