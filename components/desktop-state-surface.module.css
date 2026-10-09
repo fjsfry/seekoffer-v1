@@ -169,14 +169,9 @@
   --state-accent-soft: var(--so-success-soft, var(--so-brand-soft, #eaf5f3));
 }
 
-.loading .icon > svg {
-  animation: desktop-state-spin 900ms linear infinite;
-}
-
-@keyframes desktop-state-spin {
-  to {
-    transform: rotate(360deg);
-  }
+.loading {
+  --state-accent: var(--so-brand, #0f6b61);
+  --state-accent-soft: var(--so-brand-soft, #eaf5f3);
 }
 
 @media (max-width: 720px) {
@@ -198,19 +193,11 @@
   }
 }
 
-:global(html[data-desktop-reduce-motion='true']) .loading .icon > svg {
-  animation: none;
-}
-
 :global(html[data-desktop-reduce-motion='true']) .action :where(button, a) {
   transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .loading .icon > svg {
-    animation: none;
-  }
-
   .action :where(button, a) {
     transition: none;
   }

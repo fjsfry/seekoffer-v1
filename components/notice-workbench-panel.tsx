@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Bell, LoaderCircle, Plus, Save } from 'lucide-react';
 import {
@@ -13,6 +13,7 @@ import {
 import { openAuthModal, writeAuthIntent } from '@/lib/auth-intent';
 import { trackDesktopPendingWrite } from '@/lib/desktop-pending-writes';
 import { useUserSessionState } from '@/hooks/use-user-session';
+import { DesktopLoadingIndicator, DesktopLoadingState } from '@/components/desktop-loading';
 import {
   materialChecklistDefinitions,
   priorityOptions,
@@ -22,6 +23,14 @@ import {
   type UserProjectRecord
 } from '@/lib/mock-data';
 
+const isDesktopSurface = process.env.NEXT_PUBLIC_SEEKOFFER_SURFACE === 'desktop';
+
+function PendingIndicator() {
+  return isDesktopSurface
+    ? <DesktopLoadingIndicator size="small" />
+    : <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />;
+}
+
 export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
   const pathname = usePathname();
   const { loggedIn, ready: sessionReady } = useUserSessionState();
@@ -29,6 +38,10 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [retryToken, setRetryToken] = useState(0);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -41,17 +54,25 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
       if (!loggedIn) {
         if (active) {
           setRow(null);
+          setLoadError('');
+          setActionError('');
           setReady(true);
         }
         return;
       }
 
-      const rows = await fetchApplicationRows();
-      if (active) {
-        const current = rows.find((item) => item.project.id === projectId) || null;
-        setRow(current);
-        setNote(current?.item.myNotes || '');
-        setReady(true);
+      try {
+        const rows = await fetchApplicationRows();
+        if (active) {
+          const current = rows.find((item) => item.project.id === projectId) || null;
+          setRow(current);
+          setNote(current?.item.myNotes || '');
+          setLoadError('');
+        }
+      } catch {
+        if (active) setLoadError('暂时无法读取申请状态，请检查网络后重试。');
+      } finally {
+        if (active) setReady(true);
       }
     };
 
@@ -62,12 +83,15 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
       active = false;
       disposeApplications();
     };
-  }, [loggedIn, projectId, sessionReady]);
+  }, [loggedIn, projectId, sessionReady, retryToken]);
 
   const progress = useMemo(() => row?.item.materialsProgress || 0, [row]);
 
   async function handleJoin() {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
+    setActionError('');
 
     try {
       if (!loggedIn) {
@@ -90,17 +114,22 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
       const current = rows.find((item) => item.project.id === projectId) || null;
       setRow(current);
       setNote(current?.item.myNotes || '');
+    } catch {
+      setActionError('暂未确认加入结果，请刷新状态后重试。');
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
 
   async function handlePatch(patch: Partial<UserProjectRecord>) {
-    if (!row) {
+    if (!row || savingRef.current) {
       return;
     }
 
+    savingRef.current = true;
     setSaving(true);
+    setActionError('');
     try {
       const next = await trackDesktopPendingWrite('notice-project-update', () =>
         updateUserProject(row.item.userProjectId, patch)
@@ -110,7 +139,10 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
         const current = rows.find((item) => item.project.id === projectId) || null;
         setRow(current);
       }
+    } catch {
+      setActionError('暂未确认保存结果，当前备注仍保留，请刷新状态后确认。');
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -124,9 +156,25 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
   }
 
   if (!ready) {
+    if (isDesktopSurface) {
+      return <DesktopLoadingState variant="detail" title="正在读取申请状态" detail="通知内容可以继续查看。" rows={3} compact />;
+    }
     return (
       <section className="surface-card rounded-[32px] p-6 text-sm text-slate-500">
         正在检查申请状态...
+      </section>
+    );
+  }
+
+  if (loadError && !row) {
+    return (
+      <section className="surface-card rounded-[32px] p-6 text-sm text-slate-500">
+        <p role="alert">{loadError}</p>
+        <button type="button" className="mt-4 inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-brand" onClick={() => {
+          setLoadError('');
+          setReady(false);
+          setRetryToken((value) => value + 1);
+        }}>重新加载</button>
       </section>
     );
   }
@@ -141,11 +189,13 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
         <button
           onClick={handleJoin}
           disabled={saving}
+          aria-busy={saving}
           className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white"
         >
-          {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          {saving ? <PendingIndicator /> : <Plus className="h-4 w-4" />}
           登录并加入
         </button>
+        {actionError ? <p role="alert" className="mt-3 text-sm text-rose-600">{actionError}</p> : null}
       </section>
     );
   }
@@ -165,17 +215,19 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
         <button
           onClick={handleJoin}
           disabled={saving}
+          aria-busy={saving}
           className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white"
         >
-          {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          {saving ? <PendingIndicator /> : <Plus className="h-4 w-4" />}
           加入申请
         </button>
+        {actionError ? <p role="alert" className="mt-3 text-sm text-rose-600">{actionError}</p> : null}
       </section>
     );
   }
 
   return (
-    <section className="surface-card rounded-[32px] p-6">
+    <section className="surface-card rounded-[32px] p-6" aria-busy={saving}>
       <div className="flex items-center justify-between gap-3">
         <div className="text-lg font-semibold text-ink">全部申请</div>
         <span className="rounded-full bg-brand-cream px-3 py-1 text-xs font-semibold text-brand">
@@ -183,10 +235,14 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
         </span>
       </div>
 
+      {loadError ? <p role="status" className="mt-3 text-sm text-slate-500">{loadError} 当前申请内容已保留。</p> : null}
+      {actionError ? <p role="alert" className="mt-3 text-sm text-rose-600">{actionError}</p> : null}
+
       <div className="mt-5 grid gap-4">
         <label className="block">
           <div className="mb-2 text-sm font-semibold text-ink">当前状态</div>
           <select
+            disabled={saving}
             value={row.item.myStatus}
             onChange={(event) => void handlePatch({ myStatus: event.target.value as UserProjectRecord['myStatus'] })}
             className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
@@ -202,6 +258,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
         <label className="block">
           <div className="mb-2 text-sm font-semibold text-ink">优先级</div>
           <select
+            disabled={saving}
             value={row.item.priorityLevel}
             onChange={(event) => void handlePatch({ priorityLevel: event.target.value as PriorityLevel })}
             className="w-full rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm outline-none"
@@ -215,6 +272,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
         </label>
 
         <button
+          disabled={saving}
           onClick={() => void handlePatch({ customReminderEnabled: !row.item.customReminderEnabled })}
           className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${
             row.item.customReminderEnabled ? 'bg-brand text-white' : 'bg-slate-100 text-slate-700'
@@ -230,6 +288,7 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
             {materialChecklistDefinitions.map((field) => (
               <button
                 key={field.key}
+                disabled={saving}
                 onClick={() => void toggleChecklist(field.key, row.item[field.key])}
                 className={`rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
                   row.item[field.key] ? 'bg-emerald-50 text-emerald-700' : 'bg-white text-slate-600 shadow-sm'
@@ -255,9 +314,10 @@ export function NoticeWorkbenchPanel({ projectId }: { projectId: string }) {
         <button
           onClick={saveNote}
           disabled={saving}
+          aria-busy={saving}
           className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white"
         >
-          {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          {saving ? <PendingIndicator /> : <Save className="h-4 w-4" />}
           保存到全部申请
         </button>
       </div>

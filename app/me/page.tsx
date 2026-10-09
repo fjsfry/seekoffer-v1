@@ -25,6 +25,8 @@ import {
 import {prepareExplicitD1SignInRetry} from '@/lib/clerk-d1-session';
 import { LoginRequiredCard } from '@/components/login-required-card';
 import { SiteShell } from '@/components/site-shell';
+import { DesktopLoadingState } from '@/components/desktop-loading';
+import { resolveWorkspaceReadStatus, type DesktopWorkspaceReadStatus } from '@/components/desktop-workspace-status';
 import { useUserSessionState } from '@/hooks/use-user-session';
 import { beginDesktopPendingWrite, trackDesktopPendingWrite } from '@/lib/desktop-pending-writes';
 import { emitDesktopSyncStatus } from '@/lib/desktop-route-events';
@@ -252,6 +254,7 @@ function MePageContent() {
   const [localWorkbenchOwnerId, setLocalWorkbenchOwnerId] = useState('');
   const [todoSyncOwnerId, setTodoSyncOwnerId] = useState('');
   const [todoSyncReady, setTodoSyncReady] = useState(false);
+  const [workbenchRead, setWorkbenchRead] = useState<{ ownerId: string; status: DesktopWorkspaceReadStatus }>({ ownerId: '', status: 'loading' });
   const [workbenchSyncStatus, setWorkbenchSyncStatus] = useState<WorkbenchSyncStatus>('local');
   const [lastSyncedAt, setLastSyncedAt] = useState('');
   const [syncRetryNonce, setSyncRetryNonce] = useState(0);
@@ -316,11 +319,13 @@ function MePageContent() {
       setTodoSyncOwnerId('');
       setTodoSyncReady(false);
       setWorkbenchSyncStatus('local');
+      setWorkbenchRead({ ownerId: '', status: 'ready' });
       return () => undefined;
     }
 
     let active = true;
     setTodoSyncReady(false);
+    setWorkbenchRead({ ownerId: syncableUserId, status: 'loading' });
     setWorkbenchSyncStatus('syncing');
 
     const hydrateRemoteState = async () => {
@@ -347,9 +352,13 @@ function MePageContent() {
         setWorkbenchSyncStatus('local');
         setTodoSyncOwnerId(syncableUserId);
         setTodoSyncReady(true);
+        setWorkbenchRead({ ownerId: syncableUserId, status: 'ready' });
       } catch (error) {
         console.error('[Seekoffer][workbench] hydrate workbench state failed', error);
-        if (active) setWorkbenchSyncStatus('error');
+        if (active) {
+          setWorkbenchSyncStatus('error');
+          setWorkbenchRead({ ownerId: syncableUserId, status: 'error' });
+        }
       }
     };
 
@@ -610,8 +619,19 @@ function MePageContent() {
     setSyncRetryNonce((current) => current + 1);
   }
 
+  const readStatus = resolveWorkspaceReadStatus({
+    ownerId: profileOwnerId,
+    localOwnerId: localWorkbenchOwnerId,
+    remoteOwnerId: workbenchRead.ownerId,
+    remoteStatus: workbenchRead.status,
+    requiresRemote: Boolean(syncableUserId)
+  });
+
   if (!activeSection) return null;
-  if (!ready || !loggedIn) {
+  if (!ready || (loggedIn && localWorkbenchOwnerId !== profileOwnerId)) {
+    return <SiteShell><DesktopLoadingState variant={activeSection} title={activeSection === 'schedule' ? '正在读取日程与提醒' : '正在读取导师联系'} detail="正在恢复当前账号的工作区。" /></SiteShell>;
+  }
+  if (!loggedIn) {
     return (
       <SiteShell>
         <LoginRequiredCard
@@ -643,6 +663,7 @@ function MePageContent() {
           onDoneChange={handleScheduleDoneChange}
           onClearCompleted={handleClearCompleted}
           syncStatus={workbenchSyncStatus}
+          readStatus={readStatus}
           lastSyncedAt={lastSyncedAt}
           onRetrySync={handleRetrySync}
           contextOwner={profileOwnerId}
@@ -678,6 +699,7 @@ function MePageContent() {
           onContactChange={handleContactChange}
           onDeleteContact={handleDeleteContact}
           syncStatus={workbenchSyncStatus}
+          readStatus={readStatus}
           lastSyncedAt={lastSyncedAt}
           onRetrySync={handleRetrySync}
           contextOwner={profileOwnerId}
@@ -692,9 +714,7 @@ export default function MePage() {
     <Suspense
       fallback={(
         <SiteShell>
-          <section className="product-card rounded-[30px] px-6 py-12 text-center text-sm text-slate-500" role="status">
-            正在加载日程与导师联系…
-          </section>
+          <DesktopLoadingState variant="schedule" title="正在打开工作区" detail="准备日程与导师联系。" />
         </SiteShell>
       )}
     >

@@ -26,12 +26,17 @@ describe('desktop product layout contract', () => {
   it('keeps loading and empty panes intentional without shimmer or duplicate announcements', async () => {
     const homeSource = await readSource('components/desktop-home.tsx');
     const noticesSource = await readSource('app/notices/page.tsx');
-    const css = await readSource('app/desktop-mchose.css');
+    const loadingSource = await readSource('components/desktop-loading.tsx');
+    const loadingCss = await readSource('components/desktop-loading.module.css');
 
-    expect(homeSource).toContain('className="desktop-inspector-loading"');
-    expect(homeSource).toContain('className="desktop-workbench-loading-state"');
+    expect(homeSource).toContain('variant="detail"');
+    expect(homeSource).toContain('showHeading={false}');
+    expect(homeSource).toContain('variant="applications"');
+    expect(homeSource).toContain('const initialLoading = loading && applications.length === 0');
     expect(homeSource).not.toContain('desktop-workbench-skeleton');
-    expect(css).toContain('.desktop-inspector-loading-icon');
+    expect(loadingSource).toContain("role={showHeading ? 'status' : undefined}");
+    expect(loadingSource).toContain('aria-hidden={!showHeading || undefined}');
+    expect(loadingCss).not.toContain('gradient');
     expect(noticesSource).toContain('function NoticeLoadingState()');
     expect(noticesSource).toContain('aria-busy="true"');
     expect(noticesSource).toContain('aria-hidden="true"');

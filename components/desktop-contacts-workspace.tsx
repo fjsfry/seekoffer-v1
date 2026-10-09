@@ -31,8 +31,11 @@ import {
   type RefObject
 } from 'react';
 import { DesktopConfirmDialog } from '@/components/desktop-confirm-dialog';
+import { DesktopLoadingIndicator } from '@/components/desktop-loading';
 import {
+  DesktopWorkspaceReadFeedback,
   DesktopWorkspaceStatus,
+  type DesktopWorkspaceReadStatus,
   type DesktopWorkspaceSyncStatus
 } from '@/components/desktop-workspace-status';
 import type { WorkbenchMentorContact } from '@/lib/workbench-state';
@@ -230,6 +233,7 @@ export function DesktopContactsWorkspace({
   onContactChange,
   onDeleteContact,
   syncStatus,
+  readStatus = 'ready',
   lastSyncedAt,
   onRetrySync,
   contextOwner
@@ -255,10 +259,12 @@ export function DesktopContactsWorkspace({
   onContactChange: <K extends keyof DesktopMentorContact>(id: string, key: K, value: DesktopMentorContact[K]) => void;
   onDeleteContact: (id: string) => void;
   syncStatus: DesktopWorkspaceSyncStatus;
+  readStatus?: DesktopWorkspaceReadStatus;
   lastSyncedAt?: string;
   onRetrySync: () => void;
   contextOwner: string;
 }) {
+  const initialReadStatus = totalCount > 0 || contacts.length > 0 ? 'ready' : readStatus;
   const contextKey = `seekoffer:desktop:contacts-context:v2:${encodeURIComponent(contextOwner)}`;
   const listRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -705,11 +711,11 @@ export function DesktopContactsWorkspace({
             <h1 id="contacts-page-title" className={`${styles.pageTitle} desktop-page-header-title`}>导师联系</h1>
           </div>
           <p className={`${styles.pageSummary} desktop-page-header-subtitle`}>
-            共 {summary.total} 位 · 需跟进 {summary.followUp} 位
+            {initialReadStatus === 'ready' ? <>共 {summary.total} 位 · 需跟进 {summary.followUp} 位</> : initialReadStatus === 'error' ? '暂时未能读取云端联系人' : '正在读取导师联系人…'}
           </p>
         </div>
         <div className={`${styles.headerActions} desktop-page-header-actions`}>
-          <DesktopWorkspaceStatus status={syncStatus} lastSyncedAt={lastSyncedAt} onRetry={onRetrySync} />
+          <DesktopWorkspaceStatus status={syncStatus} initialReadStatus={initialReadStatus} lastSyncedAt={lastSyncedAt} onRetry={onRetrySync} />
           <button
             ref={headerCreateButtonRef}
             type="button"
@@ -797,7 +803,9 @@ export function DesktopContactsWorkspace({
           </div>
 
           <div ref={listRef} className={`${styles.masterScroll} desktop-contacts-list`} role="list" aria-label="导师联系人" onScroll={persistScrollContext}>
-            {contacts.length ? contacts.map((contact) => (
+            {initialReadStatus !== 'ready' ? (
+              <DesktopWorkspaceReadFeedback kind="contacts" status={initialReadStatus} onRetry={onRetrySync} />
+            ) : contacts.length ? contacts.map((contact) => (
               <div
                 key={contact.id}
                 ref={(node) => {
@@ -1443,7 +1451,7 @@ function ContactAvatar({
           />
         </>
       ) : fallback}
-      {loading ? <span className={styles.contactPhotoLoadingIndicator} aria-hidden="true" /> : null}
+      {loading ? <DesktopLoadingIndicator size="small" className={styles.contactPhotoLoadingIndicator} /> : null}
     </span>
   );
 }
@@ -1521,9 +1529,10 @@ function MentorHomepageField({
         className={styles.mentorPhotoStatus}
         data-phase={state.phase}
         aria-live="polite"
+        aria-busy={state.phase === 'loading'}
       >
         {state.phase === 'loading' ? (
-          <><span className={styles.mentorPhotoSpinner} aria-hidden="true" /><span>{state.message}</span></>
+          <><DesktopLoadingIndicator size="small" delayed /><span>{state.message}</span></>
         ) : state.phase === 'candidate' ? (
           <div className={styles.mentorPhotoCandidate}>
             {/* Native validation bounds the candidate bytes and dimensions before this preview. */}

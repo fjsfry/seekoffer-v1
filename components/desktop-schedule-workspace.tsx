@@ -37,8 +37,11 @@ import {
   type RefObject
 } from 'react';
 import { DesktopConfirmDialog } from '@/components/desktop-confirm-dialog';
+import { DesktopLoadingIndicator } from '@/components/desktop-loading';
 import {
+  DesktopWorkspaceReadFeedback,
   DesktopWorkspaceStatus,
+  type DesktopWorkspaceReadStatus,
   type DesktopWorkspaceSyncStatus
 } from '@/components/desktop-workspace-status';
 import {
@@ -266,6 +269,7 @@ export function DesktopScheduleWorkspace({
   onDoneChange,
   onClearCompleted,
   syncStatus,
+  readStatus = 'ready',
   lastSyncedAt,
   onRetrySync,
   contextOwner
@@ -287,11 +291,13 @@ export function DesktopScheduleWorkspace({
   onDoneChange: (id: string, done: boolean) => void;
   onClearCompleted: () => void;
   syncStatus: DesktopWorkspaceSyncStatus;
+  readStatus?: DesktopWorkspaceReadStatus;
   lastSyncedAt?: string;
   onRetrySync: () => void;
   contextOwner: string;
 }) {
   const today = getTodayDateString();
+  const initialReadStatus = totalCount > 0 ? 'ready' : readStatus;
   const contextKey = `seekoffer:desktop:schedule-context:v2:${encodeURIComponent(contextOwner)}`;
   const listRef = useRef<HTMLDivElement>(null);
   const scrollTopRef = useRef(0);
@@ -608,11 +614,11 @@ export function DesktopScheduleWorkspace({
             <h1 id="schedule-page-title" className={`${styles.pageTitle} desktop-page-header-title`}>日程与提醒</h1>
           </div>
           <p className={`${styles.pageSummary} desktop-page-header-subtitle`}>
-            未完成 {unfinishedCount} 项 · 待安排 {unplannedCount} 项
+            {initialReadStatus === 'ready' ? <>未完成 {unfinishedCount} 项 · 待安排 {unplannedCount} 项</> : initialReadStatus === 'error' ? '暂时未能读取云端日程' : '正在读取日程安排…'}
           </p>
         </div>
         <div className={`${styles.headerActions} desktop-page-header-actions`}>
-          <DesktopWorkspaceStatus status={syncStatus} lastSyncedAt={lastSyncedAt} onRetry={onRetrySync} />
+          <DesktopWorkspaceStatus status={syncStatus} initialReadStatus={initialReadStatus} lastSyncedAt={lastSyncedAt} onRetry={onRetrySync} />
           <button
             ref={headerCreateButtonRef}
             type="button"
@@ -647,7 +653,7 @@ export function DesktopScheduleWorkspace({
                 >
                   <ChevronLeft20Regular aria-hidden="true" />
                 </button>
-                <span className={styles.monthTitle}>{formatMonthTitle(calendarMonth)} · {monthCount} 项</span>
+                <span className={styles.monthTitle}>{formatMonthTitle(calendarMonth)} · {initialReadStatus === 'ready' ? monthCount : '—'} 项</span>
                 <button
                   type="button"
                   className={styles.iconButton}
@@ -775,7 +781,7 @@ export function DesktopScheduleWorkspace({
             ) : null}
           </div>
 
-          <div className={styles.scheduleContentGrid} data-view-mode={effectiveViewMode}>
+          <div className={styles.scheduleContentGrid} data-view-mode={effectiveViewMode} data-read-status={initialReadStatus}>
             <div
               ref={listRef}
               className={`${styles.masterScroll} desktop-schedule-list`}
@@ -783,7 +789,9 @@ export function DesktopScheduleWorkspace({
               aria-label="日程事项"
               onScroll={persistScrollContext}
             >
-            {effectiveViewMode === 'quadrant' ? (
+            {initialReadStatus !== 'ready' ? (
+              <DesktopWorkspaceReadFeedback kind="schedule" status={initialReadStatus} onRetry={onRetrySync} />
+            ) : effectiveViewMode === 'quadrant' ? (
               <ScheduleQuadrantBoard
                 items={visibleItems}
                 selectedId={selectedId}
@@ -929,7 +937,7 @@ export function DesktopScheduleWorkspace({
             )}
             </div>
 
-            {isDesktopSurface && effectiveViewMode === 'list' ? (
+            {isDesktopSurface && effectiveViewMode === 'list' && initialReadStatus === 'ready' ? (
               <aside className={styles.scheduleSummaryRail} aria-label="日程概览与快捷操作">
                 <section className={styles.scheduleSummaryCard}>
                   <header className={styles.scheduleSummaryHeader}>
@@ -1056,7 +1064,7 @@ export function DesktopScheduleWorkspace({
             </button>
             <div className={styles.detailHeading}>
               <h2 className={styles.detailTitle}>{detailHeaderTitle}</h2>
-              <p className={styles.detailSubtitle}>{detailHeaderSubtitle}</p>
+              <p className={styles.detailSubtitle}>{!createMode && initialReadStatus !== 'ready' ? '云端日程尚未读取' : detailHeaderSubtitle}</p>
             </div>
             {!isDesktopSurface ? <button type="button" className={styles.secondaryButton} onClick={(event) => startCreate(event.currentTarget)}>
               <Add20Regular aria-hidden="true" />
@@ -1065,7 +1073,7 @@ export function DesktopScheduleWorkspace({
           </div>
 
           <div className={styles.detailScroll}>
-            {!isDesktopSurface || !createMode ? <section className={styles.detailSection}>
+            {initialReadStatus === 'ready' && (!isDesktopSurface || !createMode) ? <section className={styles.detailSection}>
               <div className={styles.sectionHeader}>
                 <div>
                   <h3 className={styles.sectionTitle}>当天事项</h3>
@@ -1167,13 +1175,13 @@ export function DesktopScheduleWorkspace({
                     return Boolean(id);
                   }}
                 />
-              ) : (
+              ) : initialReadStatus === 'ready' ? (
                 <ScheduleIdleState
                   selectedDate={selectedDate}
                   selectedDayCount={selectedDayItems.length}
                   onCreate={() => startCreate()}
                 />
-              )}
+              ) : null}
             </section>
 
             {!createMode && items.some((item) => item.done) ? (
@@ -1257,6 +1265,7 @@ function ScheduleCreateForm({
   const [note, setNote] = useState('');
   const [submitState, setSubmitState] = useState<ScheduleSubmitState>('idle');
   const submitTimerRef = useRef<number | null>(null);
+  const submittingRef = useRef(false);
 
   useEffect(() => setDate(selectedDate), [selectedDate]);
   useEffect(() => () => {
@@ -1265,11 +1274,13 @@ function ScheduleCreateForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submittingRef.current) return;
     const text = title.trim();
     if (!text) {
       setSubmitState('error');
       return;
     }
+    submittingRef.current = true;
     setSubmitState('saving');
     submitTimerRef.current = window.setTimeout(() => {
       try {
@@ -1283,6 +1294,8 @@ function ScheduleCreateForm({
         setNote('');
       } catch {
         setSubmitState('error');
+      } finally {
+        submittingRef.current = false;
       }
     }, 0);
   }
@@ -1352,8 +1365,8 @@ function ScheduleCreateForm({
           {submitState === 'error' ? '保存失败，请检查标题后重试' : submitState === 'success' ? '已保存' : ''}
         </span>
         {isDesktopSurface ? <button type="button" className={styles.secondaryButton} onClick={onCancel}>取消</button> : null}
-        <button type="submit" className={styles.primaryButton} disabled={submitState === 'saving'} aria-busy={submitState === 'saving'}>
-          <Add20Regular aria-hidden="true" />
+        <button type="submit" className={`${styles.primaryButton} ${styles.saveButton}`} disabled={submitState === 'saving'} aria-busy={submitState === 'saving'}>
+          {submitState === 'saving' ? <DesktopLoadingIndicator size="small" /> : <Add20Regular aria-hidden="true" />}
           {submitState === 'saving' ? '保存中…' : submitState === 'error' ? '重试保存' : '保存日程'}
         </button>
       </div>
@@ -1381,6 +1394,7 @@ function ScheduleEditForm({
   const [done, setDone] = useState(item.done);
   const [submitState, setSubmitState] = useState<ScheduleSubmitState>('idle');
   const submitTimerRef = useRef<number | null>(null);
+  const submittingRef = useRef(false);
 
   useEffect(() => () => {
     if (submitTimerRef.current !== null) window.clearTimeout(submitTimerRef.current);
@@ -1388,10 +1402,12 @@ function ScheduleEditForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submittingRef.current) return;
     if (!title.trim()) {
       setSubmitState('error');
       return;
     }
+    submittingRef.current = true;
     setSubmitState('saving');
     submitTimerRef.current = window.setTimeout(() => {
       try {
@@ -1401,6 +1417,8 @@ function ScheduleEditForm({
         submitTimerRef.current = window.setTimeout(() => setSubmitState('idle'), 1400);
       } catch {
         setSubmitState('error');
+      } finally {
+        submittingRef.current = false;
       }
     }, 0);
   }
@@ -1483,8 +1501,8 @@ function ScheduleEditForm({
           <Delete20Regular aria-hidden="true" />
           删除
         </button>
-        <button type="submit" className={styles.primaryButton} disabled={submitState === 'saving'} aria-busy={submitState === 'saving'}>
-          <Checkmark20Regular aria-hidden="true" />
+        <button type="submit" className={`${styles.primaryButton} ${styles.saveButton}`} disabled={submitState === 'saving'} aria-busy={submitState === 'saving'}>
+          {submitState === 'saving' ? <DesktopLoadingIndicator size="small" /> : <Checkmark20Regular aria-hidden="true" />}
           {submitState === 'saving' ? '保存中…' : submitState === 'success' ? '已保存' : submitState === 'error' ? '重试保存' : '保存修改'}
         </button>
       </div>

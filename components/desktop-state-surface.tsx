@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { DesktopLoadingIndicator } from './desktop-loading';
 import styles from './desktop-state-surface.module.css';
 
 export type DesktopStateSurfaceVariant = 'section' | 'full' | 'inline';
@@ -52,7 +53,7 @@ export function DesktopStateSurface({
       data-desktop-state-tone={tone}
     >
       <span className={styles.icon} aria-hidden="true">
-        {icon}
+        {loading ? <DesktopLoadingIndicator size={variant === 'inline' ? 'small' : 'medium'} /> : icon}
       </span>
       <span className={styles.copy}>
         <strong className={styles.title}>{title}</strong>

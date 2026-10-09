@@ -33,7 +33,7 @@
       }
 
       :root {
-        --splash-canvas: #eef0f4;
+        --splash-canvas: #ffffff;
         --splash-surface: #ffffff;
         --splash-border: #c9d0d6;
         --splash-card-border: #dde2e6;
@@ -42,11 +42,10 @@
         --splash-text-tertiary: #8b949e;
         --splash-spinner-track: #dde2e6;
         --splash-brand: #137765;
-        --splash-shadow: 0 8px 26px rgba(29, 43, 50, 0.1);
       }
 
       :root[data-desktop-theme="dark"] {
-        --splash-canvas: #101615;
+        --splash-canvas: #18201f;
         --splash-surface: #18201f;
         --splash-border: #2d3a37;
         --splash-card-border: #43534f;
@@ -55,7 +54,6 @@
         --splash-text-tertiary: #899a95;
         --splash-spinner-track: #35443f;
         --splash-brand: #7bcdbd;
-        --splash-shadow: 0 14px 36px rgba(0, 0, 0, 0.34);
       }
 
       html,
@@ -79,56 +77,54 @@
       main {
         display: flex;
         width: min(100%, 340px);
-        min-height: 224px;
+        min-height: 250px;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 28px 34px 26px;
-        border: 1px solid var(--splash-card-border);
-        border-radius: 12px;
+        padding: 24px;
         background: var(--splash-surface);
-        box-shadow: var(--splash-shadow);
         text-align: center;
       }
 
       img {
         display: block;
-        width: 58px;
-        height: 58px;
+        width: 64px;
+        height: 64px;
         overflow: hidden;
-        border: 1px solid #ebe5d9;
-        border-radius: 12px;
+        border: 1px solid var(--splash-card-border);
+        border-radius: 14px;
+        background: #ffffff;
         object-fit: contain;
       }
 
       h1 {
-        margin: 12px 0 0;
-        font-size: 19px;
+        margin: 14px 0 0;
+        font-size: 20px;
         font-weight: 600;
-        letter-spacing: -0.01em;
-        line-height: 29px;
+        letter-spacing: -0.02em;
+        line-height: 28px;
       }
 
       p {
-        margin: 17px 0 0;
+        margin: 20px 0 0;
         color: var(--splash-text-secondary);
         font-size: 13px;
         line-height: 20px;
       }
 
       .progress {
-        position: relative;
-        width: 22px;
-        height: 22px;
-        margin-top: 12px;
-        border: 2px solid var(--splash-spinner-track);
-        border-top-color: var(--splash-brand);
-        border-radius: 50%;
-        animation: spin 900ms linear infinite;
+        display: block;
+        width: 30px;
+        height: 30px;
+        margin-top: 16px;
+        color: var(--splash-brand);
+        animation: spin 1050ms linear infinite;
       }
 
-      .progress span {
-        display: none;
+      .progress svg {
+        display: block;
+        width: 100%;
+        height: 100%;
       }
 
       small {
@@ -156,12 +152,17 @@
     </style>
   </head>
   <body>
-    <main aria-labelledby="splash-title">
+    <main aria-labelledby="splash-title" aria-busy="true">
       <img src="./desktop/seekoffer-mark.png" alt="" />
       <h1 id="splash-title">寻鹿 SeekOffer</h1>
-      <p role="status">正在启动寻鹿</p>
-      <div class="progress" aria-hidden="true"><span></span></div>
-      <small>正在准备申请项目与提醒</small>
+      <p role="status" aria-live="polite">正在启动寻鹿</p>
+      <div class="progress" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" focusable="false" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" opacity="0.16" />
+          <path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+      </div>
+      <small>正在准备你的工作区</small>
     </main>
   </body>
 </html>

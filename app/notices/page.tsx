@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { ApplicationActionButton } from '@/components/application-action-button';
 import { DesktopStateSurface } from '@/components/desktop-state-surface';
+import { DesktopLoadingIndicator, DesktopLoadingState } from '@/components/desktop-loading';
 import { ExternalSiteMark } from '@/components/external-site-mark';
 import { SiteShell } from '@/components/site-shell';
 import { DeadlineBadge } from '@/components/status-badge';
@@ -809,6 +810,7 @@ function NoticesPageContent() {
   }, [filterValues, nativeQueryKey, requestedPage, reloadToken, composing]);
   const visiblePages = getVisiblePages(currentPage, totalPages);
   const isNoticeLoading = nativeData ? !nativeResult && (isLoading || nativeSnapshot.key !== nativeQueryKey) : isLoading && projects.length === 0;
+  const showRefreshActivity = isRefreshing && (!isDesktopSurface || !isNoticeLoading);
   const aggregateUnavailable = nativeData && (!nativeResult || nativeResult.metadataStale || nativeResult.stale);
   const latestPublishDate = nativeData?nativeResult?.sideData.latestPublishDate??'':projects.reduce((latest,item)=>item.publishDate>latest?item.publishDate:latest,'');
 
@@ -999,10 +1001,15 @@ function NoticesPageContent() {
           type="button"
           onClick={refreshLatestNotices}
           disabled={isLoading || isRefreshing}
+          aria-busy={showRefreshActivity}
           className="desktop-notice-toolbar-action inline-flex items-center gap-2 text-sm font-semibold text-brand transition hover:text-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          {isRefreshing ? '刷新中' : '刷新最新'}
+          {isDesktopSurface && showRefreshActivity ? (
+            <DesktopLoadingIndicator size="small" />
+          ) : (
+            <RefreshCw className={`h-4 w-4 ${showRefreshActivity ? 'animate-spin' : ''}`} aria-hidden="true" />
+          )}
+          {showRefreshActivity ? '刷新中' : '刷新最新'}
         </button>
         <button onClick={resetFilters} className="desktop-notice-toolbar-action inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-brand">
           <RefreshCw className="h-4 w-4" />
@@ -1524,6 +1531,17 @@ function SideCard({
 }
 
 function NoticeLoadingState() {
+  if (isDesktopSurface) {
+    return (
+      <DesktopLoadingState
+        variant="notices"
+        title="正在同步通知"
+        detail="正在获取最新院校通知，当前筛选会保留。"
+        rows={4}
+      />
+    );
+  }
+
   return (
     <div
       className="desktop-notice-loading"
@@ -1571,6 +1589,9 @@ function SideLoadingState({
   icon: ComponentType<{ className?: string; strokeWidth?: number; 'aria-hidden'?: boolean | 'true' | 'false' }>;
   label: string;
 }) {
+  if (isDesktopSurface) {
+    return <DesktopLoadingState variant="detail" title={label} rows={2} compact showHeading={false} />;
+  }
   return (
     <div
       className="desktop-notice-side-loading flex min-h-24 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-4"

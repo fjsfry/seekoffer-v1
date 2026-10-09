@@ -113,6 +113,7 @@ import {
 } from '@/lib/notice-display';
 import { QQ_GROUP_NUMBER, QQ_GROUP_URL } from '@/lib/contact';
 import { DesktopHome } from './desktop-home';
+import { DesktopLoadingIndicator, DesktopLoadingState } from './desktop-loading';
 import {
   DesktopWindowControls,
   useDesktopTitlebarDrag
@@ -126,40 +127,49 @@ const DesktopReminderCenter = dynamic(
 );
 const DesktopSettingsPage = dynamic(
   () => import('./desktop-settings-page').then((module) => module.DesktopSettingsPage),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => <DesktopRouteLoading title="设置" detail="正在打开桌面偏好设置。" variant="settings" />
+  }
 );
 const DesktopToday = dynamic(
   () => import('./desktop-today').then((module) => module.DesktopToday),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => <DesktopRouteLoading title="我的一天" detail="正在打开日程视图。" variant="schedule" />
+  }
 );
 const DesktopResourceCenter = dynamic(
   () => import('@/app/resources/desktop-resource-center'),
   {
     ssr: false,
-    loading: () => (
-      <main id="main-content" tabIndex={-1} className="desktop-route-content desktop-focus-region">
-        <section className="desktop-route-loading" role="status" aria-live="polite">
-          <strong>正在加载资源中心</strong>
-          <p>正在整理申请资料、官方入口和常用工具。</p>
-        </section>
-      </main>
-    )
+    loading: () => <DesktopRouteLoading title="资源中心" detail="正在打开申请资料、官方入口和常用工具。" variant="resources" />
   }
 );
 const DesktopGuide = dynamic(
   () => import('@/app/guide/desktop-help-center'),
   {
     ssr: false,
-    loading: () => (
-      <main id="main-content" tabIndex={-1} className="desktop-route-content desktop-focus-region">
-        <section className="desktop-route-loading" role="status" aria-live="polite">
-          <strong>正在加载帮助与反馈</strong>
-          <p>正在整理常用帮助、问题答案和联系支持。</p>
-        </section>
-      </main>
-    )
+    loading: () => <DesktopRouteLoading title="帮助与反馈" detail="正在打开使用帮助和联系支持。" variant="help" />
   }
 );
+
+function DesktopRouteLoading({ title, detail, variant }: {
+  title: string;
+  detail: string;
+  variant: 'settings' | 'schedule' | 'resources' | 'help';
+}) {
+  return (
+    <main id="main-content" tabIndex={-1} className="desktop-route-content desktop-core-page desktop-core-page--scroll desktop-focus-region">
+      <header className="desktop-core-page-header desktop-page-header desktop-page-header--directory">
+        <div className="desktop-page-header-copy">
+          <div className="desktop-page-header-title-row"><h1 className="desktop-page-header-title">{title}</h1></div>
+        </div>
+      </header>
+      <DesktopLoadingState variant={variant} title={`正在打开${title}`} detail={detail} rows={4} />
+    </main>
+  );
+}
 
 type DesktopNavItem = {
   label: string;
@@ -2230,7 +2240,7 @@ export function DesktopAppShell({ children }: { children: ReactNode }) {
             ) : feedbackState === 'undo' ? (
               <Undo2 />
             ) : feedbackState === 'pending' ? (
-              <RefreshCw className="desktop-feedback-pending-icon" />
+              <DesktopLoadingIndicator size="small" />
             ) : (
               <Alert20Regular />
             )}
@@ -2362,7 +2372,10 @@ export function DesktopAppShell({ children }: { children: ReactNode }) {
               ) : (
                 <div className="desktop-command-empty">
                   {commandApplicationsLoading ? (
-                    '正在读取你的申请项目…'
+                    <span role="status" aria-busy="true" className="inline-flex items-center gap-2">
+                      <DesktopLoadingIndicator size="small" />
+                      正在读取你的申请项目…
+                    </span>
                   ) : commandApplicationsError ? (
                     <div role="alert" className="desktop-command-error">
                       <span>{commandApplicationsError}</span>

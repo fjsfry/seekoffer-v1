@@ -1,0 +1,146 @@
+.startupShell {
+  color: var(--so-text, #1f2329);
+  background: var(--so-surface, #fff);
+}
+
+.startupStage {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(min-content, 1fr) auto;
+  justify-items: center;
+  overflow: auto;
+  padding: 40px 24px 24px;
+  background: var(--so-surface, #fff);
+}
+
+.startupContent {
+  display: flex;
+  width: min(100%, 440px);
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  align-self: center;
+  text-align: center;
+}
+
+.startupMark {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  overflow: hidden;
+  border: 1px solid var(--so-border, #e4e7eb);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.startupWordmark {
+  margin: 14px 0 0;
+  color: var(--so-text, #1f2329);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  letter-spacing: -0.02em;
+}
+
+.startupTitle {
+  margin: 26px 0 0;
+  color: var(--so-text, #1f2329);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.startupDescription {
+  margin: 6px 0 0;
+  color: var(--so-text-secondary, #626b75);
+  font-size: 13px;
+  line-height: 22px;
+}
+
+.startupFeedback {
+  display: flex;
+  min-height: 78px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+  color: var(--so-text-secondary, #626b75);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.startupFeedback > span:first-child {
+  color: var(--so-brand, #137765);
+}
+
+.startupRecovery {
+  display: flex;
+  min-height: 96px;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding-top: 12px;
+  color: var(--so-text-secondary, #626b75);
+  font-size: 13px;
+  line-height: 22px;
+}
+
+.startupRecovery p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.startupRecovery button {
+  min-height: 36px;
+  padding: 6px 16px;
+  border: 1px solid var(--so-border-strong, #c9d0d6);
+  border-radius: 7px;
+  color: var(--so-text, #1f2329);
+  background: var(--so-surface, #fff);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 167ms ease, border-color 167ms ease;
+}
+
+.startupRecovery button:hover:not(:disabled) {
+  border-color: var(--so-brand, #137765);
+  background: var(--so-surface-hover, #f3f5f6);
+}
+
+.startupRecovery button:focus-visible {
+  outline: 2px solid var(--so-brand, #137765);
+  outline-offset: 3px;
+}
+
+.startupRecovery button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.startupFootnote {
+  margin: 20px 0 0;
+  color: var(--so-text-tertiary, #8b949e);
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+}
+
+@media (max-height: 540px) {
+  .startupStage {
+    padding-top: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startupRecovery button {
+    transition: none;
+  }
+}
+
+:global(html[data-desktop-reduce-motion='true']) .startupRecovery button {
+  transition: none;
+}

@@ -80,7 +80,7 @@ describe('desktop shell contract', () => {
     expect(rustSource).toContain('"quit-app" => app.exit(0)');
     expect(splashSource).toContain('./desktop/seekoffer-mark.png');
     expect(splashSource).toContain('正在启动寻鹿');
-    expect(splashSource).toContain('animation: spin 900ms linear infinite');
+    expect(splashSource).toContain('animation: spin 1050ms linear infinite');
     expect(splashSource).toContain('transform: rotate(360deg)');
     expect(splashSource).not.toContain('translateX(');
     expect(splashSource).not.toContain('_next');
@@ -947,11 +947,13 @@ describe('desktop shell contract', () => {
     expect(todaySource).not.toContain('/me?view=applications');
     expect(reminderSource).not.toContain('/me?view=applications');
 
-    expect(homeSource).toContain('desktop-workbench-loading-state');
+    expect(homeSource).toContain('<DesktopLoadingState');
+    expect(homeSource).toContain('variant="applications"');
+    expect(homeSource).toContain('showHeading={false}');
     expect(homeSource).toContain('正在同步申请');
     expect(homeSource).toContain('正在读取项目、材料与截止时间');
     expect(homeSource).not.toContain('desktop-workbench-loading-scope');
-    expect(homeSource).toContain('aria-busy="true"');
+    expect(homeSource).toContain('aria-busy={loading}');
     expect(homeSource).not.toContain('desktop-workbench-skeleton');
     expect(homeSource).not.toContain('正在加载工作区');
     expect(homeSource).toContain('hasHardLoadError');

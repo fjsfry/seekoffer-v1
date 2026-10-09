@@ -73,7 +73,9 @@ describe('desktop auth and settings token consistency', () => {
     expect(loginSource).toContain('aria-busy={desktopSubmitBusy}');
     expect(loginSource).toContain("data-feedback-state={desktopSubmitBusy ? 'pending' : 'idle'}");
     expect(startupSource).toContain('data-startup-phase={phase}');
-    expect(startupSource).toContain('role="progressbar"');
+    expect(startupSource).toContain('role="status"');
+    expect(startupSource).toContain('<DesktopLoadingIndicator');
+    expect(startupSource).not.toContain('role="progressbar"');
     expect(startupSource).toContain('aria-busy={retrying}');
     expect(settingsSource).toContain('data-settings-category={activeCategory}');
     expect(settingsSource).toContain("data-state={active ? 'active' : 'idle'}");

@@ -55,6 +55,10 @@ describe('shared desktop state surface', () => {
     stylesheet.walkAtRules('media', (rule) => {
       if (rule.params.includes('prefers-reduced-motion')) reducedMotionRules.push(rule.toString());
     });
-    expect(reducedMotionRules.join('\n')).toContain('animation: none');
+    expect(reducedMotionRules.join('\n')).toContain('transition: none');
+    expect(componentSource).toContain('<DesktopLoadingIndicator');
+    const loadingCss = readFileSync(resolve(projectRoot, 'components/desktop-loading.module.css'), 'utf8');
+    expect(loadingCss).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(loadingCss).toContain('.rotor, .delayed { animation: none; }');
   });
 });

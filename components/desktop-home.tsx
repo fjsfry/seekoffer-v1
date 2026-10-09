@@ -39,6 +39,7 @@ import {
   type SetStateAction
 } from 'react';
 import { ExternalSiteMark } from '@/components/external-site-mark';
+import { DesktopLoadingState } from '@/components/desktop-loading';
 import {
   DesktopManualApplicationDialog,
   type ManualApplicationCreationResult
@@ -379,6 +380,7 @@ export function DesktopHome({
   const applicationsRef = useRef<ApplicationRow[]>(applications);
   applicationsRef.current = applications;
   const loading = viewState.loading;
+  const initialLoading = loading && applications.length === 0;
   const loadError = viewState.loadError;
   const setApplications = useCallback((next: SetStateAction<ApplicationRow[]>) => {
     setStoredViewState((current) => {
@@ -1773,7 +1775,7 @@ export function DesktopHome({
               <div className="desktop-page-header-title-row">
                 <h1 className="desktop-page-header-title">全部申请</h1>
                 <span className="desktop-page-header-count desktop-application-context-count">
-                  {loading
+                  {initialLoading
                     ? '正在同步'
                     : filteredRows.length === applications.length
                       ? applications.length
@@ -1851,7 +1853,7 @@ export function DesktopHome({
                 <span>隐藏截止项目</span>
               </span>
               <span className="desktop-expired-project-toggle-count" aria-hidden="true">
-                {hideExpired ? `已隐藏 ${expiredMatchingCount} 个` : `${expiredMatchingCount} 个已截止`}
+                {initialLoading ? '正在统计' : hideExpired ? `已隐藏 ${expiredMatchingCount} 个` : `${expiredMatchingCount} 个已截止`}
               </span>
               <span className="desktop-expired-project-switch" aria-hidden="true">
                 <i />
@@ -1901,36 +1903,13 @@ export function DesktopHome({
               className="desktop-project-table-body"
               onScroll={persistApplicationContext}
             >
-              {loading ? (
-                <div
-                  className="desktop-workbench-loading-state"
-                  role="status"
-                  aria-live="polite"
-                  aria-busy="true"
-                  aria-atomic="true"
-                >
-                  <div className="desktop-workbench-loading-heading">
-                    <span className="desktop-workbench-loading-icon" aria-hidden="true">
-                      <ArrowSync20Regular />
-                    </span>
-                    <span>
-                      <strong>正在同步申请</strong>
-                      <small>正在读取项目、材料与截止时间</small>
-                    </span>
-                  </div>
-                  <div className="desktop-workbench-loading-rows" aria-hidden="true">
-                    {Array.from({ length: 5 }, (_, index) => (
-                      <div key={index} className="desktop-workbench-loading-row">
-                        <i />
-                        <span>
-                          <b />
-                          <em />
-                          <small />
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {initialLoading ? (
+                <DesktopLoadingState
+                  variant="applications"
+                  title="正在同步申请"
+                  detail="正在读取项目、材料与截止时间，筛选条件会保留。"
+                  rows={4}
+                />
               ) : hasHardLoadError ? (
                 <div className="desktop-workbench-error desktop-workbench-error-state" role="alert">
                   <DocumentText20Regular aria-hidden="true" />
@@ -2279,43 +2258,13 @@ export function DesktopHome({
               <Dismiss20Regular aria-hidden="true" />
             </button>
           ) : null}
-          {loading ? (
-            <div className="desktop-inspector-loading" aria-hidden="true">
-              <div className="desktop-inspector-loading-header">
-                <span>
-                  <b />
-                  <small />
-                </span>
-                <i />
-              </div>
-              <div className="desktop-inspector-loading-tabs">
-                <i />
-                <i />
-                <i />
-                <i />
-              </div>
-              <div className="desktop-inspector-loading-body">
-                <div className="desktop-inspector-loading-status">
-                  <span className="desktop-inspector-loading-icon">
-                    <ArrowSync20Regular />
-                  </span>
-                  <span>
-                    <strong>正在整理项目详情</strong>
-                    <small>同步完成后会在这里显示阶段、材料和下一步</small>
-                  </span>
-                </div>
-                <div className="desktop-inspector-loading-summary">
-                  {Array.from({ length: 4 }, (_, index) => (
-                    <span key={index}><i /><b /></span>
-                  ))}
-                </div>
-                <div className="desktop-inspector-loading-section">
-                  <b />
-                  <i />
-                  <i />
-                </div>
-              </div>
-            </div>
+          {initialLoading ? (
+            <DesktopLoadingState
+              variant="detail"
+              title="正在整理项目详情"
+              rows={3}
+              showHeading={false}
+            />
           ) : selectedRow ? (
             <>
               <header

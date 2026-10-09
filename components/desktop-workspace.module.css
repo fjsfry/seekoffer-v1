@@ -1766,6 +1766,13 @@ textarea.scheduleTitleControl {
     flex-direction: column;
   }
 
+  /* Keep the heading anchored when the action group moves to a second row. */
+  .schedulePage .pageHeading {
+    width: 100%;
+    align-self: stretch !important;
+    text-align: left;
+  }
+
   .schedulePage .headerActions {
     width: 100%;
     justify-content: space-between;
@@ -2552,6 +2559,14 @@ textarea.scheduleTitleControl {
   opacity: .78;
 }
 
+.saveButton {
+  min-width: 112px;
+}
+
+.manualApplicationSaveButton {
+  min-width: 164px;
+}
+
 .productivityToast {
   position: absolute;
   z-index: 80;
@@ -2974,14 +2989,9 @@ textarea.scheduleTitleControl {
   width: 17px;
   height: 17px;
   border: 2px solid var(--contacts-surface);
-  border-top-color: var(--so-brand, #177866);
   border-radius: 999px;
+  color: var(--so-brand, #177866);
   background: var(--contacts-surface);
-  animation: contact-photo-spin 800ms linear infinite;
-}
-
-@keyframes contact-photo-spin {
-  to { transform: rotate(360deg); }
 }
 
 .contactsPage .contactListRow:nth-child(3n + 2) .contactAvatar {
@@ -3618,16 +3628,6 @@ textarea.scheduleTitleControl {
 
 .mentorPhotoStatus[data-phase='error'] {
   color: var(--so-danger, #c9443d);
-}
-
-.mentorPhotoSpinner {
-  width: 15px;
-  height: 15px;
-  flex: 0 0 auto;
-  border: 2px solid color-mix(in srgb, var(--so-brand, #177866) 18%, transparent);
-  border-top-color: var(--so-brand, #177866);
-  border-radius: 999px;
-  animation: contact-photo-spin 800ms linear infinite;
 }
 
 .contactPhotoTextButton {
@@ -4294,8 +4294,6 @@ textarea.scheduleTitleControl {
   }
 
   .contactAvatarHasPhoto img,
-  .contactPhotoLoadingIndicator,
-  .mentorPhotoSpinner,
   .scheduleListRow[data-recent-action='true'],
   .contactListRow[data-recent-action='true'] {
     animation: none !important;
@@ -4957,7 +4955,9 @@ textarea.scheduleTitleControl {
   overflow: hidden;
 }
 
-.scheduleContentGrid[data-view-mode='quadrant'] {
+.scheduleContentGrid[data-view-mode='quadrant'],
+.scheduleContentGrid[data-read-status='loading'],
+.scheduleContentGrid[data-read-status='error'] {
   grid-template-columns: minmax(0, 1fr);
 }
 

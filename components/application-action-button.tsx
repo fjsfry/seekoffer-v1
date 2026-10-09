@@ -6,6 +6,9 @@ import { ArrowRight, LoaderCircle, Plus } from 'lucide-react';
 import { addProjectToApplicationTable, fetchUserProjects, watchApplicationTable } from '@/lib/cloudbase-data';
 import { openAuthModal, writeAuthIntent } from '@/lib/auth-intent';
 import { useUserSessionState } from '@/hooks/use-user-session';
+import { DesktopLoadingIndicator } from '@/components/desktop-loading';
+
+const isDesktopSurface = process.env.NEXT_PUBLIC_SEEKOFFER_SURFACE === 'desktop';
 
 function getActionErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
@@ -129,7 +132,7 @@ export function ApplicationActionButton({
       >
         <span className="inline-flex items-center gap-2">
           {pending ? (
-            <LoaderCircle className="h-4 w-4 animate-spin" />
+            isDesktopSurface ? <DesktopLoadingIndicator size="small" /> : <LoaderCircle className="h-4 w-4 animate-spin" />
           ) : added ? (
             <ArrowRight className="h-4 w-4" />
           ) : (

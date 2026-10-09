@@ -1,12 +1,14 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LoginMethodPanel } from '@/components/login-method-panel';
+import { DesktopLoadingIndicator } from '@/components/desktop-loading';
 import {
   DesktopWindowControls,
   useDesktopTitlebarDrag
 } from '@/components/desktop-window-controls';
+import styles from './desktop-login-screen.module.css';
 
 type StartupPhase = 'restore-session' | 'enter-workbench';
 
@@ -49,73 +51,105 @@ export function DesktopStartupScreen({
 }) {
   const [stalled, setStalled] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [retryError, setRetryError] = useState('');
+  const mountedRef = useRef(true);
+  const retryPendingRef = useRef(false);
+  const retryGenerationRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      retryGenerationRef.current += 1;
+    };
+  }, []);
+
+  useEffect(() => {
+    retryGenerationRef.current += 1;
+    retryPendingRef.current = false;
+    setRetrying(false);
+    setRetryError('');
+  }, [phase]);
 
   useEffect(() => {
     setStalled(false);
     const timer = window.setTimeout(() => setStalled(true), 8000);
     return () => window.clearTimeout(timer);
-  }, [phase]);
+  }, [phase, retryAttempt]);
 
   const isEntering = phase === 'enter-workbench';
-  const title = isEntering ? '正在进入全部申请' : '正在启动寻鹿';
+  const title = isEntering ? '正在进入工作台' : '正在启动寻鹿';
   const description = isEntering
-    ? '正在同步你的申请项目与最新进度'
-    : '正在准备申请项目与提醒';
+    ? '正在确认账号并准备工作区'
+    : '正在恢复登录状态，准备你的工作区';
+  const status = retryError
+    ? '暂时未能连接'
+    : retrying
+      ? '正在重新连接'
+      : stalled
+        ? '连接时间比平时稍长'
+        : '请稍候';
 
   async function handleRetry() {
-    if (!onRetry || retrying) return;
+    if (!onRetry || retryPendingRef.current) return;
+    retryPendingRef.current = true;
+    const generation = ++retryGenerationRef.current;
     setRetrying(true);
     setStalled(false);
+    setRetryError('');
+    setRetryAttempt(attempt => attempt + 1);
     try {
       await onRetry();
+    } catch {
+      if (mountedRef.current && retryGenerationRef.current === generation) {
+        setRetryError('请检查网络连接后重试；本机保存的申请和日程不会被清除。');
+        setStalled(true);
+      }
     } finally {
-      setRetrying(false);
+      if (mountedRef.current && retryGenerationRef.current === generation) {
+        retryPendingRef.current = false;
+        setRetrying(false);
+      }
     }
   }
 
   return (
     <div
-      className="desktop-auth-shell desktop-startup-shell"
+      className={`desktop-auth-shell ${styles.startupShell}`}
       data-startup-phase={phase}
-      data-feedback-state={stalled ? 'stalled' : retrying ? 'pending' : 'loading'}
+      data-feedback-state={retryError ? 'error' : retrying ? 'pending' : stalled ? 'stalled' : 'loading'}
     >
       <DesktopAuthTitlebar />
-      <main className="desktop-startup-stage" aria-busy={!stalled || retrying}>
+      <main className={styles.startupStage} aria-busy={!retryError}>
         <section
-          className="desktop-startup-content"
+          className={styles.startupContent}
           aria-labelledby="desktop-startup-title"
           aria-describedby="desktop-startup-description"
         >
-          <div className="desktop-startup-mark" aria-hidden="true">
+          <div className={styles.startupMark} aria-hidden="true">
             <Image
               src="/desktop/seekoffer-mark.png"
               alt=""
               fill
-              sizes="80px"
+              sizes="64px"
               priority
               className="desktop-brand-logo-image"
             />
           </div>
-          <p className="desktop-startup-wordmark">寻鹿 SeekOffer</p>
-          <h1 id="desktop-startup-title">{title}</h1>
-          <p id="desktop-startup-description" className="desktop-startup-description">
+          <p className={styles.startupWordmark}>寻鹿 SeekOffer</p>
+          <h1 id="desktop-startup-title" className={styles.startupTitle}>{title}</h1>
+          <p id="desktop-startup-description" className={styles.startupDescription}>
             {description}
           </p>
-          <div
-            className="desktop-startup-progress"
-            role="progressbar"
-            aria-label={isEntering ? '正在同步申请数据' : '正在启动应用'}
-          >
-            <span />
+          <div className={styles.startupFeedback} role="status" aria-live="polite" aria-atomic="true">
+            <DesktopLoadingIndicator size="large" still={Boolean(retryError)} />
+            <span>{status}</span>
           </div>
-          {stalled ? (
-            <div className="desktop-startup-recovery" role="status">
-              <span>
-                {isEntering
-                  ? '全部申请同步时间比平时稍长，你可以重新尝试。'
-                  : '启动时间比平时稍长，你可以重新连接登录服务。'}
-              </span>
-              <button
+          <div className={styles.startupRecovery}>
+            {stalled || retryError ? <>
+              <p>{retryError || '可以稍等片刻，或检查网络后重新连接。'}</p>
+              {onRetry ? <button
                 type="button"
                 onClick={() => void handleRetry()}
                 disabled={retrying}
@@ -123,15 +157,11 @@ export function DesktopStartupScreen({
                 data-feedback-state={retrying ? 'pending' : 'idle'}
               >
                 {retrying ? '正在重试…' : '重新尝试'}
-              </button>
-            </div>
-          ) : (
-            <span className="desktop-startup-status" role="status" aria-live="polite">
-              请稍候
-            </span>
-          )}
+              </button> : null}
+            </> : null}
+          </div>
         </section>
-        <p className="desktop-startup-footnote">统一管理通知、材料、进度与截止提醒</p>
+        <p className={styles.startupFootnote}>通知、申请、材料与提醒，一处管理</p>
       </main>
     </div>
   );

@@ -11,6 +11,8 @@ import { validateManualApplicationInput } from '@/lib/desktop-manual-application
 import { trackDesktopPendingWrite } from '@/lib/desktop-pending-writes';
 import { emitDesktopModalState } from '@/lib/desktop-route-events';
 import { useAccessibleModal } from '@/hooks/use-accessible-modal';
+import { DesktopLoadingIndicator } from './desktop-loading';
+import styles from './desktop-workspace.module.css';
 
 const projectTypeOptions: ManualProjectInput['projectType'][] = [
   '夏令营',
@@ -54,6 +56,7 @@ export function DesktopManualApplicationDialog({
   const errorId = useId();
   const [form, setForm] = useState<ManualProjectInput>(initialForm);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [fieldError, setFieldError] = useState<keyof ManualProjectInput | null>(null);
   const [message, setMessage] = useState('');
   const [visible, setVisible] = useState(false);
@@ -112,7 +115,7 @@ export function DesktopManualApplicationDialog({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting) return;
+    if (submittingRef.current) return;
 
     const validation = validateManualApplicationInput(form);
     if (!validation.ok) {
@@ -126,6 +129,7 @@ export function DesktopManualApplicationDialog({
       return;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
     setFieldError(null);
     setMessage('');
@@ -141,6 +145,7 @@ export function DesktopManualApplicationDialog({
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '申请保存失败，请稍后重试。');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
@@ -320,7 +325,8 @@ export function DesktopManualApplicationDialog({
             <button type="button" className="desktop-button-secondary" disabled={submitting} onClick={() => requestClose()}>
               取消
             </button>
-            <button type="submit" className="desktop-button-primary" disabled={submitting}>
+            <button type="submit" className={`desktop-button-primary ${styles.manualApplicationSaveButton}`} disabled={submitting} aria-busy={submitting}>
+              {submitting ? <DesktopLoadingIndicator size="small" /> : <Plus size={16} aria-hidden="true" />}
               {submitting ? '正在保存…' : '添加到全部申请'}
             </button>
           </footer>
