@@ -6,14 +6,14 @@
  * the in-app updater has its own release channel and lifecycle.
  */
 export const PUBLISHED_DESKTOP_RELEASE = {
-  version: '0.2.28',
+  version: '0.2.29',
   releaseDate: '2026-10-09',
-  installerName: 'SeekOffer-Desktop-v0.2.28-Windows-x64-Setup.exe',
-  installerSize: '24.48 MiB',
-  installerSizeBytes: 25_672_873,
-  installerSha256: '22e764449df98483d86623d13012b30efc1727d934e6db257680a112cdcc0d60',
+  installerName: 'SeekOffer-Desktop-v0.2.29-Windows-x64-Setup.exe',
+  installerSize: '24.53 MiB',
+  installerSizeBytes: 25_729_545,
+  installerSha256: 'b7141bdfd22ea1464b05e7bdc16b38a7cd20b67b6c0240bb15141718665e5015',
   installerUrl:
-    'https://seekoffer-client-downloads.seekoffer-9268f8c5.workers.dev/files/22e764449df9/SeekOffer-Desktop-v0.2.28-Windows-x64-Setup.exe',
+    'https://seekoffer-client-downloads.seekoffer-9268f8c5.workers.dev/files/b7141bdfd22e/SeekOffer-Desktop-v0.2.29-Windows-x64-Setup.exe',
   verificationUrl: 'https://seekoffer-client-downloads.seekoffer-9268f8c5.workers.dev',
   provenanceUrl: 'https://seekoffer-client-downloads.seekoffer-9268f8c5.workers.dev/provenance.json',
   checksumsUrl: 'https://seekoffer-client-downloads.seekoffer-9268f8c5.workers.dev/SHA256SUMS.txt',
