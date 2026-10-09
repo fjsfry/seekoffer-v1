@@ -1278,3 +1278,40 @@
     align-items: start !important;
   }
 }
+
+/* Native time inputs have an intrinsic minimum width. In a zoomed settings
+ * column give each field its own row rather than squeeze two 112px controls. */
+.integrityRoot.integrityRoot :global(.desktop-setting-time-range) {
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
+  align-items: end !important;
+  gap: 8px !important;
+}
+
+.integrityRoot.integrityRoot :global(.desktop-setting-time-field) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.integrityRoot.integrityRoot :global(.desktop-setting-time-field input) {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+@container settings-integrity (max-width: 560px) {
+  .integrityRoot.integrityRoot :global(.desktop-setting-time-range) {
+    width: 100% !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  .integrityRoot.integrityRoot :global(.desktop-setting-time-separator) {
+    display: none !important;
+  }
+}

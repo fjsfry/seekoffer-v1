@@ -3,7 +3,9 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowRight, LoaderCircle } from 'lucide-react';
+import { ArrowRight, FileSearch, LoaderCircle, WifiOff } from 'lucide-react';
+import { DesktopLoadingState } from '@/components/desktop-loading';
+import { DesktopStateSurface } from '@/components/desktop-state-surface';
 import { NoticeDetailView } from '@/components/notice-detail-view';
 import { PageSectionTitle } from '@/components/page-section-title';
 import { SiteShell } from '@/components/site-shell';
@@ -12,6 +14,8 @@ import {isD1Backend} from '@/lib/backend-mode';
 import { sanitizeNoticeForPublicView } from '@/lib/notice-public-copy';
 import { baseNoticeProjects } from '@/lib/notice-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
+
+const isDesktopSurface = process.env.NEXT_PUBLIC_SEEKOFFER_SURFACE === 'desktop';
 
 function getSafeNoticeReturnHref(value: string | null) {
   if (!value) {
@@ -96,6 +100,7 @@ function NoticeDetailContent() {
   }
 
   if (loading) {
+    if (isDesktopSurface) return <DesktopDetailLoading />;
     return (
       <DetailShell title="正在加载通知详情" subtitle="正在读取最新整理结果，请稍等。">
         <section className="desktop-notice-detail-state desktop-notice-detail-state--loading surface-card rounded-[34px] p-8">
@@ -156,6 +161,24 @@ function EmptyDetailState({
   const stateClassName =
     state === 'error' ? 'desktop-notice-detail-state--error' : 'desktop-notice-detail-state--empty';
 
+  if (isDesktopSurface) {
+    return (
+      <DesktopStateSurface
+        icon={state === 'error' ? <WifiOff /> : <FileSearch />}
+        title={state === 'error' ? '暂时无法读取这条通知' : '没有找到这条通知'}
+        detail={state === 'error'
+          ? '请检查网络后重新打开。已保存的申请记录和材料不会受到影响。'
+          : '这条通知可能已更新或撤回，你可以返回通知库查找最新内容。'}
+        tone={state === 'error' ? 'error' : 'neutral'}
+        action={
+          <Link href={href} className="desktop-setting-secondary-button">
+            {label}<ArrowRight aria-hidden="true" />
+          </Link>
+        }
+      />
+    );
+  }
+
   return (
     <section className={`desktop-notice-detail-state ${stateClassName} surface-card rounded-[34px] p-8`}>
       <div className="desktop-notice-detail-state-content flex flex-col items-center justify-center gap-5 text-center">
@@ -174,10 +197,23 @@ function EmptyDetailState({
   );
 }
 
+function DesktopDetailLoading() {
+  return (
+    <DetailShell title="通知详情" subtitle="学校、时间安排、申请条件与材料要求。">
+      <DesktopLoadingState
+        variant="detail"
+        title="正在读取通知详情"
+        detail="正在同步最新内容，请稍候。"
+        rows={3}
+      />
+    </DetailShell>
+  );
+}
+
 export default function NoticeDetailQueryPage() {
   return (
     <Suspense
-      fallback={
+      fallback={isDesktopSurface ? <DesktopDetailLoading /> :
         <DetailShell title="正在打开通知详情" subtitle="正在准备详情页，请稍等。">
           <section className="desktop-notice-detail-state desktop-notice-detail-state--loading hidden surface-card rounded-[34px] p-8">
             <div className="desktop-notice-detail-state-content flex flex-col items-center justify-center gap-5 text-center">

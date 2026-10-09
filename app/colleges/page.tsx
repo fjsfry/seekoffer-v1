@@ -32,6 +32,7 @@ import { filterMainNoticeProjects } from '@/lib/notice-quality';
 import { baseNoticeProjects } from '@/lib/notice-source';
 import type { PublicNoticeProject } from '@/lib/mock-data';
 import styles from './colleges.module.css';
+import { collegePopoverPlacement } from './college-popover-placement';
 
 const PAGE_SIZE = 16;
 const COLLEGE_VIEW_STORAGE_KEY = 'seekoffer.desktop.colleges.view.v1';
@@ -120,17 +121,16 @@ function toggleCollegePopover(trigger: HTMLElement, surface: HTMLElement) {
     return;
   }
   const rect = trigger.getBoundingClientRect();
-  const gutter = 12;
-  const width = Math.min(420, window.innerWidth - gutter * 2);
-  const estimatedHeight = 470;
-  const left = Math.max(gutter, Math.min(rect.right - width, window.innerWidth - width - gutter));
-  const below = rect.bottom + 6;
-  const top = below + estimatedHeight <= window.innerHeight - gutter
-    ? below
-    : Math.max(gutter, rect.top - estimatedHeight - 6);
-  surface.style.setProperty('--college-popover-left', `${left}px`);
-  surface.style.setProperty('--college-popover-top', `${top}px`);
-  surface.style.setProperty('--college-popover-width', `${width}px`);
+  const placement = collegePopoverPlacement({
+    trigger: rect,
+    triggerLayoutWidth: trigger.offsetWidth,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight
+  });
+  surface.style.setProperty('--college-popover-left', `${placement.left}px`);
+  surface.style.setProperty('--college-popover-top', `${placement.top}px`);
+  surface.style.setProperty('--college-popover-width', `${placement.width}px`);
+  surface.style.setProperty('--college-popover-max-height', `${placement.maxHeight}px`);
   surface.showPopover();
 }
 

@@ -66,7 +66,9 @@ describe('desktop build target isolation', () => {
     expect(webSurface).not.toContain("import './desktop");
 
     const globalDesktopCssImports = desktopSurface.match(/import '\.\/desktop[^']*\.css';/g) || [];
-    expect(globalDesktopCssImports).toHaveLength(11);
+    expect(globalDesktopCssImports).toHaveLength(12);
+    expect(globalDesktopCssImports.at(-2)).toBe("import './desktop-directory-audit.css';");
+    expect(globalDesktopCssImports.at(-1)).toBe("import './desktop-app-coherence.css';");
     expect(desktopSurface).toContain('DesktopAppShell');
     expect(desktopSurface).toContain('DesktopAuthGate');
     expect(desktopSurface).toContain('DesktopUpdateProvider');

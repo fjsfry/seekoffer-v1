@@ -2188,13 +2188,14 @@ textarea.scheduleTitleControl {
 }
 
 .schedulePopoverSurface {
+  box-sizing: border-box;
   position: fixed;
   inset: auto;
   left: var(--schedule-popover-left);
   top: var(--schedule-popover-top);
   width: var(--schedule-popover-width);
   max-width: calc(100vw - 24px);
-  max-height: min(420px, calc(100vh - 24px));
+  max-height: var(--schedule-popover-max-height, min(420px, calc(100vh - 24px)));
   padding: 0;
   margin: 0;
   overflow: auto;
@@ -2565,6 +2566,20 @@ textarea.scheduleTitleControl {
 
 .manualApplicationSaveButton {
   min-width: 164px;
+}
+
+:global(.seekoffer-desktop-surface .desktop-manual-application-actions) .manualApplicationSaveButton {
+  display: inline-flex !important;
+  min-width: 164px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+}
+
+:global(.seekoffer-desktop-surface .desktop-manual-application-actions) .manualApplicationSaveButton > svg {
+  flex: 0 0 auto;
 }
 
 .productivityToast {
@@ -6107,6 +6122,88 @@ textarea.scheduleTitleControl {
 
 :global(html[data-desktop-reduce-motion='true']) .schedulePage .masterToolbar {
   transition: none !important;
+}
+
+/* A compact, left-aligned header is shared by both collection workspaces.
+ * Let the action group wrap only when it actually runs out of room; viewport
+ * breakpoints alone cannot account for a resized or zoomed desktop window. */
+:global(.desktop-app-shell) :is(.schedulePage, .contactsPage) .pageHeader {
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+:global(.desktop-app-shell) :is(.schedulePage, .contactsPage) .pageHeader .pageHeading {
+  width: auto !important;
+  min-width: 0 !important;
+  flex: 1 1 168px !important;
+  align-self: center !important;
+  text-align: left !important;
+}
+
+:global(.desktop-app-shell) :is(.schedulePage, .contactsPage) .pageHeader .headerActions {
+  display: flex !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  flex: 0 1 auto !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  margin-left: auto !important;
+}
+
+:global(.desktop-app-shell) :is(.schedulePage, .contactsPage) .pageHeader .headerActions > * {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+/* Seven short categories fit in two rows at normal narrow-window widths.
+ * Four or more rows used to push the first agenda item below the whole frame. */
+@container schedule-workspace-page (max-width: 720px) and (min-width: 420px) {
+  :global(.desktop-app-shell) .schedulePage .workspace[data-detail-open='false'] .masterToolbar {
+    grid-template-columns: minmax(0, 1fr) 112px !important;
+    grid-template-rows: auto auto auto !important;
+    align-items: center !important;
+  }
+
+  :global(.desktop-app-shell) .schedulePage .workspace[data-detail-open='false'] .scheduleToolbarTop {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+  }
+
+  :global(.desktop-app-shell) .schedulePage .workspace[data-detail-open='false'] .searchBox {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+  }
+
+  :global(.desktop-app-shell) .schedulePage .workspace[data-detail-open='false'] .scheduleAdvancedFilters {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+  }
+
+  :global(.desktop-app-shell) .schedulePage .workspace[data-detail-open='false'] .categoryFilterBar {
+    grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@container schedule-workspace-page (max-width: 419px) {
+  :global(.desktop-app-shell) .schedulePage .workspace[data-detail-open='false'] .categoryFilterBar {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@container schedule-workspace-page (max-width: 720px) and (min-width: 500px) {
+  :global(.desktop-app-shell) .schedulePage .workspace[data-detail-open='false'] .scheduleToolbarTop {
+    display: grid !important;
+    grid-template-columns: minmax(268px, 1fr) minmax(170px, .7fr) !important;
+    gap: 10px !important;
+  }
 }
 
 /* Shared surface finish for the two workspaces. Geometry remains route-owned. */

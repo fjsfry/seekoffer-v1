@@ -55,6 +55,7 @@ import {
 } from '@/lib/workbench-state';
 import { writeSessionStorageValue } from '@/lib/safe-session-storage';
 import { DESKTOP_NEW_SCHEDULE_EVENT } from '@/lib/desktop-route-events';
+import { schedulePopoverPlacement } from './desktop-schedule-popover';
 import styles from './desktop-workspace.module.css';
 
 const isDesktopSurface = process.env.NEXT_PUBLIC_SEEKOFFER_SURFACE === 'desktop';
@@ -190,17 +191,18 @@ function toggleAnchoredPopover(
     surface.hidePopover();
     return;
   }
-  const rect = trigger.getBoundingClientRect();
-  const gutter = 12;
-  const width = Math.min(preferredWidth, window.innerWidth - gutter * 2);
-  const left = Math.max(gutter, Math.min(rect.left, window.innerWidth - width - gutter));
-  const below = rect.bottom + 6;
-  const top = below + estimatedHeight <= window.innerHeight - gutter
-    ? below
-    : Math.max(gutter, rect.top - estimatedHeight - 6);
+  const { left, top, width, maxHeight } = schedulePopoverPlacement({
+    trigger: trigger.getBoundingClientRect(),
+    triggerLayoutWidth: trigger.offsetWidth,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+    preferredWidth,
+    estimatedHeight
+  });
   surface.style.setProperty('--schedule-popover-left', `${left}px`);
   surface.style.setProperty('--schedule-popover-top', `${top}px`);
   surface.style.setProperty('--schedule-popover-width', `${width}px`);
+  surface.style.setProperty('--schedule-popover-max-height', `${maxHeight}px`);
   surface.showPopover();
 }
 

@@ -3844,7 +3844,8 @@ html[data-desktop-reduce-motion='true']
 
 .desktop-app-shell:is(.desktop-app-shell) .desktop-command-dialog {
   width: min(620px, 100%) !important;
-  max-height: min(680px, calc(100vh - var(--desktop-titlebar-height) - 40px)) !important;
+  min-height: 0 !important;
+  max-height: min(680px, calc(var(--desktop-zoomed-viewport-height, 100vh) - var(--desktop-titlebar-height) - 40px)) !important;
   padding: 0 !important;
   display: grid !important;
   grid-template-rows: auto auto minmax(0, 1fr) auto !important;
@@ -3915,7 +3916,7 @@ html[data-desktop-reduce-motion='true']
 }
 
 .desktop-app-shell:is(.desktop-app-shell) .desktop-command-results {
-  min-height: 180px !important;
+  min-height: 0 !important;
   max-height: 460px !important;
   padding: 6px !important;
   overflow-x: hidden !important;
@@ -4043,7 +4044,8 @@ html[data-desktop-reduce-motion='true']
 
 .desktop-app-shell:is(.desktop-app-shell) .desktop-shortcut-dialog {
   width: min(540px, 100%) !important;
-  max-height: min(680px, calc(100vh - 36px)) !important;
+  min-height: 0 !important;
+  max-height: min(680px, calc(var(--desktop-zoomed-viewport-height, 100vh) - 36px)) !important;
   padding: 0 !important;
   display: grid !important;
   grid-template-rows: auto minmax(0, 1fr) !important;
@@ -4087,6 +4089,7 @@ html[data-desktop-reduce-motion='true']
 }
 
 .desktop-app-shell:is(.desktop-app-shell) .desktop-shortcut-list {
+  min-height: 0 !important;
   margin: 0 !important;
   padding: 8px 16px 16px !important;
   overflow-x: hidden !important;

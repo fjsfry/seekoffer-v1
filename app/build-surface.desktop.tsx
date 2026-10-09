@@ -12,6 +12,7 @@ import './desktop-notice-alignment.css';
 import './desktop-resource-center.css';
 import './desktop-guide-center.css';
 import './desktop-help-center-v2.css';
+import './desktop-directory-audit.css';
 import './desktop-app-coherence.css';
 
 const desktopPreferenceBootstrap = `

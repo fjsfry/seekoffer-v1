@@ -166,6 +166,7 @@ describe('SeekOffer desktop flagship design contract', () => {
       'desktop-resource-center.css',
       'desktop-guide-center.css',
       'desktop-help-center-v2.css',
+      'desktop-directory-audit.css',
       'desktop-app-coherence.css'
     ]);
     expect(flagshipSource).not.toMatch(/@import\s+url\s*\(\s*['"]?https?:/i);

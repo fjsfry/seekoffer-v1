@@ -46,7 +46,7 @@ import {
   signOutUser,
   type UserSession
 } from '@/lib/user-session';
-import { DesktopSoftwareUpdateSettings } from './desktop-update-provider';
+import { DesktopSoftwareUpdateSettings, useDesktopUpdater } from './desktop-update-provider';
 import styles from './desktop-settings-page.module.css';
 
 export type DesktopSettingsCategory = 'general' | 'account' | 'notifications' | 'appearance' | 'about';
@@ -210,6 +210,7 @@ export function DesktopSettingsPage({
   syncUpdatedAt: number | null;
   onSyncNow: () => Promise<void>;
 }) {
+  const { setUpdateSettingsVisible } = useDesktopUpdater();
   const [activeCategory, setActiveCategory] =
     useState<DesktopSettingsCategory>(initialCategory);
   const [autostartState, setAutostartState] = useState<AutostartState>('checking');
@@ -225,6 +226,13 @@ export function DesktopSettingsPage({
   const resetTriggerRef = useRef<HTMLButtonElement>(null);
   const resetConfirmRef = useRef<HTMLButtonElement>(null);
   const categoryRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const settingsPageRef = useRef<HTMLDivElement>(null);
+  const settingsContentRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    setUpdateSettingsVisible(true);
+    return () => setUpdateSettingsVisible(false);
+  }, [setUpdateSettingsVisible]);
 
   const readAutostartState = useCallback(async () => {
     if (!isTauriRuntime()) {
@@ -262,6 +270,13 @@ export function DesktopSettingsPage({
   useEffect(() => {
     setActiveCategory(initialCategory);
   }, [initialCategory]);
+
+  useEffect(() => {
+    // Each category starts with its heading, even after reading a long panel.
+    // Only these settings scroll containers are reset, never the route behind it.
+    if (settingsContentRef.current) settingsContentRef.current.scrollTop = 0;
+    if (settingsPageRef.current) settingsPageRef.current.scrollTop = 0;
+  }, [activeCategory]);
 
   useEffect(() => {
     if (!statusMessage) return;
@@ -582,6 +597,7 @@ export function DesktopSettingsPage({
 
   return (
     <div
+      ref={settingsPageRef}
       className={`${styles.integrityRoot} desktop-core-page desktop-core-page--fixed desktop-settings-page`}
       data-settings-category={activeCategory}
       aria-busy={manualSyncBusy || syncStatus === 'syncing'}
@@ -661,7 +677,7 @@ export function DesktopSettingsPage({
           })}
         </div>
 
-        <main className="desktop-settings-content">
+        <main ref={settingsContentRef} className="desktop-settings-content">
           <div
             className="desktop-settings-live-region"
             role="status"

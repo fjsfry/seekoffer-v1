@@ -1,0 +1,221 @@
+/* Scoped reading-page parity: a notice title is a document heading, not a
+ * marketing hero. Keep long real titles readable without changing the web UI. */
+.desktop-app-shell[data-density]:is(.desktop-app-shell)
+  .desktop-core-page:has(> .desktop-college-page-toolbar) {
+  height: auto !important;
+  grid-auto-rows: max-content !important;
+  align-content: start !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell)
+  .desktop-core-page:has(> .desktop-college-page-toolbar) > .desktop-page-header {
+  height: auto !important;
+  min-height: var(--app-page-header-h, 88px) !important;
+}
+
+/* Respond to usable content width, not the OS window or a hard-coded zoom
+ * label. The search remains full width and the four controls share two rows. */
+.desktop-app-shell[data-density]:is(.desktop-app-shell)
+  .desktop-notice-library .desktop-notice-filters {
+  container: notice-filter-controls / inline-size;
+}
+
+@container notice-filter-controls (min-width: 460px) and (max-width: 850px) {
+  .desktop-app-shell[data-density]:is(.desktop-app-shell)
+    .desktop-notice-library .desktop-notice-search-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-rows: max-content !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell)
+    .desktop-notice-library .desktop-notice-search-row > .desktop-notice-search-field {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+  }
+
+  .desktop-app-shell[data-density]:is(.desktop-app-shell)
+    .desktop-notice-library .desktop-notice-search-row > :not(.desktop-notice-search-field) {
+    grid-column: auto !important;
+    grid-row: auto !important;
+    min-width: 0 !important;
+  }
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell)
+  .desktop-notice-detail-page .desktop-notice-detail-title {
+  font-size: 28px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+  letter-spacing: -0.025em !important;
+  text-wrap: pretty !important;
+  overflow-wrap: anywhere !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell)
+  .desktop-notice-detail-page .desktop-notice-detail-subtitle {
+  max-width: 72ch !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell)
+  .desktop-notice-detail-state-page .desktop-setting-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+  white-space: normal;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell)
+  .desktop-notice-detail-state-page .desktop-setting-secondary-button svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
+.desktop-app-shell[data-density]:is(.desktop-app-shell):is(
+  [data-zoom-level='125'], [data-zoom-level='150'],
+  [data-zoom-level='175'], [data-zoom-level='200']
+) .desktop-notice-detail-page .desktop-notice-detail-title {
+  font-size: 24px !important;
+  line-height: 1.4 !important;
+}
+
+/* GPA is a document-style tool, not a three-row fixed-height dashboard. Auto
+ * grid tracks could shrink its summary/workspace to a fraction of their content
+ * at high zoom; let the route own one normal vertical scrolling flow instead. */
+.desktop-app-shell.desktop-app-shell
+  .desktop-route-content:has(> .desktop-gpa-workspace) {
+  container: desktop-gpa-audit / inline-size;
+  display: block !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.desktop-app-shell.desktop-app-shell .desktop-route-content
+  > :is(.desktop-gpa-header, .desktop-gpa-summary, .desktop-gpa-workspace) {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
+.desktop-app-shell.desktop-app-shell .desktop-route-content > .desktop-gpa-header {
+  padding: 16px 20px !important;
+  border: 1px solid var(--so-border) !important;
+  border-radius: 12px !important;
+}
+
+.desktop-app-shell.desktop-app-shell .desktop-route-content > .desktop-gpa-summary {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  grid-auto-rows: max-content !important;
+  margin-top: 16px !important;
+  border: 1px solid var(--so-border) !important;
+  border-radius: 10px !important;
+}
+
+.desktop-app-shell.desktop-app-shell .desktop-gpa-metric {
+  height: auto !important;
+  min-height: 76px !important;
+}
+
+.desktop-app-shell.desktop-app-shell .desktop-gpa-metric
+  :is(.desktop-gpa-metric-label, .desktop-gpa-metric-hint) {
+  white-space: normal !important;
+  text-overflow: clip !important;
+  overflow: visible !important;
+}
+
+.desktop-app-shell.desktop-app-shell .desktop-route-content > .desktop-gpa-workspace {
+  margin-top: 16px !important;
+  border: 1px solid var(--so-border) !important;
+  border-radius: 12px !important;
+}
+
+.desktop-app-shell.desktop-app-shell .desktop-gpa-workspace .desktop-gpa-tabs {
+  position: static !important;
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 4px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 8px !important;
+  overflow: visible !important;
+  border-radius: 12px 12px 0 0 !important;
+  background: var(--so-surface) !important;
+  backdrop-filter: none !important;
+}
+
+.desktop-app-shell.desktop-app-shell .desktop-gpa-workspace .desktop-gpa-tab {
+  justify-content: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  min-height: 40px !important;
+  height: auto !important;
+  padding: 8px 6px !important;
+  white-space: normal !important;
+}
+
+@container desktop-gpa-audit (max-width: 740px) {
+  .desktop-app-shell.desktop-app-shell .desktop-route-content > .desktop-gpa-header {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .desktop-app-shell.desktop-app-shell .desktop-route-content > .desktop-gpa-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .desktop-app-shell.desktop-app-shell .desktop-gpa-metric:nth-child(2n) {
+    border-right: 0 !important;
+  }
+
+  .desktop-app-shell.desktop-app-shell .desktop-gpa-metric:nth-child(n + 3) {
+    border-top: 1px solid var(--so-border) !important;
+  }
+}
+
+@container desktop-gpa-audit (max-width: 500px) {
+  .desktop-app-shell.desktop-app-shell .desktop-gpa-workspace .desktop-gpa-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+/* Deadline groups share the same document-flow requirement. Their filters may
+ * become three rows at high zoom, so neither the page nor its header can be
+ * squeezed into a fixed-height grid track. */
+.desktop-app-shell.desktop-app-shell
+  .desktop-route-content:has(> .desktop-deadlines-page) {
+  display: block !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.desktop-app-shell.desktop-app-shell .desktop-route-content > .desktop-deadlines-page {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  grid-auto-rows: max-content !important;
+  align-content: start !important;
+  overflow: visible !important;
+}
+
+.desktop-app-shell.desktop-app-shell .desktop-deadlines-page
+  > :is(.page-section-title, .desktop-deadlines-toolbar, .desktop-deadline-groups) {
+  height: auto !important;
+  max-height: none !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+.desktop-app-shell.desktop-app-shell .desktop-deadlines-page
+  :is(.desktop-deadlines-toolbar, .desktop-deadline-groups) {
+  grid-auto-rows: max-content !important;
+  align-content: start !important;
+}

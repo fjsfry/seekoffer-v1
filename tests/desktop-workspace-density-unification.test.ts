@@ -172,8 +172,11 @@ describe('desktop schedule and mentor density unification', () => {
     expect(contactAvatar.get('align-self')).toBe('start');
   });
 
-  it('locks both workspaces to the shared 88px header and framed tool/empty surfaces', () => {
-    const header = declarations(lastRule(':is(.schedulePage, .contactsPage) .pageHeader'));
+  it('inherits the shared header minimum while allowing content-led wrapping and framed tool/empty surfaces', () => {
+    // An overriding layout rule need not repeat unrelated inherited geometry.
+    // Match the header itself, not a later rule for one of its descendants.
+    const header = declarations(lastRootRule(':is(.schedulePage, .contactsPage) .pageHeader', 'min-height'));
+    const headerLayout = declarations(lastRootRule(':global(.desktop-app-shell) :is(.schedulePage, .contactsPage) .pageHeader'));
     const toolbarGeometry = declarations(
       lastRule(':is(.schedulePage, .contactsPage) .masterToolbar', 'padding')
     );
@@ -184,6 +187,11 @@ describe('desktop schedule and mentor density unification', () => {
 
     expect(header.get('min-height')).toBe('88px');
     expect(header.get('padding')).toBe('12px 20px');
+    expect(header.get('height')).toBeUndefined();
+    expect(headerLayout.get('height')).toBeUndefined();
+    expect(headerLayout.get('max-height')).toBeUndefined();
+    expect(headerLayout.get('flex-direction')).toBe('row');
+    expect(headerLayout.get('flex-wrap')).toBe('wrap');
     expect(toolbarGeometry.get('padding')).toBe('14px 20px');
     expect(toolbarSurface.get('border-radius')).toBe('var(--product-radius-panel, 12px)');
     expect(toolbarSurface.get('box-shadow')).toBe('none');

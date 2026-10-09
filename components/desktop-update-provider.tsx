@@ -42,11 +42,13 @@ import {
   type DesktopUpdaterAttention,
   type DesktopUpdaterCheckOrigin,
   type DesktopUpdaterError,
+  type DesktopUpdaterSnapshot,
   type DesktopUpdaterState
 } from '@/lib/desktop-updater';
 import {
   DESKTOP_SYNC_STATUS_EVENT,
   emitDesktopFeedback,
+  type DesktopFeedback,
   type DesktopSyncStatus
 } from '@/lib/desktop-route-events';
 import {
@@ -55,6 +57,7 @@ import {
   hasDesktopPendingWrites,
   type DesktopPendingWriteSnapshot
 } from '@/lib/desktop-pending-writes';
+import styles from './desktop-update-provider.module.css';
 
 type DesktopUpdateContextValue = {
   state: DesktopUpdaterState;
@@ -65,6 +68,7 @@ type DesktopUpdateContextValue = {
   checkNow: () => Promise<void>;
   downloadUpdate: () => Promise<void>;
   requestInstall: (returnFocusTo?: HTMLElement | null) => void;
+  setUpdateSettingsVisible: (visible: boolean) => void;
 };
 
 type DesktopUpdateShellContextValue = {
@@ -118,6 +122,49 @@ function getUpdateErrorFeedback(
   return `${presentation.title}。${presentation.description}`;
 }
 
+export function getDesktopUpdateCheckFeedback(snapshot: DesktopUpdaterSnapshot): DesktopFeedback | null {
+  // These phases already have an actionable notice or an inline update panel.
+  if (snapshot.phase === 'available' || snapshot.phase === 'readyToInstall') return null;
+  if (snapshot.phase === 'error') {
+    return {
+      message: getUpdateErrorFeedback({
+        code: snapshot.errorCode || 'UPDATE_FAILED',
+        message: snapshot.errorMessage || '软件更新暂时无法完成。',
+        retryable: snapshot.retryable
+      }, 'check'),
+      tone: 'warning'
+    };
+  }
+  return {
+    message: snapshot.phase === 'upToDate' ? '当前已是最新版本' : '软件更新状态已刷新',
+    tone: 'success'
+  };
+}
+
+export function restoreDesktopUpdateFocus(target: HTMLElement | null) {
+  let frame: number | null = null;
+  let cancelled = false;
+  let attempts = 0;
+  const restore = () => {
+    frame = null;
+    if (cancelled || !target?.isConnected) return;
+    // A portal can be removed before :has(aria-modal) visibility has settled in
+    // WebView2. Focusing that still-hidden trigger silently leaves focus on body.
+    const available = !target.closest('[inert]') &&
+      target.getClientRects().length > 0 && getComputedStyle(target).visibility === 'visible';
+    if (available) {
+      target.focus({ preventScroll: true });
+      return;
+    }
+    if (++attempts < 8) frame = window.requestAnimationFrame(restore);
+  };
+  frame = window.requestAnimationFrame(restore);
+  return () => {
+    cancelled = true;
+    if (frame !== null) window.cancelAnimationFrame(frame);
+  };
+}
+
 function DesktopUpdaterSwitch({
   checked,
   onChange
@@ -159,6 +206,7 @@ function DesktopUpdateRestartDialog({
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const cancelFocusRestoreRef = useRef<(() => void) | null>(null);
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(open);
 
@@ -187,6 +235,7 @@ function DesktopUpdateRestartDialog({
 
   useEffect(() => {
     if (!mounted) return;
+    cancelFocusRestoreRef.current?.();
 
     const overlay = overlayRef.current;
     const background = Array.from(document.body.children)
@@ -209,7 +258,7 @@ function DesktopUpdateRestartDialog({
         if (item.ariaHidden === null) item.element.removeAttribute('aria-hidden');
         else item.element.setAttribute('aria-hidden', item.ariaHidden);
       }
-      window.requestAnimationFrame(() => returnFocusTo?.isConnected && returnFocusTo.focus());
+      cancelFocusRestoreRef.current = restoreDesktopUpdateFocus(returnFocusTo);
     };
   }, [mounted, returnFocusTo]);
 
@@ -312,12 +361,12 @@ function DesktopUpdateRestartDialog({
   );
 }
 
-function DesktopGlobalUpdateBar() {
+function DesktopGlobalUpdateBar({ suppressed, covered }: { suppressed: boolean; covered: boolean }) {
   const { state, pendingWriteCount, downloadUpdate, requestInstall } = useDesktopUpdater();
   const [dismissedKey, setDismissedKey] = useState('');
   const shouldShow = state.phase === 'available' || state.phase === 'readyToInstall';
   const noticeKey = `${state.phase}:${state.version || ''}`;
-  const requestedVisible = shouldShow && dismissedKey !== noticeKey;
+  const requestedVisible = shouldShow && !suppressed && dismissedKey !== noticeKey;
   const [mounted, setMounted] = useState(requestedVisible);
   const [visible, setVisible] = useState(requestedVisible);
   const exitTimerRef = useRef<number | null>(null);
@@ -359,12 +408,13 @@ function DesktopGlobalUpdateBar() {
   const ready = state.phase === 'readyToInstall';
   return (
     <aside
-      className="desktop-update-toast"
+      className={`${styles.updateToast} desktop-update-toast`}
       role="status"
       aria-live="polite"
       aria-label={ready ? '软件更新已准备好' : '发现软件更新'}
-      data-state={visible ? 'open' : 'closed'}
+      data-state={visible && !covered ? 'open' : 'closed'}
       aria-hidden={visible ? undefined : true}
+      inert={!visible}
     >
       <span className="desktop-update-toast-icon">
         {ready ? <CheckCircle2 className="desktop-update-toast-glyph" aria-hidden="true" /> : <Download className="desktop-update-toast-glyph" aria-hidden="true" />}
@@ -413,6 +463,7 @@ export function DesktopUpdateProvider({ children }: { children: ReactNode }) {
   const [pendingWriteCount, setPendingWriteCount] = useState(0);
   const [scheduleRevision, setScheduleRevision] = useState(0);
   const [restartDialogOpen, setRestartDialogOpen] = useState(false);
+  const [updateSettingsVisible, setUpdateSettingsVisible] = useState(false);
   const [returnFocusTo, setReturnFocusTo] = useState<HTMLElement | null>(null);
   const operationRef = useRef<'check' | 'download' | 'install' | null>(null);
 
@@ -513,24 +564,8 @@ export function DesktopUpdateProvider({ children }: { children: ReactNode }) {
       writeDesktopUpdaterFailureCount(0);
       dispatch({ type: 'snapshot-received', snapshot, origin, checkedAt });
       if (origin === 'manual') {
-        const errorFeedback = snapshot.phase === 'error'
-          ? getUpdateErrorFeedback({
-              code: snapshot.errorCode || 'UPDATE_FAILED',
-              message: snapshot.errorMessage || '软件更新暂时无法完成。',
-              retryable: snapshot.retryable
-            }, 'check')
-          : null;
-        emitDesktopFeedback({
-          message:
-            errorFeedback || (snapshot.phase === 'available'
-              ? `发现新版本 ${snapshot.version || ''}`.trim()
-              : snapshot.phase === 'upToDate'
-                ? '当前已是最新版本'
-                : snapshot.phase === 'readyToInstall'
-                  ? '更新已下载，重启后即可使用'
-                  : '软件更新状态已刷新'),
-          tone: snapshot.phase === 'error' ? 'warning' : 'success'
-        });
+        const feedback = getDesktopUpdateCheckFeedback(snapshot);
+        if (feedback) emitDesktopFeedback(feedback);
       }
     } catch (error) {
       const normalized = normalizeDesktopUpdaterError(error);
@@ -620,9 +655,6 @@ export function DesktopUpdateProvider({ children }: { children: ReactNode }) {
       const facade = await getDesktopUpdaterFacade();
       const snapshot = await facade.download();
       dispatch({ type: 'snapshot-received', snapshot });
-      if (snapshot.phase === 'readyToInstall') {
-        emitDesktopFeedback({ message: '更新已下载，重启后即可使用。', tone: 'success' });
-      }
     } catch (error) {
       const normalized = normalizeDesktopUpdaterError(error);
       dispatch({ type: 'operation-failed', operation: 'download', error: normalized });
@@ -682,7 +714,8 @@ export function DesktopUpdateProvider({ children }: { children: ReactNode }) {
     setAutoCheckEnabled,
     checkNow,
     downloadUpdate,
-    requestInstall
+    requestInstall,
+    setUpdateSettingsVisible
   }), [
     autoCheckEnabled,
     checkNow,
@@ -712,7 +745,7 @@ export function DesktopUpdateProvider({ children }: { children: ReactNode }) {
       <DesktopUpdateShellContext.Provider value={shellContextValue}>
         {children}
       </DesktopUpdateShellContext.Provider>
-      <DesktopGlobalUpdateBar />
+      <DesktopGlobalUpdateBar suppressed={updateSettingsVisible} covered={restartDialogOpen} />
       <DesktopUpdateRestartDialog
         open={restartDialogOpen}
         busy={state.phase === 'installing'}
