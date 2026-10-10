@@ -36,7 +36,7 @@ export const resourceProductSeeds: ResourceProductSeed[] = [
     badge: '一次购买',
     summary: '把推免申请需要准备的核心资料集中整理，付款后在订单页打开资料包。',
     description: '围绕简历、个人陈述、推荐信、联系导师、英文自我介绍、PPT 和证明材料等申请内容，提供结构化模板、表达提示和提交前检查清单。',
-    amountCents: 299,
+    amountCents: 1590,
     priceStatus: 'configured',
     features: ['简历模板', '个人陈述模板', '推荐信模板'],
     accent: 'emerald',
