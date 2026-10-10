@@ -46,6 +46,8 @@
     "LICENSE_ATTEMPTS_PER_DAY": "100",
     "ANALYTICS_ENABLED": "true",
     "ANALYTICS_EVENTS_PER_DAY": "300",
+    "DESKTOP_DOWNLOAD_TRACKING_ENABLED": "true",
+    "DESKTOP_PUBLIC_RELEASE_VERSION": "0.2.26",
     "COMMERCE_RETURN_ORIGIN": "https://www.seekoffer.com.cn",
     "COMMERCE_NOTIFY_URL": "https://migration.seekoffer.com.cn/v1/payments/jianpay/notify",
     "REFUNDS_ENABLED": "false"

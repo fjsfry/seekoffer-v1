@@ -70,9 +70,16 @@ const emptyAnalytics: AdminAnalyticsPayload = {
   recentVisitors: []
 };
 
+const emptyDownloads: AdminDownloadPayload = {
+  metrics: { total: null, today: null, lastSevenDays: null, lastThirtyDays: null },
+  tracking: { enabled: false, releaseVersion: null },
+  checkedAt: null
+};
+
 export default function AdminDashboardPage() {
   const [overviewMetrics, setOverviewMetrics] = useState<AdminOverviewMetrics>(emptyOverview);
   const [analytics, setAnalytics] = useState<AdminAnalyticsPayload>(emptyAnalytics);
+  const [downloads, setDownloads] = useState<AdminDownloadPayload>(emptyDownloads);
   const [trends, setTrends] = useState<TrendPoint[]>(buildEmptyTrends());
   const [pendingNotices, setPendingNotices] = useState<AdminNoticeRow[]>([]);
   const [pendingOffers, setPendingOffers] = useState<AdminOfferRow[]>([]);
@@ -90,7 +97,7 @@ export default function AdminDashboardPage() {
     inFlight.current = true;
     setLoading(true);
     try {
-      const [overview, analyticsData, notices, offers, feedback] = await Promise.allSettled([
+      const [overview, analyticsData, notices, offers, feedback, downloadsData] = await Promise.allSettled([
         invokeAdminApi<{ metrics: AdminOverviewMetrics; trends: TrendPoint[]; generatedAt: string }>({ resource: 'overview', action: 'get' }),
         invokeAdminApi<AdminAnalyticsPayload>({ resource: 'analytics', action: 'overview' }),
         invokeAdminApi<{ notices: NoticeApiRow[] }>({
@@ -102,7 +109,8 @@ export default function AdminDashboardPage() {
           sort: 'updated_desc'
         }),
         invokeAdminApi<{ offers: OfferApiRow[] }>({ resource: 'offers', action: 'list', page: 1, pageSize: 20 }),
-        invokeAdminApi<{ feedback: FeedbackApiRow[] }>({ resource: 'feedback', action: 'list', page: 1, pageSize: 5 })
+        invokeAdminApi<{ feedback: FeedbackApiRow[] }>({ resource: 'feedback', action: 'list', page: 1, pageSize: 5 }),
+        invokeAdminApi<AdminDownloadPayload>({ resource: 'download_monitor', action: 'snapshot', page: 1, pageSize: 10, filters: { windowDays: 30 } })
       ]);
 
       if (overview.status === 'fulfilled') {
@@ -116,8 +124,9 @@ export default function AdminDashboardPage() {
       if (notices.status === 'fulfilled') setPendingNotices(notices.value.notices.map(mapNoticeApiRow));
       if (offers.status === 'fulfilled') setPendingOffers(offers.value.offers.filter((item) => item.review_status === 'pending' || item.reports_count > 0).slice(0, 5).map(mapOfferApiRow));
       if (feedback.status === 'fulfilled') setLatestFeedback(feedback.value.feedback.map(mapFeedbackApiRow));
+      if (downloadsData.status === 'fulfilled') setDownloads(downloadsData.value);
       setListReady({ notices: notices.status === 'fulfilled', offers: offers.status === 'fulfilled', feedback: feedback.status === 'fulfilled' });
-      const failure = [overview, analyticsData, notices, offers, feedback].find(result => result.status === 'rejected');
+      const failure = [overview, analyticsData, notices, offers, feedback, downloadsData].find(result => result.status === 'rejected');
       setDataError(failure?.status === 'rejected' ? getAdminErrorMessage(failure.reason, '部分数据暂未更新，已保留上次成功记录。') : '');
       setMessage('');
     } catch (error) {
@@ -192,6 +201,14 @@ export default function AdminDashboardPage() {
       hint: pendingTotal > 0 ? '通知、Offer 与反馈' : '当前无积压',
       icon: ShieldAlert,
       tone: pendingTotal > 0 ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'
+    },
+    {
+      href: '/admin/downloads',
+      label: '今日桌面下载',
+      value: formatNumber(downloads.metrics.today),
+      hint: `累计 ${formatNumber(downloads.metrics.total)}`,
+      icon: Download,
+      tone: 'bg-cyan-50 text-cyan-700'
     }
   ];
   function exportDashboardSnapshot() {
@@ -336,7 +353,7 @@ export default function AdminDashboardPage() {
           </article>
         </section>
 
-        <section className="grid overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_8px_28px_rgba(15,23,42,0.035)] sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_8px_28px_rgba(15,23,42,0.035)] sm:grid-cols-2 xl:grid-cols-5">
           {secondaryMetrics.map((item, index) => {
             const MetricIcon = item.icon;
             return (
@@ -558,6 +575,12 @@ type AdminAnalyticsPayload = {
   metrics: AdminAnalyticsMetrics;
   onlineVisitors: AdminVisitorRow[];
   recentVisitors: AdminVisitorRow[];
+};
+
+type AdminDownloadPayload = {
+  checkedAt: string | null;
+  tracking: { enabled: boolean; releaseVersion: string | null };
+  metrics: { total: number | null; today: number | null; lastSevenDays: number | null; lastThirtyDays: number | null };
 };
 
 function buildEmptyTrends(): TrendPoint[] {

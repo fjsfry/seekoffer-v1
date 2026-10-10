@@ -5,10 +5,13 @@ import {getDeadlineTimestamp} from '../../../lib/deadline-display';
 import {overrideStatements} from './notice-overrides.ts';
 import {prepareNoticeOrder} from './notice-order';
 import {readPaymentMonitor} from './payments/payment-monitor.ts';
+import {readPaymentMonitorOrder} from './payments/payment-monitor.ts';
+import {readDownloadMonitor} from './download-analytics.ts';
+import type {DownloadConfig} from './download-analytics.ts';
 import {cachedAdminRead,adminNoticeStatistics,ADMIN_AGGREGATE_TTL} from './admin-read-cache.ts';
 import {readScanBudget,type ReadBudgetConfig} from './d1-read-budget.ts';
 export type Admin={email:string;name:string;role:string;status:string;ownerId?:string};
-const permissions:Record<string,string[]>={super_admin:['overview','content','users','settings','logs'],ops_manager:['overview','content','users','logs'],content_reviewer:['overview','content'],readonly_admin:['overview','logs']};
+const permissions:Record<string,string[]>={super_admin:['overview','content','users','payments','settings','logs'],ops_manager:['overview','content','users','payments','logs'],content_reviewer:['overview','content'],readonly_admin:['overview','payments','logs']};
 function permit(admin:Admin,permission:string){if(!permissions[admin.role]?.includes(permission))throw new ApiError(403,'ADMIN_PERMISSION_DENIED');}
 function str(value:unknown,max=200){if(value===undefined||value===null)return '';if(typeof value!=='string'||value.length>max||/[\u0000-\u001f]/.test(value))throw new ApiError(400,'INVALID_FILTER');return value.trim();}
 function multiline(value:unknown,max:number){if(value===undefined||value===null)return '';if(typeof value!=='string'||value.length>max||/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value))throw new ApiError(400,'INVALID_TEXT');return value.trim();}
@@ -102,17 +105,29 @@ async function auditMutation(db:D1Database,admin:Admin,module:string,target:stri
  const log=db.prepare('INSERT INTO main__admin_operation_logs(admin_email,action,module,target_id,before_data,after_data,remark) VALUES(?,?,?,?,?,?,?)').bind(admin.email,'update_'+module,module,target,JSON.stringify(before||{}),JSON.stringify(after||{}),note);
  const results=await db.batch([change,...extra,log]);return results[0].results[0];
 }
-export async function adminAction(db:D1Database,admin:Admin,body:Record<string,unknown>,writes:boolean,config:BootstrapConfig&AnalyticsConfig&ReadBudgetConfig={},fetcher:typeof fetch=fetch){
+export async function adminAction(db:D1Database,admin:Admin,body:Record<string,unknown>,writes:boolean,config:BootstrapConfig&AnalyticsConfig&ReadBudgetConfig&DownloadConfig={},fetcher:typeof fetch=fetch){
  fields(body,['resource','action','id','ids','status','note','key','value','notice','page','pageSize','filters','sort']);const resource=str(body.resource,40),action=str(body.action,40)||'list';
  if(resource==='me')return{admin};
- const permission=resource==='settings'?'settings':['users','feedback','ai_waitlist'].includes(resource)?'users':resource==='logs'?'logs':['notices','offers','comments'].includes(resource)?'content':'overview';permit(admin,permission);
+ const permission=resource==='settings'?'settings':['payment_monitor','download_monitor'].includes(resource)?'payments':['users','feedback','ai_waitlist'].includes(resource)?'users':resource==='logs'?'logs':['notices','offers','comments'].includes(resource)?'content':'overview';permit(admin,permission);
  if(resource==='read_budget'&&action==='snapshot')return readScanBudget(db,config);
  if(resource==='analytics')return readAnalytics(db,config);
- if(resource==='payment_monitor'&&action==='snapshot')return readPaymentMonitor(db,config);
+ if(resource==='payment_monitor'&&action==='snapshot'){
+  const filter=body.filters&&typeof body.filters==='object'&&!Array.isArray(body.filters)?body.filters as Record<string,unknown>:{};
+  return readPaymentMonitor(db,config,{page:int(body.page,1,100000),pageSize:int(body.pageSize,20,50),query:str(filter.query,120),orderStatus:str(filter.status,40)||'all',windowDays:filter.windowDays===undefined?30:Number(filter.windowDays)});
+ }
+ if(resource==='payment_monitor'&&action==='detail'){
+  const detail=await readPaymentMonitorOrder(db,str(body.id,180));
+  if(!detail)throw new ApiError(404,'PAYMENT_ORDER_NOT_FOUND');
+  return detail;
+ }
+ if(resource==='download_monitor'&&action==='snapshot'){
+  const filter=body.filters&&typeof body.filters==='object'&&!Array.isArray(body.filters)?body.filters as Record<string,unknown>:{};
+  return readDownloadMonitor(db,config,{page:int(body.page,1,100000),pageSize:int(body.pageSize,20,50),query:str(filter.query,120),windowDays:filter.windowDays===undefined?30:Number(filter.windowDays)});
+ }
  if(resource==='users'&&action==='list')return listUsers(db,body,config,fetcher);
  if(resource==='overview')return overview(db);
  if(resource==='shell'&&action==='snapshot')return{overview:{metrics:{pendingNotices:await scalar(db,"SELECT count(*) AS n FROM main__notices WHERE admin_status='pending' AND admin_deleted_at IS NULL"),pendingOffers:await scalar(db,"SELECT count(*) AS n FROM main__offer_posts WHERE review_status='pending' AND deleted_at IS NULL"),pendingFeedback:permissions[admin.role].includes('users')?await scalar(db,"SELECT count(*) AS n FROM main__feedback_reports WHERE status='pending'"):0}},analytics:await readAnalytics(db,config)};
- if(resource==='dashboard'&&action==='snapshot')return{overview:await overview(db),analytics:await readAnalytics(db,config),notices:permissions[admin.role].includes('content')?await list(db,'notices',{pageSize:5,filters:{status:'pending'},sort:'updated_desc'}):{notices:[],total:0},offers:permissions[admin.role].includes('content')?await list(db,'offers',{pageSize:20}):{offers:[],total:0},feedback:permissions[admin.role].includes('users')?await list(db,'feedback',{pageSize:5}):{feedback:[],total:0},downloads:{available:false,total:null,today:null,sevenDays:null,trackingStartedAt:'2026-09-03'}};
+ if(resource==='dashboard'&&action==='snapshot')return{overview:await overview(db),analytics:await readAnalytics(db,config),notices:permissions[admin.role].includes('content')?await list(db,'notices',{pageSize:5,filters:{status:'pending'},sort:'updated_desc'}):{notices:[],total:0},offers:permissions[admin.role].includes('content')?await list(db,'offers',{pageSize:20}):{offers:[],total:0},feedback:permissions[admin.role].includes('users')?await list(db,'feedback',{pageSize:5}):{feedback:[],total:0},downloads:await readDownloadMonitor(db,config,{page:1,pageSize:10,windowDays:30})};
  if(action==='list'&&['offers','feedback','notices','logs','ai_waitlist','crawlers'].includes(resource))return list(db,resource,body);
  if(resource==='settings'&&action==='list'){const rows=await db.prepare('SELECT key,value,description,updated_by,updated_at FROM main__admin_system_settings ORDER BY key').all<Record<string,unknown>>();return{settings:rows.results.map(parse)};}
  if(!writes)throw new ApiError(503,'MIGRATION_READ_ONLY');

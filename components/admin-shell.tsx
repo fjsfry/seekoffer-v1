@@ -34,6 +34,7 @@ const adminNavItems = [
   { href: '/admin/notices', label: '通知管理', icon: Bell },
   { href: '/admin/offers', label: 'Offer圈管理', icon: ClipboardList },
   { href: '/admin/payments', label: '支付监控', icon: CreditCard },
+  { href: '/admin/downloads', label: '桌面下载', icon: Download },
   { href: '/admin/users', label: '用户管理', icon: UsersRound },
   { href: '/admin/feedback', label: '反馈举报', icon: Flag },
   { href: '/admin/logs', label: '操作日志', icon: ShieldCheck },
