@@ -17,6 +17,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  RefreshCw,
   Search,
   Settings,
   ShieldCheck,
@@ -87,10 +88,14 @@ function getRoleName(role: string) {
 
 function AdminAuthGate({
   title,
-  showLogin = false
+  showLogin = false,
+  error,
+  onRetry
 }: {
   title: string;
   showLogin?: boolean;
+  error?: string;
+  onRetry?: () => void;
 }) {
   return (
     <main className="min-h-screen bg-[#f6f8fb] px-5 py-8 text-slate-900">
@@ -99,6 +104,8 @@ function AdminAuthGate({
           <ShieldCheck className="h-8 w-8" />
         </div>
         <h1 className="mt-6 text-2xl font-semibold text-slate-950">{title}</h1>
+        {error ? <p role="alert" className="mt-3 text-sm leading-6 text-slate-600">{error}</p> : null}
+        {onRetry ? <button type="button" onClick={onRetry} className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-teal-700 px-5 text-sm font-semibold text-white"><RefreshCw className="h-4 w-4" />重新连接</button> : null}
         {showLogin ? (
           <Link
             href="/admin/login"
@@ -124,6 +131,8 @@ export function AdminShell({
   const router = useRouter();
   const [session, setSession] = useState<AdminSession | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
+  const [sessionError, setSessionError] = useState('');
+  const [sessionAttempt, setSessionAttempt] = useState(0);
   const [globalSearch, setGlobalSearch] = useState('');
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -136,13 +145,15 @@ export function AdminShell({
 
     const syncSession = async () => {
       try {
+        if (!disposed) { setSessionReady(false); setSessionError(''); }
         const verifiedSession = await refreshAdminSession();
         if (!disposed) {
           setSession(verifiedSession);
         }
-      } catch {
+      } catch (error) {
         if (!disposed) {
           setSession(null);
+          setSessionError(getAdminErrorMessage(error, '暂时无法验证登录状态，请重试。'));
         }
       } finally {
         if (!disposed) {
@@ -155,21 +166,23 @@ export function AdminShell({
     const dispose = watchAdminSession(() => {
       void syncSession();
     });
+    window.addEventListener('online', syncSession);
 
     return () => {
       disposed = true;
       dispose();
+      window.removeEventListener('online', syncSession);
     };
-  }, []);
+  }, [sessionAttempt]);
 
   useEffect(() => {
-    if (!sessionReady || session) {
+    if (!sessionReady || session || sessionError) {
       return;
     }
 
     const next = pathname && pathname !== '/admin/login' ? `?next=${encodeURIComponent(pathname)}` : '';
     router.replace(`/admin/login${next}`);
-  }, [pathname, router, session, sessionReady]);
+  }, [pathname, router, session, sessionReady, sessionError]);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -251,6 +264,10 @@ export function AdminShell({
     return (
       <AdminAuthGate title="正在加载" />
     );
+  }
+
+  if (sessionError) {
+    return <AdminAuthGate title="暂时无法连接工作台" error={sessionError} onRetry={() => setSessionAttempt((value) => value + 1)} />;
   }
 
   if (!session) {

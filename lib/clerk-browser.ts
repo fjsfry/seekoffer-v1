@@ -72,6 +72,13 @@ export function clerkPublishableKey() {
 
 let clerkPromise: Promise<ClerkInstance> | null = null;
 
+function authTimeout<T>(task: Promise<T>, milliseconds = 20000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('认证服务连接超时，请重试。')), milliseconds);
+    task.then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 function loadClerkScript() {
   if (typeof window === 'undefined') {
     return Promise.reject(new Error('认证服务只能在浏览器中初始化。'));
@@ -84,13 +91,27 @@ function loadClerkScript() {
   return new Promise<ClerkInstance>((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>('script[data-seekoffer-clerk]');
     const script = existing || document.createElement('script');
-    const finish = () => {
-      if (window.Clerk) resolve(window.Clerk);
-      else reject(new Error('认证脚本加载完成，但 Clerk 未初始化。'));
+    const cleanup = () => {
+      clearTimeout(timer);
+      script.removeEventListener('load', finish);
+      script.removeEventListener('error', fail);
     };
+    const fail = () => {
+      cleanup();
+      // A failed script never fires load again. Remove it so the next attempt
+      // starts a real request instead of waiting forever on the old element.
+      script.remove();
+      reject(new Error('认证服务连接失败，请重试。'));
+    };
+    const finish = () => {
+      if (!window.Clerk) return fail();
+      cleanup();
+      resolve(window.Clerk);
+    };
+    const timer = setTimeout(fail, 15000);
 
     script.addEventListener('load', finish, { once: true });
-    script.addEventListener('error', () => reject(new Error('认证服务加载失败，请检查网络后重试。')), { once: true });
+    script.addEventListener('error', fail, { once: true });
     if (!existing) {
       script.src = `${clerkIssuer()}/npm/@clerk/clerk-js@6.31.0/dist/clerk.browser.js`;
       script.async = true;
@@ -106,7 +127,7 @@ export async function getClerk() {
   if (!clerkPromise) {
     clerkPromise = loadClerkScript()
       .then(async (clerk) => {
-        await clerk.load();
+        await authTimeout(clerk.load());
         return clerk;
       })
       .catch((error) => {
@@ -118,9 +139,9 @@ export async function getClerk() {
   return clerkPromise;
 }
 
-export async function getClerkToken() {
+export async function getClerkToken(options?: { skipCache?: boolean }) {
   const clerk = await getClerk();
-  return clerk.session?.getToken() || null;
+  return clerk.session ? authTimeout(clerk.session.getToken(options)) : null;
 }
 
 export function clerkErrorMessage(error: unknown, fallback: string) {

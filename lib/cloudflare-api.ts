@@ -27,6 +27,17 @@ export function cloudflareApiErrorMessage(error: unknown, fallback = '系统服�
     return '登录状态已失效，请重新登录。';
   }
 
+  if (error instanceof CloudflareApiError) {
+    if (error.status === 401) return '登录状态已失效，请重新登录。';
+    if (error.status === 403) return error.code === 'ACCOUNT_BLOCKED'
+      ? '当前账号暂时无法使用，请联系管理员。'
+      : '当前账号没有执行此操作的权限。';
+    if (error.code === 'NETWORK_UNAVAILABLE' || error.code === 'REQUEST_TIMEOUT') {
+      return '连接暂时中断，请检查网络后重试。登录状态和已保存的数据不会因此清除。';
+    }
+    if (error.status >= 500) return '服务暂时繁忙，请稍后重试。';
+  }
+
   return fallback;
 }
 
@@ -39,7 +50,7 @@ export function cloudflareApiOrigin() {
   return 'https://migration.seekoffer.com.cn';
 }
 
-export async function cloudflareRequest<T>(path: string, init: RequestInit = {}, authenticated = false) {
+export async function cloudflareRequest<T>(path: string, init: RequestInit = {}, authenticated = false, options: { retryReadOnly?: boolean } = {}) {
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.body) headers.set('Content-Type', 'application/json');
@@ -49,16 +60,36 @@ export async function cloudflareRequest<T>(path: string, init: RequestInit = {},
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${cloudflareApiOrigin()}${path}`, {
-    ...init,
-    headers,
-    signal: init.signal || AbortSignal.timeout(15000)
-  });
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new CloudflareApiError(response.status, body?.error);
+  const canRetry = options.retryReadOnly || ['GET', 'HEAD'].includes((init.method || 'GET').toUpperCase());
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const response = await fetch(`${cloudflareApiOrigin()}${path}`, {
+        ...init,
+        headers,
+        signal: init.signal || AbortSignal.timeout(15000)
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new CloudflareApiError(response.status, body?.error);
+      }
+      return await response.json() as T;
+    } catch (error) {
+      if (init.signal?.aborted) throw error;
+      const failure = error instanceof CloudflareApiError ? error : new CloudflareApiError(
+        0, error instanceof Error && /timeout|abort/i.test(error.name) ? 'REQUEST_TIMEOUT' : 'NETWORK_UNAVAILABLE'
+      );
+      if (!canRetry || attempt > 0) throw failure;
+      if (failure.status === 401 && authenticated) {
+        const token = await getClerkToken({ skipCache: true });
+        if (!token) throw new CloudflareApiError(401, 'AUTH_REQUIRED');
+        headers.set('Authorization', `Bearer ${token}`);
+      } else if (failure.status === 0 || [502, 503, 504].includes(failure.status)) {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      } else {
+        throw failure;
+      }
+    }
   }
-  return response.json() as Promise<T>;
 }
 
 export async function bootstrapCloudflareIdentity() {

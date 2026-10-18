@@ -34,6 +34,8 @@ export default function AdminLoginPage() {
       if (!disposed && session) {
         router.replace(getSafeAdminNextPath());
       }
+    }).catch((sessionError) => {
+      if (!disposed) setError(getAdminErrorMessage(sessionError, '暂时无法验证登录状态，请重试。'));
     });
 
     return () => {
@@ -95,6 +97,7 @@ export default function AdminLoginPage() {
               <span className="text-sm font-semibold text-slate-800">管理员邮箱</span>
               <input
                 type="email"
+                required
                 autoComplete="username"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
@@ -106,6 +109,7 @@ export default function AdminLoginPage() {
               <span className="text-sm font-semibold text-slate-800">密码</span>
               <input
                 type="password"
+                required
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -115,6 +119,7 @@ export default function AdminLoginPage() {
 
             <button
               type="submit"
+              disabled={pending}
               className="mt-2 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-teal-700 px-5 text-sm font-semibold text-white transition hover:bg-teal-800"
             >
               {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}

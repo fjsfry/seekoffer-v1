@@ -3,6 +3,7 @@
 import type { AdminRole } from './admin-data';
 import { invokeAdminApi, isAdminApiConfigured } from './admin-api';
 import { signInWithPasswordAccount, signOutUser } from './user-session';
+import { CloudflareApiError } from './cloudflare-api';
 
 export type AdminSession = {
   email: string;
@@ -101,11 +102,11 @@ export async function signInAdmin(email: string, password: string) {
     throw new Error('当前无法完成登录，请稍后再试或联系管理员。');
   }
 
+  writeAdminSession(null);
   await signInWithPasswordAccount({ identifier: normalizedEmail, password });
 
   const session = await refreshAdminSession({ force: true });
   if (!session) {
-    await signOutUser().catch(() => undefined);
     throw new Error('当前账号没有后台访问权限。');
   }
 
@@ -148,9 +149,14 @@ export async function refreshAdminSession(options: { force?: boolean } = {}) {
 
       writeAdminSession(session);
       return session;
-    } catch {
-      writeAdminSession(null);
-      return null;
+    } catch (error) {
+      if (error instanceof CloudflareApiError && [401, 403].includes(error.status)) {
+        writeAdminSession(null);
+        return null;
+      }
+      // A transport failure is not evidence that the account lost access.
+      // Keep the cache, but let the caller block the page until revalidation.
+      throw error;
     } finally {
       refreshInFlight = null;
     }

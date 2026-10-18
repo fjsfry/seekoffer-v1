@@ -5,7 +5,6 @@ import {
   cloudflareApiOrigin,
   cloudflareRequest,
   CloudflareApiError,
-  isCloudflareQuotaError
 } from './cloudflare-api';
 
 export type AdminApiPayload = {
@@ -30,6 +29,7 @@ export type AdminApiResponse<T> = T & {
 };
 
 export function getAdminErrorMessage(error: unknown, fallback = '操作暂时无法完成，请稍后重试。') {
+  if (error instanceof CloudflareApiError) return cloudflareApiErrorMessage(error, fallback);
   if (!(error instanceof Error)) {
     return fallback;
   }
@@ -62,19 +62,10 @@ export async function invokeAdminApi<T>(payload: AdminApiPayload): Promise<Admin
     throw new Error('当前无法完成登录，请稍后再试或联系管理员。');
   }
 
-  try {
-    return await cloudflareRequest<AdminApiResponse<T>>(
-      '/v1/admin',
-      { method: 'POST', body: JSON.stringify(payload) },
-      true
-    );
-  } catch (error) {
-    if (isCloudflareQuotaError(error)) {
-      throw new Error(cloudflareApiErrorMessage(error));
-    }
-    if (error instanceof CloudflareApiError && error.status === 401) {
-      throw new Error('登录状态已失效，请重新登录。');
-    }
-    throw new Error(toSafeAdminMessage(error instanceof Error ? error.message : ''));
-  }
+  return cloudflareRequest<AdminApiResponse<T>>(
+    '/v1/admin',
+    { method: 'POST', body: JSON.stringify(payload) },
+    true,
+    { retryReadOnly: payload.resource === 'me' && !payload.action }
+  );
 }
