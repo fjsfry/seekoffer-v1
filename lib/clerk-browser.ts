@@ -22,6 +22,7 @@ type ClerkVerification = {
 
 type ClerkSignIn = {
   status?: string;
+  supportedFirstFactors?: Array<{ strategy: string; emailAddressId?: string }> | null;
   createdSessionId?: string | null;
   firstFactorVerification?: ClerkVerification;
   secondFactorVerification?: ClerkVerification;

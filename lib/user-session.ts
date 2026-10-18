@@ -32,6 +32,8 @@ export type UserSession = {
   authProvider: AuthProviderType;
   profile: UserProfile;
   userId: string | null;
+  authSubject?: string;
+  authSessionId?: string;
   email: string;
   phone: string;
 };
@@ -233,13 +235,13 @@ function formatAuthError(error: unknown, fallback: string) {
   if (error instanceof CloudflareApiError) return cloudflareApiErrorMessage(error, fallback);
   const raw = extractErrorText(error);
   const message = raw.toLowerCase();
+  if (/network|fetch|timeout|unavailable|service/.test(message)) return '登录服务暂时不可用，请稍后再试。';
   if (/invalid.*(credential|password)|incorrect|identifier/.test(message)) {
     return '邮箱或密码不正确，请检查后重试。';
   }
   if (/already.*(registered|exists)|taken/.test(message)) return '该邮箱已经注册，请直接登录。';
   if (/verification|verify|code|token/.test(message)) return '验证码无效或已过期，请重新发送。';
   if (/rate.?limit|too many/.test(message)) return '操作太频繁了，请稍等一会儿再试。';
-  if (/network|fetch|timeout|unavailable|service/.test(message)) return '登录服务暂时不可用，请稍后再试。';
   return clerkErrorMessage(error, raw || fallback);
 }
 
@@ -261,7 +263,7 @@ function buildMemberSession(
   existing?: UserSession | null
 ) {
   const nextProfile = normalizeProfile({
-    ...(existing?.profile || {}),
+    ...(existing?.authSubject === user.id || existing?.authProvider === 'anonymous' ? existing.profile : {}),
     ...extractProfileMetadata(user.publicMetadata),
     ...extractProfileRow(profileRow)
   });
@@ -290,6 +292,8 @@ export function getUserSession(): UserSession | null {
       authProvider,
       profile: normalizeProfile(parsed.profile),
       userId: typeof parsed.userId === 'string' ? parsed.userId : null,
+      authSubject: typeof parsed.authSubject === 'string' ? parsed.authSubject : undefined,
+      authSessionId: typeof parsed.authSessionId === 'string' ? parsed.authSessionId : undefined,
       email: typeof parsed.email === 'string' ? parsed.email : '',
       phone: typeof parsed.phone === 'string' ? parsed.phone : ''
     };
@@ -315,6 +319,7 @@ async function persistClerkSession(
 ) {
   const user = clerk.user || clerk.session?.user;
   if (!user) throw new Error('当前登录状态无效，请重新登录。');
+  const subject = user.id, sessionId = clerk.session?.id;
   let profile: ClerkProfileRow | null;
   try {
     // Profile is a read path. Bootstrapping on every page load used to turn a
@@ -329,7 +334,8 @@ async function persistClerkSession(
     await bootstrapCloudflareIdentity();
     profile = await readCloudflareProfile();
   }
-  const next = buildMemberSession(user, provider, profile, getUserSession());
+  if (!sessionId || clerk.session?.id !== sessionId || clerk.user?.id !== subject) throw new Error('登录账号已变更，请重试。');
+  const next = { ...buildMemberSession(user, provider, profile, getUserSession()), authSubject: subject, authSessionId: sessionId };
   if (!next.userId) throw new Error('账号资料还在初始化，请稍后刷新页面。');
   writeUserSession(next);
   markSessionHydrated();
@@ -349,7 +355,7 @@ export async function hydrateCloudflareSession() {
         writeUserSession(null);
         return null;
       }
-      if (current?.userId && current.authProvider !== 'anonymous' && wasSessionHydratedRecently()) {
+      if (current?.userId && current.authProvider !== 'anonymous' && current.authSubject === clerk.user.id && current.authSessionId === clerk.session.id && wasSessionHydratedRecently()) {
         return current;
       }
       const provider = current?.authProvider === 'otp' ? 'otp' : 'password';
@@ -366,7 +372,7 @@ export async function hydrateCloudflareSession() {
       } else {
         console.error('[Seekoffer][auth] hydrateCloudflareSession failed', error);
       }
-      return current;
+      return getUserSession();
     } finally {
       hydrateInFlight = null;
     }
@@ -482,7 +488,9 @@ export async function sendEmailLoginCode(email: string, options: EmailLoginCodeO
   try {
     const clerk = await getClerk();
     const result = await clerk.client.signIn.create({ identifier: normalizedEmail });
-    await result.prepareFirstFactor({ strategy: 'email_code' });
+    const emailFactor = result.supportedFirstFactors?.find((factor) => factor.strategy === 'email_code' && factor.emailAddressId);
+    if (!emailFactor?.emailAddressId) throw new Error('此账号暂不支持邮箱验证码登录，请使用密码登录。');
+    await result.prepareFirstFactor({ strategy: 'email_code', emailAddressId: emailFactor.emailAddressId });
   } catch (error) {
     console.error('[Seekoffer][auth] sendEmailLoginCode failed', error);
     throw new Error(formatAuthError(error, '验证码发送失败，请稍后重试。'));
@@ -560,6 +568,12 @@ export function watchCloudflareAuthState(callback: (event?: string) => void) {
         const identity = `${clerk.session?.id || ''}:${clerk.user?.id || ''}`;
         if (identity === lastIdentity) return;
         lastIdentity = identity;
+        const cached = getUserSession();
+        if (cached?.authProvider !== 'anonymous' && (cached?.authSubject !== clerk.user?.id || cached?.authSessionId !== clerk.session?.id)) {
+          clearSessionHydrationMarker();
+          writeUserSession(null);
+        }
+        callback('identity_changed');
         if (timer) window.clearTimeout(timer);
         timer = window.setTimeout(() => {
           void hydrateCloudflareSession().finally(() => callback('session_changed'));

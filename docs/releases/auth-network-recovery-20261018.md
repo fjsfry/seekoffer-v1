@@ -5,6 +5,7 @@
 - The production home, notice list, resource product, download, workbench entry, and admin login pages rendered during the investigation.
 - The Cloudflare health endpoint, Clerk environment endpoint, and pinned Clerk browser script returned HTTP 200.
 - The previously supplied login credential was rejected as an incorrect password. The user's exact intermittent network failure was not reproduced with an authenticated session.
+- Retained browser logs additionally captured a concrete email-code failure: Clerk rejected `prepareFirstFactor` because `email_address_id` was missing. The client now uses the `emailAddressId` from the returned supported first factors, following the [Clerk sign-in contract](https://clerk.com/docs/react/reference/objects/sign-in).
 - No database quota reset, password change, payment, or authentication bypass was performed.
 
 ## Corrected Failure Paths
@@ -18,10 +19,10 @@
 
 ## Validation
 
-- 16 behavior tests passed across `clerk-loader-recovery`, `cloudflare-request-recovery`, and `admin-session-recovery`.
+- 19 behavior tests passed across `clerk-loader-recovery`, `cloudflare-request-recovery`, `admin-session-recovery`, and `email-login-recovery`.
 - TypeScript validation passed.
 - Production static build passed, including build-surface isolation. One existing image lint warning in the resource order page remains unrelated.
-- Candidate deployment: https://seekoffer-v1-al5k4l8nx-fjs1352256858-2004s-projects.vercel.app
+- Final candidate deployment: https://seekoffer-v1-2670lmh6n-fjs1352256858-2004s-projects.vercel.app
 - Full authenticated production acceptance remains pending because the user was unavailable to sign in with current credentials.
 
 ## Source
