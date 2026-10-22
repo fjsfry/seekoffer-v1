@@ -25,6 +25,7 @@
   "vars": {
     "MODE": "production",
     "BUSINESS_WRITES_ENABLED": "true",
+    "FILL_SESSION_WRITES_ENABLED": "false",
     "OPERATIONS_WRITES_ENABLED": "true",
     "NEW_ACCOUNTS_ENABLED": "true",
     "NEW_ACCOUNTS_FROM": "2026-09-09T05:33:00Z",

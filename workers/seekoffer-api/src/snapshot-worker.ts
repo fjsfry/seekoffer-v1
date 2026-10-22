@@ -12,7 +12,7 @@ import {readNoticeOverrides,readOverrideDetail} from './notice-overrides.ts';
 import {recoverLegacyApplications} from './legacy-recovery.ts';
 import {protectWorkbenchUpdate,assertWorkbenchOwner} from './workbench-compatibility.ts';
 import {ingestNotices,requireIngestSecret} from './ingest-notices.ts';
-import {billingAction,billingPlans,consumeFill} from './billing.ts';
+import {billingAction,billingPlans} from './billing.ts';
 import {licenseAction} from './license.ts';
 import {accountEntitlementAction} from './account-entitlement.ts';
 import {commercialAction,type CommercialConfig,type CommercialOwner} from './payments/commercial-api.ts';
@@ -30,6 +30,8 @@ import {createReadBudget,readBudgetReset,readScanBudget,scanBudgetLimit,quotaPau
 export interface SnapshotEnv extends AuthConfig,BootstrapConfig,AnalyticsConfig,CommercialConfig {CORE:D1Database;MODE:'local'|'preview'|'production';ALLOWED_ORIGINS:string;PREVIEW_ACCESS_TOKEN?:string;BUSINESS_WRITES_ENABLED?:string;PUBLIC_READ_ENABLED?:string;PAYMENT_PROCESSING_ENABLED?:string;OPERATIONS_WRITES_ENABLED?:string;JIANPAY_CLIENT_NO?:string;JIANPAY_MERCHANT_KEY?:string;INGEST_ENABLED?:string;SEEKOFFER_INGEST_SECRET?:string;NATIVE_OAUTH_CLIENT_ID?:string;EXTENSION_OAUTH_CLIENT_ID?:string;LICENSE_ENABLED?:string;LICENSE_ATTEMPTS_PER_DAY?:string;ACCOUNT_ENTITLEMENT_ENABLED?:string}
 export interface SnapshotEnv {ASSET_BUCKET?:R2Bucket;COMMERCE_LOCAL_PAYMENT_ENABLED?:string;COMMERCE_ORDER_IDEMPOTENCY_KEY?:string;COMMERCE_NOTIFY_URL?:string;COMMERCE_RETURN_ORIGIN?:string}
 export interface SnapshotEnv extends ReadBudgetConfig {}
+export interface SnapshotEnv {FILL_SESSION_WRITES_ENABLED?:string}
+function fillSessionWritesEnabled(env:SnapshotEnv){return env.MODE==='local'?env.FILL_SESSION_WRITES_ENABLED!=='false':env.FILL_SESSION_WRITES_ENABLED==='true';}
 const MAIN='mnotoltpythkayguhnrk';
 let publicD1QuotaBackoffUntil=0;
 function isPublicD1Read(path:string,method:string){
@@ -119,17 +121,14 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
   const requestId=crypto.randomUUID(),url=new URL(request.url),origin=request.headers.get('origin');
   const clientKind=request.headers.get('x-seekoffer-client');
   const identify=(token:string)=>clientKind==='desktop-pkce'||clientKind==='extension-pkce'?verifyNativeOAuth(token,env,clerkFetch,clientKind==='extension-pkce'?'extension':'desktop'):verifier(token,env);
-  // This existing capability operation is used from arbitrary university forms.
-  // It accepts only a five-minute, single-use fill token; it returns no identity/data.
-  const fillCapability=url.pathname.replace(/\/$/,'')==='/v1/billing/consume';
   const licenseOrigin=url.pathname.replace(/\/$/,'')==='/v1/license-entitlement'&&Boolean(origin&&/^chrome-extension:\/\/[a-p]{32}$/.test(origin));
   const extensionOrigin=Boolean(origin&&/^chrome-extension:\/\/[a-p]{32}$/.test(origin)&&(clientKind==='extension-pkce'||request.method==='OPTIONS'&&request.headers.get('access-control-request-headers')?.toLowerCase().includes('x-seekoffer-client')));
-   const allowed=env.ALLOWED_ORIGINS.split(',').map(s=>s.trim()).filter(Boolean);const cors:Record<string,string>=origin&&(allowed.includes(origin)||fillCapability||licenseOrigin||extensionOrigin)?{'Access-Control-Allow-Origin':origin,'Access-Control-Expose-Headers':'X-Request-ID,X-D1-Queries,X-D1-Rows-Read,X-D1-Rows-Written,X-Edge-Cache',Vary:'Origin'}:{};
+   const allowed=env.ALLOWED_ORIGINS.split(',').map(s=>s.trim()).filter(Boolean);const cors:Record<string,string>=origin&&(allowed.includes(origin)||licenseOrigin||extensionOrigin)?{'Access-Control-Allow-Origin':origin,'Access-Control-Expose-Headers':'X-Request-ID,X-D1-Queries,X-D1-Rows-Read,X-D1-Rows-Written,X-Edge-Cache',Vary:'Origin'}:{};
   const response=(body:unknown,status=200,extra:Record<string,string>={})=>Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Request-ID':requestId,'X-D1-Queries':String(usage.queries),'X-D1-Rows-Read':String(usage.rowsRead),'X-D1-Rows-Written':String(usage.rowsWritten),...cors,...extra}});
   try{
    if(!['local','preview','production'].includes(env.MODE))throw new ApiError(503,'MODE_NOT_CONFIGURED');
    if(env.MODE==='local'&&!['localhost','127.0.0.1','[::1]'].includes(url.hostname))throw new ApiError(503,'LOCAL_ONLY');
-   if(origin&&!allowed.includes(origin)&&!fillCapability&&!licenseOrigin&&!extensionOrigin)throw new ApiError(403,'ORIGIN_NOT_ALLOWED');
+   if(origin&&!allowed.includes(origin)&&!licenseOrigin&&!extensionOrigin)throw new ApiError(403,'ORIGIN_NOT_ALLOWED');
    if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{...cors,'Cache-Control':'no-store','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS','Access-Control-Allow-Headers':'Authorization,Content-Type,X-Preview-Access,X-Seekoffer-Client,X-Resource-Access-Token,X-Workspace-Owner'}});
    if(env.MODE==='preview'){
     if(!env.PREVIEW_ACCESS_TOKEN||env.PREVIEW_ACCESS_TOKEN.length<32)throw new ApiError(503,'PREVIEW_AUTH_NOT_CONFIGURED');
@@ -277,7 +276,7 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     const body=await boundedBody(request,4096),ip=env.MODE==='local'?'synthetic-local':request.headers.get('cf-connecting-ip');if(!ip)throw new ApiError(503,'LICENSE_GUARD_UNAVAILABLE');
     const result=await licenseAction(env.CORE,body,env.PREVIEW_ACCESS_TOKEN,ip,Number(env.LICENSE_ATTEMPTS_PER_DAY||100));return response(result,['activate','renew'].includes(String(body.action))&&!result.active?400:200);
    }
-   if(path==='/health')return response({status:'ok',backend:'d1',mode:env.MODE,migrationComplete:true,businessWritesEnabled:env.BUSINESS_WRITES_ENABLED==='true',scanBudgetEnabled:env.D1_READ_BUDGET_ENABLED==='true',scanRowsPerDay:env.D1_READ_BUDGET_ENABLED==='true'?scanBudgetLimit(env):null});
+   if(path==='/health')return response({status:'ok',backend:'d1',mode:env.MODE,migrationComplete:true,businessWritesEnabled:env.BUSINESS_WRITES_ENABLED==='true',fillSessionWritesEnabled:fillSessionWritesEnabled(env),scanBudgetEnabled:env.D1_READ_BUDGET_ENABLED==='true',scanRowsPerDay:env.D1_READ_BUDGET_ENABLED==='true'?scanBudgetLimit(env):null});
    if(path==='/v1/billing/plans'){
     if(request.method!=='GET')throw new ApiError(405,'METHOD_NOT_ALLOWED');
     const edgeCache=edgeCacheStore(),cacheKey=publicEdgeCache(request,origin,'billing-plans'),hit=await edgeCacheHit(edgeCache,cacheKey,requestId);if(hit)return hit;
@@ -286,7 +285,8 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
    if(path==='/v1/billing/consume'){
     if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');
     if(env.MODE==='preview'||env.BUSINESS_WRITES_ENABLED!=='true')throw new ApiError(503,'MIGRATION_READ_ONLY');
-    return response(await consumeFill(env.CORE,await boundedBody(request,1024)));
+    // Legacy capability-only consumption is retired. Use authenticated /v1/me/billing.
+    throw new ApiError(401,'AUTHENTICATED_BOUND_FILL_REQUIRED');
    }
    if(path==='/v1/public/notice-overrides'&&request.method==='GET')return response(await readNoticeOverrides(env.CORE,url.searchParams));
    if(path==='/v1/public/notice-detail'&&request.method==='GET')return response(await readOverrideDetail(env.CORE,url.searchParams.get('id')||''));
@@ -408,7 +408,15 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     // Code-based licenses and account grants have separate production cutover flags.
     return response(await accountEntitlementAction(env.CORE,owner,await boundedBody(request,2048),env.MODE!=='preview'&&env.BUSINESS_WRITES_ENABLED==='true'&&env.ACCOUNT_ENTITLEMENT_ENABLED==='true'));
    }
-   if(path==='/v1/me/billing'){if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');return response(await billingAction(env.CORE,owner,await boundedBody(request,4096),env.MODE!=='preview'&&env.BUSINESS_WRITES_ENABLED==='true'));}
+   if(path==='/v1/me/billing'){
+    if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');
+    const body=await boundedBody(request,4096);
+    // Deploy the account-bound protocol with this narrow maintenance gate closed
+    // before applying 0016. Billing reads and other business writes stay available;
+    // production cannot accidentally open filling when this setting is absent.
+    if((body.action==='prepare-fill-session'||body.action==='consume-fill-session')&&!fillSessionWritesEnabled(env))throw new ApiError(503,'FILL_AUTHORIZATION_MAINTENANCE');
+    return response(await billingAction(env.CORE,owner,body,env.MODE!=='preview'&&env.BUSINESS_WRITES_ENABLED==='true'));
+   }
    // This POST is a bounded read, including in read-only preview mode. One bind is
    // reserved for ownership; D1 allows 100 bound parameters in a statement.
    if(path==='/v1/me/notices/by-ids'&&request.method==='POST'){

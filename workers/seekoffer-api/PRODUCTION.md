@@ -15,9 +15,41 @@ From the repository root, use:
 npm run deploy:production --prefix workers/seekoffer-api
 ```
 
-The predeploy hook runs type checking, read-budget, payment and commerce tests.
+The predeploy hook runs type checking, account-bound fill, read-budget, payment and commerce tests.
 The quota CI workflow also runs on changes to the Worker. Keep the API worktree
 clean, commit the patch and push its production branch before deployment.
+
+Use `npm run build:production:dry-run --prefix workers/seekoffer-api` for a local
+production bundle. `build:local` uses the older prototype config and is not a
+production rehearsal.
+
+## Bound-fill cutover
+
+`FILL_SESSION_WRITES_ENABLED` is a separate switch for prepare/consume only.
+Production requires the exact value `true`; missing or any other value closes
+the switch with `FILL_AUTHORIZATION_MAINTENANCE`. Entitlement/order reads and
+unrelated business/payment operations retain their existing controls. The
+production config deliberately starts with this switch `false`.
+
+Deploy the new Worker with filling closed before applying exactly
+`migrations/d1/snapshot/0016_bound_fill_grants.sql`. The new Worker rejects the
+old public token-only consume route even while filling is closed. Migration
+0016 keeps historical records, forbids binding mutation, and rejects a late
+old Worker trying to consume an unbound prepared token. Do not weaken these
+triggers for mixed-version compatibility.
+
+Verify the full schema and current deployed version, then release the matching
+main-site and canonical extension protocol before opening filling. If the
+cutover fails, keep filling closed and repair forward. Rolling back to the old
+token-only Worker would restore an unsafe protocol and conflicts with 0016.
+Do not restore the shared D1 database automatically: that could rewind other
+users' account, application or payment changes.
+
+The production database did not have a `d1_migrations` ledger on 2026-10-22.
+Do not run an all-migrations command or fabricate historical migration receipts.
+Record the exact 0016 SHA, execution response, schema verification and deployment
+identity for this controlled cutover. See
+`docs/releases/baoyan-v116-bound-fill-cutover-20261022.md` from the repository root.
 
 ## Controls
 
