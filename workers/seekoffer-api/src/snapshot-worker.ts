@@ -249,7 +249,16 @@ export function createSnapshotWorker(verifier:IdentityVerifier=verifyIdentity,cl
     let owner:null|{userId:string}=null;const bearer=request.headers.get('authorization');
     if(bearer){if(!bearer.startsWith('Bearer '))throw new ApiError(401,'AUTH_REQUIRED');const identity=previewIdentity||await identify(bearer.slice(7));owner={userId:await resolveSnapshotOwner(env.CORE,identity)};}
     const fileId=inputId(decodeURIComponent(path.slice('/v1/resources/files/'.length)));
-    return await downloadResourceFile(env.CORE,{fileId,accessToken:request.headers.get('x-resource-access-token')||url.searchParams.get('accessToken')||undefined,owner},env.ASSET_BUCKET,env.MODE);
+    const delivery=await downloadResourceFile(env.CORE,{fileId,accessToken:request.headers.get('x-resource-access-token')||url.searchParams.get('accessToken')||undefined,owner},env.ASSET_BUCKET,env.MODE);
+    // Preserve streaming/binary headers while applying the same origin policy as JSON routes.
+    const headers=new Headers(delivery.headers);
+    for(const [key,value] of Object.entries(cors))headers.set(key,value);
+    if(origin&&cors['Access-Control-Allow-Origin'])headers.set('Access-Control-Expose-Headers',cors['Access-Control-Expose-Headers']+',Content-Disposition');
+    headers.set('X-Request-ID',requestId);
+    headers.set('X-D1-Queries',String(usage.queries));
+    headers.set('X-D1-Rows-Read',String(usage.rowsRead));
+    headers.set('X-D1-Rows-Written',String(usage.rowsWritten));
+    return new Response(delivery.body,{status:delivery.status,statusText:delivery.statusText,headers});
    }
    if(path==='/v1/commercial-order'){
     if(request.method!=='POST')throw new ApiError(405,'METHOD_NOT_ALLOWED');
